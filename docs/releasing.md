@@ -23,6 +23,14 @@ Then [bump the Homebrew cask](#homebrew-cask).
 - The printed `gh release create` attaches the zip, `appcast.xml` and the dSYM zip (for symbolicating crash reports)
 - The feed is `releases/latest/download/appcast.xml`, so every release must be marked latest, not pre-release
 
+## Ask model list
+
+Before each release, check `AskModel.all` (in `PullBullKit`) against [Anthropic's current model list](https://docs.anthropic.com/en/docs/about-claude/models):
+
+- Each ID still exists and is not deprecated
+- The default is still the intended Sonnet
+- Add or retire entries there only; nothing else holds model IDs
+
 ## Homebrew cask
 
 After the release is published, in [rustycamper/homebrew-tap](https://github.com/rustycamper/homebrew-tap):

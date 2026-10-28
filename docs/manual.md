@@ -2,7 +2,7 @@
 
 Every tab, key and setting. Overview: [README](../README.md).
 
-[Install](#install) · [Sign in](#sign-in) · [Pull Requests](#pull-requests) · [Issues](#issues) · [Search](#search) · [Keyboard](#keyboard) · [One repo](#one-repo) · [Settings](#settings) · [Data](#data) · [Build](#build-from-source)
+[Install](#install) · [Sign in](#sign-in) · [Pull Requests](#pull-requests) · [Issues](#issues) · [Search](#search) · [Ask](#ask) · [Keyboard](#keyboard) · [One repo](#one-repo) · [Settings](#settings) · [Data](#data) · [Build](#build-from-source)
 
 ## Install
 
@@ -120,6 +120,70 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 | <kbd>Return</kbd> · <kbd>Tab</kbd> | Complete |
 | <kbd>Esc</kbd> | Close |
 
+## Ask
+
+<kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> in the search field. Finds a PR or issue from a loose description ("the one that fixed the login redirect, last week") and answers a short question about it, using Anthropic's API with your own key. Off by default.
+
+### Set up
+
+Settings → Ask.
+
+| Control | Default |
+|---|---|
+| Ask on/off | Off |
+| Anthropic API key | Empty. Stored in the Keychain only |
+| Model | Sonnet 5.5. Haiku 5.5 is cheaper and less accurate |
+| Exclude from Ask | Empty. Repos from the account's scope that Ask never stores or sends |
+| Index | Items indexed, backfill progress, last sync, **Rebuild** |
+
+- The key is checked when you save it (`GET /v1/models`, free). A bad key never reaches a question
+- Without a key, <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> says "Add an Anthropic API key in Settings → Ask" and sends nothing
+
+### What is sent
+
+| When | To Anthropic |
+|---|---|
+| You save the key | The key, for the check |
+| You press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Your question and up to 40 matching PR and issue descriptions (first 1,500 characters each, plus title, author, state, labels, dates) |
+| Anything else | Nothing |
+
+- Matching runs on this Mac. Only the best matches are sent
+- Excluded repos are never sent
+- Descriptions are untrusted text. Ask can't write to GitHub or act on anything; only items it was shown become links
+
+### Asking
+
+| | |
+|---|---|
+| Ask | Type the description, press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd>. Normal results stay on screen; an "Asking…" row shows at the top |
+| Cancel | <kbd>Esc</kbd>, or edit the field |
+| Answer | Answer on top, then PRs and issues in one list, each with a line on why it matched |
+| Open | <kbd>Return</kbd> opens the item in its own mode. <kbd>Esc</kbd> or <kbd>←</kbd> in the detail returns to Ask |
+| GitHub · copy | <kbd>⌘</kbd><kbd>Return</kbd> opens on GitHub. Copy keys work as in the list |
+| Edit and re-ask | <kbd>Esc</kbd> on Ask returns to the field with the question kept |
+| Empty or edit the field | Back to normal search |
+
+- Each Ask stands alone; there are no follow-up questions
+- Questions about deployment ("is it on production?") are answered only from what descriptions and labels say. The answer says so when it can't confirm
+- "Nothing matched" is a valid answer; try other words
+- Errors show as one line in place of the answer: no network, bad key, rate limited, timeout, refusal
+- While the index is still syncing, Ask runs on what is indexed and says so
+
+### Index
+
+| | |
+|---|---|
+| Contents | PRs and issues updated in the last 90 days in the account's scope, with full descriptions. No comments |
+| Where | This Mac, in the cache folder ([Data](#data)). Never sent as a whole |
+| Built | Turning Ask on starts a paced backfill; regular refresh goes first. Then it updates on each refresh |
+| Deleted | On sign-out, Ask off, or **Rebuild** |
+| Excluded repos | Never stored. Rows are deleted when you add a repo to the list; removing it backfills the repo |
+
+### Cost
+
+- PullBull has no spending cap. Set limits in the Anthropic console
+- About $0.03 per question with Sonnet 5.5, about $0.002 with Haiku 5.5 (measured on a 14-question test)
+
 ## Keyboard
 
 | List | |
@@ -131,6 +195,7 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 | <kbd>⌘</kbd><kbd>C</kbd> | Copy link |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd> | Copy `owner/repo#123` |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy Markdown link |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | [Ask](#ask), from the search field |
 | <kbd>⌘</kbd><kbd>1</kbd> · <kbd>⌘</kbd><kbd>2</kbd> | Pull Requests · Issues |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> | Repo menu |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> | Board menu |
@@ -165,6 +230,7 @@ Reopen within a minute and the detail is still there.
 | Account | Account, org, board, access notices |
 | Notifications | One toggle per event |
 | Search | Saved searches |
+| Ask | [Ask](#ask): on/off, key, model, exclude list, index |
 
 | Notification | Default |
 |---|---|
@@ -185,7 +251,9 @@ Click a notification to open the detail.
 | Cache | `~/Library/Application Support/io.github.rustycamper.pullbull/` |
 | Avatars | `~/Library/Caches/io.github.rustycamper.pullbull/` |
 | Settings | defaults domain `io.github.rustycamper.pullbull` |
+| Ask index | Same cache folder, one file per account. Only while Ask is on |
 | Sign-in tokens | Keychain, this Mac only, not synced |
+| Anthropic API key | Keychain, this Mac only, not synced |
 | `gh` tokens | Not stored |
 
 ## Build from source
