@@ -1,0 +1,59 @@
+{
+  "data": {
+    "repository": {
+      "issue": {
+        "number": 231,
+        "title": "Example issue title",
+        "url": "https://github.com/initech/gadgets/issues/231",
+        "state": "OPEN",
+        "stateReason": "REOPENED",
+        "createdAt": "2026-10-20T09:00:00Z",
+        "updatedAt": "2026-10-25T14:03:11Z",
+        "closedAt": null,
+        "repository": { "nameWithOwner": "initech/gadgets" },
+        "author": { "login": "dev-b" },
+        "comments": { "totalCount": 5 },
+        "labels": { "nodes": [{ "name": "bug" }, { "name": "backend" }] },
+        "assignees": {
+          "nodes": [
+            { "login": "devon", "avatarUrl": "https://avatars.githubusercontent.com/u/1?v=4" },
+            { "login": "dev-a", "avatarUrl": null }
+          ]
+        },
+        "body": "Example description.\n\n- first point\n- second point",
+        "lastComments": {
+          "totalCount": 5,
+          "nodes": [
+            { "author": { "login": "devon" }, "body": "Example reply.", "createdAt": "2026-10-25T14:03:11Z" },
+            { "author": { "login": "dev-a" }, "body": "Example comment.", "createdAt": "2026-10-24T10:00:00Z" }
+          ]
+        },
+        "closedByPullRequestsReferences": {
+          "nodes": [
+            {
+              "number": 412,
+              "title": "Example linked pull request",
+              "url": "https://github.com/initech/gadgets/pull/412",
+              "state": "OPEN",
+              "isDraft": true,
+              "author": { "login": "dev-a" },
+              "repository": { "nameWithOwner": "initech/gadgets" },
+              "commits": { "nodes": [{ "commit": { "statusCheckRollup": { "state": "PENDING" } } }] }
+            },
+            {
+              "number": 88,
+              "title": "Example merged pull request",
+              "url": "https://github.com/initech/widgets/pull/88",
+              "state": "MERGED",
+              "author": null,
+              "repository": { "nameWithOwner": "initech/widgets" },
+              "commits": { "nodes": [{ "commit": { "statusCheckRollup": null } }] }
+            },
+            null,
+            { "title": "Missing number is skipped" }
+          ]
+        }
+      }
+    }
+  }
+}

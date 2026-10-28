@@ -1,0 +1,35 @@
+name: CI
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: No secrets
+        run: bash scripts/check-no-secrets.sh
+      - name: Xcode version
+        run: xcodebuild -version
+      - name: Kit tests
+        run: swift test --package-path Packages/PullBullKit
+      - name: App build
+        run: |
+          brew install xcodegen
+          xcodegen generate
+          xcodebuild -scheme PullBull -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO build | tee build.log
+          ! grep -E '\.swift:[0-9]+:[0-9]+: warning:' build.log
+      - name: Release build (unsigned)
+        run: |
+          xcodebuild -scheme PullBull -configuration Release -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO build | tee release-build.log
+          ! grep -E '\.swift:[0-9]+:[0-9]+: warning:' release-build.log

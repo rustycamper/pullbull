@@ -1,0 +1,10 @@
+*.xcodeproj
+build/
+.build/
+.superpowers/
+.DS_Store
+xcuserdata/
+Config/Local.xcconfig
+
+# Mockup symbols, exported by docs/media/src/render.sh (Apple assets, not redistributed)
+docs/media/src/symbols/

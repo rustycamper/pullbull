@@ -1,0 +1,7 @@
+// Release builds are signed by the maintainer's Developer ID team below, with the keychain entitlement, so a
+// clean checkout produces a build that can Sign in with GitHub. Local.xcconfig (included last, via Shared) may
+// override.
+DEVELOPMENT_TEAM = 98ZBCX6D7T
+CODE_SIGN_ENTITLEMENTS = PullBull/PullBull.entitlements
+
+#include "Shared.xcconfig"

@@ -1,0 +1,59 @@
+name: PullBull
+options:
+  bundleIdPrefix: io.github.rustycamper
+  deploymentTarget:
+    macOS: "14.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+packages:
+  PullBullKit:
+    path: Packages/PullBullKit
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.10.1
+targets:
+  PullBull:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - PullBull
+    dependencies:
+      - package: PullBullKit
+      - package: Sparkle
+    info:
+      path: PullBull/Info.plist
+      properties:
+        CFBundleIdentifier: io.github.rustycamper.pullbull
+        CFBundleName: PullBull
+        CFBundleDisplayName: PullBull
+        CFBundleExecutable: PullBull
+        CFBundlePackageType: APPL
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: "14.0"
+        LSUIElement: true
+        PBGitHubClientID: $(PULLBULL_GITHUB_CLIENT_ID)
+        PBGitHubAppSlug: $(PULLBULL_GITHUB_APP_SLUG)
+        SUFeedURL: https://github.com/rustycamper/pullbull/releases/latest/download/appcast.xml
+        SUPublicEDKey: $(PULLBULL_SPARKLE_PUBLIC_KEY)
+        SUScheduledCheckInterval: 86400
+    configFiles:
+      Debug: Config/Shared.xcconfig
+      Release: Config/Release.xcconfig
+    settings:
+      base:
+        PRODUCT_NAME: PullBull
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.rustycamper.pullbull
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Automatic
+schemes:
+  PullBull:
+    build:
+      targets:
+        PullBull: all
+    test:
+      targets: []

@@ -1,0 +1,448 @@
+/* PullBull popover mockup. Every size here is in points (1 CSS px = 1 pt) and comes from the SwiftUI
+   views named in the comments; colours come from Palette.swift and the resolved AppKit system colours. */
+
+/* ---------- Tokens ---------- */
+
+.scheme-dark {
+  /* AppKit system colours, darkAqua */
+  /* labelColor is 0.847; the popover's vibrancy lifts primary text to about 0.92 on screen. */
+  --label: rgba(255, 255, 255, 0.92);
+  --secondary: rgba(255, 255, 255, 0.549);
+  --tertiary: rgba(255, 255, 255, 0.247);
+  --separator: rgba(255, 255, 255, 0.098);
+  /* The field's placeholder reads at about secondary strength in the reference. */
+  --placeholder: rgba(255, 255, 255, 0.6);
+  --accent: #007aff;
+  --red: #ff4245;
+  /* Palette */
+  --secondary-text: rgba(255, 255, 255, 0.549);
+  --fill: rgba(255, 255, 255, 0.06);
+  --strong-fill: rgba(255, 255, 255, 0.1);
+  /* Palette.field is white at 0.07; vibrancy makes it read as about 0.09. */
+  --field: rgba(255, 255, 255, 0.09);
+  --changes-requested: #ff9f45;
+  --amber-glyph: #f5b041;
+  --merged-text: #c69ef0;
+  --merged-fill: rgba(198, 158, 240, 0.11);
+  --closed-text: #ff7b73;
+  --closed-fill: rgba(255, 123, 115, 0.1);
+  --changes-fill: rgba(255, 159, 69, 0.12);
+  --row-hover: rgba(255, 255, 255, 0.05);
+  --approved: #56c26f;
+  --card-fill: rgba(255, 255, 255, 0.035);
+  /* .regularMaterial behind the completion list */
+  --menu-material: rgba(48, 48, 50, 0.96);
+  /* Native tooltip, darkAqua */
+  --tooltip-bg: rgba(44, 44, 46, 0.96);
+  --tooltip-text: rgba(255, 255, 255, 0.88);
+  --tooltip-border: rgba(255, 255, 255, 0.16);
+  --tooltip-edge: rgba(0, 0, 0, 0.6);
+  /* Palette.statusOptionColor */
+  --status-blue: #6cb0ff;
+  --status-green: #5fc27a;
+  --status-yellow: #d8b04a;
+  --status-orange: #f59e5a;
+  --status-pink: #f38dc4;
+  /* Materials (approximations of NSVisualEffectView .popover and the menu bar) */
+  --panel-tint: rgba(42, 42, 42, 0.9);
+  --panel-rim: rgba(255, 255, 255, 0.16);
+  --panel-edge: rgba(0, 0, 0, 0.85);
+  --panel-shadow: 0 18px 44px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
+  --menubar-tint: rgba(16, 18, 24, 0.42);
+  --menubar-ink: rgba(255, 255, 255, 0.95);
+  --menubar-highlight: rgba(255, 255, 255, 0.16);
+  --desktop: radial-gradient(120% 90% at 18% 0%, #3b4a63 0%, transparent 60%),
+    radial-gradient(110% 90% at 100% 100%, #3a2f4f 0%, transparent 65%),
+    linear-gradient(160deg, #222a38 0%, #1c1f29 55%, #211c2a 100%);
+  color-scheme: dark;
+}
+
+.scheme-light {
+  /* AppKit system colours, aqua */
+  --label: rgba(0, 0, 0, 0.847);
+  --secondary: rgba(0, 0, 0, 0.498);
+  --tertiary: rgba(0, 0, 0, 0.259);
+  --separator: rgba(0, 0, 0, 0.098);
+  --placeholder: rgba(0, 0, 0, 0.45);
+  --accent: #007aff;
+  --red: #ff383c;
+  /* Palette */
+  --secondary-text: rgba(0, 0, 0, 0.6);
+  --fill: rgba(0, 0, 0, 0.06);
+  --strong-fill: rgba(0, 0, 0, 0.1);
+  --field: #ffffff;
+  --changes-requested: #9a4400;
+  --amber-glyph: #8a5700;
+  --merged-text: #7339ae;
+  --merged-fill: rgba(115, 57, 174, 0.09);
+  --closed-text: #b1271f;
+  --closed-fill: rgba(177, 39, 31, 0.08);
+  --changes-fill: rgba(154, 68, 0, 0.12);
+  --row-hover: rgba(0, 0, 0, 0.05);
+  --approved: #1f7a3a;
+  --card-fill: rgba(0, 0, 0, 0.035);
+  --menu-material: rgba(248, 248, 248, 0.97);
+  /* Native tooltip, aqua */
+  --tooltip-bg: rgba(250, 250, 250, 0.97);
+  --tooltip-text: rgba(0, 0, 0, 0.85);
+  --tooltip-border: rgba(0, 0, 0, 0.14);
+  --tooltip-edge: rgba(0, 0, 0, 0);
+  /* Palette.statusOptionColor */
+  --status-blue: #0b5fc5;
+  --status-green: #1a7f37;
+  --status-yellow: #8a5700;
+  --status-orange: #a64b00;
+  --status-pink: #ad2471;
+  /* Materials */
+  --panel-tint: rgba(242, 242, 242, 0.78);
+  --panel-rim: rgba(255, 255, 255, 0.6);
+  --panel-edge: rgba(0, 0, 0, 0.12);
+  --panel-shadow: 0 18px 44px rgba(20, 30, 60, 0.22), 0 4px 12px rgba(20, 30, 60, 0.12);
+  --menubar-tint: rgba(255, 255, 255, 0.42);
+  --menubar-ink: rgba(0, 0, 0, 0.85);
+  --menubar-highlight: rgba(0, 0, 0, 0.16);
+  --desktop: radial-gradient(120% 90% at 18% 0%, #cfe0f5 0%, transparent 60%),
+    radial-gradient(110% 90% at 100% 100%, #e6dcf3 0%, transparent 65%),
+    linear-gradient(160deg, #dfe6f0 0%, #e9ecf2 55%, #ece6f1 100%);
+  color-scheme: light;
+}
+
+/* ---------- Base ---------- */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: transparent; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-kerning: normal;
+  overflow: hidden;
+}
+
+.mono { font-variant-numeric: tabular-nums; }
+.hstack { display: flex; flex-direction: row; align-items: center; min-width: 0; }
+.vstack { display: flex; flex-direction: column; min-width: 0; }
+.spacer { flex: 1 1 auto; }
+.nowrap { white-space: nowrap; }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+/* Font sizes with the line heights SwiftUI gives Text: ceil(ascender) + ceil(descender). */
+.f10 { font-size: 10px; line-height: 13px; }
+.f11 { font-size: 11px; line-height: 14px; }
+.f12 { font-size: 12px; line-height: 15px; }
+.f13 { font-size: 13px; line-height: 16px; }
+.f14 { font-size: 14px; line-height: 17px; }
+.w-medium { font-weight: 500; }
+.w-semibold { font-weight: 600; }
+.w-bold { font-weight: 700; }
+
+.c-label { color: var(--label); }
+.c-secondary { color: var(--secondary); }
+.c-secondary-text { color: var(--secondary-text); }
+.c-tertiary { color: var(--tertiary); }
+.c-accent { color: var(--accent); }
+
+/* A symbol: an exported mask tinted with the current colour, at the symbol's point size. */
+.sym {
+  display: inline-block;
+  flex: none;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  mask-size: 100% 100%;
+}
+
+/* A one-device-pixel separator (Hairline.swift); 0.5 pt at 2x. */
+.hairline { height: 0.5px; background: var(--separator); flex: none; }
+.hairline-v { width: 0.5px; background: var(--separator); flex: none; }
+
+/* ---------- Scene ---------- */
+
+.scene {
+  position: relative;
+  overflow: hidden;
+  background: var(--desktop);
+}
+
+.menubar {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 24px;
+  background: var(--menubar-tint);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
+}
+
+/* StatusItemLabel: glyph, 3 pt, count in the menu bar font (13 pt monospaced digits). The open
+   highlight is the button layer: labelColor at 0.16, corner radius 6 (PopoverController). */
+.status-item {
+  position: absolute;
+  top: 1px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--menubar-ink);
+  display: flex;
+  align-items: center;
+}
+.status-item.open { background: var(--menubar-highlight); }
+.status-item .glyph { width: 18px; height: 18px; }
+.status-item .count {
+  margin-left: 3px;
+  font-size: 13px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Panel (PopoverController / PopoverPanel) ---------- */
+
+.panel {
+  position: absolute;
+  width: 360px;
+  height: 560px;
+  border-radius: 11px;
+  overflow: hidden;
+  background: var(--panel-tint);
+  -webkit-backdrop-filter: blur(40px) saturate(1.8);
+  backdrop-filter: blur(40px) saturate(1.8);
+  box-shadow: 0 0 0 1px var(--panel-edge), var(--panel-shadow);
+  display: flex;
+  flex-direction: column;
+}
+/* The system draws a light rim just inside the window edge. */
+.panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 11px;
+  box-shadow: inset 0 0 0 1px var(--panel-rim);
+  pointer-events: none;
+}
+
+/* ---------- Header (HeaderView) ---------- */
+
+.title-row { height: 40px; padding: 0 8px; gap: 4px; flex: none; }
+
+/* ModeToggle: two 22×28 buttons, 2 apart, then a hairline 18 tall with 2 before it. */
+.mode-toggle { gap: 2px; flex: none; }
+.mode-button { width: 22px; height: 28px; display: flex; align-items: center; justify-content: center; color: var(--secondary); border-radius: 6px; }
+.mode-button.selected { color: var(--accent); }
+.mode-toggle .hairline-v { height: 18px; margin-left: 2px; }
+
+/* TabBar: equal segments 2 apart, 22 tall, inside 2 pt of vertical padding. */
+.tab-bar { flex: 1 1 auto; padding: 2px 0; display: flex; gap: 2px; }
+.segment {
+  flex: 1 1 0;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+/* HStack(alignment: .firstTextBaseline, spacing: 3) */
+.segment .label-run { display: flex; align-items: baseline; gap: 3px; }
+.segment.selected {
+  background: var(--strong-fill);
+  box-shadow: inset 0 0 0 0.5px var(--separator);
+}
+.segment .title { display: inline-grid; color: var(--secondary-text); }
+/* The semibold width is always reserved, so selecting changes the weight, never the position. */
+.segment .title::before { content: attr(data-title); font-weight: 600; visibility: hidden; grid-area: 1 / 1; }
+.segment .title > span { grid-area: 1 / 1; text-align: center; }
+.segment.selected .title { color: var(--label); font-weight: 600; }
+.segment .count { color: var(--secondary-text); }
+.segment.selected .count { color: var(--label); }
+
+/* Search field: 24 tall, inset 6 (Metrics.rowInset), 6 below. */
+.search-row { padding: 0 6px 6px; flex: none; }
+.search-field {
+  position: relative;
+  height: 24px;
+  padding: 0 6px 0 8px;
+  gap: 6px;
+  border-radius: 6px;
+  background: var(--field);
+  box-shadow: inset 0 0 0 0.5px var(--separator);
+}
+.search-field .placeholder { color: var(--placeholder); flex: 1 1 auto; }
+.search-field .text { color: var(--label); flex: 1 1 auto; }
+.search-field .shortcut { color: var(--secondary); }
+.search-field.focused::after {
+  content: "";
+  position: absolute;
+  inset: -3.5px;
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 3.5px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* ---------- Filter row (FilterBar) ---------- */
+
+.filter-bar { height: 26px; padding: 0 8px 0 14px; gap: 6px; color: var(--secondary); flex: none; position: relative; }
+.filter-bar::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 0.5px; background: var(--separator); }
+
+/* ---------- List (PRListView, PRRow) ---------- */
+
+.list { flex: 1 1 auto; overflow: hidden; padding: 0 6px 6px; }
+
+.group-header { padding: 10px 8px 4px; gap: 6px; color: var(--secondary); }
+
+.row { display: flex; align-items: flex-start; gap: 10px; padding: 7px 8px 8px; border-radius: 7px; }
+.row.hover { background: var(--row-hover); }
+.row.selected { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.row .leading { margin-top: 1px; flex: none; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; color: var(--secondary); }
+.row .body { flex: 1 1 auto; min-width: 0; }
+.row .title-text {
+  color: var(--label);
+  /* lineSpacing(1), two lines at most */
+  line-height: 17px;
+  margin-bottom: -1px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.row.draft .title-text, .row.dimmed .title-text { color: var(--secondary); }
+.row .ci { margin-top: 1px; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; flex: none; }
+
+.meta { height: 16px; margin-top: 3px; gap: 5px; color: var(--secondary); white-space: nowrap; overflow: hidden; }
+.meta .dot { color: var(--tertiary); }
+.meta .label { display: flex; align-items: center; gap: 3px; }
+.meta .label.count { gap: 2px; margin-left: 4px; }
+
+.pill {
+  height: 16px; padding: 0 6px; border-radius: 8px;
+  display: inline-flex; align-items: center; gap: 3px; flex: none;
+  font-size: 10px; line-height: 12px; font-weight: 600; white-space: nowrap;
+}
+.pill.draft { color: var(--secondary-text); box-shadow: inset 0 0 0 0.5px var(--separator); }
+.pill.merged { color: var(--merged-text); background: var(--merged-fill); }
+.pill.closed { color: var(--closed-text); background: var(--closed-fill); }
+/* ReadyToMergePill: gray on Palette.fill; the changes-requested Pill: amber at 0.12 */
+.pill.ready { color: var(--secondary-text); background: var(--fill); }
+.pill.changes { color: var(--changes-requested); background: var(--changes-fill); }
+
+/* Mine's folded "Recently closed" section */
+.closed-rule { margin: 6px 8px 0; }
+.closed-header { height: 30px; margin-top: 2px; padding: 0 8px; gap: 6px; color: var(--secondary); }
+.closed-row { gap: 10px; padding: 5px 8px; border-radius: 7px; }
+.closed-row .glyph { width: 20px; display: flex; justify-content: center; flex: none; }
+.closed-row .body { flex: 1 1 auto; gap: 1px; color: var(--secondary); }
+
+/* Avatars (AvatarView): a circle with a 0.5 pt primary-at-0.1 ring. */
+.avatar { display: block; position: relative; border-radius: 50%; overflow: hidden; flex: none; }
+.avatar svg { display: block; width: 100%; height: 100%; }
+.avatar::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 0.5px rgba(127, 127, 127, 0.25); }
+.scheme-dark .avatar::after { box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.1); }
+.scheme-light .avatar::after { box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.1); }
+
+/* ---------- Footer (FooterView) ---------- */
+
+.footer { height: 34px; padding: 0 8px 0 14px; gap: 4px; color: var(--secondary); flex: none; position: relative; }
+.footer::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 0.5px; background: var(--separator); }
+.footer .account { gap: 5px; }
+.footer-button { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 6px; flex: none; }
+
+/* ---------- Issues (IssueRow, IssueListView) ---------- */
+
+.row.past .title-text { color: var(--secondary); }
+.label-chip {
+  height: 16px; padding: 0 6px; border-radius: 4px; flex: none;
+  display: inline-flex; align-items: center; gap: 4px;
+  box-shadow: inset 0 0 0 0.5px var(--separator);
+  color: var(--secondary-text); font-size: 10px; line-height: 13px; font-weight: 600; white-space: nowrap;
+}
+/* LabelDot: 6 pt, with a 0.5 pt separator ring */
+.label-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 0.5px var(--separator); }
+
+/* IssueGroupHeader: glyph in the rows' 20 pt icon column, 10 before the title; the fold chevron hangs in the 8 pt inset. */
+.lane-header { position: relative; padding: 10px 8px 4px; gap: 10px; color: var(--secondary); }
+.lane-header .lane-chevron { position: absolute; left: 0; top: 10px; height: 14px; }
+.done-header { position: relative; height: 32px; margin-top: 2px; padding: 0 8px; gap: 10px; color: var(--secondary); }
+.done-header .lane-chevron { position: absolute; left: 0; top: 0; bottom: 0; }
+.lane-chevron { width: 8px; display: flex; align-items: center; justify-content: center; }
+.icon-col { width: 20px; display: flex; justify-content: center; flex: none; }
+
+/* ---------- Pointer and native tooltip ---------- */
+
+.cursor { position: absolute; width: 28px; height: 40px; z-index: 20; pointer-events: none; }
+.tooltip {
+  position: absolute; z-index: 21; white-space: nowrap;
+  padding: 3px 7px 4px; border-radius: 6px;
+  background: var(--tooltip-bg); color: var(--tooltip-text);
+  box-shadow: 0 0 0 0.5px var(--tooltip-edge), inset 0 0 0 0.5px var(--tooltip-border), 0 4px 12px rgba(0, 0, 0, 0.22), 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+/* ---------- Detail (PRDetailView, IssueDetailView, DetailComponents) ---------- */
+
+.link { color: var(--accent); }
+.detail { display: flex; flex-direction: column; height: 100%; color: var(--label); }
+.detail-header { position: relative; height: 44px; padding: 0 8px; display: flex; align-items: center; gap: 4px; flex: none; }
+.detail-icon { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; flex: none; }
+/* The title overlays the whole bar, centred, 72 clear of each side. */
+.detail-title { position: absolute; left: 0; right: 0; padding: 0 72px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.detail-scroll { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.detail-content { padding-bottom: 14px; }
+.detail-summary { padding: 14px 16px 0; }
+/* 15 pt semibold with lineSpacing(2) */
+.detail-heading { font-size: 15px; line-height: 21px; margin: -1px 0; font-weight: 600; }
+.detail-section { padding: 14px 16px 0; display: flex; flex-direction: column; gap: 6px; }
+.section-head { display: flex; align-items: baseline; gap: 8px; color: var(--secondary); line-height: 14px; }
+.detail-card { border-radius: 8px; background: var(--card-fill); box-shadow: inset 0 0 0 0.5px var(--separator); overflow: hidden; }
+.card-line { display: flex; align-items: center; gap: 8px; padding: 0 10px; min-height: 28px; }
+.card-line.reviewer { min-height: 34px; }
+.card-line.linked { min-height: 42px; padding: 5px 10px; }
+.icon14 { width: 14px; display: flex; justify-content: center; flex: none; }
+.team-badge { width: 20px; height: 20px; border-radius: 50%; background: var(--strong-fill); display: flex; align-items: center; justify-content: center; flex: none; }
+.card-row { display: flex; align-items: center; gap: 8px; padding: 5px 10px; min-height: 30px; }
+.card-row-name { width: 70px; flex: none; }
+.card-row-value { flex: 1 1 auto; min-width: 0; }
+.flow { display: flex; flex-wrap: wrap; align-items: center; }
+.branch-chip {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: 5px; background: var(--fill);
+  font: 11px/14px ui-monospace, "SF Mono", Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+.diffstat { display: inline-flex; gap: 1px; align-self: center; }
+.diff-block { width: 7px; height: 7px; border-radius: 1.5px; }
+.diff-count { width: 64px; text-align: right; flex: none; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+.description { font-size: 12.5px; line-height: 19px; }
+.issue-description { font-size: 12px; line-height: 17px; padding: 10px 12px; }
+.comment { display: flex; align-items: flex-start; gap: 8px; }
+.comment-body { line-height: 17px; }
+.detail-bar { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 12px; flex: none; }
+.detail-bar::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 0.5px; background: var(--separator); }
+.outlined-button { width: 30px; height: 24px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--separator); display: flex; align-items: center; justify-content: center; flex: none; }
+
+/* MarkdownBlocks: blocks 8 apart, list items 3 apart, details summary semibold behind a chevron */
+.md { display: flex; flex-direction: column; gap: 8px; }
+.md p { margin: 0; }
+.md-list { display: flex; flex-direction: column; gap: 3px; }
+.md-item { display: flex; align-items: baseline; gap: 5px; }
+.md-task { align-self: center; display: inline-flex; }
+.md-code-inline { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.92em; }
+.md-details { display: flex; flex-direction: column; gap: 6px; }
+.md-summary { display: flex; align-items: baseline; gap: 5px; font-weight: 600; }
+.md-chevron { width: 10px; display: inline-flex; justify-content: center; color: var(--secondary); align-self: center; }
+.md-details-body { padding-left: 15px; }
+
+/* ---------- Search (SearchResultsView, CompletionList) ---------- */
+
+.below-header { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.search-context { padding: 10px 8px 0; min-height: 24px; gap: 6px; color: var(--secondary); }
+.search-group { padding: 12px 8px 4px; gap: 6px; color: var(--secondary); }
+.search-row-pr .meta { gap: 5px; }
+.search-row-pr strong { font-weight: 700; }
+.caret { display: inline-block; width: 1.5px; height: 14px; margin-left: 1px; vertical-align: -2px; background: var(--accent); border-radius: 1px; }
+.completion-overlay { position: absolute; left: 0; right: 0; top: 0; padding: 4px 10px 0; z-index: 5; }
+.completion-list {
+  padding: 4px; border-radius: 7px; background: var(--menu-material);
+  -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6);
+  box-shadow: inset 0 0 0 0.5px var(--separator);
+}
+.completion-row { display: flex; align-items: center; gap: 8px; padding: 0 8px; height: 26px; border-radius: 5px; white-space: nowrap; color: var(--label); }
+.completion-row.selected { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.keycap {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 16px; padding: 0 6px;
+  border-radius: 4px; box-shadow: inset 0 0 0 0.5px var(--separator);
+  font-size: 10px; line-height: 13px; font-weight: 600; color: var(--secondary-text);
+}

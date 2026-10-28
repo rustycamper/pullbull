@@ -1,0 +1,7 @@
+{"data":{"organization":{"projectV2":{"title":"Team Board","field":{"options":[{"id":"opt1","name":"Todo"},{"id":"opt2","name":"In progress"},{"id":"opt3","name":"Done"}]},"items":{"pageInfo":{"endCursor":"B1","hasNextPage":false},"nodes":[
+{"databaseId":1001,"fieldValueByName":{"name":"In progress","optionId":"opt2"},"content":{"__typename":"Issue","number":42,"title":"Sync drops updates","url":"https://github.com/initech/widgets/issues/42","state":"OPEN","stateReason":null,"createdAt":"2026-10-20T08:00:00Z","updatedAt":"2026-10-26T10:15:00Z","closedAt":null,"repository":{"nameWithOwner":"initech/widgets"},"author":{"login":"dev-b"},"comments":{"totalCount":2},"labels":{"nodes":[{"name":"bug"}]},"assignees":{"nodes":[]}}},
+{"databaseId":1002,"fieldValueByName":null,"content":{"__typename":"Issue","number":43,"title":"Tab counts","url":"https://github.com/initech/widgets/issues/43","state":"CLOSED","stateReason":"COMPLETED","createdAt":"2026-10-01T08:00:00Z","updatedAt":"2026-10-22T10:00:00Z","closedAt":"2026-10-22T10:00:00Z","repository":{"nameWithOwner":"initech/widgets"},"author":null,"comments":{"totalCount":0},"labels":{"nodes":[]},"assignees":{"nodes":[]}}},
+{"databaseId":1003,"fieldValueByName":{"name":"Todo","optionId":"opt1"},"content":{"__typename":"PullRequest"}},
+{"databaseId":1004,"fieldValueByName":null,"content":{"__typename":"DraftIssue"}},
+{"databaseId":1005,"fieldValueByName":null,"content":null}
+]}}}}}

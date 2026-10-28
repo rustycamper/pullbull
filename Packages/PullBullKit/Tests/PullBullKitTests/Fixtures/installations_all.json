@@ -1,0 +1,1 @@
+{"total_count":1,"installations":[{"id":1,"account":{"login":"acme","type":"Organization"},"repository_selection":"all","permissions":{"metadata":"read","organization_projects":"read","pull_requests":"read"}}]}

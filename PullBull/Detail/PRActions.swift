@@ -1,0 +1,148 @@
+import AppKit
+import SwiftUI
+import PullBullKit
+
+/// The PR and issue actions shared by the row context menus and the detail views.
+enum PRActions {
+    static func copyBranch(_ pr: PullRequest) {
+        copy(pr.headRef)
+    }
+
+    static func copyLink(_ pr: PullRequest) {
+        copy(pr.url.absoluteString)
+    }
+
+    /// Whether the click being handled held ⌘: a ⌘-click on a row opens its page on GitHub instead of
+    /// its detail, as ⌘↩ does. Only a mouse click counts: `currentEvent` outlives its dispatch, so a
+    /// VoiceOver or keyboard press could otherwise read an earlier ⌘ shortcut's key event.
+    @MainActor static var commandClicked: Bool {
+        guard let event = NSApp.currentEvent, event.type == .leftMouseUp || event.type == .leftMouseDown else {
+            return false
+        }
+        return event.modifierFlags.contains(.command)
+    }
+
+    static func openOnGitHub(_ pr: PullRequest) {
+        NSWorkspace.shared.open(pr.url)
+    }
+
+    static func copyLink(_ issue: BoardIssue) {
+        copy(issue.url.absoluteString)
+    }
+
+    static func openOnGitHub(_ issue: BoardIssue) {
+        NSWorkspace.shared.open(issue.url)
+    }
+
+    @MainActor static func copyMarkdownLink(_ pr: PullRequest) {
+        copyMarkdownLink(title: pr.title, key: pr.key, url: pr.url)
+    }
+
+    @MainActor static func copyMarkdownLink(_ issue: BoardIssue) {
+        copyMarkdownLink(title: issue.title, key: issue.key, url: issue.url)
+    }
+
+    /// ⌥⌘C: the Markdown link as text, and the page as a URL for the apps that take one; then the quiet
+    /// "Copied" where the popover shows it.
+    @MainActor static func copyMarkdownLink(title: String?, key: PRKey, url: URL) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(MarkdownLink.item(title: title, key: key, url: url), forType: .string)
+        pasteboard.setString(url.absoluteString, forType: .URL)
+        CopyConfirmation.shared.show("Copied Markdown link")
+    }
+
+    static func copy(_ string: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(string, forType: .string)
+    }
+}
+
+/// The repo focus item at the top of a list row's or repo header's context menu: "Show Only <name>",
+/// or "Show All Repositories" on the focused repository.
+struct FocusMenuItem {
+    let title: String
+    let action: () -> Void
+}
+
+extension FocusMenuItem {
+    /// Choosing it focuses `repo` (`owner/name`), or clears the focus when `repo` is the one focused.
+    @MainActor init(model: AppModel, repo: String) {
+        let focused = model.repoFocus?.repo.caseInsensitiveCompare(repo) == .orderedSame
+        self.init(title: focused ? "Show All Repositories" : "Show Only \(model.displayName(of: repo))") {
+            model.focus(on: focused ? nil : repo)
+        }
+    }
+}
+
+extension FocusMenuItem {
+    /// "Search @login" on a list row: searches for everything `login` is on. Nil for a missing author
+    /// and for GitHub's deleted-account placeholder, "ghost".
+    @MainActor static func person(model: AppModel, login: String?) -> FocusMenuItem? {
+        guard let login, login.caseInsensitiveCompare("ghost") != .orderedSame else { return nil }
+        return FocusMenuItem(title: "Search @\(login)") { model.searchForPerson(login) }
+    }
+}
+
+extension View {
+    /// Right-click: the repo focus and person search items (list rows only), Copy Branch Name, Copy Link,
+    /// Copy as Markdown Link, Open on GitHub. VoiceOver gets Copy as Markdown Link as an action too.
+    func prContextMenu(_ pr: PullRequest, focus: FocusMenuItem? = nil, person: FocusMenuItem? = nil) -> some View {
+        contextMenu {
+            if focus != nil || person != nil {
+                if let focus { FocusMenuButton(item: focus) }
+                if let person { PersonMenuButton(item: person) }
+                Divider()
+            }
+            Button("Copy Branch Name", systemImage: "arrow.triangle.branch") { PRActions.copyBranch(pr) }
+            Button("Copy Link", systemImage: "link") { PRActions.copyLink(pr) }
+            Button("Copy as Markdown Link", systemImage: "link.badge.plus") { PRActions.copyMarkdownLink(pr) }
+            Divider()
+            Button("Open on GitHub", systemImage: "arrow.up.right.square") { PRActions.openOnGitHub(pr) }
+        }
+        .accessibilityAction(named: "Copy as Markdown Link") { PRActions.copyMarkdownLink(pr) }
+    }
+
+    /// Right-click on an issue: the repo focus and person search items (list rows only), Copy Link,
+    /// Copy as Markdown Link, Open on GitHub. VoiceOver gets Copy as Markdown Link as an action too.
+    func issueContextMenu(_ issue: BoardIssue, focus: FocusMenuItem? = nil, person: FocusMenuItem? = nil) -> some View {
+        contextMenu {
+            if focus != nil || person != nil {
+                if let focus { FocusMenuButton(item: focus) }
+                if let person { PersonMenuButton(item: person) }
+                Divider()
+            }
+            Button("Copy Link", systemImage: "link") { PRActions.copyLink(issue) }
+            Button("Copy as Markdown Link", systemImage: "link.badge.plus") { PRActions.copyMarkdownLink(issue) }
+            Divider()
+            Button("Open on GitHub", systemImage: "arrow.up.right.square") { PRActions.openOnGitHub(issue) }
+        }
+        .accessibilityAction(named: "Copy as Markdown Link") { PRActions.copyMarkdownLink(issue) }
+    }
+
+    /// Right-click on a repo group header: the repo focus item alone; no menu without one.
+    @ViewBuilder func focusContextMenu(_ focus: FocusMenuItem?) -> some View {
+        if let focus {
+            contextMenu { FocusMenuButton(item: focus) }
+        } else {
+            self
+        }
+    }
+}
+
+private struct FocusMenuButton: View {
+    let item: FocusMenuItem
+
+    var body: some View {
+        Button(item.title, systemImage: "line.3.horizontal.decrease", action: item.action)
+    }
+}
+
+private struct PersonMenuButton: View {
+    let item: FocusMenuItem
+
+    var body: some View {
+        Button(item.title, systemImage: "person", action: item.action)
+    }
+}

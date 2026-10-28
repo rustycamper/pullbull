@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PullBull popover</title>
+<link rel="stylesheet" href="popover.css">
+<script src="symbols/manifest.js"></script>
+<script src="components.js"></script>
+<script src="detail.js"></script>
+<script src="search.js"></script>
+<script src="data/review.js"></script>
+<script src="data/mine.js"></script>
+<script src="data/board.js"></script>
+<script src="data/pr-detail.js"></script>
+<script src="data/issue-detail.js"></script>
+<script src="data/search.js"></script>
+</head>
+<body>
+<div id="scene"></div>
+<script>
+  // ?scheme=dark|light  &data=review|mine|board|pr-detail|issue-detail|search  &width=520  &height=640
+  const q = new URLSearchParams(location.search);
+  const scene = {
+    scheme: q.get("scheme") || "dark",
+    width: Number(q.get("width") || 520),
+    height: Number(q.get("height") || 640),
+  };
+  PullBull.renderScene(document.getElementById("scene"), window.SCENES[q.get("data") || "review"], scene);
+</script>
+</body>
+</html>

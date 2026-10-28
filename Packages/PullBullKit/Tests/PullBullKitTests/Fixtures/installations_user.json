@@ -1,0 +1,1 @@
+{"total_count":2,"installations":[{"id":1,"account":{"login":"octocat","type":"User"},"repository_selection":"all","permissions":{"metadata":"read","pull_requests":"read"}},{"id":2,"account":{"login":"acme","type":"Organization"},"repository_selection":"all","permissions":{"metadata":"read","organization_projects":"read","pull_requests":"read"}}]}

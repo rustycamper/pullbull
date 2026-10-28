@@ -1,0 +1,12 @@
+// Copy to Local.xcconfig (ignored by git) and fill in. It is read last, so it overrides Shared.xcconfig
+// and Release.xcconfig.
+// DEVELOPMENT_TEAM = XXXXXXXXXX
+// PULLBULL_GITHUB_CLIENT_ID = Iv1.0000000000000000
+// PULLBULL_GITHUB_APP_SLUG = your-app-slug
+// Sign in with GitHub keeps tokens in the data protection keychain, which needs this entitlement and a
+// provisioning profile. Set it only with DEVELOPMENT_TEAM, and build with -allowProvisioningUpdates (or from
+// Xcode with your Apple ID added under Settings → Accounts). A build without a team must leave it unset.
+// Release builds already set both for the maintainer's team (in Config/Release.xcconfig): set your own
+// DEVELOPMENT_TEAM, or clear both (`DEVELOPMENT_TEAM =` and `CODE_SIGN_ENTITLEMENTS =`) to build Release
+// without a team.
+// CODE_SIGN_ENTITLEMENTS = PullBull/PullBull.entitlements

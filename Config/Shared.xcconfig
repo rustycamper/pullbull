@@ -1,0 +1,14 @@
+// Values filled in for the registered GitHub App. Local overrides live in Local.xcconfig.
+PULLBULL_GITHUB_CLIENT_ID = Iv23liyKl0ucybgk89li
+PULLBULL_GITHUB_APP_SLUG = pullbull-for-macos
+
+// Defaults for local builds. scripts/release.sh passes the release's version and build number (the
+// commit count of main) on the command line instead.
+MARKETING_VERSION = 1.0.0
+CURRENT_PROJECT_VERSION = 1
+
+// Sparkle's EdDSA public key (from generate_keys). While it is empty the updater never starts and
+// scripts/release.sh refuses to publish. xcconfig reads `//` as a comment: write any `//` in the key as `/$()/`.
+PULLBULL_SPARKLE_PUBLIC_KEY = TZkoCgwVTSz4sfynkmBwjdazGx0Mq2PB5ZyzZ353zM4=
+
+#include? "Local.xcconfig"
