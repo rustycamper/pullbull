@@ -25,7 +25,7 @@ Then [bump the Homebrew cask](#homebrew-cask).
 
 ## Ask model list
 
-Before each release, check `AskModel.all` (in `PullBullKit`) against [Anthropic's current model list](https://docs.anthropic.com/en/docs/about-claude/models):
+Before each release, check `AskModel.all` (in `PullBullKit`) against [Anthropic's current model list](https://platform.claude.com/docs/en/models/overview):
 
 - Each ID still exists and is not deprecated
 - The default is still the intended Sonnet

@@ -181,8 +181,8 @@ Settings → Ask.
 
 ### Cost
 
-- PullBull has no spending cap. Set limits in the Anthropic console
-- About $0.03 per question with Sonnet 5.5, about $0.002 with Haiku 5.5 (measured on a 14-question test)
+- No spending cap in PullBull. Set limits in the Anthropic console
+- Cost depends on how long your descriptions are
 
 ## Keyboard
 
