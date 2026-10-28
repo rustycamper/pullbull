@@ -77,6 +77,7 @@ private struct Harness {
     let clock: TestClock
     let now: Box<Date>
     let refreshing: Box<Bool>
+    let excluded: Box<Set<String>>
     let sync: AskSync
 
     init(
@@ -88,10 +89,12 @@ private struct Harness {
         clock = TestClock()
         let now = Box(t0)
         let refreshing = Box(false)
+        let excludedBox = Box(excluded)
         self.now = now
         self.refreshing = refreshing
+        self.excluded = excludedBox
         sync = AskSync(
-            index: index, fetcher: fetcher, scope: scope, excluded: { excluded },
+            index: index, fetcher: fetcher, scope: scope, excluded: { excludedBox.get() },
             refreshing: { refreshing.get() }, clock: clock, now: { now.get() }, pause: pause)
     }
 
@@ -234,7 +237,9 @@ private struct Harness {
 
         h.now.set(t0.addingTimeInterval(300))
         await h.sync.sync()
-        #expect(await h.fetcher.calls.count == 3)
+        #expect(await Array(h.fetcher.queries.dropFirst()) == [
+            "org:acme is:pr", "org:acme is:issue", "repo:acme/web is:pr", "repo:acme/web is:issue",
+        ].map { "\($0) updated:\(iso(t0.addingTimeInterval(300 - AskSync.window)))..\(iso(t0.addingTimeInterval(300)))" })
         #expect(try await h.index.count() == 1)
     }
 
@@ -282,12 +287,97 @@ private struct Harness {
     @Test func scopeChangeCancelsSync() async throws {
         let recent = t0.addingTimeInterval(-day)
         let h = try Harness([item("acme/web", 1, kind: .pr, updated: recent), item("acme/web", 2, updated: recent)])
-        let sync = h.sync
-        await h.fetcher.setOnFetch { number in if number == 2 { await sync.cancel() } }
-        await h.sync.sync()
+        let (reached, signal) = AsyncStream<Void>.makeStream()
+        let gate = TestClock()
+        let released = Box(false)
+        await h.fetcher.setOnFetch { number in
+            guard number == 2 else { return }
+            signal.yield()
+            // Holds the page until the pass is cancelled; the gate clock is never advanced.
+            try? await gate.sleep(for: .seconds(1))
+            released.set(true)
+        }
+        let task = Task { await h.sync.sync() }
+        var iterator = reached.makeAsyncIterator()
+        await iterator.next()
+
+        await h.sync.cancel()
+        #expect(released.get())
+        let stored = try await h.stored()
+        let lastSync = try await h.index.meta(.lastSync)
+        let backfilled = try await h.index.meta(.backfilledUntil)
+        await task.value
+        #expect(stored == ["acme/web#1"])
+        #expect(lastSync == nil && backfilled == nil)
+        #expect(try await h.stored() == stored)
+        #expect(await h.fetcher.calls.count == 2)
+    }
+
+    @Test func refreshStartingDuringPauseHoldsThePage() async throws {
+        let h = try Harness([item("acme/web", 1, kind: .pr, updated: t0)], pause: .seconds(1))
+        try await h.index.setMeta(.lastFullSync, t0)
+        try await h.index.setMeta(.lastSync, t0)
+        h.now.set(t0.addingTimeInterval(3600))
+        let task = Task { await h.sync.sync() }
+
+        _ = await h.clock.waitForSleeps(1)
+        h.refreshing.set(true)
+        h.clock.advance(by: .seconds(1))
+        _ = await h.clock.waitForSleeps(2)
+        #expect(await h.fetcher.calls.isEmpty)
+        h.refreshing.set(false)
+        h.clock.advance(by: .seconds(1))
+        _ = await h.clock.waitForSleeps(3)
+        #expect(await h.fetcher.calls.isEmpty)
+        h.clock.advance(by: .seconds(1))
+        _ = await h.clock.waitForSleeps(4)
+        #expect(await h.fetcher.calls.count == 1)
+        h.clock.advance(by: .seconds(1))
+        await task.value
         #expect(await h.fetcher.calls.count == 2)
         #expect(try await h.stored() == ["acme/web#1"])
-        #expect(try await h.index.meta(.lastSync) == nil)
+    }
+
+    @Test func repoExcludedMidPassIsNotStored() async throws {
+        let recent = t0.addingTimeInterval(-day)
+        let web = (0..<150).map { item("acme/web", $0, kind: .pr, updated: recent.addingTimeInterval(Double($0))) }
+        let h = try Harness(web + [item("acme/api", 500, kind: .pr, updated: recent.addingTimeInterval(-1))])
+        let excluded = h.excluded
+        await h.fetcher.setOnFetch { number in if number == 2 { excluded.set(["acme/web"]) } }
+        await h.sync.sync()
+        let stored = try await h.stored()
+        #expect(stored.filter { $0.hasPrefix("acme/web#") }.count == 100)
+        #expect(stored.contains("acme/api#500"))
+    }
+
+    @Test func blockedRepoBackfillIsRetriedAtNextSync() async throws {
+        let recent = t0.addingTimeInterval(-day)
+        let h = try Harness([item("acme/web", 1, updated: recent)])
+        await h.fetcher.fail(call: 1, with: APIError.rateLimited(resetAt: t0.addingTimeInterval(60)))
+        await h.sync.sync()
+        await h.sync.backfill(repo: "acme/web")
+        #expect(await h.fetcher.calls.count == 1)
+
+        h.now.set(t0.addingTimeInterval(60))
+        await h.sync.sync()
+        let repoQueries = await h.fetcher.queries.filter { $0.hasPrefix("repo:acme/web ") }
+        #expect(repoQueries.count == 2)
+
+        h.now.set(t0.addingTimeInterval(120))
+        await h.sync.sync()
+        #expect(await h.fetcher.queries.filter { $0.hasPrefix("repo:") }.count == 2)
+    }
+
+    @Test func failedRepoBackfillIsRetriedAtNextSync() async throws {
+        let recent = t0.addingTimeInterval(-day)
+        let h = try Harness([item("acme/web", 1, updated: recent)])
+        await h.fetcher.fail(call: 1, with: APIError.graphQL("boom"))
+        await h.sync.backfill(repo: "acme/web")
+        #expect(try await h.index.count() == 0)
+
+        await h.sync.sync()
+        #expect(await h.fetcher.queries.filter { $0.hasPrefix("repo:acme/web ") }.count == 3)
+        #expect(try await h.stored() == ["acme/web#1"])
     }
 
     @Test func syncWhileRunningReturnsImmediately() async throws {

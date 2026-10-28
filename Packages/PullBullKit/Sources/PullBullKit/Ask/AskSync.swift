@@ -19,6 +19,7 @@ public struct AskSyncProgress: Equatable, Sendable {
 /// Keeps an `AskIndex` in step with GitHub for one scope: a backfill over the window, then incremental
 /// syncs, with a weekly full re-sync that drops rows search no longer returns. Pages run one at a time,
 /// a `pause` apart and never while a regular refresh runs; a rate limit stops all fetching until it resets.
+/// A pass runs in its own task: callers stop it with `cancel()`, not by cancelling the task that awaits it.
 public actor AskSync {
     public static let window: TimeInterval = 90 * 86_400
     /// How far before the last sync an incremental sync starts.
@@ -45,8 +46,8 @@ public actor AskSync {
 
     private var running: Task<Void, Never>?
     private var blockedUntil: Date?
-    /// Lowercased owner/name of every repo the current pass skips.
-    private var skipped: Set<String> = []
+    /// Repos whose `backfill(repo:)` hasn't finished yet; each sync retries them.
+    private var pendingRepos: Set<String> = []
     /// Lowercased keys the current full re-sync has seen; nil outside one.
     private var seen: Set<String>?
     private var backfilling = false
@@ -76,24 +77,32 @@ public actor AskSync {
     // MARK: Entry points
 
     /// Backfills if no backfill has finished, runs a full re-sync when the last one is over a week old,
-    /// and otherwise fetches what changed since the last sync. Returns at once while another pass runs.
+    /// and otherwise fetches what changed since the last sync; then retries unfinished repo backfills.
+    /// Returns at once while another pass runs.
     public func sync() async {
         guard running == nil, !isBlocked else { return }
-        await run { try await $0.syncPass() }
+        await run { sync in
+            try await sync.syncPass()
+            for repo in await sync.pendingRepos.sorted() {
+                try await sync.repoPass(repo)
+            }
+        }
     }
 
     /// Fetches `repo` (`owner/name`) over the window, as when it leaves the exclude list. Waits for a
-    /// running pass first.
+    /// running pass first. Until one finishes, every `sync()` retries it.
     public func backfill(repo: String) async {
+        let repo = repo.lowercased()
+        pendingRepos.insert(repo)
         await waitForRunning()
-        guard !isBlocked else { return }
+        guard pendingRepos.contains(repo), !isBlocked else { return }
         await run { try await $0.repoPass(repo) }
     }
 
     /// Deletes every row and the sync state, then syncs from scratch.
     public func rebuild() async {
-        running?.cancel()
-        await waitForRunning()
+        await cancel()
+        pendingRepos = []
         await run { sync in
             try await sync.clear()
             guard await !sync.isBlocked else { return }
@@ -101,9 +110,10 @@ public actor AskSync {
         }
     }
 
-    /// Stops the running pass; it writes nothing further.
-    public func cancel() {
+    /// Stops the running pass and returns once it has ended; nothing is written after that.
+    public func cancel() async {
         running?.cancel()
+        await waitForRunning()
     }
 
     // MARK: Passes
@@ -145,8 +155,8 @@ public actor AskSync {
     private func syncPass() async throws {
         let start = Self.wholeSeconds(now())
         let windowStart = start.addingTimeInterval(-Self.window)
-        try await prepareFilter()
-        let skipped = skipped
+        let skipped = await excluded()
+        try Task.checkCancellation()
         try await index.deleteRepos { [scope] in !scope.covers($0) || skipped.contains($0) }
 
         let base = scope.searchQualifier
@@ -176,15 +186,14 @@ public actor AskSync {
     }
 
     private func repoPass(_ repo: String) async throws {
-        let start = Self.wholeSeconds(now())
-        try await prepareFilter()
-        try await startBackfill()
-        try await sweep(start.addingTimeInterval(-Self.window), start, base: "repo:\(repo)")
-    }
-
-    private func prepareFilter() async throws {
-        skipped = await excluded()
+        if await !excluded().contains(repo) {
+            let start = Self.wholeSeconds(now())
+            try await startBackfill()
+            try await sweep(start.addingTimeInterval(-Self.window), start, base: "repo:\(repo)")
+        }
         try Task.checkCancellation()
+        pendingRepos.remove(repo)
+        backfilling = false
     }
 
     private func startBackfill() async throws {
@@ -267,11 +276,14 @@ public actor AskSync {
         _ query: String, after: String?, counted: (Int) -> Void = { _ in }
     ) async throws -> AskPage {
         try Task.checkCancellation()
-        while await refreshing() {
+        repeat {
+            while await refreshing() {
+                try await clock.sleep(for: pause)
+            }
             try await clock.sleep(for: pause)
-        }
-        try await clock.sleep(for: pause)
+        } while await refreshing()
         let page = try await fetcher.askPage(query: query, after: after)
+        let skipped = await excluded()
         try Task.checkCancellation()
         seen?.formUnion(page.items.map { $0.key.askKey.lowercased() })
         let kept = page.items.filter { scope.covers($0.key.repo) && !skipped.contains($0.key.repo.lowercased()) }
