@@ -13,12 +13,6 @@ enum AskKeyState: Equatable {
     case invalid(String)
 }
 
-/// The account and scope an Ask index belongs to.
-struct AskTarget: Equatable {
-    let account: AccountRef
-    let scope: FetchScope
-}
-
 /// The open Ask index of one account and scope, its sync, and the work started on them. Work runs off
 /// the main actor; `close()` returns once none of it can write to the index again.
 @MainActor
@@ -96,40 +90,31 @@ extension AppModel {
         return runningAskTarget
     }
 
+    /// The open Ask index and its sync; nil while Ask is off, no account runs, or the open failed.
+    var askRuntime: AskRuntime? { askLifecycle?.runtime }
+
     /// Opens, switches or closes the Ask index to match the setting and the running account and scope.
-    /// The old sync stops before another index opens, so no row lands in the old file afterwards.
+    /// `AskLifecycle` keeps at most one index open and stops the old sync before another opens.
     func reconcileAsk() {
-        let wanted = wantedAskTarget
-        guard wanted != askWanted else { return }
-        askWanted = wanted
-        let old = dropAskRuntime()
-        askStep { [weak self] in
-            await old?.close()
-            guard let self, let wanted, self.askWanted == wanted else { return }
-            self.openAsk(wanted)
-        }
+        let lifecycle = askLifecycle ?? makeAskLifecycle()
+        askLifecycle = lifecycle
+        if !settings.askEnabled { askOpenError = nil }
+        lifecycle.update(wanted: wantedAskTarget, enabled: settings.askEnabled)
     }
 
-    /// Turns Ask on (the index opens and its backfill starts) or off (the sync stops and every Ask
-    /// index file is deleted).
+    /// Turns Ask on (the index opens and its backfill starts) or off (the sync stops, then every Ask
+    /// index file is deleted unless Ask is on again by then).
     func setAskEnabled(_ on: Bool) {
         guard settings.askEnabled != on else { return }
         settings.askEnabled = on
         reconcileAsk()
-        guard !on else { return }
-        let store = snapshotStore
-        askStep { try? await store.removeAskIndexes() }
     }
 
-    /// Stops Ask for `login` and returns once nothing writes to its index, so its files can be deleted
-    /// (sign-out, a renamed login).
-    func closeAsk(of login: String) async {
-        if askWanted?.account.login == login {
-            askWanted = nil
-            let old = dropAskRuntime()
-            askStep { await old?.close() }
-        }
-        await askSteps?.value
+    /// Returns once the Ask index matches the running account and scope, so the files of an account
+    /// that stopped running or is signed out can be deleted (sign-out, a renamed login).
+    func settleAsk() async {
+        reconcileAsk()
+        await askLifecycle?.idle()
     }
 
     /// A refresh brought a fresh snapshot: the index fetches what changed since its last sync.
@@ -190,15 +175,33 @@ extension AppModel {
         Set(settings.askExcludedRepos.map { $0.lowercased() })
     }
 
-    private func openAsk(_ target: AskTarget) {
+    private func makeAskLifecycle() -> AskLifecycle<AskRuntime> {
+        let store = snapshotStore
+        return AskLifecycle(
+            open: { [unowned self] target in try self.openAsk(target) },
+            close: { [unowned self] runtime in
+                self.askProgress = nil
+                await runtime.close()
+            },
+            removeFiles: { try? await store.removeAskIndexes() })
+    }
+
+    private func openAsk(_ target: AskTarget) throws -> AskRuntime {
         let url = snapshotStore.askIndexURL(account: target.account.login, scope: target.scope)
-        guard let index = try? AskIndex(fileURL: url) else { return }
+        let index: AskIndex
+        do {
+            index = try AskIndex(fileURL: url)
+        } catch {
+            let reason = (error as? AskIndex.IndexError)?.message ?? error.localizedDescription
+            askOpenError = "Couldn't open the Ask index (\(reason))."
+            throw error
+        }
+        askOpenError = nil
         let sync = AskSync(
             index: index, fetcher: api(for: target.account), scope: target.scope,
             excluded: { [weak self] in await self?.askExcludedRepos() ?? [] },
             refreshing: { [weak self] in await self?.isRefreshingForAsk() ?? false })
         let runtime = AskRuntime(target: target, index: index, sync: sync)
-        askRuntime = runtime
         runtime.listen { [weak self] progress in
             guard let self, self.askRuntime === runtime else { return }
             self.askProgress = progress
@@ -206,6 +209,7 @@ extension AppModel {
         runtime.run { [weak self] _, index in await self?.showAskCount(of: index, for: runtime) }
         // A backfill when the index is new or unfinished, else what changed since its last sync.
         runtime.syncNow()
+        return runtime
     }
 
     private func isRefreshingForAsk() -> Bool { status.isRefreshing }
@@ -218,23 +222,6 @@ extension AppModel {
         askProgress = AskSyncProgress(
             indexed: indexed, estimatedTotal: askProgress?.estimatedTotal,
             backfilling: askProgress?.backfilling ?? false, lastSync: lastSync)
-    }
-
-    /// Detaches the running index from the model; the caller closes it.
-    private func dropAskRuntime() -> AskRuntime? {
-        let old = askRuntime
-        askRuntime = nil
-        askProgress = nil
-        return old
-    }
-
-    /// Runs Ask's close, open and delete steps in the order they were asked for.
-    private func askStep(_ body: @escaping @MainActor () async -> Void) {
-        let previous = askSteps
-        askSteps = Task {
-            await previous?.value
-            await body()
-        }
     }
 }
 

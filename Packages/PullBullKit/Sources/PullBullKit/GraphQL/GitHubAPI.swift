@@ -22,15 +22,9 @@ public enum APIError: Error, Equatable {
     /// GitHub answered FORBIDDEN for a board or an owner's board list: this token may not read it
     /// (a GitHub App's sign-in can't read personal boards).
     case boardForbidden
-}
-
-public extension APIError {
-    /// GitHub no longer resolves the PR or issue a detail fetch asked for: deleted, transferred or
-    /// no longer readable.
-    var isNotFound: Bool {
-        guard case .graphQL(let message) = self else { return false }
-        return message.hasSuffix(" not found")
-    }
+    /// The PR or issue a detail fetch asked for doesn't exist (deleted or transferred); the message
+    /// is the one shown.
+    case notFound(String)
 }
 
 public struct OrgContext: Codable, Sendable, Equatable {
@@ -600,10 +594,10 @@ public struct GitHubAPI: Sendable {
     public func detail(_ key: PRKey) async throws -> PRDetail {
         let parts = key.repo.split(separator: "/", maxSplits: 1).map(String.init)
         guard parts.count == 2 else { throw APIError.graphQL("bad repo \(key.repo)") }
-        let data = try await execute(
+        let (data, errors) = try await executeReportingErrors(
             Queries.detail, ["owner": parts[0], "name": parts[1], "n": key.number])
         guard let pr = (data["repository"] as? [String: Any])?["pullRequest"] as? [String: Any] else {
-            throw APIError.graphQL("pull request \(key.repo)#\(key.number) not found")
+            throw Self.missing(data, errors, "pull request \(key.repo)#\(key.number) not found")
         }
 
         let commit = ((pr["commits"] as? [String: Any])?["nodes"] as? [[String: Any]])?.last?["commit"]
@@ -643,11 +637,14 @@ public struct GitHubAPI: Sendable {
     public func issueDetail(_ key: PRKey) async throws -> IssueDetail {
         let parts = key.repo.split(separator: "/", maxSplits: 1).map(String.init)
         guard parts.count == 2 else { throw APIError.graphQL("bad repo \(key.repo)") }
-        let data = try await execute(
+        let (data, errors) = try await executeReportingErrors(
             Queries.issueDetail, ["owner": parts[0], "name": parts[1], "n": key.number])
-        guard let node = (data["repository"] as? [String: Any])?["issue"] as? [String: Any],
-              let issue = Decoding.issue(from: node)
-        else { throw APIError.graphQL("issue \(key.repo)#\(key.number) not found") }
+        let message = "issue \(key.repo)#\(key.number) not found"
+        guard let node = (data["repository"] as? [String: Any])?["issue"] as? [String: Any] else {
+            throw Self.missing(data, errors, message)
+        }
+        // A node that is there but doesn't decode isn't a missing issue.
+        guard let issue = Decoding.issue(from: node) else { throw APIError.graphQL(message) }
 
         let commentsConnection = node["lastComments"] as? [String: Any]
         let commentNodes = commentsConnection?["nodes"] as? [[String: Any]] ?? []
@@ -724,6 +721,16 @@ public struct GitHubAPI: Sendable {
     /// A 401 is reported to the token source; the query is sent again, once, when it has a new token.
     private func execute(_ query: String, _ variables: [String: Any]) async throws -> [String: Any] {
         try await executeReportingErrors(query, variables).data
+    }
+
+    /// Why a detail's PR or issue node is null: `.notFound` when GitHub says so (a `NOT_FOUND` error,
+    /// or the repository there without the item), else `.graphQL(message)`, as for a repository hidden
+    /// behind `FORBIDDEN` (single sign-on, permissions).
+    private static func missing(_ data: [String: Any], _ errors: [[String: Any]], _ message: String) -> APIError {
+        if isForbidden(errors) { return .graphQL(message) }
+        let notFound = data["repository"] is [String: Any]
+            || errors.contains { $0["type"] as? String == "NOT_FOUND" }
+        return notFound ? .notFound(message) : .graphQL(message)
     }
 
     private static func isForbidden(_ errors: [[String: Any]]) -> Bool {

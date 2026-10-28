@@ -196,6 +196,9 @@ struct AskSettingsTab: View {
                     }
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
+                } else if let error = model.askOpenError {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
                 } else {
                     Text("Indexing starts once an account is running.")
                         .foregroundStyle(.secondary)

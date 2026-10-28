@@ -101,37 +101,31 @@ private func tempDir() -> URL {
 
     @Test func missingIssueThrows() async throws {
         let stub = StubTransport([(Data(#"{"data":{"repository":{"issue":null}}}"#.utf8), response(200))])
-        await #expect(throws: APIError.graphQL("issue initech/gadgets#231 not found")) {
+        await #expect(throws: APIError.notFound("issue initech/gadgets#231 not found")) {
             try await api(stub).issueDetail(key)
         }
     }
 
-    /// A PR or issue GitHub no longer resolves reads as not found; other failures don't.
-    @Test func missingItemIsNotFound() async throws {
-        let missing: [(Data, HTTPURLResponse)] = [
-            (Data(#"{"data":{"repository":{"issue":null}}}"#.utf8), response(200)),
+    /// Only an item GitHub says is gone is `.notFound`: a repository hidden by FORBIDDEN, a node that
+    /// doesn't decode and a server error keep their errors, with the same message.
+    @Test func onlyAMissingItemIsNotFound() async throws {
+        let issueMessage = "issue initech/gadgets#231 not found"
+        let prMessage = "pull request initech/gadgets#231 not found"
+        let stub = StubTransport([
             (Data(#"{"data":{"repository":null},"errors":[{"type":"NOT_FOUND"}]}"#.utf8), response(200)),
+            (Data(#"{"data":{"repository":{"pullRequest":null}}}"#.utf8), response(200)),
+            (Data(#"{"data":{"repository":null},"errors":[{"type":"FORBIDDEN"}]}"#.utf8), response(200)),
+            (Data(#"{"data":{"repository":null},"errors":[{"type":"FORBIDDEN"},{"type":"NOT_FOUND"}]}"#.utf8), response(200)),
+            (Data(#"{"data":{"repository":{"issue":{"number":"x"}}}}"#.utf8), response(200)),
             (Data("{}".utf8), response(502)),
-        ]
-        let stub = StubTransport(missing)
-        do {
-            _ = try await api(stub).issueDetail(key)
-            Issue.record("expected a throw")
-        } catch {
-            #expect((error as? APIError)?.isNotFound == true)
-        }
-        do {
-            _ = try await api(stub).detail(key)
-            Issue.record("expected a throw")
-        } catch {
-            #expect((error as? APIError)?.isNotFound == true)
-        }
-        do {
-            _ = try await api(stub).detail(key)
-            Issue.record("expected a throw")
-        } catch {
-            #expect((error as? APIError)?.isNotFound == false)
-        }
+        ])
+        await #expect(throws: APIError.notFound(issueMessage)) { try await api(stub).issueDetail(key) }
+        await #expect(throws: APIError.notFound(prMessage)) { try await api(stub).detail(key) }
+        await #expect(throws: APIError.graphQL(prMessage)) { try await api(stub).detail(key) }
+        await #expect(throws: APIError.graphQL(issueMessage)) { try await api(stub).issueDetail(key) }
+        await #expect(throws: APIError.graphQL(issueMessage)) { try await api(stub).issueDetail(key) }
+        await #expect(throws: APIError.server(502)) { try await api(stub).detail(key) }
+        #expect(RefreshError(APIError.notFound(issueMessage)) == RefreshError(APIError.graphQL(issueMessage)))
     }
 
     @Test func noCommentsMeansNoEarlierCount() {

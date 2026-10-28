@@ -203,12 +203,10 @@ final class AppModel {
     var askProgress: AskSyncProgress?
     /// The Anthropic key's state for Settings → Ask.
     var askKeyState: AskKeyState = .none
-    /// The open Ask index and its sync; nil while Ask is off or no account runs.
-    @ObservationIgnored var askRuntime: AskRuntime?
-    /// The account and scope Ask is set up for; `askRuntime` follows once the old sync has stopped.
-    @ObservationIgnored var askWanted: AskTarget?
-    /// Orders Ask's close, open and delete steps.
-    @ObservationIgnored var askSteps: Task<Void, Never>?
+    /// Why the Ask index couldn't open; nil after a successful open and while Ask is off.
+    var askOpenError: String?
+    /// Opens and closes the Ask index; created on first use.
+    @ObservationIgnored var askLifecycle: AskLifecycle<AskRuntime>?
     /// Watches connectivity so a refresh runs as soon as the network is back (see `NetworkRecovery`);
     /// started by the main init only, cancelled in deinit.
     @ObservationIgnored private let pathMonitor = NWPathMonitor()
@@ -1493,7 +1491,7 @@ final class AppModel {
         signedOutDropped = account
         let store = snapshotStore
         Task { [weak self] in
-            await self?.closeAsk(of: account.login)
+            await self?.settleAsk()
             try? await store.removeAll(account: account.login)
         }
     }
@@ -1731,7 +1729,7 @@ extension AppModel {
             } catch {
                 guard let self, !Task.isCancelled, self.detailFetch?.key == key else { return }
                 self.detailFetch = DetailFetch(key: key, isLoading: false, error: self.message(for: RefreshError(error)))
-                if (error as? APIError)?.isNotFound == true { self.askItemNotFound(key) }
+                if case APIError.notFound = error { self.askItemNotFound(key) }
             }
         }
     }
@@ -2039,7 +2037,7 @@ extension AppModel {
                 guard let self, !Task.isCancelled, self.issueDetailFetch?.key == key else { return }
                 self.issueDetailFetch = DetailFetch(
                     key: key, isLoading: false, error: self.message(for: RefreshError(error)))
-                if (error as? APIError)?.isNotFound == true { self.askItemNotFound(key) }
+                if case APIError.notFound = error { self.askItemNotFound(key) }
             }
         }
     }
@@ -2227,7 +2225,7 @@ extension AppModel {
     /// The old login's caches after a rename, unless a `gh` login still uses that name.
     private func dropCaches(ofRenamed renamed: AccountSummary?) async {
         guard let renamed, !accounts.contains(where: { $0.login == renamed.login }) else { return }
-        await closeAsk(of: renamed.login)
+        await settleAsk()
         try? await snapshotStore.removeAll(account: renamed.login)
     }
 
@@ -2294,7 +2292,7 @@ extension AppModel {
             var avatars = await snapshotStore.avatarURLs(account: account.login)
             avatars.formUnion(CachedAvatars.own(login: account.login, avatarURL: summary?.avatarURL))
             AvatarCache.shared.remove(avatars)
-            await closeAsk(of: account.login)
+            await settleAsk()
             try? await snapshotStore.removeAll(account: account.login)
         }
         return removedFromKeychain
