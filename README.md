@@ -125,7 +125,7 @@ Or download the zip from [Releases](https://github.com/rustycamper/pullbull/rele
 
 ## Contributing
 
-Bug reports welcome. For bigger changes, open an issue first.
+Bug reports and fixes welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
