@@ -133,10 +133,10 @@ Settings → Ask.
 | Ask on/off | Off |
 | Anthropic API key | Empty. Stored in the Keychain only |
 | Model | Sonnet 5.5. Haiku 5.5 is cheaper and less accurate |
-| Exclude from Ask | Empty. Repos from the account's scope that Ask never stores or sends |
-| Index | Items indexed, backfill progress, last sync, **Rebuild** |
+| Exclude from Ask | Empty. Pick from the repos of the current org or scope; excluded repos are never stored or sent |
+| Index | Shown while Ask is on: items indexed, backfill progress ("N of ~M") or last sync, **Rebuild** |
 
-- The key is checked when you save it (`GET /v1/models`, free). A bad key never reaches a question
+- The key can be saved only while Ask is on. It is checked when you save it (`GET /v1/models`, free). A bad key never reaches a question
 - Without a key, <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> says "Add an Anthropic API key in Settings → Ask" and sends nothing
 
 ### What is sent
@@ -166,7 +166,7 @@ Settings → Ask.
 - Each Ask stands alone; there are no follow-up questions
 - Questions about deployment ("is it on production?") are answered only from what descriptions and labels say. The answer says so when it can't confirm
 - "Nothing matched" is a valid answer; try other words
-- Errors show as one line in place of the answer: no network, bad key, rate limited, timeout, refusal
+- Errors show as one line in place of the answer: no network, key rejected, rate limited, no answer in 20 s, declined, answer cut off, no answer, HTTP error
 - While the index is still syncing, Ask runs on what is indexed and says so
 
 ### Index
@@ -176,7 +176,7 @@ Settings → Ask.
 | Contents | PRs and issues updated in the last 90 days in the account's scope, with full descriptions. No comments |
 | Where | This Mac, in the cache folder ([Data](#data)). Never sent as a whole |
 | Built | Turning Ask on starts a paced backfill; regular refresh goes first. Then it updates on each refresh |
-| Deleted | On sign-out, Ask off, or **Rebuild** |
+| Deleted | Ask off (every index file), sign-out, or a renamed login. **Rebuild** empties the index and refetches; the file stays |
 | Excluded repos | Never stored. Rows are deleted when you add a repo to the list; removing it backfills the repo |
 
 ### Cost
@@ -251,7 +251,7 @@ Click a notification to open the detail.
 | Cache | `~/Library/Application Support/io.github.rustycamper.pullbull/` |
 | Avatars | `~/Library/Caches/io.github.rustycamper.pullbull/` |
 | Settings | defaults domain `io.github.rustycamper.pullbull` |
-| Ask index | Same cache folder, one file per account. Only while Ask is on |
+| Ask index | Same cache folder, one file per account and scope. Only while Ask is on |
 | Sign-in tokens | Keychain, this Mac only, not synced |
 | Anthropic API key | Keychain, this Mac only, not synced |
 | `gh` tokens | Not stored |
