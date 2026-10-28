@@ -115,7 +115,7 @@ struct AskView: View {
     static func sourceLine(_ answer: AskAnswer) -> String {
         let parts = answer.elapsed.components
         let seconds = Double(parts.seconds) + Double(parts.attoseconds) / 1e18
-        return "\(answer.model.name) · \(String(format: "%.1f", seconds)) s · \(answer.cardsSent) candidates sent"
+        return "\(answer.model.name) · \(seconds.formatted(.number.precision(.fractionLength(1)).locale(Locale(identifier: "en_US_POSIX")))) s · \(answer.cardsSent) candidates sent"
     }
 
     // MARK: Footer
@@ -203,8 +203,8 @@ private struct AskRow: View {
 
     @ViewBuilder private var statePill: some View {
         switch item.state {
-        case "merged": Pill(symbol: nil, text: "Merged", foreground: Palette.mergedText, fill: Palette.mergedFill)
-        case "closed": Pill(symbol: nil, text: "Closed", foreground: Palette.closedText, fill: Palette.closedFill)
+        case "merged": EndedPill(merged: true)
+        case "closed": EndedPill(merged: false)
         case "draft": DraftPill()
         default: Pill(symbol: nil, text: "Open", foreground: Palette.secondaryText, fill: Palette.fill)
         }
@@ -213,13 +213,7 @@ private struct AskRow: View {
     private var glyph: (symbol: String, color: Color) {
         switch item.kind {
         case .pr:
-            let g: PRGlyph =
-                switch item.state {
-                case "merged": .merged
-                case "closed": .closed
-                case "draft": .draft
-                default: .open
-                }
+            let g = PRGlyph(state: PRState(rawValue: item.state) ?? .open, isDraft: item.state == "draft")
             return (Palette.prGlyph(g), Palette.prGlyphColor(g))
         case .issue:
             let g = Palette.issueGlyph(item.state == "closed" ? .completed : .open)

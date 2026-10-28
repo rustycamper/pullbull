@@ -509,8 +509,8 @@ private struct SearchPRRow: View {
 
     @ViewBuilder private var trailing: some View {
         switch pr.state {
-        case .merged: Pill(symbol: nil, text: "Merged", foreground: Palette.mergedText, fill: Palette.mergedFill)
-        case .closed: Pill(symbol: nil, text: "Closed", foreground: Palette.closedText, fill: Palette.closedFill)
+        case .merged: EndedPill(merged: true)
+        case .closed: EndedPill(merged: false)
         case .open: CIGlyph(state: pr.ci)
         }
     }

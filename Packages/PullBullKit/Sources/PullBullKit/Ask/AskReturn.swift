@@ -2,7 +2,7 @@ import Foundation
 
 /// Where Back, Esc and a popover reopen land for the Ask screen and the details opened from it. Route
 /// agnostic: the app maps its own `Route` to `Place` and back.
-public enum AskReturn {
+public struct AskReturn: Equatable, Sendable {
     public enum Place: Equatable, Sendable {
         case search, list, ask, issueDetail, pullRequestDetail
     }
@@ -13,14 +13,23 @@ public enum AskReturn {
         public let searchText: String
     }
 
-    /// Closing a detail goes back to where it was opened from. A PR linked from an issue that Ask opened
-    /// returns to that issue (`.issueDetail`), and closing the issue returns to `.ask`.
-    public static func closing(openedFrom: Place) -> Place { openedFrom }
+    /// Where each open detail returns to, innermost last.
+    private var openers: [Place] = []
 
-    /// The detail's back button title when it was opened from Ask.
-    public static func backTitle(openedFrom: Place) -> String? {
-        openedFrom == .ask ? "Ask results" : nil
-    }
+    public init() {}
+
+    /// A detail opens from `place`. An issue opened from Ask pushes `.ask`; a PR linked from that issue
+    /// pushes `.issueDetail`.
+    public mutating func open(from place: Place) { openers.append(place) }
+
+    /// The innermost detail closes: back to its opener, `.list` when nothing is open.
+    public mutating func close() -> Place { openers.popLast() ?? .list }
+
+    /// The back button's title for the innermost detail: "Ask results" only when Ask opened it.
+    public var backTitle: String? { openers.last == .ask ? "Ask results" : nil }
+
+    /// Leaving Ask or the popover closing drops every open detail.
+    public mutating func reset() { openers.removeAll() }
 
     /// Esc on the Ask screen: the search field, with the question kept.
     public static func leavingAsk(question: String) -> Landing {

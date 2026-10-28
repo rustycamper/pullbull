@@ -5,25 +5,34 @@ import Testing
 private let closedAt = Date(timeIntervalSince1970: 1_800_000_000)
 
 @Test func returnRouteAsk() {
-    // A detail opened from Ask closes onto Ask.
-    #expect(AskReturn.closing(openedFrom: .ask) == .ask)
-    // A PR linked from an issue that was opened from Ask: back to the issue first, then Ask.
-    #expect(AskReturn.closing(openedFrom: .issueDetail) == .issueDetail)
-    #expect(AskReturn.closing(openedFrom: .ask) == .ask)
-    // Details opened elsewhere are not Ask's business.
-    #expect(AskReturn.closing(openedFrom: .list) == .list)
-    #expect(AskReturn.closing(openedFrom: .search) == .search)
+    var route = AskReturn()
+    // Ask opens an issue; the issue opens a linked PR.
+    route.open(from: .ask)
+    #expect(route.backTitle == "Ask results")
+    route.open(from: .issueDetail)
+    #expect(route.backTitle == nil)
+    // Closing the PR comes back through the issue, then to Ask.
+    #expect(route.close() == .issueDetail)
+    #expect(route.backTitle == "Ask results")
+    #expect(route.close() == .ask)
+    // Nothing open: the list.
+    #expect(route.close() == .list)
+}
+
+@Test func detailOpenedFromAskClosesOntoAsk() {
+    var route = AskReturn()
+    route.open(from: .ask)
+    #expect(route.close() == .ask)
+    // A detail opened from the list does not return to Ask.
+    route.open(from: .list)
+    #expect(route.backTitle == nil)
+    #expect(route.close() == .list)
 }
 
 @Test func escOnAskGoesBackToSearchWithTheQuestion() {
     let landing = AskReturn.leavingAsk(question: "who fixed the acme paging bug")
     #expect(landing.place == .search)
     #expect(landing.searchText == "who fixed the acme paging bug")
-}
-
-@Test func backTitleNamesAskResults() {
-    #expect(AskReturn.backTitle(openedFrom: .ask) == "Ask results")
-    #expect(AskReturn.backTitle(openedFrom: .list) == nil)
 }
 
 @Test func reopenAfterLongWhileKeepsQuestion() {
