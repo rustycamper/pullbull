@@ -120,11 +120,18 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var savedSearches = SavedSearches()
     /// The Board tab's folded lanes, per board.
     public var laneFolds = LaneFolds()
+    /// Ask (AI search over a local index) is on. Off means no index file, no backfill and no key check.
+    public var askEnabled = false
+    /// The `AskModel` ID Ask uses; an unknown one reads as `AskModel.default`.
+    public var askModel = AskModel.default.id
+    /// Repos (`owner/name`) Ask never indexes or sends.
+    public var askExcludedRepos: [String] = []
 
     private enum CodingKeys: String, CodingKey {
         case account, org, projectNumber, projectOwner, projectOrg, orgByAccount, grouping, compact,
             hideOlderThanTwoMonths, hideApprovedByMe, hideDrafts, badge, notify, refreshMinutes, lastTab, toggleHotkey, mode, lastIssueTab,
-            countAssignedIssues, solidBackground, accountSource, appAccounts, signedOutByUser, laneFolds
+            countAssignedIssues, solidBackground, accountSource, appAccounts, signedOutByUser, laneFolds,
+            askEnabled, askModel, askExcludedRepos
     }
 
     public init() {}
@@ -177,6 +184,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         d.appAccounts = c.readableElements(AccountSummary.self, forKey: .appAccounts) ?? d.appAccounts
         d.signedOutByUser = c.readable(Bool.self, forKey: .signedOutByUser) ?? d.signedOutByUser
         d.laneFolds = c.readable(LaneFolds.self, forKey: .laneFolds) ?? d.laneFolds
+        d.askEnabled = c.readable(Bool.self, forKey: .askEnabled) ?? d.askEnabled
+        d.askModel = c.readable(String.self, forKey: .askModel) ?? d.askModel
+        d.askExcludedRepos = c.readableElements(String.self, forKey: .askExcludedRepos) ?? d.askExcludedRepos
         self = d
     }
 
@@ -205,6 +215,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         try c.encode(appAccounts, forKey: .appAccounts)
         try c.encode(signedOutByUser, forKey: .signedOutByUser)
         try c.encode(laneFolds, forKey: .laneFolds)
+        try c.encode(askEnabled, forKey: .askEnabled)
+        try c.encode(askModel, forKey: .askModel)
+        try c.encode(askExcludedRepos, forKey: .askExcludedRepos)
     }
 
     /// The current account with its token source; nil when none is chosen.

@@ -289,6 +289,31 @@ private func sample() -> Snapshot {
         #expect(await store.loadDetail(key, account: "octocat-2") != nil)
     }
 
+    /// Ask off deletes every account's and scope's Ask index, and nothing else.
+    @Test func removeAskIndexesKeepsSnapshots() async throws {
+        let dir = tempDir()
+        let store = SnapshotStore(directory: dir)
+        try await store.save(sample(), account: "octocat", scope: .org("acme"))
+        let fm = FileManager.default
+        let indexes = [
+            store.askIndexURL(account: "octocat", scope: .org("acme")),
+            store.askIndexURL(account: "octocat-2", scope: .personal(login: "octocat-2")),
+        ]
+        for url in indexes {
+            for suffix in ["", "-wal", "-shm"] {
+                #expect(fm.createFile(atPath: url.path + suffix, contents: Data("x".utf8)))
+            }
+        }
+
+        try await store.removeAskIndexes()
+
+        for url in indexes {
+            for suffix in ["", "-wal", "-shm"] { #expect(!fm.fileExists(atPath: url.path + suffix)) }
+        }
+        #expect(await store.load(account: "octocat", scope: .org("acme")) != nil)
+        try await store.removeAskIndexes()
+    }
+
     @Test func removeAllWithNoFilesDoesNotThrow() async throws {
         let store = SnapshotStore(directory: tempDir())
         try await store.removeAll(account: "octocat")
@@ -622,6 +647,28 @@ private func sample() -> Snapshot {
         s.signedOutByUser = true
         store.save(s)
         #expect(store.load().signedOutByUser)
+        #expect(store.load() == s)
+    }
+
+    /// Settings saved before Ask read as Ask off, Sonnet and nothing excluded; set values round-trip.
+    @Test func askSettingsDefaultAndDecodeOldFile() throws {
+        let old = #"{"account":"me","refreshMinutes":5}"#
+        let read = try JSONDecoder().decode(AppSettings.self, from: Data(old.utf8))
+        #expect(read.askEnabled == false)
+        #expect(read.askModel == "claude-sonnet-5-5")
+        #expect(read.askExcludedRepos == [])
+        #expect(read.refreshMinutes == 5)
+        let garbage = #"{"askEnabled":"yes","askModel":7,"askExcludedRepos":["acme/web",3]}"#
+        let partial = try JSONDecoder().decode(AppSettings.self, from: Data(garbage.utf8))
+        #expect(partial.askEnabled == false)
+        #expect(partial.askModel == AskModel.default.id)
+        #expect(partial.askExcludedRepos == ["acme/web"])
+        let store = SettingsStore(defaults: defaults())
+        var s = AppSettings()
+        s.askEnabled = true
+        s.askModel = "claude-haiku-5-5"
+        s.askExcludedRepos = ["acme/web", "acme/api"]
+        store.save(s)
         #expect(store.load() == s)
     }
 

@@ -170,7 +170,7 @@ final class AppModel {
     private(set) var installCheckError: RefreshError?
 
     @ObservationIgnored private let settingsStore: SettingsStore
-    @ObservationIgnored private let snapshotStore: SnapshotStore
+    @ObservationIgnored let snapshotStore: SnapshotStore
     @ObservationIgnored private let gh: GhCLI
     @ObservationIgnored private let transport: any GraphQLTransport
     @ObservationIgnored private let httpTransport: any HTTPTransport
@@ -191,11 +191,24 @@ final class AppModel {
     /// Accounts whose token can't read notifications (the activity check), until they sign in or out
     /// again or the app restarts; their loops poll without the check.
     @ObservationIgnored private var activityUnsupported: Set<AccountRef> = []
-    @ObservationIgnored private var running: RunConfig?
+    @ObservationIgnored private var running: RunConfig? {
+        didSet { reconcileAsk() }
+    }
     @ObservationIgnored private var updatesTask: Task<Void, Never>?
     @ObservationIgnored private var bootstrapTask: Task<Void, Never>?
     @ObservationIgnored private var wakeObserver: (any NSObjectProtocol)?
     @ObservationIgnored private var activationObserver: (any NSObjectProtocol)?
+    // Ask (see Ask/AppModel+Ask.swift).
+    /// The Ask index's progress for Settings → Ask; nil while no index is open.
+    var askProgress: AskSyncProgress?
+    /// The Anthropic key's state for Settings → Ask.
+    var askKeyState: AskKeyState = .none
+    /// The open Ask index and its sync; nil while Ask is off or no account runs.
+    @ObservationIgnored var askRuntime: AskRuntime?
+    /// The account and scope Ask is set up for; `askRuntime` follows once the old sync has stopped.
+    @ObservationIgnored var askWanted: AskTarget?
+    /// Orders Ask's close, open and delete steps.
+    @ObservationIgnored var askSteps: Task<Void, Never>?
     /// Watches connectivity so a refresh runs as soon as the network is back (see `NetworkRecovery`);
     /// started by the main init only, cancelled in deinit.
     @ObservationIgnored private let pathMonitor = NWPathMonitor()
@@ -284,6 +297,9 @@ final class AppModel {
         var ref: AccountRef { AccountRef(login: account, source: source) }
     }
 
+    /// The running account and scope, which Ask indexes while it is on.
+    var runningAskTarget: AskTarget? { running.map { AskTarget(account: $0.ref, scope: $0.scope) } }
+
     /// "Use X from GitHub CLI": running, or the message of its failure.
     struct GhUse: Equatable {
         let login: String
@@ -352,6 +368,7 @@ final class AppModel {
                 case .signedOut: self.dropSignedOutData(account)
                 case .valid, .unsaved: if self.signedOutDropped == account { self.signedOutDropped = nil }
                 }
+                self.reconcileAsk()
             }
         }
         cacheTrimTask = Self.trimCaches(snapshotStore)
@@ -1294,7 +1311,7 @@ final class AppModel {
             installationID: installationID)
     }
 
-    private func api(for account: AccountRef) -> GitHubAPI {
+    func api(for account: AccountRef) -> GitHubAPI {
         GitHubAPI(transport: transport, auth: broker.source(for: account))
     }
 
@@ -1475,7 +1492,10 @@ final class AppModel {
         guard signedOutDropped != account else { return }
         signedOutDropped = account
         let store = snapshotStore
-        Task { try? await store.removeAll(account: account.login) }
+        Task { [weak self] in
+            await self?.closeAsk(of: account.login)
+            try? await store.removeAll(account: account.login)
+        }
     }
 
     /// Account or org changed: drops everything shown for the previous one.
@@ -1515,6 +1535,7 @@ final class AppModel {
         rebuildTabs()
         if route == .search, searchResults == nil, snapshot != nil { updateSearch(searchText) }
         prefetchAfterSuccessfulRefresh(status)
+        syncAskAfterRefresh(status)
         if !status.isRefreshing, status.error == nil { pickPersonalBoardIfNeeded() }
         // The token may lack the project scope that was assumed; scopes are read again (throttled).
         if snapshot?.boardError == RefreshError(APIError.insufficientScopes).message { reloadAccounts() }
@@ -1710,6 +1731,7 @@ extension AppModel {
             } catch {
                 guard let self, !Task.isCancelled, self.detailFetch?.key == key else { return }
                 self.detailFetch = DetailFetch(key: key, isLoading: false, error: self.message(for: RefreshError(error)))
+                if (error as? APIError)?.isNotFound == true { self.askItemNotFound(key) }
             }
         }
     }
@@ -2017,6 +2039,7 @@ extension AppModel {
                 guard let self, !Task.isCancelled, self.issueDetailFetch?.key == key else { return }
                 self.issueDetailFetch = DetailFetch(
                     key: key, isLoading: false, error: self.message(for: RefreshError(error)))
+                if (error as? APIError)?.isNotFound == true { self.askItemNotFound(key) }
             }
         }
     }
@@ -2204,6 +2227,7 @@ extension AppModel {
     /// The old login's caches after a rename, unless a `gh` login still uses that name.
     private func dropCaches(ofRenamed renamed: AccountSummary?) async {
         guard let renamed, !accounts.contains(where: { $0.login == renamed.login }) else { return }
+        await closeAsk(of: renamed.login)
         try? await snapshotStore.removeAll(account: renamed.login)
     }
 
@@ -2270,6 +2294,7 @@ extension AppModel {
             var avatars = await snapshotStore.avatarURLs(account: account.login)
             avatars.formUnion(CachedAvatars.own(login: account.login, avatarURL: summary?.avatarURL))
             AvatarCache.shared.remove(avatars)
+            await closeAsk(of: account.login)
             try? await snapshotStore.removeAll(account: account.login)
         }
         return removedFromKeychain

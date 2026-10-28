@@ -106,6 +106,34 @@ private func tempDir() -> URL {
         }
     }
 
+    /// A PR or issue GitHub no longer resolves reads as not found; other failures don't.
+    @Test func missingItemIsNotFound() async throws {
+        let missing: [(Data, HTTPURLResponse)] = [
+            (Data(#"{"data":{"repository":{"issue":null}}}"#.utf8), response(200)),
+            (Data(#"{"data":{"repository":null},"errors":[{"type":"NOT_FOUND"}]}"#.utf8), response(200)),
+            (Data("{}".utf8), response(502)),
+        ]
+        let stub = StubTransport(missing)
+        do {
+            _ = try await api(stub).issueDetail(key)
+            Issue.record("expected a throw")
+        } catch {
+            #expect((error as? APIError)?.isNotFound == true)
+        }
+        do {
+            _ = try await api(stub).detail(key)
+            Issue.record("expected a throw")
+        } catch {
+            #expect((error as? APIError)?.isNotFound == true)
+        }
+        do {
+            _ = try await api(stub).detail(key)
+            Issue.record("expected a throw")
+        } catch {
+            #expect((error as? APIError)?.isNotFound == false)
+        }
+    }
+
     @Test func noCommentsMeansNoEarlierCount() {
         let issue = BoardIssue(key: key, title: "t", url: URL(string: "https://github.com/o/r/issues/1")!, isOpen: true)
         let d = IssueDetail(key: key, issue: issue, body: "", commentTotal: 0, lastComments: [], linkedPRs: [])

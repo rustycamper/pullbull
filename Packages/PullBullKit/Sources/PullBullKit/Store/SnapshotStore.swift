@@ -54,9 +54,8 @@ public actor SnapshotStore {
         let fm = FileManager.default
         let prefix = Self.sanitize(account) + "@"
         let names = (try? fm.contentsOfDirectory(atPath: directory.path)) ?? []
-        let askSuffixes = [".ask.sqlite", ".ask.sqlite-wal", ".ask.sqlite-shm"]
         for name in names where name.hasPrefix(prefix)
-            && (name.hasSuffix(".json") || askSuffixes.contains(where: name.hasSuffix)) {
+            && (name.hasSuffix(".json") || Self.askSuffixes.contains(where: name.hasSuffix)) {
             try fm.removeItem(at: directory.appendingPathComponent(name))
         }
         let details = directory
@@ -92,6 +91,18 @@ public actor SnapshotStore {
     private func snapshotURL(account: String, scope: FetchScope) -> URL {
         directory.appendingPathComponent("\(Self.sanitize(account))@\(Self.sanitize(scope.cacheKey)).json")
     }
+
+    /// Deletes the Ask index of every account and scope (Ask turned off). Snapshots and details stay.
+    public func removeAskIndexes() throws {
+        let fm = FileManager.default
+        let names = (try? fm.contentsOfDirectory(atPath: directory.path)) ?? []
+        for name in names where Self.askSuffixes.contains(where: name.hasSuffix) {
+            try fm.removeItem(at: directory.appendingPathComponent(name))
+        }
+    }
+
+    /// An Ask index file and SQLite's write-ahead log and shared memory beside it.
+    private static let askSuffixes = [".ask.sqlite", ".ask.sqlite-wal", ".ask.sqlite-shm"]
 
     /// `<login>@<org>.ask.sqlite`, the Ask index beside the snapshot of the same scope.
     public nonisolated func askIndexURL(account: String, scope: FetchScope) -> URL {

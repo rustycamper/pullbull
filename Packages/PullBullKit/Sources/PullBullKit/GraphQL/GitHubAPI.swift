@@ -24,6 +24,15 @@ public enum APIError: Error, Equatable {
     case boardForbidden
 }
 
+public extension APIError {
+    /// GitHub no longer resolves the PR or issue a detail fetch asked for: deleted, transferred or
+    /// no longer readable.
+    var isNotFound: Bool {
+        guard case .graphQL(let message) = self else { return false }
+        return message.hasSuffix(" not found")
+    }
+}
+
 public struct OrgContext: Codable, Sendable, Equatable {
     public let org: String
     public let viewer: String
