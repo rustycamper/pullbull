@@ -7,6 +7,8 @@ private actor Script: HTTPTransport {
         case reply(String)
         case hang(TestClock)
         case fail(URLError)
+        /// Runs the hook as the request arrives, then replies.
+        case hook(@Sendable () -> Void, String)
     }
 
     private var steps: [Step]
@@ -21,6 +23,9 @@ private actor Script: HTTPTransport {
         steps.removeFirst()
         switch step {
         case .reply(let json):
+            return (Data(json.utf8), HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        case .hook(let hook, let json):
+            hook()
             return (Data(json.utf8), HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!)
         case .fail(let error):
             throw error
@@ -44,6 +49,18 @@ private func toolReply(_ name: String, _ input: [String: Any]) -> Script.Step {
 
 private func show(_ keys: [String]) -> Script.Step {
     toolReply("show_results", ["results": keys.map { ["key": $0, "why": "fits"] }, "answer": "Here."])
+}
+
+private func replyBody(_ step: Script.Step) -> String {
+    if case .reply(let body) = step { return body }
+    return ""
+}
+
+private final class TaskBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var task: Task<AskOutcome, any Error>?
+    func set(_ task: Task<AskOutcome, any Error>) { lock.withLock { self.task = task } }
+    func cancel() { lock.withLock { task }?.cancel() }
 }
 
 private func searchLocal(_ query: String) -> Script.Step { toolReply("search_local", ["query": query]) }
@@ -142,5 +159,45 @@ private func makeSession(
     @Test func urlErrorCancelledIsRethrown() async throws {
         let (session, _) = try await makeSession([.fail(URLError(.cancelled))], items: [item("acme/web", 1)])
         await #expect(throws: URLError.self) { try await session.run("login", focusedRepo: nil, stillSyncing: nil) }
+    }
+
+    @Test func moreAppliesFocusedRepoAndExcludeRecheck() async throws {
+        let (session, script) = try await makeSession(
+            [searchLocal("zebra"), show(["acme/web#4"])],
+            items: [
+                item("acme/web", 1), item("acme/web", 4, title: "zebra feature"),
+                item("acme/api", 2, title: "zebra retry"), item("acme/old", 3, title: "zebra retry"),
+            ],
+            excluded: ["acme/old"])
+        _ = try await session.run("login", focusedRepo: "acme/web", stillSyncing: nil)
+        let bodies = await script.bodies
+        #expect(bodies.count == 2)
+        #expect(bodies[1].contains("acme/web#4"))
+        #expect(!bodies[1].contains("acme/api#2"))
+        #expect(!bodies[1].contains("acme/old#3"))
+    }
+
+    @Test func moreSearchesPastAlreadyShownCards() async throws {
+        let shown = (1...20).map { item("acme/web", $0, title: "alpha zebra") }
+        let fresh = AskItem(
+            key: PRKey(repo: "acme/web", number: 21), kind: .issue, state: "open", author: "ann",
+            created: Date(timeIntervalSince1970: 1000), updated: Date(timeIntervalSince1970: 1_000_000),
+            labels: [], title: "beta", body: "zebra")
+        let (session, script) = try await makeSession(
+            [searchLocal("zebra"), show(["acme/web#21"])], items: shown + [fresh])
+        let outcome = try await session.run("alpha", focusedRepo: nil, stillSyncing: nil)
+        guard case .answered(_, _, let rows, _) = outcome else { Issue.record("expected answered"); return }
+        #expect(rows.map(\.key.number) == [21])
+        #expect(try #require(await script.bodies.last).contains("acme/web#21"))
+    }
+
+    @Test func cancelDuringFollowUpSearchPropagates() async throws {
+        let box = TaskBox()
+        let hooked = Script.Step.hook({ box.cancel() }, replyBody(searchLocal("zebra")))
+        let (session, _) = try await makeSession(
+            [hooked, show(["acme/web#1"])], items: [item("acme/web", 1)])
+        let task = Task { try await session.run("login", focusedRepo: nil, stillSyncing: nil) }
+        box.set(task)
+        await #expect(throws: CancellationError.self) { try await task.value }
     }
 }
