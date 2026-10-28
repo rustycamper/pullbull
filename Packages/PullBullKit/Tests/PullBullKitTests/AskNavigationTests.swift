@@ -166,3 +166,35 @@ private func answered(_ question: String) -> AskOutcome {
     #expect(state.outcome == nil)
     #expect(state.errorLine(for: "q") == nil)
 }
+
+@Test func longReopenOnADetailOpenedFromAskLandsOnSearchWithTheQuestion() {
+    let question = "paging bug in acme/web"
+    let long = closedAt.addingTimeInterval(PopoverReopen.keepDetailFor)
+    // Ask opened an issue, and the issue a linked PR.
+    var route = AskReturn()
+    route.open(from: .ask)
+    route.open(from: .issueDetail)
+    let landing = route.reopen(at: .pullRequestDetail, question: question, closedAt: closedAt, now: long)
+    #expect(landing == AskReturn.Landing(place: .search, searchText: question))
+    // Nothing is left to go back through.
+    #expect(route.isEmpty)
+}
+
+@Test func reopenWithinAMinuteKeepsTheAskChain() {
+    var route = AskReturn()
+    route.open(from: .ask)
+    let soon = closedAt.addingTimeInterval(59)
+    let landing = route.reopen(at: .issueDetail, question: "q", closedAt: closedAt, now: soon)
+    #expect(landing.place == .issueDetail)
+    #expect(!route.isEmpty)
+    #expect(route.close() == .ask)
+}
+
+@Test func askWithoutAnOpenIndexSaysSo() {
+    var state = AskState()
+    let token = state.begin("q")
+    state.refuse(AskState.indexNotReadyNotice)
+    #expect(state.notice == "Ask index isn't ready yet.")
+    #expect(state.asking == nil)
+    #expect(state.land(answered("q"), token: token) == .ignored)
+}

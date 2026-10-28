@@ -14,6 +14,8 @@ public struct AskState: Equatable, Sendable {
     }
 
     public static let needsKeyNotice = "Add an Anthropic API key in Settings → Ask"
+    /// A key is saved but the index hasn't opened (and reported no error).
+    public static let indexNotReadyNotice = "Ask index isn't ready yet."
 
     /// The question in flight; nil when none runs.
     public private(set) var asking: String?
@@ -61,9 +63,12 @@ public struct AskState: Equatable, Sendable {
     }
 
     /// ⌥⌘↩ without a key: nothing is sent, and the notice says why.
-    public mutating func needsKey() {
+    public mutating func needsKey() { refuse(Self.needsKeyNotice) }
+
+    /// ⌥⌘↩ that can't run (no key, no open index): nothing is sent, and `notice` says why.
+    public mutating func refuse(_ notice: String) {
         clear()
-        notice = Self.needsKeyNotice
+        self.notice = notice
     }
 
     /// The failure line for the search on screen; nil unless the last Ask of `question` failed.

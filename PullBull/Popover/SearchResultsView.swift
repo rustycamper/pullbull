@@ -218,6 +218,14 @@ struct SearchResultsView: View {
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                // With a key saved, Ask may find it from a looser description.
+                if model.offersAsk {
+                    Text("Try other words, or ⌥⌘↩ to Ask.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .padding(.horizontal, 40)
         } else {

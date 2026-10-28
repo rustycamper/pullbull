@@ -107,7 +107,7 @@ extension AppModel {
     func setAskEnabled(_ on: Bool) {
         guard settings.askEnabled != on else { return }
         settings.askEnabled = on
-        if !on { clearAsk() }
+        if !on { leaveAskForSearch() }
         reconcileAsk()
     }
 
@@ -290,11 +290,12 @@ extension AppModel {
     /// The ⌥⌘↩ hint shows only with Ask on and a key saved.
     var offersAsk: Bool { settings.askEnabled && askKeyState == .valid }
 
-    /// The question the Ask screen answers; empty before any answer.
+    /// The question the Ask screen shows: the one in flight, else the last one answered; empty before any.
     var askQuestion: String {
+        if let asking { return asking }
         switch askOutcome {
-        case .answered(let question, _, _, _), .failed(let question, _): question
-        case nil: ""
+        case .answered(let question, _, _, _), .failed(let question, _): return question
+        case nil: return ""
         }
     }
 
@@ -307,63 +308,6 @@ extension AppModel {
     /// The failure line over the search results for the question in the field; nil otherwise.
     var askErrorLine: String? {
         askState.errorLine(for: searchText.trimmingCharacters(in: .whitespacesAndNewlines))
-    }
-
-    /// ⌥⌘↩ in the search field: asks the field's text over the open Ask index with the saved key and
-    /// model. The only way anything reaches Anthropic's Messages API. Without a key (or an open index)
-    /// nothing is sent and the notice says so. A later Ask or an edit drops this one's reply.
-    func ask() {
-        let question = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard settings.askEnabled, route == .search, !question.isEmpty else { return }
-        askTask?.cancel()
-        askTask = nil
-        guard let key = (try? AnthropicKeyStore().load()) ?? nil else {
-            askKeyState = .none
-            askState.needsKey()
-            return
-        }
-        guard let runtime = askRuntime else {
-            askState.needsKey()
-            return
-        }
-        let target = runtime.target
-        let scopeName = switch target.scope {
-        case .org(let org): org
-        case .personal(let login, _): login
-        }
-        let session = AskSession(
-            index: runtime.index,
-            client: AskClient(apiKey: key, model: AskModel.named(settings.askModel)),
-            context: AskContext(scopeName: scopeName, isOrg: target.scope.org != nil, today: Date()),
-            excluded: askExcludedRepos(), scope: target.scope)
-        let focusedRepo = repoFocus?.repo
-        let stillSyncing = askProgress.flatMap { $0.backfilling ? $0.indexed : nil }
-        let token = askState.begin(question)
-        askTask = Task { [weak self] in
-            let outcome: AskOutcome?
-            do {
-                outcome = try await session.run(question, focusedRepo: focusedRepo, stillSyncing: stillSyncing)
-            } catch {
-                // `run` throws only cancellation; anything else would still be a failed Ask.
-                outcome = AskGeneration.isCancellation(error) ? nil : .failed(question: question, .server(0))
-            }
-            guard let self else { return }
-            if let outcome { self.landAsk(outcome, token: token) } else { self.askState.cancelled(token: token) }
-        }
-    }
-
-    /// Esc while asking, or a detail opening: the reply in flight is dropped.
-    func cancelAsk() {
-        askTask?.cancel()
-        askTask = nil
-        askState.cancel()
-    }
-
-    /// The field was edited or emptied: no Ask runs, and its line and notice go.
-    func clearAsk() {
-        askTask?.cancel()
-        askTask = nil
-        askState.clear()
     }
 
     /// ↑/↓ on the Ask screen.
@@ -407,21 +351,5 @@ extension AppModel {
         guard let link = askSelectionLink else { return false }
         PRActions.copyMarkdownLink(title: link.item.title, key: link.item.key, url: link.url)
         return true
-    }
-
-    /// A reply arrived. An answer opens the Ask screen with its first row highlighted; a failure stays as
-    /// one line over the normal results. Nothing lands once the search was left.
-    private func landAsk(_ outcome: AskOutcome, token: Int) {
-        guard route == .search else {
-            askState.cancelled(token: token)
-            return
-        }
-        let arrival = askState.land(outcome, token: token)
-        guard arrival != .ignored else { return }
-        askTask = nil
-        guard arrival == .screen else { return }
-        askSelection = askRows.first?.key
-        closeCompletion()
-        route = .ask
     }
 }

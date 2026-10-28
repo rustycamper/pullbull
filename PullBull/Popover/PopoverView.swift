@@ -315,9 +315,13 @@ struct PopoverView: View {
     private func popoverDidShow(_ window: NSWindow) {
         // Only the detail it was closed on goes stale: one a notification click opened while closed
         // shows as it is, even if it is the same PR or issue.
-        if let closedAt = closedOnDetail, !model.detailOpenedWhileClosed,
-           PopoverReopen.showsList(closedAt: closedAt, now: Date()) {
-            model.showListInsteadOfDetail()
+        if let closedAt = closedOnDetail, !model.detailOpenedWhileClosed {
+            // The Ask screen, and details opened from it, follow `AskReturn.reopen`.
+            if model.askOnScreen {
+                model.reopenAsk(closedAt: closedAt, now: Date())
+            } else if PopoverReopen.showsList(closedAt: closedAt, now: Date()) {
+                model.showListInsteadOfDetail()
+            }
         }
         shown = true
         closedOnDetail = nil
@@ -728,11 +732,15 @@ struct PopoverView: View {
     }
 
     /// The Ask screen: ↑/↓ move the highlight, ↩ opens it in its mode, ⌘↩ opens it on GitHub, ⌘C copies
-    /// its link, ⌘⇧C its reference, ⌥⌘C its Markdown link, Esc goes back to the field with the question.
-    /// Every other key passes through.
+    /// its link, ⌘⇧C its reference, ⌥⌘C its Markdown link, ⌥⌘↩ asks the question again, Esc goes back to
+    /// the field with the question. Every other key passes through.
     private func handleAskKey(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
         let plain = flags.subtracting([.capsLock, .numericPad, .function])
         if flags.contains(.command) {
+            if Self.isOptionCommandReturn(event, flags: flags) {
+                model.askAgain()
+                return true
+            }
             if Self.isOptionCommandC(event, flags: flags) { return model.copyAskSelectionMarkdownLink() }
             guard plain.subtracting([.command, .shift]).isEmpty else { return false }
             if event.keyCode == SearchKeyMonitor.return || event.keyCode == SearchKeyMonitor.enter {

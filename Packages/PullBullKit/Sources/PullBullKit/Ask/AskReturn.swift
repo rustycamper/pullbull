@@ -39,6 +39,14 @@ public struct AskReturn: Equatable, Sendable {
         Landing(place: .search, searchText: question)
     }
 
+    /// The popover opening again on `place` (the Ask screen or a detail opened from it): where it lands,
+    /// as `reopening`. Landing on the search drops every detail opened from Ask.
+    public mutating func reopen(at place: Place, question: String, closedAt: Date, now: Date) -> Landing {
+        let landing = Self.reopening(at: place, question: question, closedAt: closedAt, now: now)
+        if landing.place == .search { reset() }
+        return landing
+    }
+
     /// The popover opening again. Within `PopoverReopen.keepDetailFor` it stays where it was; after that
     /// it opens on search with the question kept.
     public static func reopening(at place: Place, question: String, closedAt: Date, now: Date) -> Landing {

@@ -208,7 +208,7 @@ final class AppModel {
     /// Opens and closes the Ask index; created on first use.
     @ObservationIgnored var askLifecycle: AskLifecycle<AskRuntime>?
     /// The Ask behind the search field: the question in flight, its outcome and the no-key notice.
-    var askState = AskState()
+    private(set) var askState = AskState()
     /// The highlighted row of the Ask screen (↑/↓; Return opens it).
     var askSelection: PRKey?
     /// Where Back lands from each detail opened from the Ask screen, innermost last.
@@ -1951,11 +1951,15 @@ extension AppModel {
     /// (the search, query kept, when Back would end there). The Ask screen, and details opened from it,
     /// drop to the search with the question kept.
     func showListInsteadOfDetail() {
-        if route == .ask || !askReturn.isEmpty {
-            askReturn.reset()
-            keepQuestionInField()
-        }
         let toSearch = detailReturnsToSearch && !searchText.isEmpty
+        askReturn.reset()
+        dropDetails()
+        route = toSearch ? .search : .list
+        searchAgainIfStale()
+    }
+
+    /// Stops the details' fetches and forgets where they return to.
+    fileprivate func dropDetails() {
         detailTask?.cancel()
         detailTask = nil
         detailFetch = nil
@@ -1964,8 +1968,6 @@ extension AppModel {
         issueDetailFetch = nil
         detailReturnRoute = .list
         issueDetailReturnRoute = .list
-        route = toSearch ? .search : .list
-        searchAgainIfStale()
     }
 
     /// ⌘R in a detail: fetches it again unless a fetch is already running.
@@ -2001,13 +2003,66 @@ extension AppModel {
         if let key = askSelection { openAskResult(key) }
     }
 
-    /// Esc or ‹ on the Ask screen: the search field, with the question kept to edit and ask again.
+    /// Esc or ‹ on the Ask screen: the search field, with the question kept to edit and ask again. An
+    /// Ask running again from here stops.
     func closeAsk() {
         guard route == .ask else { return }
+        let landing = AskReturn.leavingAsk(question: askQuestion)
+        cancelAsk()
         askReturn.reset()
-        keepQuestionInField()
-        route = .search
-        searchAgainIfStale()
+        showSearch(landing)
+    }
+
+    /// The Ask screen is on screen, or under the detail on screen.
+    var askOnScreen: Bool { route == .ask || !askReturn.isEmpty }
+
+    /// The popover opening again on the Ask screen or a detail opened from it: `AskReturn.reopen` decides
+    /// whether it stays or, after a long while, lands on the search with the question kept.
+    func reopenAsk(closedAt: Date, now: Date) {
+        guard askOnScreen else { return }
+        let place: AskReturn.Place = switch route {
+        case .detail: .pullRequestDetail
+        case .issueDetail: .issueDetail
+        case .list, .search, .ask: .ask
+        }
+        let landing = askReturn.reopen(at: place, question: askQuestion, closedAt: closedAt, now: now)
+        if landing.place == .search { showSearch(landing) }
+    }
+
+    /// Ask turned off: no Ask runs, and the Ask screen (with any detail opened from it) gives way to the
+    /// search with the question kept.
+    func leaveAskForSearch() {
+        let landing = AskReturn.leavingAsk(question: askQuestion)
+        let shown = askOnScreen
+        clearAsk()
+        askReturn.reset()
+        if shown { showSearch(landing) }
+    }
+
+    /// ⌥⌘↩ in the search field: asks the field's text.
+    func ask() {
+        guard route == .search else { return }
+        startAsk(searchText.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// ⌥⌘↩ on the Ask screen: asks the same question again.
+    func askAgain() {
+        guard route == .ask else { return }
+        startAsk(askQuestion)
+    }
+
+    /// Esc while asking, or a detail opening: the reply in flight is dropped.
+    func cancelAsk() {
+        askTask?.cancel()
+        askTask = nil
+        askState.cancel()
+    }
+
+    /// The field was edited or emptied: no Ask runs, and its line and notice go.
+    func clearAsk() {
+        askTask?.cancel()
+        askTask = nil
+        askState.clear()
     }
 
     /// A detail opening from the list or search: no Back leads to Ask, and a running Ask stops.
@@ -2016,13 +2071,85 @@ extension AppModel {
         cancelAsk()
     }
 
-    /// The field holds the question asked (`AskReturn.leavingAsk`), as when the Ask started.
-    fileprivate func keepQuestionInField() {
-        let landing = AskReturn.leavingAsk(question: askQuestion)
-        guard !landing.searchText.isEmpty,
-              searchText.trimmingCharacters(in: .whitespacesAndNewlines) != landing.searchText
-        else { return }
-        updateSearch(landing.searchText, debounced: false)
+    /// Asks `question` over the open Ask index with the saved key and model: the only way anything
+    /// reaches Anthropic's Messages API, and only from an explicit ⌥⌘↩. Without a key or an open index
+    /// nothing is sent and a notice says why. A later Ask or an edit drops this one's reply.
+    private func startAsk(_ question: String) {
+        guard settings.askEnabled, !question.isEmpty else { return }
+        askTask?.cancel()
+        askTask = nil
+        guard let key = (try? AnthropicKeyStore().load()) ?? nil else {
+            askKeyState = .none
+            refuseAsk(AskState.needsKeyNotice)
+            return
+        }
+        guard let runtime = askRuntime else {
+            refuseAsk(askOpenError ?? AskState.indexNotReadyNotice)
+            return
+        }
+        let target = runtime.target
+        let scopeName = switch target.scope {
+        case .org(let org): org
+        case .personal(let login, _): login
+        }
+        let session = AskSession(
+            index: runtime.index,
+            client: AskClient(apiKey: key, model: AskModel.named(settings.askModel)),
+            context: AskContext(scopeName: scopeName, isOrg: target.scope.org != nil, today: Date()),
+            excluded: askExcludedRepos(), scope: target.scope)
+        let focusedRepo = repoFocus?.repo
+        let stillSyncing = askProgress.flatMap { $0.backfilling ? $0.indexed : nil }
+        let token = askState.begin(question)
+        askTask = Task { [weak self] in
+            let outcome: AskOutcome?
+            do {
+                outcome = try await session.run(question, focusedRepo: focusedRepo, stillSyncing: stillSyncing)
+            } catch {
+                // `run` throws only cancellation; anything else would still be a failed Ask.
+                outcome = AskGeneration.isCancellation(error) ? nil : .failed(question: question, .server(0))
+            }
+            guard let self else { return }
+            if let outcome { self.landAsk(outcome, token: token) } else { self.askState.cancelled(token: token) }
+        }
+    }
+
+    /// The notice shows over the search results, so from the Ask screen it goes back to the field first.
+    private func refuseAsk(_ notice: String) {
+        if route == .ask { closeAsk() }
+        askState.refuse(notice)
+    }
+
+    /// A reply arrived. An answer opens the Ask screen with its first row highlighted; a failure stays as
+    /// one line over the normal results (or in place of the answer on the Ask screen). Nothing lands once
+    /// the search and the Ask screen were left.
+    private func landAsk(_ outcome: AskOutcome, token: Int) {
+        guard route == .search || route == .ask else {
+            askState.cancelled(token: token)
+            return
+        }
+        let arrival = askState.land(outcome, token: token)
+        guard arrival != .ignored else { return }
+        askTask = nil
+        guard arrival == .screen else { return }
+        askSelection = askRows.first?.key
+        closeCompletion()
+        route = .ask
+    }
+
+    /// Leaves Ask and any detail for the search with `landing`'s text. Opening a result may have switched
+    /// the mode, which drops a narrowed tab, so the query is searched again for the scope shown.
+    private func showSearch(_ landing: AskReturn.Landing) {
+        dropDetails()
+        guard !landing.searchText.isEmpty else {
+            route = .list
+            return
+        }
+        if searchText.trimmingCharacters(in: .whitespacesAndNewlines) != landing.searchText {
+            updateSearch(landing.searchText, debounced: false)
+        } else {
+            route = .search
+            runSearch(searchQuery, debounced: false, keeping: searchSelection)
+        }
     }
 }
 
