@@ -48,6 +48,10 @@ public actor AskSync {
     private var blockedUntil: Date?
     /// Repos whose `backfill(repo:)` hasn't finished yet; each sync retries them.
     private var pendingRepos: Set<String> = []
+    /// Bumped by each `cancel()`, so a `backfill(repo:)` queued before it doesn't start afterwards.
+    private var cancels = 0
+    /// Callers suspended in `waitForRunning()`, for tests.
+    private(set) var waiters = 0
     /// Lowercased keys the current full re-sync has seen; nil outside one.
     private var seen: Set<String>?
     private var backfilling = false
@@ -94,8 +98,9 @@ public actor AskSync {
     public func backfill(repo: String) async {
         let repo = repo.lowercased()
         pendingRepos.insert(repo)
+        let generation = cancels
         await waitForRunning()
-        guard pendingRepos.contains(repo), !isBlocked else { return }
+        guard generation == cancels, pendingRepos.contains(repo), !isBlocked else { return }
         await run { try await $0.repoPass(repo) }
     }
 
@@ -110,10 +115,12 @@ public actor AskSync {
         }
     }
 
-    /// Stops the running pass and returns once it has ended; nothing is written after that.
+    /// Stops the running pass, and any pass that starts while it winds down, and returns once they have
+    /// ended; nothing is written after that. Queued repo backfills stay pending for the next `sync()`.
+    /// Never call it from within a pass (a fetcher, say): it would wait on itself.
     public func cancel() async {
-        running?.cancel()
-        await waitForRunning()
+        cancels += 1
+        await waitForRunning(cancelling: true)
     }
 
     // MARK: Passes
@@ -134,8 +141,11 @@ public actor AskSync {
         if running == task { running = nil }
     }
 
-    private func waitForRunning() async {
+    private func waitForRunning(cancelling: Bool = false) async {
+        waiters += 1
+        defer { waiters -= 1 }
         while let task = running {
+            if cancelling { task.cancel() }
             await task.value
             if running == task { running = nil }
         }

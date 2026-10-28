@@ -313,6 +313,37 @@ private struct Harness {
         #expect(await h.fetcher.calls.count == 2)
     }
 
+    @Test func cancelAlsoStopsAQueuedRepoBackfill() async throws {
+        let recent = t0.addingTimeInterval(-day)
+        let h = try Harness([item("acme/web", 1, kind: .pr, updated: recent), item("acme/api", 2, updated: recent)])
+        let (reached, signal) = AsyncStream<Void>.makeStream()
+        let gate = TestClock()
+        await h.fetcher.setOnFetch { number in
+            guard number == 2 else { return }
+            signal.yield()
+            try? await gate.sleep(for: .seconds(1))
+        }
+        let pass = Task { await h.sync.sync() }
+        var iterator = reached.makeAsyncIterator()
+        await iterator.next()
+        let queued = Task { await h.sync.backfill(repo: "acme/api") }
+        while await h.sync.waiters == 0 { await Task.yield() }
+
+        await h.sync.cancel()
+        let calls = await h.fetcher.calls.count
+        let stored = try await h.stored()
+        await pass.value
+        await queued.value
+        #expect(calls == 2)
+        #expect(await h.fetcher.calls.count == 2)
+        #expect(try await h.stored() == stored)
+        #expect(!stored.contains("acme/api#2"))
+
+        await h.sync.sync()
+        #expect(await h.fetcher.queries.contains { $0.hasPrefix("repo:acme/api ") })
+        #expect(try await h.stored().contains("acme/api#2"))
+    }
+
     @Test func refreshStartingDuringPauseHoldsThePage() async throws {
         let h = try Harness([item("acme/web", 1, kind: .pr, updated: t0)], pause: .seconds(1))
         try await h.index.setMeta(.lastFullSync, t0)
