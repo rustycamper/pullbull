@@ -102,6 +102,35 @@ public enum Decoding {
         )
     }
 
+    /// An Ask search node (`Queries.askSearch`); nil without `__typename`, number, title, repo or a
+    /// readable created/updated date. A draft PR that is still open reads "draft".
+    public static func askItem(from node: [String: Any]) -> AskItem? {
+        let kind: AskItem.Kind
+        switch node["__typename"] as? String {
+        case "PullRequest": kind = .pr
+        case "Issue": kind = .issue
+        default: return nil
+        }
+        guard let number = node["number"] as? Int,
+              let title = node["title"] as? String,
+              let repo = (node["repository"] as? [String: Any])?["nameWithOwner"] as? String,
+              let state = node["state"] as? String,
+              let created = (node["createdAt"] as? String).flatMap({ try? date($0) }),
+              let updated = (node["updatedAt"] as? String).flatMap({ try? date($0) })
+        else { return nil }
+        let labelNodes = (node["labels"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
+        let isDraft = node["isDraft"] as? Bool == true
+        return AskItem(
+            key: PRKey(repo: repo, number: number), kind: kind,
+            state: kind == .pr && isDraft && state == "OPEN" ? "draft" : state.lowercased(),
+            author: (node["author"] as? [String: Any])?["login"] as? String,
+            created: created, updated: updated,
+            labels: labelNodes.compactMap { $0["name"] as? String },
+            title: title, body: node["body"] as? String ?? "",
+            mergedAt: lenientDate(node["mergedAt"]),
+            baseRef: node["baseRefName"] as? String)
+    }
+
     /// A board item's `fieldValueByName` value; nil unless both name and optionId are present.
     public static func statusValue(_ raw: Any?) -> BoardStatusValue? {
         guard let value = raw as? [String: Any],

@@ -494,6 +494,23 @@ public struct GitHubAPI: Sendable {
         return (result, true)
     }
 
+    /// One page (50) of the Ask index search `query`, from `after`; `total` is GitHub's result count.
+    /// Nodes that are not decodable PRs or issues are skipped.
+    public func askPage(query: String, after: String?) async throws -> AskPage {
+        var variables: [String: Any] = ["q": query, "first": 50]
+        if let after { variables["after"] = after }
+        let data = try await execute(Queries.askSearch, variables)
+        guard let search = data["search"] as? [String: Any] else {
+            throw APIError.graphQL("missing data.search")
+        }
+        let items = (search["nodes"] as? [Any] ?? []).compactMap { raw in
+            (raw as? [String: Any]).flatMap(Decoding.askItem(from:))
+        }
+        let info = search["pageInfo"] as? [String: Any]
+        let next = info?["hasNextPage"] as? Bool == true ? info?["endCursor"] as? String : nil
+        return AskPage(items: items, total: search["issueCount"] as? Int ?? items.count, next: next)
+    }
+
     public func lookup(
         number: Int, org: String, repos: [String]
     ) async throws -> (prs: [PullRequest], issues: [BoardIssue]) {

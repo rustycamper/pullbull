@@ -100,6 +100,27 @@ enum Queries {
     \(prFields)
     """
 
+    /// The Ask index's search: PRs and issues with their text, `__typename` telling them apart.
+    static let askSearch = """
+    query($q:String!,$first:Int!,$after:String){
+      search(query:$q, type:ISSUE, first:$first, after:$after){
+        issueCount
+        pageInfo{endCursor hasNextPage}
+        nodes{
+          __typename
+          ... on PullRequest{
+            number title body state isDraft createdAt updatedAt mergedAt baseRefName
+            author{login} repository{nameWithOwner} labels(first:20){nodes{name}}
+          }
+          ... on Issue{
+            number title body state createdAt updatedAt
+            author{login} repository{nameWithOwner} labels(first:20){nodes{name}}
+          }
+        }
+      }
+    }
+    """
+
     static func issueSearch(withAssignment: Bool) -> String {
         """
         query($q:String!,$after:String,$first:Int=50){

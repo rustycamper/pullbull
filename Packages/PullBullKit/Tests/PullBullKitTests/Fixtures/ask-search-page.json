@@ -1,0 +1,6 @@
+{"data":{"search":{"issueCount":137,"pageInfo":{"endCursor":"A1","hasNextPage":true},"nodes":[
+{"__typename":"PullRequest","number":7,"title":"Fix tab counts","body":"Counts were off by one.","state":"MERGED","isDraft":false,"createdAt":"2026-10-01T08:00:00Z","updatedAt":"2026-10-05T09:30:00Z","mergedAt":"2026-10-05T09:30:00Z","baseRefName":"main","author":{"login":"alice"},"repository":{"nameWithOwner":"acme/web"},"labels":{"nodes":[{"name":"bug"},{"name":"ui"}]}},
+{"__typename":"PullRequest","number":8,"title":"WIP: new sidebar","body":"","state":"OPEN","isDraft":true,"createdAt":"2026-10-10T08:00:00Z","updatedAt":"2026-10-11T09:00:00Z","mergedAt":null,"baseRefName":"develop","author":null,"repository":{"nameWithOwner":"acme/web"},"labels":{"nodes":[]}},
+{},
+{"__typename":"Issue","number":9,"title":"Sync drops updates","body":"After reconnect.","state":"OPEN","createdAt":"2026-10-12T08:00:00Z","updatedAt":"2026-10-13T09:00:00Z","author":{"login":"bob"},"repository":{"nameWithOwner":"acme/web"},"labels":{"nodes":[{"name":"backend"}]}}
+]}}}
