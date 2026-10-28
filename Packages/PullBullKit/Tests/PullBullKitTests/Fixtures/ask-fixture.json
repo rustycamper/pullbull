@@ -1,0 +1,952 @@
+{
+ "items": [
+  {
+   "key": {
+    "repo": "acme/web",
+    "number": 12
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "ann",
+   "created": "2026-09-02T09:00:00Z",
+   "updated": "2026-10-20T09:00:00Z",
+   "labels": [
+    "bug",
+    "ui"
+   ],
+   "title": "Invoice list jumps back to page one",
+   "body": "## Problem\n\nWhen a customer opens the billing screen and scrolls to the second page of invoices, then edits a note on one of them, the table silently resets to the first page. Finance staff lose their place several times a day.\n\n### Steps\n1. Open Billing.\n2. Go to page 2.\n3. Edit any note and save.\n\nExpected: the pager keeps its position. Actual: it reloads the query with offset zero because the cursor is held in component state that is recreated after the mutation."
+  },
+  {
+   "key": {
+    "repo": "acme/web",
+    "number": 13
+   },
+   "kind": "pr",
+   "state": "merged",
+   "author": "bob",
+   "created": "2026-10-18T09:00:00Z",
+   "updated": "2026-10-21T09:00:00Z",
+   "labels": [
+    "bug",
+    "ui"
+   ],
+   "title": "Keep pager cursor across mutations",
+   "body": "Fixes #12. The cursor now lives in the URL query string rather than local state, so a refetch after saving a note does not rebuild it.\n\nAlso adds a regression test that mounts the invoice table, advances to page 2 and saves a note.\n\nNo schema changes. Rollout is safe to do any time.",
+   "mergedAt": "2026-10-21T09:00:00Z",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/web",
+    "number": 14
+   },
+   "kind": "issue",
+   "state": "closed",
+   "author": "carol",
+   "created": "2026-08-11T09:00:00Z",
+   "updated": "2026-09-14T09:00:00Z",
+   "labels": [
+    "design",
+    "a11y"
+   ],
+   "title": "Dark theme hurts contrast on disabled buttons",
+   "body": "Disabled primary buttons in the dark theme use a grey that measures 2.1:1 against the card background. Our accessibility target is 4.5:1 for text. Screen reader users are not affected but low-vision users report they cannot tell which actions are unavailable.\n\nProposal: derive disabled colors from the surface token instead of using a fixed opacity."
+  },
+  {
+   "key": {
+    "repo": "acme/web",
+    "number": 15
+   },
+   "kind": "pr",
+   "state": "open",
+   "author": "dave",
+   "created": "2026-10-22T09:00:00Z",
+   "updated": "2026-10-27T09:00:00Z",
+   "labels": [
+    "feature"
+   ],
+   "title": "Add keyboard shortcuts to the command palette",
+   "body": "Introduces a global shortcut layer so people can open the palette with slash or Cmd+K, jump between recent customers, and dismiss with escape. Shortcuts are registered through a small hook which cleans up on unmount.\n\nOpen question: should we expose a settings panel for rebinding? I would rather ship the defaults first and collect feedback.",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/web",
+    "number": 16
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "erin",
+   "created": "2026-10-05T09:00:00Z",
+   "updated": "2026-10-25T09:00:00Z",
+   "labels": [
+    "bug",
+    "auth"
+   ],
+   "title": "Session expires mid-form with no warning",
+   "body": "Users who leave a long onboarding form open for more than thirty minutes lose everything they typed. The refresh token is rotated server side, but the browser tab sleeps and misses the renewal window, so the next submit returns 401 and the form clears.\n\nWe should either extend the sliding window while a form is dirty or show a countdown and a stay signed in button."
+  },
+  {
+   "key": {
+    "repo": "acme/web",
+    "number": 17
+   },
+   "kind": "pr",
+   "state": "merged",
+   "author": "frank",
+   "created": "2026-09-20T09:00:00Z",
+   "updated": "2026-09-23T09:00:00Z",
+   "labels": [
+    "perf"
+   ],
+   "title": "Lazy load the chart bundle",
+   "body": "The dashboard shipped a 380 kB charting library on every route, including login. This change splits it into a dynamic import used only by the analytics tab. First contentful paint on the login page drops by about 400 ms on a throttled connection.\n\nI also removed an unused locale pack from the bundle analyzer output.",
+   "mergedAt": "2026-09-23T09:00:00Z",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/web",
+    "number": 18
+   },
+   "kind": "issue",
+   "state": "closed",
+   "author": "gina",
+   "created": "2026-07-30T09:00:00Z",
+   "updated": "2026-08-05T09:00:00Z",
+   "labels": [
+    "bug",
+    "i18n"
+   ],
+   "title": "CSV export garbles accented customer names",
+   "body": "Exporting customers to CSV produces mojibake for names like Zoë or José when opened in Excel. The file is UTF-8 without a byte order mark, which Excel guesses wrongly. Adding the BOM at the start of the stream fixes it in our manual test."
+  },
+  {
+   "key": {
+    "repo": "acme/web",
+    "number": 19
+   },
+   "kind": "pr",
+   "state": "draft",
+   "author": "hank",
+   "created": "2026-10-24T09:00:00Z",
+   "updated": "2026-10-28T09:00:00Z",
+   "labels": [
+    "chore"
+   ],
+   "title": "Replace moment with date-fns",
+   "body": "Work in progress. Migrates date handling from moment to date-fns to reduce bundle size and stop mutating inputs. About half of the call sites are converted. Timezone formatting in the activity feed still needs a careful review because moment-timezone did some implicit conversions.",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/web",
+    "number": 20
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "ann",
+   "created": "2026-10-14T09:00:00Z",
+   "updated": "2026-10-26T09:00:00Z",
+   "labels": [
+    "bug",
+    "browser"
+   ],
+   "title": "Search box does nothing on Safari when pressing enter",
+   "body": "On Safari 17 pressing the return key in the global search field does not run the query; clicking the magnifier works. Looks like our keydown handler checks event.code only for NumpadEnter. Chrome and Firefox are fine."
+  },
+  {
+   "key": {
+    "repo": "acme/web",
+    "number": 21
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "bob",
+   "created": "2026-09-28T09:00:00Z",
+   "updated": "2026-10-10T09:00:00Z",
+   "labels": [
+    "design"
+   ],
+   "title": "Empty states are inconsistent between modules",
+   "body": "Customers shows an illustration and a call to action, Invoices shows a bare sentence, and Reports shows a blank white area. Design wants one shared component with an icon slot, a headline and an optional button."
+  },
+  {
+   "key": {
+    "repo": "acme/api",
+    "number": 101
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "carol",
+   "created": "2026-09-10T09:00:00Z",
+   "updated": "2026-10-22T09:00:00Z",
+   "labels": [
+    "bug",
+    "webhooks"
+   ],
+   "title": "Webhook deliveries retry forever on 410 responses",
+   "body": "If a subscriber endpoint answers with HTTP 410 Gone we still keep retrying with exponential backoff for seven days. That wastes queue capacity and floods logs. We should treat 410 as a permanent failure, disable the subscription and notify the owner by email.\n\nBackoff schedule is defined in the delivery worker; the status classification lives in one helper."
+  },
+  {
+   "key": {
+    "repo": "acme/api",
+    "number": 102
+   },
+   "kind": "pr",
+   "state": "merged",
+   "author": "dave",
+   "created": "2026-10-12T09:00:00Z",
+   "updated": "2026-10-23T09:00:00Z",
+   "labels": [
+    "bug",
+    "webhooks"
+   ],
+   "title": "Disable webhook subscriptions after permanent failure",
+   "body": "Closes #101. Adds a classification step so 404 for the third time and 410 immediately mark the endpoint as disabled. Owners receive an email with the last response body. A new admin action lets them re-enable the subscription once the receiver is fixed.",
+   "mergedAt": "2026-10-23T09:00:00Z",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/api",
+    "number": 103
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "erin",
+   "created": "2026-10-01T09:00:00Z",
+   "updated": "2026-10-19T09:00:00Z",
+   "labels": [
+    "bug",
+    "infra"
+   ],
+   "title": "Rate limiter counts health checks against tenants",
+   "body": "The load balancer probes /healthz every few seconds using the tenant header of the first customer it saw. These probes consume that tenant's quota and cause occasional 429 responses for real traffic at the start of each minute. Exempt the probe path from limiting or give it its own bucket."
+  },
+  {
+   "key": {
+    "repo": "acme/api",
+    "number": 104
+   },
+   "kind": "pr",
+   "state": "merged",
+   "author": "frank",
+   "created": "2026-08-20T09:00:00Z",
+   "updated": "2026-09-02T09:00:00Z",
+   "labels": [
+    "feature",
+    "api"
+   ],
+   "title": "Cursor pagination for the orders endpoint",
+   "body": "Offset pagination got slow beyond page 400 because the database must walk and discard rows. This PR adds opaque cursors built from created_at and id, keeps offset working for one release, and documents the deprecation in the changelog. Response includes next and previous tokens.",
+   "mergedAt": "2026-09-02T09:00:00Z",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/api",
+    "number": 105
+   },
+   "kind": "issue",
+   "state": "closed",
+   "author": "gina",
+   "created": "2026-06-15T09:00:00Z",
+   "updated": "2026-07-01T09:00:00Z",
+   "labels": [
+    "bug",
+    "api"
+   ],
+   "title": "Timestamps returned without timezone offset",
+   "body": "Several endpoints return 2026-03-01T10:00:00 with no Z or offset, so clients in other regions interpret them as local time. All stored values are UTC. Serialize with the explicit Z suffix everywhere and add a contract test."
+  },
+  {
+   "key": {
+    "repo": "acme/api",
+    "number": 106
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "hank",
+   "created": "2026-10-09T09:00:00Z",
+   "updated": "2026-10-27T09:00:00Z",
+   "labels": [
+    "feature",
+    "payments"
+   ],
+   "title": "Add idempotency keys to payment creation",
+   "body": "Mobile clients on flaky networks sometimes submit a payment twice after a timeout. We need an Idempotency-Key header stored for 24 hours with the first response, so a repeat returns the same result instead of charging again. Needs a unique index and a cleanup job."
+  },
+  {
+   "key": {
+    "repo": "acme/api",
+    "number": 107
+   },
+   "kind": "pr",
+   "state": "open",
+   "author": "ann",
+   "created": "2026-10-25T09:00:00Z",
+   "updated": "2026-10-28T09:00:00Z",
+   "labels": [
+    "feature",
+    "payments"
+   ],
+   "title": "Idempotency key middleware",
+   "body": "Implements the middleware from #106. Keys are hashed with the tenant id, stored in Redis with a lock to avoid concurrent duplicates, and the cached response replays status and body. Includes tests for conflict when the same key is reused with a different payload.",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/api",
+    "number": 108
+   },
+   "kind": "issue",
+   "state": "closed",
+   "author": "bob",
+   "created": "2026-05-02T09:00:00Z",
+   "updated": "2026-05-20T09:00:00Z",
+   "labels": [
+    "perf",
+    "database"
+   ],
+   "title": "Slow query on audit log search",
+   "body": "Searching audit events by actor takes up to twelve seconds for large tenants. The query filters on actor_id and sorts by occurred_at but only an index on occurred_at exists. A composite index brings it under fifty milliseconds in staging."
+  },
+  {
+   "key": {
+    "repo": "acme/api",
+    "number": 109
+   },
+   "kind": "pr",
+   "state": "merged",
+   "author": "carol",
+   "created": "2026-05-10T09:00:00Z",
+   "updated": "2026-05-18T09:00:00Z",
+   "labels": [
+    "perf",
+    "database"
+   ],
+   "title": "Composite index for audit events",
+   "body": "Adds an index on actor_id, occurred_at descending. Created concurrently so the table is not locked. Migration was rehearsed against a restored copy of production, taking about nine minutes.",
+   "mergedAt": "2026-05-18T09:00:00Z",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/api",
+    "number": 110
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "dave",
+   "created": "2026-10-17T09:00:00Z",
+   "updated": "2026-10-24T09:00:00Z",
+   "labels": [
+    "docs"
+   ],
+   "title": "Document error codes in the OpenAPI spec",
+   "body": "Integrators keep asking what a 422 means for each endpoint. The spec lists only 200 and 500. We should add the validation and conflict responses with example bodies, generated from the same error enum the code uses."
+  },
+  {
+   "key": {
+    "repo": "acme/api",
+    "number": 111
+   },
+   "kind": "pr",
+   "state": "closed",
+   "author": "erin",
+   "created": "2026-07-04T09:00:00Z",
+   "updated": "2026-07-29T09:00:00Z",
+   "labels": [
+    "experiment"
+   ],
+   "title": "Experiment: GraphQL gateway",
+   "body": "Spike to see whether a GraphQL layer would simplify the mobile client. Results were mixed: resolvers duplicated authorization logic and caching got harder. Closing in favour of improving the existing REST endpoints.",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/api",
+    "number": 112
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "frank",
+   "created": "2026-10-21T09:00:00Z",
+   "updated": "2026-10-28T09:00:00Z",
+   "labels": [
+    "bug",
+    "infra"
+   ],
+   "title": "Background jobs stuck after Redis failover",
+   "body": "After the primary failed over last Thursday, the worker pool kept a connection to the old node and silently stopped consuming. Nothing alerted for forty minutes. Workers should reconnect when the sentinel announces a new primary and expose a heartbeat."
+  },
+  {
+   "key": {
+    "repo": "acme/mobile",
+    "number": 30
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "gina",
+   "created": "2026-10-13T09:00:00Z",
+   "updated": "2026-10-28T09:00:00Z",
+   "labels": [
+    "bug",
+    "android"
+   ],
+   "title": "App crashes on launch on Android 11 devices",
+   "body": "Crash reports show a null pointer in the splash screen initialisation only on Android 11. The window insets controller is requested before the activity is attached. About three percent of daily users are affected."
+  },
+  {
+   "key": {
+    "repo": "acme/mobile",
+    "number": 31
+   },
+   "kind": "pr",
+   "state": "merged",
+   "author": "hank",
+   "created": "2026-10-26T09:00:00Z",
+   "updated": "2026-10-28T09:00:00Z",
+   "labels": [
+    "bug",
+    "android"
+   ],
+   "title": "Guard splash insets until attached",
+   "body": "Defers the insets controller call to the first layout pass and falls back to the legacy flags on API 30. Verified on an emulator and two physical devices. Crash free rate should recover after release 4.12.",
+   "mergedAt": "2026-10-28T09:00:00Z",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/mobile",
+    "number": 32
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "ann",
+   "created": "2026-09-30T09:00:00Z",
+   "updated": "2026-10-23T09:00:00Z",
+   "labels": [
+    "bug",
+    "ios"
+   ],
+   "title": "Push notifications arrive twice on iOS",
+   "body": "Customers receive duplicate pushes for order updates. The server sends one message per registered device token and some users have the same device registered under two tokens after reinstalling. We should remove stale tokens when APNs reports them unregistered and dedupe by installation id."
+  },
+  {
+   "key": {
+    "repo": "acme/mobile",
+    "number": 33
+   },
+   "kind": "pr",
+   "state": "open",
+   "author": "bob",
+   "created": "2026-10-19T09:00:00Z",
+   "updated": "2026-10-27T09:00:00Z",
+   "labels": [
+    "feature",
+    "security"
+   ],
+   "title": "Biometric unlock for the wallet screen",
+   "body": "Adds Face ID and fingerprint prompts before showing balances. Falls back to the device passcode. The preference is stored in the keychain so it survives reinstall only if the user opts in. Needs design review for the permission copy.",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/mobile",
+    "number": 34
+   },
+   "kind": "issue",
+   "state": "closed",
+   "author": "carol",
+   "created": "2026-07-12T09:00:00Z",
+   "updated": "2026-08-30T09:00:00Z",
+   "labels": [
+    "bug",
+    "offline"
+   ],
+   "title": "Offline mode loses drafts of new orders",
+   "body": "If the network drops while saving a draft the order form is closed and the unsent data is gone. Drafts should be written to local storage first and synced when the connection returns."
+  },
+  {
+   "key": {
+    "repo": "acme/mobile",
+    "number": 35
+   },
+   "kind": "pr",
+   "state": "merged",
+   "author": "dave",
+   "created": "2026-08-10T09:00:00Z",
+   "updated": "2026-08-29T09:00:00Z",
+   "labels": [
+    "feature",
+    "offline"
+   ],
+   "title": "Persist order drafts locally",
+   "body": "Introduces a small SQLite table for drafts with a sync state column. A background task uploads pending drafts with exponential backoff, and the UI shows a cloud badge for items not yet synced.",
+   "mergedAt": "2026-08-29T09:00:00Z",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/mobile",
+    "number": 36
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "erin",
+   "created": "2026-10-03T09:00:00Z",
+   "updated": "2026-10-15T09:00:00Z",
+   "labels": [
+    "design",
+    "tablet"
+   ],
+   "title": "Tablet layout wastes the right half of the screen",
+   "body": "On tablets the single column list is stretched with huge margins. Introduce a two pane master-detail layout when the width is above 840 dp, following the platform guidelines."
+  },
+  {
+   "key": {
+    "repo": "acme/mobile",
+    "number": 37
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "frank",
+   "created": "2026-09-15T09:00:00Z",
+   "updated": "2026-10-02T09:00:00Z",
+   "labels": [
+    "perf"
+   ],
+   "title": "Reduce the APK size",
+   "body": "The release APK is 68 MB. Large contributors are unused ABI splits, uncompressed fonts and a bundled copy of a video sample. Android app bundles with per-language splits should bring us near 30 MB."
+  },
+  {
+   "key": {
+    "repo": "acme/infra",
+    "number": 7
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "gina",
+   "created": "2026-10-24T09:00:00Z",
+   "updated": "2026-10-28T09:00:00Z",
+   "labels": [
+    "bug",
+    "ci"
+   ],
+   "title": "Terraform state is locked by an old CI run",
+   "body": "Plans fail with a lock held since Tuesday by a cancelled pipeline. We need a safe way to force unlock and prevent the issue by always releasing the lock in a final pipeline step, even on cancel."
+  },
+  {
+   "key": {
+    "repo": "acme/infra",
+    "number": 8
+   },
+   "kind": "pr",
+   "state": "merged",
+   "author": "hank",
+   "created": "2026-09-06T09:00:00Z",
+   "updated": "2026-09-12T09:00:00Z",
+   "labels": [
+    "infra",
+    "perf"
+   ],
+   "title": "Autoscale workers on queue depth",
+   "body": "Replaces the CPU based scaling policy with one driven by the number of waiting jobs. Scale out when depth per worker exceeds fifty for two minutes; scale in slowly. Cuts peak latency of report generation by half in load tests.",
+   "mergedAt": "2026-09-12T09:00:00Z",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/infra",
+    "number": 9
+   },
+   "kind": "issue",
+   "state": "closed",
+   "author": "ann",
+   "created": "2026-04-01T09:00:00Z",
+   "updated": "2026-06-10T09:00:00Z",
+   "labels": [
+    "security"
+   ],
+   "title": "Rotate database credentials every ninety days",
+   "body": "Credentials for the primary database have not changed in two years. Move them into the secret manager with automatic rotation and make the services read them on each connection rather than at boot."
+  },
+  {
+   "key": {
+    "repo": "acme/infra",
+    "number": 10
+   },
+   "kind": "pr",
+   "state": "open",
+   "author": "bob",
+   "created": "2026-10-20T09:00:00Z",
+   "updated": "2026-10-26T09:00:00Z",
+   "labels": [
+    "chore",
+    "finops"
+   ],
+   "title": "Add cost tags to every resource",
+   "body": "Applies team, service and environment tags through a shared module so the monthly cost report can group spend. Untagged resources are listed in a CI warning for now and will become an error next quarter.",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/infra",
+    "number": 11
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "carol",
+   "created": "2026-10-11T09:00:00Z",
+   "updated": "2026-10-21T09:00:00Z",
+   "labels": [
+    "bug",
+    "staging"
+   ],
+   "title": "Staging database is restored from a stale snapshot",
+   "body": "Staging data is three months old because the nightly restore job points at a deleted snapshot name. Developers test against outdated schemas and miss migration problems."
+  },
+  {
+   "key": {
+    "repo": "acme/infra",
+    "number": 12
+   },
+   "kind": "pr",
+   "state": "merged",
+   "author": "dave",
+   "created": "2026-08-03T09:00:00Z",
+   "updated": "2026-08-07T09:00:00Z",
+   "labels": [
+    "security"
+   ],
+   "title": "Pin base images by digest",
+   "body": "Dockerfiles used floating tags, which made builds non reproducible. All images now reference sha256 digests and a weekly bot proposes updates after scanning for vulnerabilities.",
+   "mergedAt": "2026-08-07T09:00:00Z",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/docs",
+    "number": 3
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "erin",
+   "created": "2026-10-07T09:00:00Z",
+   "updated": "2026-10-18T09:00:00Z",
+   "labels": [
+    "docs"
+   ],
+   "title": "Getting started guide still shows the old login screen",
+   "body": "Screenshots in the quickstart predate the redesign and the instructions mention a sign up button that no longer exists. New customers get confused during onboarding."
+  },
+  {
+   "key": {
+    "repo": "acme/docs",
+    "number": 4
+   },
+   "kind": "pr",
+   "state": "merged",
+   "author": "frank",
+   "created": "2026-09-25T09:00:00Z",
+   "updated": "2026-09-27T09:00:00Z",
+   "labels": [
+    "docs"
+   ],
+   "title": "Add troubleshooting page for webhooks",
+   "body": "Collects the common reasons deliveries fail: wrong signing secret, firewall rules, timeouts above ten seconds, and subscribers answering with redirects. Includes a table of response codes and what we do with each.",
+   "mergedAt": "2026-09-27T09:00:00Z",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/docs",
+    "number": 5
+   },
+   "kind": "issue",
+   "state": "closed",
+   "author": "gina",
+   "created": "2026-06-02T09:00:00Z",
+   "updated": "2026-06-03T09:00:00Z",
+   "labels": [
+    "docs"
+   ],
+   "title": "Broken link to the changelog",
+   "body": "The footer link goes to a 404 since the site moved to a new path. Update it and add a link checker to CI."
+  },
+  {
+   "key": {
+    "repo": "acme/docs",
+    "number": 6
+   },
+   "kind": "pr",
+   "state": "open",
+   "author": "hank",
+   "created": "2026-10-23T09:00:00Z",
+   "updated": "2026-10-27T09:00:00Z",
+   "labels": [
+    "docs"
+   ],
+   "title": "Document rate limits",
+   "body": "Explains per tenant limits, how bursts are handled, which headers report remaining quota and what to do when receiving 429. Includes a short code sample showing a retry with jitter.",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/analytics",
+    "number": 50
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "ann",
+   "created": "2026-10-08T09:00:00Z",
+   "updated": "2026-10-24T09:00:00Z",
+   "labels": [
+    "bug",
+    "data"
+   ],
+   "title": "Weekly retention chart double counts reactivated users",
+   "body": "Users who return after being inactive appear in both the new and the returning cohorts for that week, inflating retention by a few points. Cohorts should be disjoint and defined by first activity date."
+  },
+  {
+   "key": {
+    "repo": "acme/analytics",
+    "number": 51
+   },
+   "kind": "pr",
+   "state": "merged",
+   "author": "bob",
+   "created": "2026-10-15T09:00:00Z",
+   "updated": "2026-10-20T09:00:00Z",
+   "labels": [
+    "bug",
+    "data"
+   ],
+   "title": "Dedupe cohort assignment",
+   "body": "Assigns each user to exactly one cohort by the earliest event timestamp and backfills the last twelve weeks. Adds a unit test with a reactivation scenario and updates the dashboard definitions.",
+   "mergedAt": "2026-10-20T09:00:00Z",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/analytics",
+    "number": 52
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "carol",
+   "created": "2026-09-18T09:00:00Z",
+   "updated": "2026-10-12T09:00:00Z",
+   "labels": [
+    "bug",
+    "ingestion"
+   ],
+   "title": "Event ingestion drops batches larger than 5 MB",
+   "body": "The collector rejects payloads over five megabytes with a generic error, and the SDK does not split them. Users with offline sessions lose many events at once. Raise the limit or have the SDK chunk uploads."
+  },
+  {
+   "key": {
+    "repo": "acme/analytics",
+    "number": 53
+   },
+   "kind": "pr",
+   "state": "draft",
+   "author": "dave",
+   "created": "2026-10-26T09:00:00Z",
+   "updated": "2026-10-28T09:00:00Z",
+   "labels": [
+    "feature"
+   ],
+   "title": "Funnel builder prototype",
+   "body": "Early version of a drag and drop funnel editor. Computes conversion between up to six steps with a configurable window. Performance with large datasets is not yet acceptable.",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/analytics",
+    "number": 54
+   },
+   "kind": "issue",
+   "state": "closed",
+   "author": "erin",
+   "created": "2026-05-14T09:00:00Z",
+   "updated": "2026-06-25T09:00:00Z",
+   "labels": [
+    "perf"
+   ],
+   "title": "Export to Excel times out for yearly reports",
+   "body": "Yearly report exports run synchronously and are killed by the gateway after sixty seconds. Run the export as a background job and email a download link."
+  },
+  {
+   "key": {
+    "repo": "acme/analytics",
+    "number": 55
+   },
+   "kind": "pr",
+   "state": "merged",
+   "author": "frank",
+   "created": "2026-06-05T09:00:00Z",
+   "updated": "2026-06-24T09:00:00Z",
+   "labels": [
+    "feature",
+    "perf"
+   ],
+   "title": "Background exports with email link",
+   "body": "Exports are queued, written to object storage and linked in an email that expires after seven days. The UI shows progress and allows cancelling.",
+   "mergedAt": "2026-06-24T09:00:00Z",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/web",
+    "number": 22
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "gina",
+   "created": "2026-10-16T09:00:00Z",
+   "updated": "2026-10-27T09:00:00Z",
+   "labels": [
+    "bug",
+    "i18n"
+   ],
+   "title": "Currency symbol appears after the amount in German locale",
+   "body": "In the German locale amounts render as 1,234.50 € with an English decimal separator. Expected 1.234,50 €. We format with a hard coded locale in the invoice helper rather than reading the user preference."
+  },
+  {
+   "key": {
+    "repo": "acme/web",
+    "number": 23
+   },
+   "kind": "pr",
+   "state": "merged",
+   "author": "hank",
+   "created": "2026-10-27T09:00:00Z",
+   "updated": "2026-10-28T09:00:00Z",
+   "labels": [
+    "bug",
+    "i18n"
+   ],
+   "title": "Use the user locale for currency formatting",
+   "body": "Replaces the hard coded formatter with Intl.NumberFormat built from the profile locale, falling back to the browser. Adds snapshot tests for German, French and Japanese.",
+   "mergedAt": "2026-10-28T09:00:00Z",
+   "baseRef": "main"
+  },
+  {
+   "key": {
+    "repo": "acme/api",
+    "number": 113
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "ann",
+   "created": "2026-10-23T09:00:00Z",
+   "updated": "2026-10-28T09:00:00Z",
+   "labels": [
+    "bug",
+    "security"
+   ],
+   "title": "Avatar uploads accept files of any size",
+   "body": "The upload endpoint streams whatever it receives into storage. A user could upload hundreds of megabytes and fill the bucket. Enforce a two megabyte limit at the gateway and validate the image type by magic bytes."
+  },
+  {
+   "key": {
+    "repo": "acme/infra",
+    "number": 13
+   },
+   "kind": "issue",
+   "state": "open",
+   "author": "bob",
+   "created": "2026-10-18T09:00:00Z",
+   "updated": "2026-10-26T09:00:00Z",
+   "labels": [
+    "chore",
+    "monitoring"
+   ],
+   "title": "Alert noise: disk usage warnings fire at 70 percent",
+   "body": "On-call gets paged for volumes that are far from full because the threshold ignores that logs are rotated hourly. Switch to a predictive alert based on growth rate instead of a fixed percentage."
+  },
+  {
+   "key": {
+    "repo": "acme/mobile",
+    "number": 38
+   },
+   "kind": "pr",
+   "state": "closed",
+   "author": "carol",
+   "created": "2026-08-22T09:00:00Z",
+   "updated": "2026-09-09T09:00:00Z",
+   "labels": [
+    "experiment"
+   ],
+   "title": "Try a new navigation library",
+   "body": "Evaluated a different navigation library for the mobile app. Transitions were smoother but deep links broke and state restoration was unreliable. Abandoning in favour of the current setup.",
+   "baseRef": "main"
+  }
+ ],
+ "questions": [
+  {
+   "q": "People keep losing their place when they flip through bills and then change something",
+   "want": [
+    "acme/web#12"
+   ]
+  },
+  {
+   "q": "Why do we keep retrying receivers that told us they are gone for good?",
+   "want": [
+    "acme/api#101"
+   ]
+  },
+  {
+   "q": "Is there anything about users getting kicked out while still typing a long form?",
+   "want": [
+    "acme/web#16"
+   ]
+  },
+  {
+   "q": "Which handsets blow up the moment you open the app on version 11?",
+   "want": [
+    "acme/mobile#30"
+   ]
+  },
+  {
+   "q": "Did we ever stop customers from being billed twice when their connection hiccups?",
+   "want": [
+    "acme/api#106"
+   ]
+  },
+  {
+   "q": "Anything on sending the same alert to a person two times on their handset?",
+   "want": [
+    "acme/mobile#32"
+   ]
+  },
+  {
+   "q": "Do German-speaking customers see amounts with the wrong separators?",
+   "want": [
+    "acme/web#22"
+   ]
+  },
+  {
+   "q": "Where are we on giving large reports a way to finish without freezing the browser?",
+   "want": [
+    "acme/analytics#54"
+   ]
+  },
+  {
+   "q": "Who looked at having servers add capacity when there are lots of waiting tasks?",
+   "want": [
+    "acme/infra#8"
+   ]
+  },
+  {
+   "q": "Are returning people being counted as brand new in our weekly graphs?",
+   "want": [
+    "acme/analytics#50"
+   ]
+  }
+ ]
+}

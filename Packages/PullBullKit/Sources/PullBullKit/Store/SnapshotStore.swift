@@ -48,13 +48,15 @@ public actor SnapshotStore {
         try write(detail, to: issueDetailURL(detail.key, account: account))
     }
 
-    /// Deletes every snapshot and detail cache of `account`. The `@` that follows its name in a snapshot
+    /// Deletes every snapshot, Ask index and detail cache of `account`. The `@` that follows its name in a snapshot
     /// file can't occur in a sanitized login, so the prefix matches that account only.
     public func removeAll(account: String) throws {
         let fm = FileManager.default
         let prefix = Self.sanitize(account) + "@"
         let names = (try? fm.contentsOfDirectory(atPath: directory.path)) ?? []
-        for name in names where name.hasPrefix(prefix) && name.hasSuffix(".json") {
+        let askSuffixes = [".ask.sqlite", ".ask.sqlite-wal", ".ask.sqlite-shm"]
+        for name in names where name.hasPrefix(prefix)
+            && (name.hasSuffix(".json") || askSuffixes.contains(where: name.hasSuffix)) {
             try fm.removeItem(at: directory.appendingPathComponent(name))
         }
         let details = directory
@@ -89,6 +91,11 @@ public actor SnapshotStore {
     /// `<login>@<org>.json`, or `<login>@-personal.json` for the personal scope.
     private func snapshotURL(account: String, scope: FetchScope) -> URL {
         directory.appendingPathComponent("\(Self.sanitize(account))@\(Self.sanitize(scope.cacheKey)).json")
+    }
+
+    /// `<login>@<org>.ask.sqlite`, the Ask index beside the snapshot of the same scope.
+    public nonisolated func askIndexURL(account: String, scope: FetchScope) -> URL {
+        directory.appendingPathComponent("\(Self.sanitize(account))@\(Self.sanitize(scope.cacheKey)).ask.sqlite")
     }
 
     private func detailURL(_ key: PRKey, account: String) -> URL {
