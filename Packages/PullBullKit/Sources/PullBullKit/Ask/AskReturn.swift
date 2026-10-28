@@ -31,6 +31,9 @@ public struct AskReturn: Equatable, Sendable {
     /// Leaving Ask or the popover closing drops every open detail.
     public mutating func reset() { openers.removeAll() }
 
+    /// No detail opened from Ask is open: Back follows the normal routes.
+    public var isEmpty: Bool { openers.isEmpty }
+
     /// Esc on the Ask screen: the search field, with the question kept.
     public static func leavingAsk(question: String) -> Landing {
         Landing(place: .search, searchText: question)

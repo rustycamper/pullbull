@@ -5,7 +5,7 @@ import Observation
 import PullBullKit
 
 enum Route: Equatable {
-    case list, search, detail(PRKey), issueDetail(PRKey)
+    case list, search, ask, detail(PRKey), issueDetail(PRKey)
 }
 
 /// A tab in either mode, such as the one type-anywhere started a search on.
@@ -207,6 +207,13 @@ final class AppModel {
     var askOpenError: String?
     /// Opens and closes the Ask index; created on first use.
     @ObservationIgnored var askLifecycle: AskLifecycle<AskRuntime>?
+    /// The Ask behind the search field: the question in flight, its outcome and the no-key notice.
+    var askState = AskState()
+    /// The highlighted row of the Ask screen (↑/↓; Return opens it).
+    var askSelection: PRKey?
+    /// Where Back lands from each detail opened from the Ask screen, innermost last.
+    private(set) var askReturn = AskReturn()
+    @ObservationIgnored var askTask: Task<Void, Never>?
     /// Watches connectivity so a refresh runs as soon as the network is back (see `NetworkRecovery`);
     /// started by the main init only, cancelled in deinit.
     @ObservationIgnored private let pathMonitor = NWPathMonitor()
@@ -423,6 +430,8 @@ final class AppModel {
     func popoverDidOpen() {
         popoverOpens += 1
         reloadAccounts()
+        // The ⌥⌘↩ hint shows once a key is saved; reading the Keychain sends nothing.
+        if settings.askEnabled { loadAskKeyState() }
         if case .detail(let key) = route { loadDetail(key) }
         if case .issueDetail(let key) = route { loadIssueDetail(key) }
         if route == .search, searchResults == nil || searchResults?.phase != .done || searchField.isStale {
@@ -625,6 +634,8 @@ final class AppModel {
     func updateSearch(_ text: String, caret: Int? = nil, startedOnTab: ShownTab? = nil, debounced: Bool = true) {
         // Opening a detail unfocuses the field, which pushes its unchanged text back; that must not close the detail.
         if text == searchText, route != .list, route != .search { return }
+        // Editing or emptying the field cancels a running Ask and drops its line: back to normal search.
+        if text != searchText { clearAsk() }
         if let startedOnTab, route != .search { searchStartedOnTab = startedOnTab }
         // Whitespace-only text clears the origin; a bare "#" keeps it for the number that follows.
         if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { searchStartedOnTab = nil }
@@ -1652,6 +1663,12 @@ extension AppModel {
 
     /// Shows the detail view for `key` with the cached detail at once, then refreshes it in place.
     func openDetail(_ key: PRKey) {
+        switch route {
+        case .ask: askReturn.open(from: .ask)
+        case .issueDetail: if !askReturn.isEmpty { askReturn.open(from: .issueDetail) }
+        case .list, .search: leaveAsk()
+        case .detail: break
+        }
         if case .detail = route {} else { detailReturnRoute = route }
         openedPR = pullRequest(for: key)
         closeCompletion()
@@ -1659,13 +1676,16 @@ extension AppModel {
         loadDetail(key)
     }
 
-    /// Back: the issue detail a linked PR was opened from (fetched again, since it may have changed
-    /// while the PR was open), the search (query kept) when the detail was opened from it, else the list.
+    /// Back: the Ask screen when Ask opened the detail, the issue detail a linked PR was opened from
+    /// (fetched again, since it may have changed while the PR was open), the search (query kept) when
+    /// the detail was opened from it, else the list.
     func closeDetail() {
         detailTask?.cancel()
         detailTask = nil
         detailFetch = nil
-        if case .issueDetail(let issue) = detailReturnRoute {
+        if !askReturn.isEmpty, askReturn.close() == .ask {
+            route = .ask
+        } else if case .issueDetail(let issue) = detailReturnRoute {
             route = detailReturnRoute
             loadIssueDetail(issue)
         } else {
@@ -1677,7 +1697,11 @@ extension AppModel {
     /// Whether Back from the detail on screen (through an issue detail, for a linked PR) ends in the
     /// search, so its query is kept while the popover is closed.
     var detailReturnsToSearch: Bool {
+        // Back through Ask ends in the search too: Esc on the Ask screen keeps the question.
+        if !askReturn.isEmpty { return true }
         switch route {
+        case .ask:
+            return true
         case .detail:
             if case .issueDetail = detailReturnRoute { return issueDetailReturnRoute == .search }
             return detailReturnRoute == .search
@@ -1818,9 +1842,12 @@ extension AppModel {
         openedIssue = nil
         issueDetailReturnRoute = .list
         switch route {
-        case .detail, .issueDetail: route = .list
+        case .detail, .issueDetail, .ask: route = .list
         case .list, .search: break
         }
+        // Nothing the previous account asked about may show either.
+        clearAsk()
+        askReturn.reset()
     }
 }
 
@@ -1906,7 +1933,7 @@ extension AppModel {
             return (key, pullRequest(for: key)?.url ?? GitHubLinks.pullRequest(key))
         case .issueDetail(let key):
             return (key, (issueDetails[key]?.issue ?? issue(for: key))?.url ?? GitHubLinks.issue(key))
-        case .list, .search:
+        case .list, .search, .ask:
             return nil
         }
     }
@@ -1916,13 +1943,18 @@ extension AppModel {
         switch route {
         case .detail: closeDetail()
         case .issueDetail: closeIssueDetail()
-        case .list, .search: break
+        case .list, .search, .ask: break
         }
     }
 
     /// A reopen after a long while: drops the detail on screen, and any stacked under it, for the list
-    /// (the search, query kept, when Back would end there).
+    /// (the search, query kept, when Back would end there). The Ask screen, and details opened from it,
+    /// drop to the search with the question kept.
     func showListInsteadOfDetail() {
+        if route == .ask || !askReturn.isEmpty {
+            askReturn.reset()
+            keepQuestionInField()
+        }
         let toSearch = detailReturnsToSearch && !searchText.isEmpty
         detailTask?.cancel()
         detailTask = nil
@@ -1941,8 +1973,56 @@ extension AppModel {
         switch route {
         case .detail: if detailFetch?.isLoading != true { reloadDetail() }
         case .issueDetail: if issueDetailFetch?.isLoading != true { reloadIssueDetail() }
-        case .list, .search: break
+        case .list, .search, .ask: break
         }
+    }
+}
+
+// MARK: - Ask screen
+
+extension AppModel {
+    /// ↩ or a click on an Ask row: switches to the item's mode and opens its detail, whose Back
+    /// returns to the Ask screen.
+    func openAskResult(_ key: PRKey) {
+        guard route == .ask, let item = askRows.first(where: { $0.key == key }) else { return }
+        askSelection = key
+        switch item.kind {
+        case .pr:
+            mode = .pullRequests
+            openDetail(key)
+        case .issue:
+            mode = .issues
+            openIssueDetail(key)
+        }
+    }
+
+    /// Return on the Ask screen: the highlighted row.
+    func openAskSelection() {
+        if let key = askSelection { openAskResult(key) }
+    }
+
+    /// Esc or ‹ on the Ask screen: the search field, with the question kept to edit and ask again.
+    func closeAsk() {
+        guard route == .ask else { return }
+        askReturn.reset()
+        keepQuestionInField()
+        route = .search
+        searchAgainIfStale()
+    }
+
+    /// A detail opening from the list or search: no Back leads to Ask, and a running Ask stops.
+    fileprivate func leaveAsk() {
+        askReturn.reset()
+        cancelAsk()
+    }
+
+    /// The field holds the question asked (`AskReturn.leavingAsk`), as when the Ask started.
+    fileprivate func keepQuestionInField() {
+        let landing = AskReturn.leavingAsk(question: askQuestion)
+        guard !landing.searchText.isEmpty,
+              searchText.trimmingCharacters(in: .whitespacesAndNewlines) != landing.searchText
+        else { return }
+        updateSearch(landing.searchText, debounced: false)
     }
 }
 
@@ -1979,9 +2059,14 @@ extension AppModel {
     func openIssueDetail(_ key: PRKey) {
         switch route {
         case .list, .search:
+            leaveAsk()
+            issueDetailReturnRoute = route
+        case .ask:
+            askReturn.open(from: .ask)
             issueDetailReturnRoute = route
         case .detail:
             // From a PR detail (e.g. a notification): Back goes to the list, not into the PR.
+            askReturn.reset()
             detailTask?.cancel()
             detailTask = nil
             detailFetch = nil
@@ -1995,11 +2080,16 @@ extension AppModel {
         loadIssueDetail(key)
     }
 
-    /// Back: the search (query kept) when the issue detail was opened from it, else the list.
+    /// Back: the Ask screen when Ask opened the issue detail, the search (query kept) when the issue
+    /// detail was opened from it, else the list.
     func closeIssueDetail() {
         issueDetailTask?.cancel()
         issueDetailTask = nil
         issueDetailFetch = nil
+        if !askReturn.isEmpty, askReturn.close() == .ask {
+            route = .ask
+            return
+        }
         route = issueDetailReturnRoute == .search && !searchText.isEmpty ? .search : .list
         searchAgainIfStale()
     }

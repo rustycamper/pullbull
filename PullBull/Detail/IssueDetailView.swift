@@ -91,7 +91,7 @@ struct IssueDetailView: View {
     }
 
     private var backTitle: String {
-        model.issueDetailReturnRoute == .search ? "Search" : model.selectedTabTitle
+        model.askReturn.backTitle ?? (model.issueDetailReturnRoute == .search ? "Search" : model.selectedTabTitle)
     }
 
     private var repoName: String {

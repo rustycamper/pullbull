@@ -72,3 +72,97 @@ private let closedAt = Date(timeIntervalSince1970: 1_800_000_000)
     #expect(!AskGeneration.isCancellation(URLError(.notConnectedToInternet)))
     #expect(!AskGeneration.isCancellation(AskError.timeout))
 }
+
+private func answered(_ question: String) -> AskOutcome {
+    let answer = AskAnswer(results: [], answer: "Nothing.", model: .default, elapsed: .seconds(1), cardsSent: 0)
+    return .answered(question: question, answer: answer, rows: [], stillSyncing: nil)
+}
+
+@Test func askReturnIsEmptyOnlyWithNoOpener() {
+    var route = AskReturn()
+    #expect(route.isEmpty)
+    route.open(from: .ask)
+    #expect(!route.isEmpty)
+    _ = route.close()
+    #expect(route.isEmpty)
+    route.open(from: .ask)
+    route.reset()
+    #expect(route.isEmpty)
+}
+
+@Test func askStateShowsTheScreenForAnAnswer() {
+    var state = AskState()
+    let token = state.begin("paging bug in acme/web")
+    #expect(state.asking == "paging bug in acme/web")
+    #expect(state.outcome == nil)
+    #expect(state.land(answered("paging bug in acme/web"), token: token) == .screen)
+    #expect(state.asking == nil)
+    #expect(state.outcome == answered("paging bug in acme/web"))
+}
+
+@Test func askStateKeepsAFailureOnTheSearch() {
+    var state = AskState()
+    let token = state.begin("q")
+    #expect(state.land(.failed(question: "q", .timeout), token: token) == .errorLine)
+    #expect(state.errorLine(for: "q") == "No answer in 20 s.")
+    // Another question in the field: the line is not about it.
+    #expect(state.errorLine(for: "other") == nil)
+}
+
+@Test func lateReplyNeverReplacesTheScreen() {
+    var state = AskState()
+    let first = state.begin("first")
+    // Typing in the field: the reply in flight is dropped and nothing shows.
+    state.clear()
+    #expect(state.asking == nil)
+    #expect(state.land(answered("first"), token: first) == .ignored)
+    #expect(state.outcome == nil)
+    // A newer Ask supersedes one still in flight, whichever replies first.
+    let second = state.begin("second")
+    let third = state.begin("third")
+    #expect(state.land(answered("second"), token: second) == .ignored)
+    #expect(state.asking == "third")
+    #expect(state.land(answered("third"), token: third) == .screen)
+    #expect(state.outcome == answered("third"))
+    // An earlier failure arriving after the answer changes nothing either.
+    #expect(state.land(.failed(question: "second", .offline), token: second) == .ignored)
+    #expect(state.outcome == answered("third"))
+}
+
+@Test func cancelledAskEndsQuietly() {
+    var state = AskState()
+    let old = state.begin("old")
+    let current = state.begin("current")
+    // The superseded Ask's cancellation leaves the running one alone.
+    state.cancelled(token: old)
+    #expect(state.asking == "current")
+    state.cancelled(token: current)
+    #expect(state.asking == nil)
+    #expect(state.outcome == nil)
+    #expect(state.notice == nil)
+}
+
+@Test func askWithoutKeyShowsTheNoticeAndDropsTheAskInFlight() {
+    var state = AskState()
+    let token = state.begin("q")
+    state.needsKey()
+    #expect(state.notice == "Add an Anthropic API key in Settings → Ask")
+    #expect(state.asking == nil)
+    #expect(state.outcome == nil)
+    #expect(state.land(answered("q"), token: token) == .ignored)
+    // The next Ask or edit clears the notice.
+    _ = state.begin("q")
+    #expect(state.notice == nil)
+    state.needsKey()
+    state.clear()
+    #expect(state.notice == nil)
+}
+
+@Test func editClearsAnErrorLine() {
+    var state = AskState()
+    let token = state.begin("q")
+    _ = state.land(.failed(question: "q", .offline), token: token)
+    state.clear()
+    #expect(state.outcome == nil)
+    #expect(state.errorLine(for: "q") == nil)
+}

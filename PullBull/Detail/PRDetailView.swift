@@ -83,10 +83,11 @@ struct PRDetailView: View {
     }
 
     private var backTitle: String {
+        if let title = model.askReturn.backTitle { return title }
         switch model.detailReturnRoute {
-        case .issueDetail(let issue): "#\(issue.number)"
-        case .search: "Search"
-        case .list, .detail: model.selectedTabTitle
+        case .issueDetail(let issue): return "#\(issue.number)"
+        case .search: return "Search"
+        case .list, .ask, .detail: return model.selectedTabTitle
         }
     }
 

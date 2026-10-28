@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import PullBullKit
 
 /// The Anthropic key's state in Settings → Ask.
@@ -107,6 +107,7 @@ extension AppModel {
     func setAskEnabled(_ on: Bool) {
         guard settings.askEnabled != on else { return }
         settings.askEnabled = on
+        if !on { clearAsk() }
         reconcileAsk()
     }
 
@@ -273,5 +274,154 @@ extension AppModel {
         case .server(let code): "Not saved: Anthropic answered \(code)."
         default: "Not saved: the key couldn't be checked."
         }
+    }
+}
+
+// MARK: - Asking
+
+extension AppModel {
+    /// The last reply that landed; nil while asking and after the field was edited.
+    var askOutcome: AskOutcome? { askState.outcome }
+    /// The question in flight; nil when no Ask runs.
+    var asking: String? { askState.asking }
+    /// Why ⌥⌘↩ sent nothing; nil otherwise.
+    var askNotice: String? { askState.notice }
+
+    /// The ⌥⌘↩ hint shows only with Ask on and a key saved.
+    var offersAsk: Bool { settings.askEnabled && askKeyState == .valid }
+
+    /// The question the Ask screen answers; empty before any answer.
+    var askQuestion: String {
+        switch askOutcome {
+        case .answered(let question, _, _, _), .failed(let question, _): question
+        case nil: ""
+        }
+    }
+
+    /// The Ask screen's rows, in the model's order.
+    var askRows: [AskItem] {
+        if case .answered(_, _, let rows, _) = askOutcome { return rows }
+        return []
+    }
+
+    /// The failure line over the search results for the question in the field; nil otherwise.
+    var askErrorLine: String? {
+        askState.errorLine(for: searchText.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// ⌥⌘↩ in the search field: asks the field's text over the open Ask index with the saved key and
+    /// model. The only way anything reaches Anthropic's Messages API. Without a key (or an open index)
+    /// nothing is sent and the notice says so. A later Ask or an edit drops this one's reply.
+    func ask() {
+        let question = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard settings.askEnabled, route == .search, !question.isEmpty else { return }
+        askTask?.cancel()
+        askTask = nil
+        guard let key = (try? AnthropicKeyStore().load()) ?? nil else {
+            askKeyState = .none
+            askState.needsKey()
+            return
+        }
+        guard let runtime = askRuntime else {
+            askState.needsKey()
+            return
+        }
+        let target = runtime.target
+        let scopeName = switch target.scope {
+        case .org(let org): org
+        case .personal(let login, _): login
+        }
+        let session = AskSession(
+            index: runtime.index,
+            client: AskClient(apiKey: key, model: AskModel.named(settings.askModel)),
+            context: AskContext(scopeName: scopeName, isOrg: target.scope.org != nil, today: Date()),
+            excluded: askExcludedRepos(), scope: target.scope)
+        let focusedRepo = repoFocus?.repo
+        let stillSyncing = askProgress.flatMap { $0.backfilling ? $0.indexed : nil }
+        let token = askState.begin(question)
+        askTask = Task { [weak self] in
+            let outcome: AskOutcome?
+            do {
+                outcome = try await session.run(question, focusedRepo: focusedRepo, stillSyncing: stillSyncing)
+            } catch {
+                // `run` throws only cancellation; anything else would still be a failed Ask.
+                outcome = AskGeneration.isCancellation(error) ? nil : .failed(question: question, .server(0))
+            }
+            guard let self else { return }
+            if let outcome { self.landAsk(outcome, token: token) } else { self.askState.cancelled(token: token) }
+        }
+    }
+
+    /// Esc while asking, or a detail opening: the reply in flight is dropped.
+    func cancelAsk() {
+        askTask?.cancel()
+        askTask = nil
+        askState.cancel()
+    }
+
+    /// The field was edited or emptied: no Ask runs, and its line and notice go.
+    func clearAsk() {
+        askTask?.cancel()
+        askTask = nil
+        askState.clear()
+    }
+
+    /// ↑/↓ on the Ask screen.
+    func moveAskSelection(by offset: Int) {
+        let keys = askRows.map(\.key)
+        guard !keys.isEmpty else { return }
+        let current = askSelection.flatMap { keys.firstIndex(of: $0) } ?? (offset > 0 ? -1 : keys.count)
+        askSelection = keys[min(max(current + offset, 0), keys.count - 1)]
+    }
+
+    /// The highlighted Ask row's GitHub page.
+    private var askSelectionLink: (item: AskItem, url: URL)? {
+        guard let key = askSelection, let item = askRows.first(where: { $0.key == key }) else { return nil }
+        return (item, item.kind == .pr ? GitHubLinks.pullRequest(key) : GitHubLinks.issue(key))
+    }
+
+    /// ⌘↩ on the Ask screen.
+    @discardableResult
+    func openAskSelectionOnGitHub() -> Bool {
+        guard let link = askSelectionLink else { return false }
+        NSWorkspace.shared.open(link.url)
+        return true
+    }
+
+    /// ⌘C on the Ask screen: the highlighted row's link.
+    func copyAskSelectionLink() -> Bool {
+        guard let link = askSelectionLink else { return false }
+        PRActions.copy(link.url.absoluteString)
+        return true
+    }
+
+    /// ⌘⇧C on the Ask screen: `owner/repo#n`.
+    func copyAskSelectionReference() -> Bool {
+        guard let link = askSelectionLink else { return false }
+        PRActions.copy(ListNavigation.reference(link.item.key))
+        return true
+    }
+
+    /// ⌥⌘C on the Ask screen: a Markdown link titled as the row.
+    func copyAskSelectionMarkdownLink() -> Bool {
+        guard let link = askSelectionLink else { return false }
+        PRActions.copyMarkdownLink(title: link.item.title, key: link.item.key, url: link.url)
+        return true
+    }
+
+    /// A reply arrived. An answer opens the Ask screen with its first row highlighted; a failure stays as
+    /// one line over the normal results. Nothing lands once the search was left.
+    private func landAsk(_ outcome: AskOutcome, token: Int) {
+        guard route == .search else {
+            askState.cancelled(token: token)
+            return
+        }
+        let arrival = askState.land(outcome, token: token)
+        guard arrival != .ignored else { return }
+        askTask = nil
+        guard arrival == .screen else { return }
+        askSelection = askRows.first?.key
+        closeCompletion()
+        route = .ask
     }
 }
