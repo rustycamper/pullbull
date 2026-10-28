@@ -6,6 +6,7 @@ scripts/release.sh 1.0.0           # build, sign, notarise, tag
 ```
 
 Then run the two commands it prints: `git push origin v1.0.0` and `gh release create …`.
+Then [bump the Homebrew cask](#homebrew-cask).
 
 ## What the script does
 
@@ -21,6 +22,20 @@ Then run the two commands it prints: `git push origin v1.0.0` and `gh release cr
 - Commits, pushes and publishes nothing
 - The printed `gh release create` attaches the zip, `appcast.xml` and the dSYM zip (for symbolicating crash reports)
 - The feed is `releases/latest/download/appcast.xml`, so every release must be marked latest, not pre-release
+
+## Homebrew cask
+
+After the release is published, in [rustycamper/homebrew-tap](https://github.com/rustycamper/homebrew-tap):
+
+```bash
+shasum -a 256 build/release/PullBull-1.0.0.zip   # in this repo
+# Casks/pullbull.rb: set version and sha256
+brew audit --cask --online --strict rustycamper/tap/pullbull
+git commit -am "pullbull 1.0.0" && git push
+```
+
+- Installed copies update through Sparkle (`auto_updates true`); the cask only matters for new installs
+- Don't test with `brew uninstall` on a Mac running PullBull: the cask's `uninstall quit:` quits it
 
 ## One-time setup
 
