@@ -251,11 +251,7 @@ struct ClosedRow: View {
                         .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                if merged {
-                    Pill(symbol: nil, text: "Merged", foreground: Palette.mergedText, fill: Palette.mergedFill)
-                } else {
-                    Pill(symbol: nil, text: "Closed", foreground: Palette.closedText, fill: Palette.closedFill)
-                }
+                EndedPill(merged: merged)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
@@ -353,6 +349,19 @@ struct ReadyToMergePill: View {
         Pill(symbol: "arrow.triangle.merge", text: "Ready to merge", foreground: Palette.secondaryText, fill: fill)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Ready to merge")
+    }
+}
+
+/// The "Merged" or "Closed" pill of an item that has ended.
+struct EndedPill: View {
+    let merged: Bool
+
+    var body: some View {
+        if merged {
+            Pill(symbol: nil, text: "Merged", foreground: Palette.mergedText, fill: Palette.mergedFill)
+        } else {
+            Pill(symbol: nil, text: "Closed", foreground: Palette.closedText, fill: Palette.closedFill)
+        }
     }
 }
 
