@@ -39,7 +39,7 @@ struct IssueListView: View {
     private var doneNote: String { tab == .assigned ? "still open" : "last 14 days" }
 
     private var list: some View {
-        LazyVStack(alignment: .leading, spacing: 0) {
+        LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
             if listed.isEmpty {
                 Group {
                     if let focus, total > contents.issues.count {
@@ -56,16 +56,22 @@ struct IssueListView: View {
                     // Under a focus the kit merges repo groups into one untitled group.
                     if group.title.isEmpty {
                         Color.clear.frame(height: 6)
+                        // No header pins above it, so there is none to clear.
+                        rows(group.issues, inRepoGroup: group.isRepo, clearance: 0)
                     } else {
-                        IssueGroupHeader(
-                            model: model, group: group,
-                            fold: foldState(group, folded: folded)
-                        ) {
-                            model.toggleLane(group.kind, on: tab, doneExpanded: doneExpanded)
+                        Section {
+                            if !folded.contains(group.kind) {
+                                rows(group.issues, inRepoGroup: group.isRepo)
+                            }
+                        } header: {
+                            IssueGroupHeader(
+                                model: model, group: group,
+                                fold: foldState(group, folded: folded)
+                            ) {
+                                model.toggleLane(group.kind, on: tab, doneExpanded: doneExpanded)
+                            }
+                            .pinnedHeaderBackground()
                         }
-                    }
-                    if !folded.contains(group.kind) {
-                        rows(group.issues, inRepoGroup: group.isRepo)
                     }
                 }
                 if scoped.hiddenCount > 0 {
@@ -86,16 +92,29 @@ struct IssueListView: View {
         return folded.contains(group.kind) ? .folded : .open
     }
 
-    private func rows(_ issues: [BoardIssue], inRepoGroup: Bool = false) -> some View {
+    private func rows(
+        _ issues: [BoardIssue], inRepoGroup: Bool = false, clearance: CGFloat = PinnedHeader.clearance
+    ) -> some View {
         let wantedLabels = model.searchQuery.labels
         return ForEach(issues) { issue in
             IssueRow(model: model, issue: issue, tab: tab, now: now, selected: model.listSelection == issue.key,
                      inRepoGroup: inRepoGroup || focus != nil, wantedLabels: wantedLabels)
-                .id(issue.key)
+                .scrollTarget(issue.key, clearance: clearance)
         }
     }
 
-    @ViewBuilder private func doneSection(_ group: IssueGroup) -> some View {
+    private func doneSection(_ group: IssueGroup) -> some View {
+        Section {
+            if doneExpanded {
+                rows(group.issues)
+            }
+        } header: {
+            doneHeader(group)
+                .pinnedHeaderBackground()
+        }
+    }
+
+    private func doneHeader(_ group: IssueGroup) -> some View {
         Button {
             doneExpanded.toggle()
         } label: {
@@ -133,9 +152,6 @@ struct IssueListView: View {
         .padding(.top, 2)
         .accessibilityLabel("Done, \(group.issues.count), \(doneNote)")
         .accessibilityValue(doneExpanded ? "expanded" : "collapsed")
-        if doneExpanded {
-            rows(group.issues)
-        }
     }
 }
 
@@ -180,7 +196,6 @@ private struct IssueGroupHeader: View {
                             .rotationEffect(.degrees(fold == .open ? 90 : 0))
                             .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: fold == .open)
                             .frame(width: 8)
-                            .padding(.top, 6)
                     }
                     .contentShape(Rectangle())
             }
@@ -222,8 +237,7 @@ private struct IssueGroupHeader: View {
         .foregroundStyle(.secondary)
         .lineLimit(1)
         .padding(.horizontal, 8)
-        .padding(.top, 10)
-        .padding(.bottom, 4)
+        .padding(.vertical, 7)
     }
 
     /// Status lanes take the owner's Status colour; the colour is decorative, the title names the status.
