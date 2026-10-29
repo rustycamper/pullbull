@@ -87,9 +87,10 @@ struct IssueListView: View {
     }
 
     private func rows(_ issues: [BoardIssue], inRepoGroup: Bool = false) -> some View {
-        ForEach(issues) { issue in
+        let wantedLabels = model.searchQuery.labels
+        return ForEach(issues) { issue in
             IssueRow(model: model, issue: issue, tab: tab, now: now, selected: model.listSelection == issue.key,
-                     inRepoGroup: inRepoGroup || focus != nil)
+                     inRepoGroup: inRepoGroup || focus != nil, wantedLabels: wantedLabels)
                 .id(issue.key)
         }
     }

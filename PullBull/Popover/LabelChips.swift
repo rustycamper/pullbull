@@ -41,16 +41,19 @@ struct ChipFit: Hashable {
 }
 
 /// `line(fit)` with as many chips of `set` as fit at full width: chips drop off the end into "+N", so the
-/// rest of the line always shows. With `canLean`, the line next tries leaving out what it can spare before
-/// any chip shortens. The last resort keeps one chip, shortened, so a row with labels always shows a
-/// colour; it gives way before the rest of the line does.
+/// rest of the line always shows. With `canLean`, the line next tries leaving out what it can spare, with
+/// or without labels, before anything shortens. The last resort, the only one that may truncate, keeps one
+/// chip, shortened, so a row with labels always shows a colour; it gives way before the rest of the line.
 struct ChipsThatFit<Line: View>: View {
     let set: LabelChipSet
     var canLean = false
     @ViewBuilder let line: (ChipFit) -> Line
 
     private var fits: [ChipFit] {
-        guard !set.chips.isEmpty else { return [ChipFit(count: 0, squeezed: false)] }
+        guard !set.chips.isEmpty else {
+            let full = ChipFit(count: 0, squeezed: false)
+            return canLean ? [full, ChipFit(count: 0, squeezed: false, lean: true)] : [full]
+        }
         let counts = (1...set.chips.count).reversed()
         let full = counts.map { ChipFit(count: $0, squeezed: false) }
         let lean = canLean ? counts.map { ChipFit(count: $0, squeezed: false, lean: true) } : []
@@ -58,10 +61,11 @@ struct ChipsThatFit<Line: View>: View {
     }
 
     var body: some View {
+        let fits = fits
         ViewThatFits(in: .horizontal) {
             ForEach(fits, id: \.self) { fit in
                 line(fit)
-                    .fixedSize(horizontal: fit.count > 0 && !fit.squeezed, vertical: false)
+                    .fixedSize(horizontal: fit != fits.last, vertical: false)
             }
         }
     }

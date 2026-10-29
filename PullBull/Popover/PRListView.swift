@@ -64,10 +64,11 @@ struct PRListView: View {
     }
 
     private func rows(_ rows: [Row]) -> some View {
-        ForEach(rows) { row in
+        let wantedLabels = model.searchQuery.labels
+        return ForEach(rows) { row in
             PRRow(
                 model: model, row: row, tab: tab, compact: model.settings.compact, now: now,
-                selected: model.listSelection == row.pr.key)
+                selected: model.listSelection == row.pr.key, wantedLabels: wantedLabels)
             .id(row.pr.key)
         }
     }

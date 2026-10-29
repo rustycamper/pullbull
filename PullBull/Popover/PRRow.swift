@@ -12,6 +12,8 @@ struct PRRow: View {
     let now: Date
     /// The keyboard highlight (↑/↓).
     var selected = false
+    /// The labels a `~label` search asks for, passed in so a row doesn't follow every keystroke.
+    var wantedLabels: [String] = []
     @State private var hovering = false
 
     private var pr: PullRequest { row.pr }
@@ -94,7 +96,7 @@ struct PRRow: View {
     /// never truncate.
     private var meta: some View {
         let chips = chips
-        let labels = LabelChipSet(pr, first: model.searchQuery.labels)
+        let labels = LabelChipSet(pr, first: wantedLabels)
         return ChipsThatFit(set: labels, canLean: tab != .mine) { fitting in
             metaLine(chips: chips, labels: labels, fitting: fitting)
         }
@@ -119,7 +121,7 @@ struct PRRow: View {
             Text(age)
                 .fixedSize()
                 // The avatar, which names a left-out author on hover, is hidden from VoiceOver.
-                .accessibilityLabel(tab != .mine && fitting.lean ? "\(pr.author), \(age)" : age)
+                .accessibilityLabel(fitting.lean ? "\(pr.author), \(age)" : age)
             ForEach(chips.info.filter { !$0.isCount }, id: \.text) { info in
                 Text("·").foregroundStyle(.tertiary).accessibilityHidden(true)
                 Label { Text(info.text) } icon: {

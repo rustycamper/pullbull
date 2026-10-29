@@ -12,6 +12,8 @@ struct IssueRow: View {
     var selected = false
     /// Under a repo header, which already names the repo.
     var inRepoGroup = false
+    /// The labels a `~label` search asks for, passed in so a row doesn't follow every keystroke.
+    var wantedLabels: [String] = []
     @State private var hovering = false
 
     private var compact: Bool { model.settings.compact }
@@ -60,7 +62,7 @@ struct IssueRow: View {
                     .multilineTextAlignment(.leading)
                     .foregroundStyle(past ? .secondary : .primary)
                     .fixedSize(horizontal: false, vertical: true)
-                IssueMetaLine(issue: issue, now: now, showsRepo: !inRepoGroup, wantedLabels: model.searchQuery.labels)
+                IssueMetaLine(issue: issue, now: now, showsRepo: !inRepoGroup, wantedLabels: wantedLabels)
                     .padding(.top, 3)
             }
             .frame(maxWidth: .infinity, alignment: .leading)

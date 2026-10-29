@@ -243,30 +243,9 @@ struct DetailLabels: View {
     var body: some View {
         FlowLayout(spacing: 4, lineSpacing: 4) {
             ForEach(Array(labels.enumerated()), id: \.offset) { index, label in
-                DetailLabelChip(name: label, color: LabelDotColor.parse(color(index)))
+                RowLabelChip(text: label, color: LabelDotColor.parse(color(index)), squeezable: true)
             }
         }
-    }
-}
-
-/// A muted outline chip, led by a dot in the label's GitHub colour when it has one. The text stays gray.
-struct DetailLabelChip: View {
-    let name: String
-    let color: UInt32?
-
-    var body: some View {
-        HStack(spacing: 4) {
-            if let color { LabelDot(color: color) }
-            Text(name)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Palette.secondaryText)
-                .lineLimit(1)
-                .truncationMode(.tail)
-        }
-        .padding(.horizontal, 6)
-        .frame(height: 16)
-        .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Palette.separator, lineWidth: 0.5))
-        .accessibilityElement(children: .combine)
     }
 }
 
