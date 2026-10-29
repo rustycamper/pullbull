@@ -301,6 +301,7 @@ struct SearchResultsView: View {
             ForEach(prs) { pr in
                 SearchPRRow(
                     pr: pr, words: words, labels: labels, role: role(of: pr), viewer: viewer, now: now,
+                    compact: model.settings.compact,
                     selected: model.searchSelection == pr.key, flashing: model.rowFlash.key == pr.key
                 ) {
                     if PRActions.commandClicked { model.openSearchResultOnGitHub(pr) } else { model.openSearchResult(pr) }
@@ -319,6 +320,7 @@ struct SearchResultsView: View {
             ForEach(issues) { issue in
                 SearchIssueRow(
                     issue: issue, words: words, labels: labels, role: role(of: issue), now: now,
+                    compact: model.settings.compact,
                     selected: model.searchSelection == issue.key, flashing: model.rowFlash.key == issue.key
                 ) {
                     if PRActions.commandClicked { model.openSearchResultOnGitHub(issue) } else { model.openSearchResult(issue) }
@@ -485,35 +487,65 @@ private struct SearchPRRow: View {
     let role: String?
     let viewer: String
     let now: Date
+    let compact: Bool
     let selected: Bool
     let flashing: Bool
     let action: () -> Void
 
     var body: some View {
-        let open = pr.state == .open
-        SearchRowButton(selected: selected, flashing: flashing, action: action) {
-            HStack(alignment: .top, spacing: 10) {
-                glyph
-                    .font(.system(size: 13))
-                    .frame(width: 20, height: 20)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(Highlight.title(pr.title, words: words))
-                        .font(.system(size: 13))
-                        .lineSpacing(1)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                        .foregroundStyle(open && !pr.isDraft ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-                        .fixedSize(horizontal: false, vertical: true)
-                        // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
-                        .help(pr.title)
-                    meta
-                        .padding(.top, 3)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                trailing
-                    .padding(.top, 1)
-            }
+        SearchRowButton(compact: compact, selected: selected, flashing: flashing, action: action) {
+            if compact { compactBody } else { fullBody }
         }
+    }
+
+    private var fullBody: some View {
+        HStack(alignment: .top, spacing: 10) {
+            glyph
+                .font(.system(size: 13))
+                .frame(width: 20, height: 20)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(Highlight.title(pr.title, words: words))
+                    .font(.system(size: 13))
+                    .lineSpacing(1)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .foregroundStyle(titleStyle)
+                    .fixedSize(horizontal: false, vertical: true)
+                    // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
+                    .help(pr.title)
+                meta
+                    .padding(.top, 3)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            trailing
+                .padding(.top, 1)
+        }
+    }
+
+    /// The tab rows' compact line: the state glyph still leads, an open PR keeps its CI glyph, and an ended
+    /// one's glyph colour and "merged Oct 12" stand in for the pill.
+    private var compactBody: some View {
+        let highlighted = Highlight.title(pr.title, words: words)
+        return CompactRowLayout(
+            repoNumber: RepoNumber(key: pr.key, compact: true),
+            age: when, ageWidth: pr.state == .open ? 24 : nil
+        ) {
+            glyph
+                .font(.system(size: 11))
+                .frame(width: 16)
+        } title: {
+            Text(pr.isDraft ? AttributedString("Draft: ") + highlighted : highlighted)
+                .foregroundStyle(titleStyle)
+                .help(pr.title)
+        } badges: {
+            CompactChipGlyphs(chips: RowChips(searchResult: pr, viewer: viewer))
+        } trailing: {
+            if pr.state == .open { CIGlyph(state: pr.ci) }
+        }
+    }
+
+    private var titleStyle: AnyShapeStyle {
+        pr.state == .open && !pr.isDraft ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)
     }
 
     @ViewBuilder private var glyph: some View {
@@ -599,43 +631,83 @@ private struct SearchIssueRow: View {
     let labels: [String]
     let role: String?
     let now: Date
+    let compact: Bool
     let selected: Bool
     let flashing: Bool
     let action: () -> Void
 
+    private var glyph: (symbol: String, color: Color, label: String) { Palette.issueGlyph(issue.glyph) }
+
     var body: some View {
-        let glyph = Palette.issueGlyph(issue.glyph)
-        SearchRowButton(selected: selected, flashing: flashing, action: action) {
-            HStack(alignment: .top, spacing: 10) {
-                Image(symbol: glyph.symbol)
+        SearchRowButton(compact: compact, selected: selected, flashing: flashing, action: action) {
+            if compact { compactBody } else { fullBody }
+        }
+    }
+
+    private var fullBody: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(symbol: glyph.symbol)
+                .font(.system(size: 13))
+                .foregroundStyle(glyph.color)
+                .frame(width: 20, height: 20)
+                .accessibilityLabel(glyph.label)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(Highlight.title(issue.title, words: words))
                     .font(.system(size: 13))
-                    .foregroundStyle(glyph.color)
-                    .frame(width: 20, height: 20)
-                    .accessibilityLabel(glyph.label)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(Highlight.title(issue.title, words: words))
-                        .font(.system(size: 13))
-                        .lineSpacing(1)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                        .foregroundStyle(issue.isOpen ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-                        .fixedSize(horizontal: false, vertical: true)
-                        // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
-                        .help(issue.title)
-                    IssueMetaLine(issue: issue, now: now, role: role, wantedLabels: labels)
-                        .padding(.top, 3)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                if let status = issue.status?.name {
-                    Pill(symbol: nil, text: status, foreground: Palette.secondaryText, fill: Palette.fill)
-                        .accessibilityLabel("Status: \(status)")
-                }
+                    .lineSpacing(1)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .foregroundStyle(titleStyle)
+                    .fixedSize(horizontal: false, vertical: true)
+                    // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
+                    .help(issue.title)
+                IssueMetaLine(issue: issue, now: now, role: role, wantedLabels: labels)
+                    .padding(.top, 3)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            statusPill
+        }
+    }
+
+    /// The tab rows' compact line, with the Status pill where a tab row has its assignees.
+    private var compactBody: some View {
+        CompactRowLayout(
+            repoNumber: RepoNumber(key: issue.key, compact: true),
+            age: IssueMetaLine.age(of: issue, now: now), ageWidth: issue.isOpen ? 24 : nil
+        ) {
+            Image(symbol: glyph.symbol)
+                .font(.system(size: 11))
+                .foregroundStyle(glyph.color)
+                .frame(width: 16)
+                .accessibilityLabel(glyph.label)
+        } title: {
+            Text(Highlight.title(issue.title, words: words))
+                .foregroundStyle(titleStyle)
+                .help(issue.title)
+        } badges: {
+            EmptyView()
+        } trailing: {
+            // Sized to fit, so the title truncates first.
+            statusPill
+                .fixedSize()
+        }
+    }
+
+    private var titleStyle: AnyShapeStyle {
+        issue.isOpen ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)
+    }
+
+    @ViewBuilder private var statusPill: some View {
+        if let status = issue.status?.name {
+            Pill(symbol: nil, text: status, foreground: Palette.secondaryText, fill: Palette.fill)
+                .accessibilityLabel("Status: \(status)")
         }
     }
 }
 
 private struct SearchRowButton<Label: View>: View {
+    /// A compact label brings its own height and padding (`CompactRowLayout`).
+    let compact: Bool
     let selected: Bool
     let flashing: Bool
     let action: () -> Void
@@ -645,11 +717,12 @@ private struct SearchRowButton<Label: View>: View {
     var body: some View {
         Button(action: action) {
             label()
-                .padding(.horizontal, 8)
-                .padding(.top, 7)
-                .padding(.bottom, 8)
+                .padding(.horizontal, compact ? 0 : 8)
+                .padding(.top, compact ? 0 : 7)
+                .padding(.bottom, compact ? 0 : 8)
                 .contentShape(Rectangle())
-                .modifier(RowFill(cornerRadius: 7, selected: selected, hovering: hovering, flashing: flashing))
+                .modifier(RowFill(
+                    cornerRadius: compact ? 6 : 7, selected: selected, hovering: hovering, flashing: flashing))
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }

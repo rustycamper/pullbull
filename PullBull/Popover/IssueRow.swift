@@ -118,8 +118,10 @@ struct IssueMetaLine: View {
         .metaLineStyle()
     }
 
+    private var age: String? { Self.age(of: issue, now: now) }
+
     /// "closed 3d ago" for a closed issue; otherwise the time since its last update.
-    private var age: String? {
+    static func age(of issue: BoardIssue, now: Date) -> String? {
         if !issue.isOpen, let ended = EndedAge.text(state: .closed, closedAt: issue.closedAt, now: now) {
             return ended
         }
