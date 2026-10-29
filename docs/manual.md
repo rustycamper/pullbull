@@ -71,13 +71,14 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 | Tab | Shows |
 |---|---|
 | Review | PRs waiting on you or your team. Icon says why: requested, team, re-requested, new commits |
-| Mine | Your PRs, review pills, checks, **Ready to merge**. Folded "Recently closed" |
+| Mine | Your PRs, review pills, checks, **Ready to merge**. Folded "Recently closed": yours closed or merged in the last 7 days |
 | Team | Other open PRs in the org |
 
 > [!NOTE]
 > Ready to merge = approved, no changes requested, checks green or none, no conflicts, not a draft. It doesn't see branch protection (required review count).
 
-- **Detail:** reviewers, checks, description, conversation, files. Markdown incl. `<details>`
+- **Detail:** labels, reviewers, checks, description, conversation, files. Markdown incl. `<details>`
+- **Labels:** up to two chips per row, each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail lists them all
 - **Right-click a row:** copy branch, link or Markdown link · open on GitHub · show only this repo · search author
 - **Footer:** account · refresh · open on GitHub · settings. Turns amber with **Retry** when a refresh fails
 
@@ -87,12 +88,19 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 
 | Tab | Shows | Grouped by |
 |---|---|---|
-| Assigned | Your issues | Board Status, then "Not on board" |
-| Created | Issues you opened | Repo |
+| Assigned | Your issues | Board Status, then "Not on board". Done folded: done on the board, still open. Repo without a board |
+| Created | Issues you opened | Repo, or none (Settings → General) |
 | Board | All open issues on the board | Board Status. Done folded, last 14 days |
 
-- **Switch board:** click its name in the filter row, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd>
-- **Detail:** board card · linked PRs (<kbd>Esc</kbd> returns) · description · last two comments
+- **Status lanes:** the glyph takes the Status colour set on the board, on Board and Assigned
+- **Fold a lane:** click its header. Status, "No status" and "Not on board" fold; repo groups don't. Needs a board
+- **Folds:** kept per tab and per board, across relaunches. Folding on Board leaves Assigned as it is
+- **Searching:** every lane shows open; folds come back when the search ends
+- **Done:** click its header to unfold. Never counted
+- **Labels:** chips as on [pull requests](#pull-requests). The board card lists them all
+- **Switch board:** on the Board tab, click its name in the filter row, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd>
+- **Right-click a row:** copy link or Markdown link · open on GitHub · show only this repo · search author
+- **Detail:** board card (incl. labels) · linked PRs (<kbd>Esc</kbd> returns) · description · last two comments
 
 ## Search
 
@@ -115,7 +123,7 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 - Results span all tabs; click a tab to narrow
 - Matches in the other mode show a hint: <kbd>⌘</kbd><kbd>1</kbd> / <kbd>⌘</kbd><kbd>2</kbd>
 - Empty field shows saved searches and token hints. <kbd>↓</kbd> to walk them
-- Typing `@`, `~`, `label:`, `is:` or `status:` opens a completion list. `status:` lists the board's Status columns
+- Typing `@`, `~`, `label:`, `is:` or `status:` opens a completion list. `status:` lists the board's Status columns with their open counts; picking one writes the full name in quotes
 - Typing the start of `status:` or `label:` (`st`, `la`) at the end of the field shows the rest in grey. Not `is:`, a common word; `status:` only when the board has Status columns
 - **Save:** bookmark icon in the field. Manage in Settings → Search
 
@@ -208,8 +216,8 @@ Settings → Ask AI.
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy Markdown link |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | [Ask AI](#ask-ai), from the search field |
 | <kbd>⌘</kbd><kbd>1</kbd> · <kbd>⌘</kbd><kbd>2</kbd> | Pull Requests · Issues |
-| <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> | Repo menu |
-| <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> | Board menu |
+| <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> | Repo menu ([one repo](#one-repo)) |
+| <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> | Board menu, on the Board tab |
 | <kbd>⌘</kbd><kbd>R</kbd> | Refresh |
 | <kbd>⌘</kbd><kbd>,</kbd> | Settings |
 | <kbd>Esc</kbd> | Clear search → clear repo → close |
@@ -226,7 +234,9 @@ Reopen within a minute and the detail is still there.
 
 ## One repo
 
-- Right-click a row → **Show Only *repo***, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd>
+- Right-click a row or a repo header → **Show Only *repo***
+- Or the repo menu: <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd>, or the repo name in the filter row. Each repo shows its counts
+- Back to all: ✕ in the filter row, **Show all**, **Show All Repositories**, or <kbd>Esc</kbd>
 - Applies to every tab; search stays inside it
 - Counts and notifications still cover all repos
 - Cleared on relaunch
@@ -237,10 +247,10 @@ Reopen within a minute and the detail is still there.
 
 | Tab | |
 |---|---|
-| General | Background, filters, menu bar count, refresh interval, shortcut, launch at login, updates |
+| General | Grouping, compact cards, background, filters (Review and Team), menu bar count, refresh interval, shortcut, launch at login, updates |
 | Account | Account, org, board, access notices |
 | Notifications | One toggle per event |
-| Search | Saved searches |
+| Search | Saved searches: rename, edit the query, drag to reorder, **+** and **−**. Apply one from the empty search field |
 | Ask AI | [Ask AI](#ask-ai): on/off, key, model, exclude list, index |
 
 | Notification | Default |
