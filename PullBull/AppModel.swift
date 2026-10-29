@@ -1615,14 +1615,25 @@ final class AppModel {
         issueTabs = IssueTabBuilder.build(snapshot, settings: settings, now: now)
         hiddenApprovedCount = built.hiddenApprovedCount
         reviewCleared.observe(count: built.review.rows.count, fetchedAt: snapshot.fetchedAt)
-        modeNews.observe(.pullRequests, items: ModeNews.items(review: built.review.rows), shown: mode == .pullRequests)
+        var news = modeNews
+        news.observe(
+            .pullRequests, items: ModeNews.items(review: built.review.rows), basis: ModeNews.reviewBasis(settings),
+            shown: mode == .pullRequests)
         // Assigned as its empty state sees it: the folded Done group doesn't count.
         if let issues = issueTabs, issues.assignedLoaded, let fetchedAt = issues.assignedFetchedAt {
             let listed = issues.assigned.groups.filter { $0.kind != .done }.reduce(0) { $0 + $1.issues.count }
             assignedCleared.observe(count: listed, fetchedAt: fetchedAt)
-            // Only once Assigned has loaded: an unloaded, empty list would make every issue new.
-            modeNews.observe(.issues, items: ModeNews.items(assigned: issues.assigned), shown: mode == .issues)
+            // Only once Assigned has loaded (an unloaded, empty list would make every issue new), and only
+            // with the board's Status known: without it Done issues rejoin the list, which isn't news. On
+            // another board, what's Done differs, so that look is a baseline.
+            if issues.statusKnown {
+                news.observe(
+                    .issues, items: ModeNews.items(assigned: issues.assigned),
+                    basis: ModeNews.assignedBasis(settings.board), shown: mode == .issues)
+            }
         }
+        // Set only on a change: every refresh rebuilds, and the toggle redraws for each set.
+        if news != modeNews { modeNews = news }
         if let f = repoFocus, let tabs, !f.isValid(prs: tabs, issues: issueTabs, org: snapshot.org) { repoFocus = nil }
         refreshSearchMatchCounts(for: searchQuery)
         // A narrowed search is the lists' own items, so it follows them.

@@ -4,7 +4,8 @@ import Foundation
 /// glyph: Pull Requests counts PRs newly in Review (a new request, a re-request, new commits since my
 /// review), Issues counts issues newly in Assigned. The mode on screen is always seen; the other one
 /// compares its items with those it had when it was last on screen. The first look at a mode (launch,
-/// another account) only records a baseline. Kept in memory only.
+/// another account) only records a baseline, as does a look on another basis: what decides the list
+/// changed (Review's filters, Assigned's board), so items it adds or drops aren't news. Kept in memory only.
 public struct ModeNews: Equatable, Sendable {
     /// One item of a mode's list: a PR and why it is in Review, or an assigned issue (no reason).
     public struct Item: Hashable, Sendable {
@@ -14,13 +15,16 @@ public struct ModeNews: Equatable, Sendable {
 
     private var seen: [PopoverMode: Set<Item>] = [:]
     private var current: [PopoverMode: Set<Item>] = [:]
+    private var basis: [PopoverMode: String] = [:]
 
     public init() {}
 
-    /// `mode`'s items as just built; `shown` when that mode is on screen, which marks them all seen.
-    public mutating func observe(_ mode: PopoverMode, items: Set<Item>, shown: Bool) {
+    /// `mode`'s items as just built, on `basis` (what decided them); `shown` when that mode is on screen,
+    /// which marks them all seen.
+    public mutating func observe(_ mode: PopoverMode, items: Set<Item>, basis: String, shown: Bool) {
         current[mode] = items
-        if shown || seen[mode] == nil { seen[mode] = items }
+        if shown || seen[mode] == nil || self.basis[mode] != basis { seen[mode] = items }
+        self.basis[mode] = basis
     }
 
     /// `mode` came on screen: what it lists now is seen.
@@ -39,14 +43,35 @@ public struct ModeNews: Equatable, Sendable {
     public mutating func reset() {
         seen = [:]
         current = [:]
+        basis = [:]
     }
 
     /// Review's rows awaiting my review, each with its reason, so a re-request or new commits on a PR
-    /// already listed counts as new. PRs I already approved (no reason) don't count.
+    /// already listed counts as new. PRs I already approved (no reason) don't count. A team request
+    /// counts as one reason whichever of my teams it names, so a second team's request isn't news.
     public static func items(review rows: [Row]) -> Set<Item> {
         Set(rows.compactMap { row in
-            row.reviewReason.map { Item(key: row.pr.key, reason: String(describing: $0)) }
+            row.reviewReason.map { Item(key: row.pr.key, reason: tag($0)) }
         })
+    }
+
+    private static func tag(_ reason: ReviewReason) -> String {
+        switch reason {
+        case .requested: "requested"
+        case .reRequested: "reRequested"
+        case .newCommitsSinceReview: "newCommits"
+        case .teamRequested: "team"
+        }
+    }
+
+    /// Review's basis: the filters that decide which PRs it lists.
+    public static func reviewBasis(_ settings: AppSettings) -> String {
+        "\(settings.hideDrafts) \(settings.hideOlderThanTwoMonths) \(settings.hideApprovedByMe)"
+    }
+
+    /// Assigned's basis: the board whose Status decides which assigned issues are Done.
+    public static func assignedBasis(_ board: BoardRef?) -> String {
+        board.map(LaneFolds.boardKey) ?? ""
     }
 
     /// Assigned's issues, without the folded Done group.
