@@ -65,9 +65,7 @@ struct AskSettingsTab: View {
             }
         }
         .formStyle(.grouped)
-        .fixedSize(horizontal: false, vertical: true)
-        // It always fits; without this a scroller can flash in after the window resizes for this tab.
-        .scrollDisabled(true)
+        .settingsTabHeight()
         .onAppear { model.loadAskKeyState() }
     }
 

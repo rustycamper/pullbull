@@ -28,7 +28,7 @@ struct GeneralSettingsTab: View {
             appSection
         }
         .formStyle(.grouped)
-        .fixedSize(horizontal: false, vertical: true)
+        .settingsTabHeight()
         .onAppear { syncLaunchAtLogin() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             syncLaunchAtLogin()

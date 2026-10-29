@@ -55,9 +55,7 @@ struct NotificationSettingsTab: View {
             .disabled(permission.state == .denied)
         }
         .formStyle(.grouped)
-        .fixedSize(horizontal: false, vertical: true)
-        // It always fits; without this a scroller can flash in after the window resizes for this tab.
-        .scrollDisabled(true)
+        .settingsTabHeight()
     }
 
     private var notificationsOffRow: some View {
