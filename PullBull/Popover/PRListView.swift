@@ -32,7 +32,7 @@ struct PRListView: View {
     }
 
     private var list: some View {
-        LazyVStack(alignment: .leading, spacing: 0) {
+        LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
             if contents.rows.isEmpty {
                 Group {
                     if let focus, total > scopedTotal {
@@ -45,8 +45,12 @@ struct PRListView: View {
                 .frame(height: tab == .mine && !recentlyClosed.isEmpty ? 260 : 400)
             } else if model.listGroupedByRepo {
                 ForEach(groups, id: \.repo) { group in
-                    GroupHeader(model: model, repo: group.repo, count: group.rows.filter(\.counted).count)
-                    rows(group.rows)
+                    Section {
+                        rows(group.rows)
+                    } header: {
+                        GroupHeader(model: model, repo: group.repo, count: group.rows.filter(\.counted).count)
+                            .pinnedHeaderBackground()
+                    }
                 }
             } else {
                 rows(contents.rows)
@@ -69,7 +73,8 @@ struct PRListView: View {
             PRRow(
                 model: model, row: row, tab: tab, compact: model.settings.compact, now: now,
                 selected: model.listSelection == row.pr.key, wantedLabels: wantedLabels)
-            .id(row.pr.key)
+            // Ungrouped rows have no header to clear.
+            .scrollTarget(row.pr.key, clearance: model.listGroupedByRepo ? PinnedHeader.clearance : 0)
         }
     }
 
@@ -82,6 +87,20 @@ struct PRListView: View {
         Hairline()
             .padding(.horizontal, 8)
             .padding(.top, 6)
+        Section {
+            if closedExpanded {
+                ForEach(recentlyClosed) { pr in
+                    ClosedRow(model: model, pr: pr, now: now, selected: model.listSelection == pr.key)
+                        .scrollTarget(pr.key, clearance: PinnedHeader.clearance)
+                }
+            }
+        } header: {
+            closedHeader
+                .pinnedHeaderBackground()
+        }
+    }
+
+    private var closedHeader: some View {
         Button {
             closedExpanded.toggle()
         } label: {
@@ -107,12 +126,6 @@ struct PRListView: View {
         .padding(.top, 2)
         .accessibilityLabel("Recently closed, \(recentlyClosed.count)")
         .accessibilityValue(closedExpanded ? "expanded" : "collapsed")
-        if closedExpanded {
-            ForEach(recentlyClosed) { pr in
-                ClosedRow(model: model, pr: pr, now: now, selected: model.listSelection == pr.key)
-                    .id(pr.key)
-            }
-        }
     }
 }
 
@@ -135,8 +148,7 @@ private struct GroupHeader: View {
         .font(.system(size: 11, weight: .semibold))
         .foregroundStyle(.secondary)
         .padding(.horizontal, 8)
-        .padding(.top, 10)
-        .padding(.bottom, 4)
+        .padding(.vertical, 7)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
         .focusContextMenu(FocusMenuItem(model: model, repo: repo))
