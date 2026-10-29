@@ -591,13 +591,8 @@ private struct SearchPRRow: View {
     }
 
     private var when: String {
-        guard pr.state != .open, let closedAt = pr.closedAt else {
-            return RelativeAge.short(from: pr.updatedAt, to: now)
-        }
-        let sameYear = Calendar.current.isDate(closedAt, equalTo: now, toGranularity: .year)
-        return sameYear
-            ? closedAt.formatted(.dateTime.month(.abbreviated).day())
-            : closedAt.formatted(.dateTime.month(.abbreviated).day().year())
+        EndedAge.text(state: pr.state, closedAt: pr.closedAt, now: now)
+            ?? RelativeAge.short(from: pr.updatedAt, to: now)
     }
 }
 

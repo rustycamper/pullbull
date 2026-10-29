@@ -128,12 +128,20 @@ struct IssueMetaLine: View {
         .lineLimit(1)
     }
 
+    /// "closed 3d ago" for a closed issue; otherwise the time since its last update.
+    private var age: String? {
+        if !issue.isOpen, let ended = EndedAge.text(state: .closed, closedAt: issue.closedAt, now: now) {
+            return ended
+        }
+        return issue.updatedAt.map { RelativeAge.short(from: $0, to: now) }
+    }
+
     private func line(chips: LabelChipSet, fitting: ChipFit) -> some View {
         HStack(spacing: 5) {
             RepoNumber(key: issue.key, showsRepo: showsRepo)
-            if let updatedAt = issue.updatedAt {
+            if let age {
                 Text("·").foregroundStyle(.tertiary).accessibilityHidden(true)
-                Text(RelativeAge.short(from: updatedAt, to: now))
+                Text(age)
             }
             if issue.commentCount > 0 {
                 Label { Text("\(issue.commentCount)") } icon: { Image(systemName: "bubble.left") }

@@ -289,8 +289,8 @@ struct ClosedRow: View {
 
     private func meta(merged: Bool) -> String {
         let repo = pr.key.repo.split(separator: "/").last.map(String.init) ?? pr.key.repo
-        let when = pr.closedAt.map { RelativeAge.ago($0, now: now) } ?? ""
-        return "\(repo) #\(pr.key.number) · \(merged ? "merged" : "closed") \(when)"
+        let ended = EndedAge.text(state: pr.state, closedAt: pr.closedAt, now: now) ?? (merged ? "merged" : "closed")
+        return "\(repo) #\(pr.key.number) · \(ended)"
     }
 }
 
