@@ -151,7 +151,10 @@ struct PRRow: View {
     // MARK: Compact
 
     private var compactBody: some View {
-        HStack(spacing: 8) {
+        CompactRowLayout(
+            repoNumber: RepoNumber(key: pr.key, showsRepo: model.rowsShowRepo, compact: true),
+            age: RelativeAge.short(from: pr.updatedAt, to: now)
+        ) {
             if tab == .mine {
                 Image(symbol: Palette.prGlyph(pr.glyph))
                     .font(.system(size: 11))
@@ -162,53 +165,18 @@ struct PRRow: View {
                     .opacity(row.dimmed ? 0.45 : 1)
                     .help(pr.author)
             }
+        } title: {
             Text((pr.isDraft ? "Draft: " : "") + pr.title)
-                .font(.system(size: 12.5))
                 .foregroundStyle(titleStyle)
-                .lineLimit(1)
-                .truncationMode(.tail)
                 .help(pr.title)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if case .changesRequested = chips.action {
-                Image(systemName: "arrow.uturn.backward")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Palette.changesRequested)
-                    .accessibilityLabel("Changes requested")
-            }
-            if chips.action == .readyToMerge {
-                Image(systemName: "arrow.triangle.merge")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Palette.secondaryText)
-                    .help("Ready to merge")
-                    .accessibilityLabel("Ready to merge")
-            }
-            if tab == .review && !row.dimmed, let reason = chips.info.first(where: { $0 != .conflicts }) {
-                Image(systemName: reason.symbol)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .help(reason.label)
-                    .accessibilityLabel(reason.label)
-            }
-            if chips.info.contains(.conflicts) {
-                Image(systemName: RowChips.Info.conflicts.symbol)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Palette.amberGlyph)
-                    .help(RowChips.Info.conflicts.label)
-                    .accessibilityLabel(RowChips.Info.conflicts.label)
-            }
-            Group {
-                RepoNumber(key: pr.key, showsRepo: model.rowsShowRepo, compact: true)
-                    .fixedSize()
-                Text(RelativeAge.short(from: pr.updatedAt, to: now))
-                    .frame(width: 24, alignment: .trailing)
-            }
-            .font(.system(size: 11))
-            .monospacedDigit()
-            .foregroundStyle(.secondary)
+        } badges: {
+            let chips = chips
+            CompactChipGlyphs(
+                chips: chips,
+                reason: tab == .review && !row.dimmed ? chips.info.first(where: { $0 != .conflicts }) : nil)
+        } trailing: {
             CIGlyph(state: pr.ci)
         }
-        .padding(.horizontal, 8)
-        .frame(height: 26)
     }
 }
 

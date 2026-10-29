@@ -78,35 +78,25 @@ struct IssueRow: View {
     // MARK: Compact
 
     private var compactBody: some View {
-        HStack(spacing: 8) {
+        CompactRowLayout(
+            repoNumber: RepoNumber(key: issue.key, showsRepo: !inRepoGroup, compact: true),
+            age: issue.updatedAt.map { RelativeAge.short(from: $0, to: now) }
+        ) {
             Image(symbol: glyph.symbol)
                 .font(.system(size: 11))
                 .foregroundStyle(glyph.color)
                 .frame(width: 16)
                 .accessibilityLabel(glyph.label)
+        } title: {
             Text(issue.title)
-                .font(.system(size: 12.5))
                 .foregroundStyle(past ? .secondary : .primary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
                 // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
                 .help(issue.title)
-            Group {
-                RepoNumber(key: issue.key, showsRepo: !inRepoGroup, compact: true)
-                    .fixedSize()
-                if let updatedAt = issue.updatedAt {
-                    Text(RelativeAge.short(from: updatedAt, to: now))
-                        .frame(width: 24, alignment: .trailing)
-                }
-            }
-            .font(.system(size: 11))
-            .monospacedDigit()
-            .foregroundStyle(.secondary)
+        } badges: {
+            EmptyView()
+        } trailing: {
             AssigneeStack(assignees: avatars, showUnassigned: tab == .board, size: 16)
         }
-        .padding(.horizontal, 8)
-        .frame(height: 26)
     }
 }
 

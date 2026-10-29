@@ -70,7 +70,7 @@ struct SkeletonList: View {
         .padding(.bottom, 8)
     }
 
-    /// `PRRow.compactBody` / `IssueRow.compactBody`.
+    /// `CompactRowLayout`, as the tab rows use it.
     private func compactRow(_ index: Int) -> some View {
         HStack(spacing: 8) {
             Circle()
