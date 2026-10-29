@@ -300,16 +300,11 @@ struct SearchResultsView: View {
         if !prs.isEmpty {
             Section {
                 ForEach(prs) { pr in
-                    SearchPRRow(
-                        pr: pr, words: words, labels: labels, role: role(of: pr), viewer: viewer, now: now,
-                        compact: model.settings.compact,
-                        selected: model.searchSelection == pr.key, flashing: model.rowFlash.key == pr.key
-                    ) {
-                        if PRActions.commandClicked { model.openSearchResultOnGitHub(pr) } else { model.openSearchResult(pr) }
-                    }
-                    .prContextMenu(
-                        pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
-                        person: .person(model: model, login: pr.author))
+                    PRRow(
+                        model: model, row: Row(pr: pr, dimmed: false, counted: false),
+                        context: .search(words: words, role: role(of: pr), viewer: viewer),
+                        compact: model.settings.compact, now: now,
+                        selected: model.searchSelection == pr.key, wantedLabels: labels)
                     .scrollTarget(pr.key, clearance: PinnedHeader.clearance)
                 }
             } header: {
@@ -469,149 +464,6 @@ private struct FailureBanner: View {
     }
 }
 
-private struct SearchPRRow: View {
-    let pr: PullRequest
-    let words: [String]
-    /// The labels a `~label` search asks for, whose chips lead.
-    let labels: [String]
-    let role: String?
-    let viewer: String
-    let now: Date
-    let compact: Bool
-    let selected: Bool
-    let flashing: Bool
-    let action: () -> Void
-
-    var body: some View {
-        SearchRowButton(compact: compact, selected: selected, flashing: flashing, action: action) {
-            if compact { compactBody } else { fullBody }
-        }
-    }
-
-    private var fullBody: some View {
-        HStack(alignment: .top, spacing: 10) {
-            glyph
-                .font(.system(size: 13))
-                .frame(width: 20, height: 20)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(Highlight.title(pr.title, words: words))
-                    .font(.system(size: 13))
-                    .lineSpacing(1)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .foregroundStyle(titleStyle)
-                    .fixedSize(horizontal: false, vertical: true)
-                    // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
-                    .help(pr.title)
-                meta
-                    .padding(.top, 3)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            trailing
-                .padding(.top, 1)
-        }
-    }
-
-    /// The tab rows' compact line: the state glyph still leads, an open PR keeps its CI glyph, and an ended
-    /// one's glyph colour and "merged Oct 12" stand in for the pill.
-    private var compactBody: some View {
-        let highlighted = Highlight.title(pr.title, words: words)
-        return CompactRowLayout(
-            repoNumber: RepoNumber(key: pr.key, compact: true),
-            age: when, ageWidth: pr.state == .open ? 24 : nil
-        ) {
-            glyph
-                .font(.system(size: 11))
-                .frame(width: 16)
-        } title: {
-            Text(pr.isDraft ? AttributedString("Draft: ") + highlighted : highlighted)
-                .foregroundStyle(titleStyle)
-                .help(pr.title)
-        } badges: {
-            CompactChipGlyphs(chips: RowChips(searchResult: pr, viewer: viewer))
-        } trailing: {
-            if pr.state == .open { CIGlyph(state: pr.ci) }
-        }
-    }
-
-    private var titleStyle: AnyShapeStyle {
-        pr.state == .open && !pr.isDraft ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)
-    }
-
-    @ViewBuilder private var glyph: some View {
-        switch pr.state {
-        case .merged:
-            Image(symbol: Palette.prGlyph(pr.glyph))
-                .foregroundStyle(Palette.mergedText)
-                .accessibilityLabel("Merged pull request")
-        case .closed:
-            Image(symbol: Palette.prGlyph(pr.glyph))
-                .foregroundStyle(Palette.closedText)
-                .accessibilityLabel("Closed pull request")
-        case .open:
-            Image(symbol: Palette.prGlyph(pr.glyph))
-                .foregroundStyle(.secondary)
-                .accessibilityLabel(pr.isDraft ? "Draft pull request" : "Open pull request")
-        }
-    }
-
-    @ViewBuilder private var trailing: some View {
-        switch pr.state {
-        case .merged: EndedPill(merged: true)
-        case .closed: EndedPill(merged: false)
-        case .open: CIGlyph(state: pr.ci)
-        }
-    }
-
-    /// One line at a fixed height, like a tab row's: the review signals that hold on any tab, then label
-    /// chips, which drop off the end into "+N". Under pressure the repo name gives way first; the age and
-    /// counts never truncate.
-    private var meta: some View {
-        let chips = RowChips(searchResult: pr, viewer: viewer)
-        let labels = LabelChipSet(pr, first: self.labels)
-        return ChipsThatFit(set: labels) { fitting in
-            metaLine(chips: chips, labels: labels, fitting: fitting)
-        }
-        .metaLineStyle()
-        .frame(height: 16)
-    }
-
-    private func metaLine(chips: RowChips, labels: LabelChipSet, fitting: ChipFit) -> some View {
-        HStack(spacing: 5) {
-            if pr.isDraft { DraftPill().fixedSize() }
-            RepoNumber(key: pr.key)
-                .layoutPriority(-1)
-            MetaDot()
-            Text(pr.author)
-            MetaDot()
-            Text(when)
-                .fixedSize()
-            if let role {
-                MetaDot()
-                Text(role)
-            }
-            ForEach(chips.info, id: \.text) { info in
-                MetaDot()
-                MetaInfo(info: info)
-            }
-            if pr.commentCount > 0 {
-                CommentCount(count: pr.commentCount)
-                    .padding(.leading, 4)
-            }
-            if let action = chips.action {
-                ActionCapsule(action: action)
-                    .padding(.leading, 4)
-            }
-            LabelChips(set: labels, fit: fitting)
-        }
-    }
-
-    private var when: String {
-        EndedAge.text(state: pr.state, closedAt: pr.closedAt, now: now)
-            ?? RelativeAge.short(from: pr.updatedAt, to: now)
-    }
-}
-
 /// An issue result: the state glyph, the highlighted title, the Issues list's meta line and a muted
 /// board Status pill (search results are not grouped by Status).
 private struct SearchIssueRow: View {
@@ -720,7 +572,7 @@ private struct SearchRowButton<Label: View>: View {
     }
 }
 
-private enum Highlight {
+enum Highlight {
     /// The title with every query word in bold.
     static func title(_ title: String, words: [String]) -> AttributedString {
         var attributed = AttributedString(title)

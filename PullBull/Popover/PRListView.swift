@@ -71,7 +71,7 @@ struct PRListView: View {
         let wantedLabels = model.searchQuery.labels
         return ForEach(rows) { row in
             PRRow(
-                model: model, row: row, tab: tab, compact: model.settings.compact, now: now,
+                model: model, row: row, context: .tab(tab), compact: model.settings.compact, now: now,
                 selected: model.listSelection == row.pr.key, wantedLabels: wantedLabels)
             // Ungrouped rows have no header to clear.
             .scrollTarget(row.pr.key, clearance: model.listGroupedByRepo ? PinnedHeader.clearance : 0)
