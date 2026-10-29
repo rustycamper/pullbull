@@ -100,10 +100,7 @@ struct PRRow: View {
         return ChipsThatFit(set: labels, canLean: tab != .mine) { fitting in
             metaLine(chips: chips, labels: labels, fitting: fitting)
         }
-        .font(.system(size: 11))
-        .monospacedDigit()
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
+        .metaLineStyle()
         .frame(height: 16)
     }
 
@@ -112,10 +109,10 @@ struct PRRow: View {
             if pr.isDraft { DraftPill().fixedSize() }
             identifier
                 .layoutPriority(-1)
-            Text("·").foregroundStyle(.tertiary).accessibilityHidden(true)
+            MetaDot()
             if tab != .mine && !fitting.lean {
                 Text(pr.author)
-                Text("·").foregroundStyle(.tertiary).accessibilityHidden(true)
+                MetaDot()
             }
             let age = RelativeAge.short(from: pr.updatedAt, to: now)
             Text(age)
@@ -123,14 +120,8 @@ struct PRRow: View {
                 // The avatar, which names a left-out author on hover, is hidden from VoiceOver.
                 .accessibilityLabel(fitting.lean ? "\(pr.author), \(age)" : age)
             ForEach(chips.info.filter { !$0.isCount }, id: \.text) { info in
-                Text("·").foregroundStyle(.tertiary).accessibilityHidden(true)
-                Label { Text(info.text) } icon: {
-                    Image(systemName: info.symbol)
-                        .foregroundStyle(info.isWarning ? AnyShapeStyle(Palette.amberGlyph) : AnyShapeStyle(.secondary))
-                }
-                    .labelStyle(TightLabelStyle(spacing: 3))
-                    .help(info.label)
-                    .accessibilityLabel(info.label)
+                MetaDot()
+                MetaInfo(info: info)
             }
             ForEach(chips.info.filter(\.isCount), id: \.text) { info in
                 Label { Text(info.text) } icon: { Image(systemName: info.symbol) }
@@ -141,31 +132,14 @@ struct PRRow: View {
                     .accessibilityLabel(info.label)
             }
             if pr.commentCount > 0 {
-                Label { Text("\(pr.commentCount)") } icon: { Image(systemName: "bubble.left") }
-                    .labelStyle(TightLabelStyle(spacing: 3))
-                    .fixedSize()
+                CommentCount(count: pr.commentCount)
                     .padding(.leading, 4)
-                    .accessibilityLabel("\(pr.commentCount) comments")
             }
             if let action = chips.action {
-                actionCapsule(action)
+                ActionCapsule(action: action)
                     .padding(.leading, 4)
             }
             LabelChips(set: labels, fit: fitting)
-        }
-    }
-
-    /// The tier-1 capsule: the one thing on the row that asks for action.
-    @ViewBuilder private func actionCapsule(_ action: RowChips.Action) -> some View {
-        switch action {
-        case .readyToMerge:
-            ReadyToMergePill()
-                .fixedSize()
-        case .changesRequested(let by):
-            Pill(
-                symbol: "arrow.uturn.backward",
-                text: "Changes requested · \(by.joined(separator: ", "))",
-                foreground: Palette.changesRequested, fill: Palette.changesRequested.opacity(0.12))
         }
     }
 
@@ -264,10 +238,7 @@ struct ClosedRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                     Text(meta(merged: merged))
-                        .font(.system(size: 11))
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .metaLineStyle()
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 EndedPill(merged: merged)
@@ -330,6 +301,68 @@ struct RepoNumber: View {
             }
             Text("#\(String(key.number))")
         }
+    }
+}
+
+/// The tertiary "·" between meta-line items, which VoiceOver skips.
+struct MetaDot: View {
+    var body: some View {
+        Text("·").foregroundStyle(.tertiary).accessibilityHidden(true)
+    }
+}
+
+/// A meta line's comment count: a speech bubble and the number, which never truncates.
+struct CommentCount: View {
+    let count: Int
+
+    var body: some View {
+        Label { Text("\(count)") } icon: { Image(systemName: "bubble.left") }
+            .labelStyle(TightLabelStyle(spacing: 3))
+            .fixedSize()
+            .accessibilityLabel(count == 1 ? "1 comment" : "\(count) comments")
+    }
+}
+
+/// A `RowChips.Info` that follows the age after a `·`: glyph and text, the glyph amber for a warning.
+struct MetaInfo: View {
+    let info: RowChips.Info
+
+    var body: some View {
+        Label { Text(info.text) } icon: {
+            Image(systemName: info.symbol)
+                .foregroundStyle(info.isWarning ? AnyShapeStyle(Palette.amberGlyph) : AnyShapeStyle(.secondary))
+        }
+            .labelStyle(TightLabelStyle(spacing: 3))
+            .help(info.label)
+            .accessibilityLabel(info.label)
+    }
+}
+
+/// A full PR row's tier-1 capsule (`RowChips.Action`): the one thing on the row that asks for action.
+struct ActionCapsule: View {
+    let action: RowChips.Action
+
+    var body: some View {
+        switch action {
+        case .readyToMerge:
+            ReadyToMergePill()
+                .fixedSize()
+        case .changesRequested(let by):
+            Pill(
+                symbol: "arrow.uturn.backward",
+                text: "Changes requested · \(by.joined(separator: ", "))",
+                foreground: Palette.changesRequested, fill: Palette.changesRequested.opacity(0.12))
+        }
+    }
+}
+
+extension View {
+    /// The type of a row's meta line: 11pt, monospaced digits, secondary, one line.
+    func metaLineStyle() -> some View {
+        font(.system(size: 11))
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
     }
 }
 

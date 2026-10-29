@@ -122,10 +122,7 @@ struct IssueMetaLine: View {
         ChipsThatFit(set: chips) { fitting in
             line(chips: chips, fitting: fitting)
         }
-        .font(.system(size: 11))
-        .monospacedDigit()
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
+        .metaLineStyle()
     }
 
     /// "closed 3d ago" for a closed issue; otherwise the time since its last update.
@@ -140,17 +137,15 @@ struct IssueMetaLine: View {
         HStack(spacing: 5) {
             RepoNumber(key: issue.key, showsRepo: showsRepo)
             if let age {
-                Text("·").foregroundStyle(.tertiary).accessibilityHidden(true)
+                MetaDot()
                 Text(age)
             }
             if issue.commentCount > 0 {
-                Label { Text("\(issue.commentCount)") } icon: { Image(systemName: "bubble.left") }
-                    .labelStyle(TightLabelStyle(spacing: 3))
+                CommentCount(count: issue.commentCount)
                     .padding(.leading, 2)
-                    .accessibilityLabel(issue.commentCount == 1 ? "1 comment" : "\(issue.commentCount) comments")
             }
             if let role {
-                Text("·").accessibilityHidden(true)
+                MetaDot()
                 Text(role)
             }
             LabelChips(set: chips, fit: fitting)

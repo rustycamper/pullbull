@@ -327,8 +327,8 @@ struct SearchResultsView: View {
             SearchGroupHeader(title: title, count: prs.count)
             ForEach(prs) { pr in
                 SearchPRRow(
-                    pr: pr, words: words, labels: labels, role: role(of: pr), now: now, selected: model.searchSelection == pr.key,
-                    flashing: model.rowFlash.key == pr.key
+                    pr: pr, words: words, labels: labels, role: role(of: pr), viewer: viewer, now: now,
+                    selected: model.searchSelection == pr.key, flashing: model.rowFlash.key == pr.key
                 ) {
                     if PRActions.commandClicked { model.openSearchResultOnGitHub(pr) } else { model.openSearchResult(pr) }
                 }
@@ -506,10 +506,13 @@ private struct SearchPRRow: View {
     /// The labels a `~label` search asks for, whose chips lead.
     let labels: [String]
     let role: String?
+    let viewer: String
     let now: Date
     let selected: Bool
     let flashing: Bool
     let action: () -> Void
+
+    private var own: Bool { pr.author.caseInsensitiveCompare(viewer) == .orderedSame }
 
     var body: some View {
         let open = pr.state == .open
@@ -519,7 +522,7 @@ private struct SearchPRRow: View {
                     .font(.system(size: 13))
                     .frame(width: 20, height: 20)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(Highlight.title((pr.isDraft ? "Draft: " : "") + pr.title, words: words))
+                    Text(Highlight.title(pr.title, words: words))
                         .font(.system(size: 13))
                         .lineSpacing(1)
                         .lineLimit(2)
@@ -557,36 +560,51 @@ private struct SearchPRRow: View {
         switch pr.state {
         case .merged: EndedPill(merged: true)
         case .closed: EndedPill(merged: false)
-        case .open: CIGlyph(state: pr.ci)
+        // Someone else's failure is gray, as on Team.
+        case .open: CIGlyph(state: pr.ci, muted: !own)
         }
     }
 
-    /// Label chips that don't fit drop off the end into "+N".
+    /// One line at a fixed height, like a tab row's: the review signals that hold on any tab, then label
+    /// chips, which drop off the end into "+N". Under pressure the repo name gives way first; the age and
+    /// counts never truncate.
     private var meta: some View {
-        let chips = LabelChipSet(pr, first: labels)
-        return ChipsThatFit(set: chips) { fitting in
-            metaLine(chips: chips, fitting: fitting)
+        let chips = RowChips(searchResult: pr, viewer: viewer)
+        let labels = LabelChipSet(pr, first: self.labels)
+        return ChipsThatFit(set: labels) { fitting in
+            metaLine(chips: chips, labels: labels, fitting: fitting)
         }
-        .font(.system(size: 11))
-        .monospacedDigit()
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
+        .metaLineStyle()
+        .frame(height: 16)
     }
 
-    private func metaLine(chips: LabelChipSet, fitting: ChipFit) -> some View {
+    private func metaLine(chips: RowChips, labels: LabelChipSet, fitting: ChipFit) -> some View {
         HStack(spacing: 5) {
-            Text("\(Highlight.repoName(pr.key.repo)) #\(String(pr.key.number))")
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-            Text("·").accessibilityHidden(true)
+            if pr.isDraft { DraftPill().fixedSize() }
+            RepoNumber(key: pr.key)
+                .layoutPriority(-1)
+            MetaDot()
             Text(pr.author)
-            Text("·").accessibilityHidden(true)
+            MetaDot()
             Text(when)
+                .fixedSize()
             if let role {
-                Text("·").accessibilityHidden(true)
+                MetaDot()
                 Text(role)
             }
-            LabelChips(set: chips, fit: fitting)
+            ForEach(chips.info, id: \.text) { info in
+                MetaDot()
+                MetaInfo(info: info)
+            }
+            if pr.commentCount > 0 {
+                CommentCount(count: pr.commentCount)
+                    .padding(.leading, 4)
+            }
+            if let action = chips.action {
+                ActionCapsule(action: action)
+                    .padding(.leading, 4)
+            }
+            LabelChips(set: labels, fit: fitting)
         }
     }
 
@@ -677,10 +695,6 @@ private enum Highlight {
             }
         }
         return attributed
-    }
-
-    static func repoName(_ repo: String) -> String {
-        repo.split(separator: "/").last.map(String.init) ?? repo
     }
 }
 
