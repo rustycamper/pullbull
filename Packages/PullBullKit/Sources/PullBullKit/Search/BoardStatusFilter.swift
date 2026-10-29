@@ -72,6 +72,8 @@ public struct StatusIndex: Equatable, Sendable {
         return StatusIndex(columns: columns)
     }
 
+    public var isEmpty: Bool { columns.isEmpty }
+
     /// Ranked for prefix `p`, ignoring case: (1) the name, (2) a name starting with `p`, (3) a word of the
     /// name starting with `p`, (4) a name containing `p`. Within a tier, in board order.
     public func candidates(prefix: String) -> [StatusCandidate] {

@@ -115,7 +115,8 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 - Results span all tabs; click a tab to narrow
 - Matches in the other mode show a hint: <kbd>⌘</kbd><kbd>1</kbd> / <kbd>⌘</kbd><kbd>2</kbd>
 - Empty field shows saved searches and token hints. <kbd>↓</kbd> to walk them
-- Typing `@`, `~`, `is:` or `status:` opens a completion list. `status:` lists the board's Status columns
+- Typing `@`, `~`, `label:`, `is:` or `status:` opens a completion list. `status:` lists the board's Status columns
+- Typing the start of `status:` or `label:` (`st`, `la`) shows the rest in grey; <kbd>Tab</kbd> writes it and opens its list. <kbd>Return</kbd> still searches the word
 - **Save:** bookmark icon in the field. Manage in Settings → Search
 
 | Completion list | |

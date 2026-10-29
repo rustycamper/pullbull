@@ -669,6 +669,26 @@ final class AppModel {
         return accepted.caret
     }
 
+    /// The rest of the qualifier the word at the caret starts, drawn after it in the field; nil while a
+    /// list is open or off the list and search routes.
+    var qualifierGhost: QualifierGhost? {
+        guard route == .list || route == .search else { return nil }
+        return searchField.ghost(statuses: statuses)
+    }
+
+    /// Text is selected in the field: no caret, so no ghost until it moves again.
+    func searchTextSelected() {
+        searchField.forgetCaret()
+    }
+
+    /// Tab on a ghost: writes the qualifier, which opens its list, and returns the caret for the view to
+    /// apply; nil without a ghost.
+    func acceptQualifierGhost() -> Int? {
+        guard let accepted = qualifierGhost?.accepted(in: searchText) else { return nil }
+        updateSearch(accepted.text, caret: accepted.caret)
+        return accepted.caret
+    }
+
     /// Esc, or Return with no candidate: the token stays as typed and counts as a name to filter by.
     func dismissCompletion() {
         guard route == .list || route == .search else {

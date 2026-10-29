@@ -16,6 +16,8 @@ public struct SearchFieldState: Equatable, Sendable {
     public private(set) var searchCompletion: SearchCompletion?
     /// The query last searched for.
     public private(set) var query: SearchQuery = .empty
+    /// The field editor's caret (UTF-16) as last reported; nil when unknown.
+    public private(set) var caret: Int?
     /// UTF-16 start of the token the list was closed on, so it doesn't reopen there.
     private var dismissedStart: Int?
     /// The kind of that token: a dismissal holds only while the same sigil starts there.
@@ -58,6 +60,8 @@ public struct SearchFieldState: Equatable, Sendable {
         statuses: StatusIndex = .empty
     ) -> SearchQuery? {
         let changed = text != self.text
+        // A rerun of the same text without a caret leaves the last one standing.
+        if changed || caret != nil { self.caret = caret }
         if changed, let start = dismissedStart, !Self.dismissalHolds(at: start, kind: dismissedKind, in: text) {
             dismissedStart = nil
             dismissedKind = nil
@@ -80,6 +84,7 @@ public struct SearchFieldState: Equatable, Sendable {
     public mutating func caretMoved(
         to caret: Int, people: PeopleIndex, labels: LabelIndex = .empty, statuses: StatusIndex = .empty
     ) -> SearchQuery? {
+        self.caret = caret
         guard let current = searchCompletion else { return nil }
         let fresh = SearchCompletion.open(
             text: text, caret: caret, dismissedStart: dismissedStart, people: people, labels: labels,
@@ -126,6 +131,18 @@ public struct SearchFieldState: Equatable, Sendable {
                 statuses: statuses),
               !fresh.hasSameCandidates(as: open) else { return }
         searchCompletion = fresh.selecting(open.selectedID)
+    }
+
+    /// Text is selected: there is no caret until the next move reports one.
+    public mutating func forgetCaret() {
+        caret = nil
+    }
+
+    /// The qualifier the word at the caret starts, while no list is open; `status:` only with Status
+    /// columns to pick from.
+    public func ghost(statuses: StatusIndex) -> QualifierGhost? {
+        guard searchCompletion == nil, let caret else { return nil }
+        return QualifierGhost.at(caret: caret, in: text, statuses: !statuses.isEmpty)
     }
 
     private var pendingQuery: SearchQuery {

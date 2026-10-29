@@ -30,7 +30,7 @@ struct QueryTerm {
 enum QueryScanner {
     static let personSigils: Set<Character> = ["@", "＠"]
     static let labelSigils: Set<Character> = ["~", "～"]
-    private static let alias = "label:"
+    static let labelQualifier = "label:"
     static let stateQualifier = "is:"
     static let statusQualifier = "status:"
 
@@ -53,9 +53,9 @@ enum QueryScanner {
             if labelSigils.contains(c) {
                 kind = .label
                 valueStart = text.index(after: i)
-            } else if text[i...].prefix(alias.count).lowercased() == alias {
+            } else if text[i...].prefix(labelQualifier.count).lowercased() == labelQualifier {
                 kind = .labelAlias
-                valueStart = text.index(i, offsetBy: alias.count)
+                valueStart = text.index(i, offsetBy: labelQualifier.count)
             } else if startsState(text[i...]) {
                 kind = .state
                 valueStart = nil
@@ -111,7 +111,7 @@ enum QueryScanner {
     private static func startsSigilTerm(_ rest: Substring) -> Bool {
         guard let first = rest.first else { return false }
         return personSigils.contains(first) || labelSigils.contains(first) || first == "#"
-            || rest.prefix(alias.count).lowercased() == alias || startsState(rest) || startsStatus(rest)
+            || rest.prefix(labelQualifier.count).lowercased() == labelQualifier || startsState(rest) || startsStatus(rest)
     }
 
     /// `rest` starts with "is:", any case.
@@ -122,5 +122,10 @@ enum QueryScanner {
     /// `rest` starts with "status:", any case.
     static func startsStatus(_ rest: Substring) -> Bool {
         rest.prefix(statusQualifier.count).lowercased() == statusQualifier
+    }
+
+    /// `rest` starts with "label:", any case.
+    static func startsLabelAlias(_ rest: Substring) -> Bool {
+        rest.prefix(labelQualifier.count).lowercased() == labelQualifier
     }
 }

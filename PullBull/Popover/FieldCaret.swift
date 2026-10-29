@@ -23,14 +23,17 @@ enum FieldCaret {
 }
 
 /// Calls `handler` with the caret and the editor's text whenever the selection of a field editor in
-/// `window` changes, nothing is selected and no input method is composing. Installed while the popover
-/// is visible.
+/// `window` changes, nothing is selected and no input method is composing; `selected` when text is
+/// selected instead. Installed while the popover is visible.
 @MainActor
 final class FieldCaretObserver {
     private var observer: (any NSObjectProtocol)?
     private weak var window: NSWindow?
 
-    func install(on window: NSWindow, handler: @escaping @MainActor (_ caret: Int, _ text: String) -> Void) {
+    func install(
+        on window: NSWindow, handler: @escaping @MainActor (_ caret: Int, _ text: String) -> Void,
+        selected: @escaping @MainActor () -> Void = {}
+    ) {
         remove()
         self.window = window
         observer = NotificationCenter.default.addObserver(
@@ -45,7 +48,10 @@ final class FieldCaretObserver {
                       !editor.hasMarkedText()
                 else { return }
                 let range = editor.selectedRange()
-                guard range.length == 0 else { return }
+                guard range.length == 0 else {
+                    selected()
+                    return
+                }
                 handler(range.location, editor.string)
             }
         }

@@ -11,6 +11,8 @@ struct HeaderView: View {
     /// Results, or the empty field's hints, are on screen.
     let searchOpen: Bool
     var fieldFocused: FocusState<Bool>.Binding
+    /// Set while the qualifier ghost is drawn, so Tab never writes one that is hidden.
+    @Binding var ghostDrawn: Bool
     /// The popover's window, whose field editor holds the caret.
     let window: () -> NSWindow?
     /// Closes a field that shows no results (its hints, or a lone token being completed), before a tab is picked.
@@ -64,6 +66,11 @@ struct HeaderView: View {
                 .font(.system(size: 12))
                 .focused(fieldFocused)
                 .accessibilityLabel(placeholder)
+                .overlay(alignment: .leading) {
+                    if fieldFocused.wrappedValue, let ghost = model.qualifierGhost {
+                        QualifierGhostText(typed: model.searchText, remainder: ghost.remainder, drawn: $ghostDrawn)
+                    }
+                }
             if !model.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 SaveSearchButton(saved: model.searchIsSaved, action: onSaveSearch)
             }
@@ -106,6 +113,40 @@ struct HeaderView: View {
     /// Search follows the mode; the field's label reads the same.
     private var placeholder: String {
         model.mode == .issues ? "Search issues" : "Search pull requests"
+    }
+}
+
+/// The grey rest of a qualifier, drawn just after the typed text (`sta` then `tus:`); Tab writes it. Shown
+/// only while it fits, since a field scrolled past its start would put it in the wrong place.
+private struct QualifierGhostText: View {
+    let typed: String
+    let remainder: String
+    @Binding var drawn: Bool
+
+    /// Where the field editor starts drawing text, inside the field.
+    private static let textInset: CGFloat = 0
+    private static let font = NSFont.systemFont(ofSize: 12)
+
+    var body: some View {
+        GeometryReader { geometry in
+            let typedWidth = Self.width(typed)
+            if Self.textInset + typedWidth + Self.width(remainder) <= geometry.size.width {
+                Text(remainder)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
+                    .offset(x: Self.textInset + typedWidth)
+                    .frame(maxHeight: .infinity, alignment: .center)
+                    .onAppear { drawn = true }
+                    .onDisappear { drawn = false }
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private static func width(_ text: String) -> CGFloat {
+        (text as NSString).size(withAttributes: [.font: font]).width
     }
 }
 

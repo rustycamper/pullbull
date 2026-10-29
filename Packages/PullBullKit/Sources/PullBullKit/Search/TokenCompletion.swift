@@ -4,7 +4,7 @@ public struct PendingToken: Equatable, Sendable {
     public enum Kind: Equatable, Sendable {
         /// `@login`
         case person
-        /// `~label` or `~"label with spaces"`
+        /// `~label`, `~"label with spaces"` or `label:label`
         case label
         /// `is:open`
         case state
@@ -12,7 +12,7 @@ public struct PendingToken: Equatable, Sendable {
         case status
     }
 
-    /// UTF-16 offset of the sigil ("@", "＠", "~", "～", "is:" or "status:", any case).
+    /// UTF-16 offset of the sigil ("@", "＠", "~", "～", "label:", "is:" or "status:", any case).
     public let start: Int
     /// UTF-16 offset of the caret.
     public let end: Int
@@ -27,8 +27,8 @@ public struct PendingToken: Equatable, Sendable {
         self.kind = kind
     }
 
-    /// The `@`, `~`, `is:` or `status:` token that ends at the caret, if any. A label or status may be
-    /// quoted; a closed quote ends it. An `is:` value is letters only.
+    /// The `@`, `~`, `label:`, `is:` or `status:` token that ends at the caret, if any. A label or status may
+    /// be quoted; a closed quote ends it. An `is:` value is letters only.
     public static func at(caret: Int, in text: String) -> PendingToken? {
         let scalars = text.unicodeScalars
         guard caret >= 0, caret <= text.utf16.count else { return nil }
@@ -43,13 +43,13 @@ public struct PendingToken: Equatable, Sendable {
         case .person:
             guard prefix.isEmpty || SearchQuery.isLogin(term.value) else { return nil }
             return PendingToken(start: start, end: caret, prefix: prefix, kind: .person)
-        case .label, .status:
+        case .label, .labelAlias, .status:
             if term.quoted && term.closed { return nil }
-            return PendingToken(start: start, end: caret, prefix: prefix, kind: term.kind == .label ? .label : .status)
+            return PendingToken(start: start, end: caret, prefix: prefix, kind: term.kind == .status ? .status : .label)
         case .state:
             guard prefix.allSatisfy(\.isLetter) else { return nil }
             return PendingToken(start: start, end: caret, prefix: prefix, kind: .state)
-        case .labelAlias, .word:
+        case .word:
             return nil
         }
     }
@@ -88,6 +88,8 @@ public struct PendingToken: Equatable, Sendable {
             case .person where QueryScanner.personSigils.contains(character),
                  .label where QueryScanner.labelSigils.contains(character):
                 return scalars.index(after: index)
+            case .label where QueryScanner.startsLabelAlias(text[index...]):
+                return text.index(index, offsetBy: QueryScanner.labelQualifier.count)
             case .state where QueryScanner.startsState(text[index...]):
                 return text.index(index, offsetBy: QueryScanner.stateQualifier.count)
             case .status where QueryScanner.startsStatus(text[index...]):
