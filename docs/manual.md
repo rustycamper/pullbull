@@ -81,6 +81,7 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 - **Labels:** up to two chips per row (none in compact cards), each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail lists them all
 - **Right-click a row:** copy branch, link or Markdown link · open on GitHub · show only this repo · search author
 - **Footer:** account · refresh · open on GitHub · settings. Turns amber with **Retry** when a refresh fails
+- **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Lists your signed-in accounts, then GitHub CLI logins, each with the org it opens in; then Add Account… and Account Settings…. Each account comes back with its last org, and each org with its last board
 
 ## Issues
 
@@ -218,6 +219,7 @@ Settings → Ask AI.
 | <kbd>⌘</kbd><kbd>1</kbd> · <kbd>⌘</kbd><kbd>2</kbd> | Pull Requests · Issues |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> | Repo menu ([one repo](#one-repo)) |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> | Board menu, on the Board tab |
+| <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd> | Account menu |
 | <kbd>⌘</kbd><kbd>R</kbd> | Refresh |
 | <kbd>⌘</kbd><kbd>,</kbd> | Settings |
 | <kbd>Esc</kbd> | Clear search → clear repo → close |
