@@ -7,6 +7,8 @@ import Testing
 
     static func row(
         repo: String = "org/repo",
+        author: String = "me",
+        state: PRState = .open,
         isDraft: Bool = false,
         ci: CIState = .success,
         reviews: [(String, ReviewState)] = [],
@@ -17,7 +19,7 @@ import Testing
         let pr = PullRequest(
             key: PRKey(repo: repo, number: 1), title: "t",
             url: URL(string: "https://github.com/org/repo/pull/1")!,
-            author: "me", authorAvatarURL: nil, state: .open, isDraft: isDraft,
+            author: author, authorAvatarURL: nil, state: state, isDraft: isDraft,
             createdAt: t0, updatedAt: t0, closedAt: nil, headRef: "h", baseRef: "main",
             ci: ci, headCommitDate: nil, commentCount: 0, lastCommentAuthor: nil,
             latestReviews: reviews.map { Review(author: $0.0, state: $0.1, submittedAt: t0) },
@@ -117,6 +119,45 @@ import Testing
     @Test func reviewNeverGetsACapsule() {
         let chips = RowChips(row: Self.row(reviews: [("a", .changesRequested)], reason: .reRequested), tab: .review)
         #expect(chips.action == nil)
+    }
+
+    // MARK: Search
+
+    static func search(
+        author: String = "me", state: PRState = .open, reviews: [(String, ReviewState)] = [],
+        mergeable: Mergeable? = nil, viewer: String = "me"
+    ) -> RowChips {
+        RowChips(
+            searchResult: row(author: author, state: state, reviews: reviews, mergeable: mergeable).pr, viewer: viewer)
+    }
+
+    @Test func searchShowsNoCountsOrNoReviews() {
+        #expect(Self.search() == RowChips(action: nil, info: []))
+        #expect(Self.search(reviews: [("a", .approved)], viewer: "other") == RowChips(action: nil, info: []))
+    }
+
+    @Test func searchReadyToMergeOnlyOnTheViewersOwn() {
+        #expect(Self.search(reviews: [("a", .approved)]) == RowChips(action: .readyToMerge, info: []))
+        #expect(Self.search(reviews: [("a", .approved)], viewer: "ME").action == .readyToMerge)
+        #expect(Self.search(author: "alice", reviews: [("a", .approved)]).action == nil)
+    }
+
+    @Test func searchChangesRequestedOnAnyOpenPR() {
+        let chips = Self.search(author: "alice", reviews: [("bob", .changesRequested), ("carol", .approved)])
+        #expect(chips == RowChips(action: .changesRequested(by: ["bob"]), info: []))
+    }
+
+    @Test func searchConflictsOnAnyOpenPR() {
+        #expect(Self.search(author: "alice", mergeable: .conflicting) == RowChips(action: nil, info: [.conflicts]))
+        let own = Self.search(reviews: [("a", .approved)], mergeable: .conflicting)
+        #expect(own == RowChips(action: nil, info: [.conflicts]))
+    }
+
+    @Test func searchEndedPRShowsNothing() {
+        for state: PRState in [.merged, .closed] {
+            let chips = Self.search(state: state, reviews: [("a", .changesRequested)], mergeable: .conflicting)
+            #expect(chips == RowChips(action: nil, info: []))
+        }
     }
 
     // MARK: Wording

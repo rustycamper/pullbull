@@ -20,7 +20,8 @@ public struct RowChips: Equatable, Sendable {
         case newCommits
         /// Requested from a team of mine: `org/slug`, or the bare slug when the repo has no owner.
         case viaTeam(String)
-        /// GitHub reports merge conflicts with the base branch; Mine only, as resolving is the author's job.
+        /// GitHub reports merge conflicts with the base branch; Mine and search only, as on Review and Team
+        /// resolving them is someone else's job.
         case conflicts
 
         /// The SF Symbol drawn before the text.
@@ -110,5 +111,22 @@ public struct RowChips: Equatable, Sendable {
             }
             self.init(action: nil, info: info.map { [$0] } ?? [])
         }
+    }
+
+    /// A search result's review state: only what holds whichever tab the PR sits on. Changes requested and
+    /// conflicts on any open PR, ready to merge on the viewer's own; no counts and none of Review's reasons,
+    /// which the role suffix stands in for. An ended PR has none.
+    public init(searchResult pr: PullRequest, viewer: String) {
+        guard pr.state == .open else {
+            self.init(action: nil, info: [])
+            return
+        }
+        let changesRequestedBy = pr.latestReviews.filter { $0.state == .changesRequested }.map(\.author)
+        let own = pr.author.caseInsensitiveCompare(viewer) == .orderedSame
+        let action: Action? =
+            if own && ReviewRules.isReadyToMerge(pr) { .readyToMerge }
+            else if !changesRequestedBy.isEmpty { .changesRequested(by: changesRequestedBy) }
+            else { nil }
+        self.init(action: action, info: pr.hasConflicts ? [.conflicts] : [])
     }
 }
