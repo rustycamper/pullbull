@@ -59,7 +59,7 @@ struct PRRow: View {
                     .padding(.top, 3)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            CIGlyph(state: pr.ci, muted: tab == .team)
+            CIGlyph(state: pr.ci)
                 .padding(.top, 1)
         }
         .padding(.horizontal, 8)
@@ -205,7 +205,7 @@ struct PRRow: View {
             .font(.system(size: 11))
             .monospacedDigit()
             .foregroundStyle(.secondary)
-            CIGlyph(state: pr.ci, muted: tab == .team)
+            CIGlyph(state: pr.ci)
         }
         .padding(.horizontal, 8)
         .frame(height: 26)
@@ -269,11 +269,9 @@ struct ClosedRow: View {
 
 struct CIGlyph: View {
     let state: CIState
-    /// Someone else's PR: a failure is shown in gray, as it isn't the viewer's to act on.
-    var muted = false
 
     var body: some View {
-        let glyph = Palette.ciGlyph(state, muted: muted)
+        let glyph = Palette.ciGlyph(state)
         Image(systemName: glyph.symbol)
             .font(.system(size: 13))
             .foregroundStyle(glyph.color)

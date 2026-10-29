@@ -489,8 +489,6 @@ private struct SearchPRRow: View {
     let flashing: Bool
     let action: () -> Void
 
-    private var own: Bool { pr.author.caseInsensitiveCompare(viewer) == .orderedSame }
-
     var body: some View {
         let open = pr.state == .open
         SearchRowButton(selected: selected, flashing: flashing, action: action) {
@@ -539,8 +537,7 @@ private struct SearchPRRow: View {
         switch pr.state {
         case .merged: EndedPill(merged: true)
         case .closed: EndedPill(merged: false)
-        // Someone else's failure is gray, as on Team.
-        case .open: CIGlyph(state: pr.ci, muted: !own)
+        case .open: CIGlyph(state: pr.ci)
         }
     }
 

@@ -134,10 +134,10 @@
   }
 
   // Palette.ciGlyph
-  function ciGlyph(state, muted) {
+  function ciGlyph(state) {
     const g = {
       success: ["checkmark.circle", "var(--secondary)"],
-      failure: muted ? ["xmark.circle", "var(--secondary)"] : ["xmark.circle.fill", "var(--red)"],
+      failure: ["xmark.circle.fill", "var(--red)"],
       pending: ["clock", "var(--secondary)"],
       skipped: ["minus.circle", "var(--secondary)"],
       none: ["minus", "var(--tertiary)"],
@@ -177,7 +177,7 @@
     const cls = ["row", pr.draft ? "draft" : "", pr.dimmed ? "dimmed" : "", pr.hover ? "hover" : "", pr.selected ? "selected" : ""].filter(Boolean).join(" ");
     return `<div class="${cls}" data-number="${pr.number}"><span class="leading"${pr.dimmed ? ' style="opacity:.45"' : ""}>${leading}</span>` +
       `<div class="vstack body"><span class="title-text f13">${esc(pr.title)}</span><div class="hstack meta f11 mono">${meta}</div></div>` +
-      `${ciGlyph(pr.ci, tab === "team")}</div>`;
+      `${ciGlyph(pr.ci)}</div>`;
   }
 
   /** PRListView.GroupHeader */

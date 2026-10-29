@@ -4,11 +4,10 @@ import PullBullKit
 
 /// Color and glyph rules: gray for healthy or informational states, color only where action is needed.
 enum Palette {
-    /// `muted` shows a failure in the same shape without the red, for PRs that aren't the viewer's.
-    static func ciGlyph(_ s: CIState, muted: Bool = false) -> (symbol: String, color: Color) {
+    static func ciGlyph(_ s: CIState) -> (symbol: String, color: Color) {
         switch s {
         case .success: ("checkmark.circle", .secondary)
-        case .failure: muted ? ("xmark.circle", .secondary) : ("xmark.circle.fill", .red)
+        case .failure: ("xmark.circle.fill", .red)
         case .pending: ("clock", .secondary)
         case .skipped: ("minus.circle", .secondary)
         case .none: ("minus", tertiary)
