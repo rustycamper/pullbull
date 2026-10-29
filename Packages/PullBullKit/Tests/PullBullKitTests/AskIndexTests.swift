@@ -45,6 +45,13 @@ struct AskIndexTests {
         #expect(try await index.search("kraken", limit: 5, excluding: [], repo: nil).map(\.key.number) == [2, 1])
     }
 
+    @Test func accentedTitleIsFoundByAccentedQuery() async throws {
+        let index = try AskIndex(fileURL: Self.tempURL())
+        try await index.upsert([Self.item("o/a", 1, title: "Café crème menu"), Self.item("o/a", 2, title: "other")])
+        let hits = try await index.search("café", limit: 5, excluding: [], repo: nil)
+        #expect(hits.map(\.key.number) == [1])
+    }
+
     @Test func searchFiltersRepoAndExcluding() async throws {
         let index = try AskIndex(fileURL: Self.tempURL())
         try await index.upsert([

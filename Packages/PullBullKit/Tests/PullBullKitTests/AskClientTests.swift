@@ -308,6 +308,21 @@ private func toolResults(_ message: [String: Any]) -> [[String: Any]] {
         #expect(answer.results.map(\.key) == [PRKey(repo: "acme/web", number: 2)])
     }
 
+    @Test func emptyEndTurnIsNotSentBackAsAnAssistantMessage() async throws {
+        let transport = ScriptedTransport([.reply(200, message([], stop: "end_turn")), show([("acme/web#2", "w")])])
+        let answer = try await ask(transport)
+        #expect(answer.results.map(\.key) == [PRKey(repo: "acme/web", number: 2)])
+        let second = try #require(await transport.sent.last)
+        #expect(second.messages.count == 2)
+        #expect(second.messages.allSatisfy { $0["role"] as? String == "user" })
+        #expect(userText(second.messages[1]) == "Call show_results now.")
+    }
+
+    @Test func nonJSONSuccessBodyIsNoAnswer() async throws {
+        let transport = ScriptedTransport([.reply(200, "<html>proxy</html>")])
+        await #expect(throws: AskError.noAnswer) { try await ask(transport) }
+    }
+
     @Test func errorMapping() async throws {
         let cases: [(ScriptedTransport.Step, AskError)] = [
             (.reply(401, #"{"type":"error"}"#), .unauthorized),

@@ -10,7 +10,7 @@ public enum AskQuery {
         "some", "just", "thing", "stuff", "one", "ones",
     ]
 
-    /// The question's words (`[a-z0-9]`, two or more characters, no stopwords), each quoted so an FTS5
+    /// The question's words (letters and numbers, two or more characters, no stopwords), each quoted so an FTS5
     /// operator or column filter in the question is plain text, joined with OR. Nil when none are left.
     public static func match(_ question: String) -> String? {
         var words: [String] = []
@@ -19,9 +19,9 @@ public enum AskQuery {
             if current.count >= 2, !stopwords.contains(current) { words.append(current) }
             current = ""
         }
-        for scalar in question.lowercased().unicodeScalars {
-            if ("a"..."z").contains(scalar) || ("0"..."9").contains(scalar) {
-                current.unicodeScalars.append(scalar)
+        for character in question.lowercased() {
+            if character.isLetter || character.isNumber {
+                current.append(character)
             } else {
                 flush()
             }

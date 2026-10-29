@@ -207,7 +207,7 @@ struct AskSettingsTab: View {
             Spacer()
             Button("Rebuild") { model.rebuildAskIndex() }
                 .disabled(model.askProgress == nil)
-                .help("Delete the index and fetch it again")
+                .help("Empty the index and fetch it again")
         }
     }
 }

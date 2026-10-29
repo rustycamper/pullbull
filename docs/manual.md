@@ -160,7 +160,7 @@ Settings → Ask.
 | Answer | Answer on top, then PRs and issues in one list, each with a line on why it matched |
 | Open | <kbd>Return</kbd> opens the item in its own mode. <kbd>Esc</kbd> or <kbd>←</kbd> in the detail returns to Ask |
 | GitHub · copy | <kbd>⌘</kbd><kbd>Return</kbd> opens on GitHub. Copy keys work as in the list |
-| Edit and re-ask | <kbd>Esc</kbd> on Ask returns to the field with the question kept |
+| Edit and re-ask | <kbd>Esc</kbd> or <kbd>←</kbd> on Ask returns to the field with the question kept |
 | Empty or edit the field | Back to normal search |
 
 - Each Ask stands alone; there are no follow-up questions

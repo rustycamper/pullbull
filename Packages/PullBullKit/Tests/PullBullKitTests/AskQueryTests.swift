@@ -13,6 +13,16 @@ struct AskQueryTests {
         #expect(AskQuery.match(#"NEAR "foo" -bar: OR baz*"#) == #""near" OR "foo" OR "bar" OR "baz""#)
     }
 
+    @Test func matchKeepsNonASCIIWords() {
+        #expect(AskQuery.match("Café crème") == #""café" OR "crème""#)
+        #expect(AskQuery.match("Ошибка входа") == #""ошибка" OR "входа""#)
+    }
+
+    @Test func matchKeepsFTSSyntaxInsideNonASCIIWordsInert() {
+        #expect(AskQuery.match(#"café"* OR "crème:"#) == #""café" OR "crème""#)
+        #expect(AskQuery.match("(naïve) ^ünï-col:x") == #""naïve" OR "ünï" OR "col""#)
+    }
+
     @Test func askKeyRoundTrips() {
         #expect(PRKey(repo: "o/r", number: 5).askKey == "o/r#5")
         #expect(PRKey(askKey: "o/r#5") == PRKey(repo: "o/r", number: 5))

@@ -157,7 +157,8 @@ public struct AskClient: Sendable, CustomStringConvertible, CustomDebugStringCon
                 return Self.outcome(show["input"] as? [String: Any] ?? [:], shown: shown)
             }
 
-            messages.append(["role": "assistant", "content": reply["content"] ?? []])
+            // The API rejects an empty assistant message; consecutive user turns are legal.
+            if !content.isEmpty { messages.append(["role": "assistant", "content": content]) }
             if toolUses.isEmpty {
                 messages.append(["role": "user", "content": Self.reminder])
                 continue
@@ -191,9 +192,9 @@ public struct AskClient: Sendable, CustomStringConvertible, CustomDebugStringCon
         request.setValue(Self.apiVersion, forHTTPHeaderField: "anthropic-version")
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await Self.perform(request, transport)
+        let (data, _) = try await Self.perform(request, transport)
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw AskError.server(response.statusCode)
+            throw AskError.noAnswer
         }
         return root
     }

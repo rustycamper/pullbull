@@ -754,6 +754,10 @@ struct PopoverView: View {
             guard flags.isDisjoint(with: [.control, .option]) else { return false }
             model.closeAsk()
             return true
+        case SearchKeyMonitor.leftArrow:
+            guard plain.isEmpty else { return false }
+            model.closeAsk()
+            return true
         case SearchKeyMonitor.upArrow, SearchKeyMonitor.downArrow:
             guard plain.isEmpty else { return false }
             model.moveAskSelection(by: event.keyCode == SearchKeyMonitor.downArrow ? 1 : -1)
