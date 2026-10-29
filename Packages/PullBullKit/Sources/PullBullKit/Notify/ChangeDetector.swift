@@ -80,7 +80,7 @@ public enum ChangeDetector {
             {
                 result.append(PREvent(kind: .newComment, pr: pr, actor: pr.lastCommentAuthor))
             }
-            if toggles.readyToMerge, ReviewRules.isReadyToMerge(pr), !ReviewRules.isReadyToMerge(prev) {
+            if toggles.readyToMerge, settledReady(pr, prev: prev), !ReviewRules.isReadyToMerge(prev) {
                 result.append(PREvent(kind: .readyToMerge, pr: pr, actor: nil))
             }
         }
@@ -90,7 +90,8 @@ public enum ChangeDetector {
             let before = Dictionary(old.reviewCandidates.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
             var seen = Set<PRKey>()
             for pr in new.reviewCandidates
-            where !same(pr.author, me) && pr.latestReviews.contains(where: { same($0.author, me) })
+            where !same(pr.author, me)
+                && pr.latestReviews.contains(where: { same($0.author, me) && $0.state != .pending })
                 && seen.insert(pr.key).inserted
             {
                 guard let prev = before[pr.key], pr.commentCount > prev.commentCount,
@@ -111,6 +112,13 @@ public enum ChangeDetector {
             if $0.pr.key.number != $1.pr.key.number { return $0.pr.key.number < $1.pr.key.number }
             return ($0.actor ?? "") < ($1.actor ?? "")
         }
+    }
+
+    /// Ready to merge, and not only on the way somewhere else: GitHub has finished computing
+    /// mergeability (an UNKNOWN after a push may still turn out CONFLICTING), and no checks means none
+    /// were ever set up rather than a new head commit's checks that haven't started.
+    private static func settledReady(_ pr: PullRequest, prev: PullRequest) -> Bool {
+        ReviewRules.isReadyToMerge(pr) && pr.mergeable != .unknown && (pr.ci != .none || prev.ci == .none)
     }
 
     /// How far before the previous poll a merge may be and still count as new when that poll never
@@ -162,13 +170,19 @@ public enum ChangeDetector {
 
     /// New comments by someone else on open issues assigned to me or that I created, one event per issue
     /// with the count. Only issues both polls listed: a newly listed issue's comments aren't news (its
-    /// assignment is). An issue both assigned to me and mine notifies once, when either toggle is on.
+    /// assignment is), and only when the previous poll's search succeeded: a failed one carries an older
+    /// list forward (at launch, the cached one), whose counts would turn every comment since into news.
+    /// An issue both assigned to me and mine notifies once, when either toggle is on.
     private static func commentEvents(
         old: Snapshot, new: Snapshot, me: String, toggles: NotificationToggles
     ) -> [IssueEvent] {
         var lists: [(before: [BoardIssue]?, now: [BoardIssue]?)] = []
-        if toggles.assignedIssueComment { lists.append((old.assignedIssues, new.assignedIssues)) }
-        if toggles.createdIssueComment { lists.append((old.createdIssues, new.createdIssues)) }
+        if toggles.assignedIssueComment, old.assignedIssuesError == nil {
+            lists.append((old.assignedIssues, new.assignedIssues))
+        }
+        if toggles.createdIssueComment, old.createdIssuesError == nil {
+            lists.append((old.createdIssues, new.createdIssues))
+        }
         var seen = Set<PRKey>()
         var result: [IssueEvent] = []
         for (before, now) in lists {

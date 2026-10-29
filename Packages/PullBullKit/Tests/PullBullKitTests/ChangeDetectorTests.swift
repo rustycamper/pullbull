@@ -7,14 +7,14 @@ private let now = Date(timeIntervalSince1970: 1_800_000_000)
 private func pr(
     _ n: Int, author: String = "alice", ci: CIState = .none, comments: Int = 0,
     lastCommenter: String? = nil, reviews: [Review] = [], requests: [Reviewer] = [],
-    draft: Bool = false, updated: Date = now
+    draft: Bool = false, updated: Date = now, mergeable: Mergeable? = nil
 ) -> PullRequest {
     PullRequest(
         key: PRKey(repo: "r", number: n), title: "t\(n)", url: URL(string: "https://x/\(n)")!,
         author: author, authorAvatarURL: nil, state: .open, isDraft: draft,
         createdAt: now, updatedAt: updated, closedAt: nil, headRef: "h", baseRef: "main", ci: ci,
         headCommitDate: nil, commentCount: comments, lastCommentAuthor: lastCommenter,
-        latestReviews: reviews, reviewRequests: requests)
+        latestReviews: reviews, reviewRequests: requests, mergeable: mergeable)
 }
 
 private func snap(review: [PullRequest] = [], mine: [PullRequest] = []) -> Snapshot {
@@ -347,6 +347,29 @@ private var issuesOn: NotificationToggles {
         #expect(events(waiting, ready).isEmpty)
     }
 
+    /// GitHub recomputing mergeability after a push isn't ready: it may still be conflicting.
+    @Test func readyToMergeWaitsForMergeability() {
+        let conflicting = snap(mine: [pr(1, author: "me", ci: .success, reviews: [approval], mergeable: .conflicting)])
+        let computing = snap(mine: [pr(1, author: "me", ci: .success, reviews: [approval], mergeable: .unknown)])
+        let clean = snap(mine: [pr(1, author: "me", ci: .success, reviews: [approval], mergeable: .mergeable)])
+        #expect(events(conflicting, computing, toggles: on).isEmpty)
+        #expect(events(computing, clean, toggles: on).isEmpty)
+        #expect(events(conflicting, clean, toggles: on).map(\.kind) == [.readyToMerge])
+    }
+
+    /// A push clears the checks until they start; that gap isn't ready, so it doesn't fire a second time.
+    @Test func readyToMergeIgnoresChecksNotYetStarted() {
+        let passed = snap(mine: [pr(1, author: "me", ci: .success, reviews: [approval])])
+        let pushed = snap(mine: [pr(1, author: "me", ci: .none, reviews: [approval])])
+        let failed = snap(mine: [pr(1, author: "me", ci: .failure, reviews: [approval])])
+        #expect(!events(failed, pushed, toggles: on).contains { $0.kind == .readyToMerge })
+        #expect(events(passed, pushed, toggles: on).isEmpty)
+        // A repo without checks is ready on approval.
+        let unapproved = snap(mine: [pr(2, author: "me")])
+        let approved = snap(mine: [pr(2, author: "me", reviews: [approval])])
+        #expect(events(unapproved, approved, toggles: on).map(\.kind).contains(.readyToMerge))
+    }
+
     @Test func commentAfterMyReviewFiresForOthersComments() {
         let before = snap(review: [pr(1, comments: 2, reviews: [myReview])])
         let after = snap(review: [pr(1, comments: 3, lastCommenter: "alice", reviews: [myReview])])
@@ -362,6 +385,11 @@ private var issuesOn: NotificationToggles {
         let mine = snap(review: [pr(1, comments: 3, lastCommenter: "me", reviews: [myReview])])
         #expect(events(before, mine, toggles: on).isEmpty)
         // A PR I haven't reviewed (only requested): not "after my review".
+        // A draft review of mine I haven't submitted.
+        let draft = Review(author: "me", state: .pending, submittedAt: now)
+        let drafted = snap(review: [pr(3, comments: 0, reviews: [draft])])
+        let replied = snap(review: [pr(3, comments: 1, lastCommenter: "alice", reviews: [draft])])
+        #expect(events(drafted, replied, toggles: on).isEmpty)
         let requested = snap(review: [pr(2, comments: 0, requests: [.user("me")])])
         let commented = snap(review: [pr(2, comments: 1, lastCommenter: "alice", requests: [.user("me")])])
         #expect(!events(requested, commented, toggles: on).contains { $0.kind == .commentAfterMyReview })
@@ -434,6 +462,16 @@ private func issueSnap(_ offset: TimeInterval, assigned: [BoardIssue]?, created:
         #expect(issue?.lastCommentAuthor == "dev-b")
         #expect(Queries.issueSearch(withAssignment: false, withLastComment: true).contains(Queries.lastCommentAuthor))
         #expect(!Queries.issueSearch(withAssignment: false).contains("lastComment"))
+    }
+
+    /// A failed search carries an older list (at launch, the cached one) forward; its counts aren't a baseline.
+    @Test func failedPreviousSearchIsNoBaseline() {
+        var old = issueSnap(0, assigned: [commented(1, comments: 1)], created: [])
+        old.assignedIssuesError = "timed out"
+        let new = issueSnap(120, assigned: [commented(1, comments: 6)], created: [])
+        #expect(run(old, new).isEmpty)
+        let next = issueSnap(240, assigned: [commented(1, comments: 7)], created: [])
+        #expect(run(new, next).map(\.count) == [1])
     }
 
     /// A newly listed issue's comments aren't news, and neither is a list that wasn't fetched.
