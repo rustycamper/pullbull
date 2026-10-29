@@ -52,17 +52,6 @@ private func ok(_ title: String, hold: Bool = false) -> FakeFetcher.Step {
     .init(result: .success(snapshot(title)), hold: hold)
 }
 
-/// Polls `condition` on the real clock until it holds or `timeout` passes.
-private func eventually(within timeout: Duration = .seconds(2), _ condition: () async -> Bool) async -> Bool {
-    let clock = ContinuousClock()
-    let deadline = clock.now + timeout
-    while clock.now < deadline {
-        if await condition() { return true }
-        try? await clock.sleep(for: .milliseconds(1))
-    }
-    return await condition()
-}
-
 private struct Harness {
     let fetcher: FakeFetcher
     let clock = TestClock()
@@ -91,6 +80,15 @@ private struct Harness {
 
     /// How many sleeps of `duration` were requested so far (poll timer and check timer alike).
     func sleeps(of duration: Duration) -> Int { clock.requestedSleeps.filter { $0 == duration }.count }
+
+    /// Waits on the test clock until at least `counts` sleeps of each duration were requested, then
+    /// tells whether the counts are exact.
+    func sleepsReach(_ counts: [Duration: Int], sourceLocation: SourceLocation = #_sourceLocation) async -> Bool {
+        let reached = await clock.waitForSleeps(sourceLocation: sourceLocation) { requested in
+            counts.allSatisfy { duration, count in requested.filter { $0 == duration }.count >= count }
+        }
+        return reached && counts.allSatisfy { sleeps(of: $0.key) == $0.value }
+    }
 }
 
 @Suite struct RefreshActivityTests {
@@ -106,7 +104,7 @@ private struct Harness {
         let h = Harness([ok("a"), ok("b", hold: true)])
         await h.start(interval: .seconds(120), activity: activity)
         #expect(await eventually { await h.coordinator.heldStatus.activity == .active })
-        #expect(await eventually { h.sleeps(of: .seconds(120)) == 1 && h.sleeps(of: .seconds(60)) == 1 })
+        #expect(await h.sleepsReach([.seconds(120): 1, .seconds(60): 1]))
         #expect(await h.fetcher.callCount == 1)
     }
 
@@ -114,13 +112,13 @@ private struct Harness {
         let activity = FakeActivity([.unchanged, .changed(nil)])
         let h = Harness([ok("a"), ok("b"), ok("c", hold: true)])
         await h.start(interval: .seconds(300), activity: activity)
-        #expect(await eventually { h.sleeps(of: .seconds(300)) == 1 && h.sleeps(of: .seconds(60)) == 1 })
+        #expect(await h.sleepsReach([.seconds(300): 1, .seconds(60): 1]))
         h.advance(by: 60)
         await h.fetcher.waitForCalls(2)
         // The early refresh restarted the poll timer: 300 s from t = 60, not from t = 0.
-        #expect(await eventually { h.sleeps(of: .seconds(300)) == 2 && h.sleeps(of: .seconds(60)) == 2 })
+        #expect(await h.sleepsReach([.seconds(300): 2, .seconds(60): 2]))
         h.advance(by: 240)
-        #expect(await eventually { h.sleeps(of: .seconds(60)) == 3 })
+        #expect(await h.sleepsReach([.seconds(60): 3]))
         #expect(await h.fetcher.callCount == 2)
         h.advance(by: 60)
         await h.fetcher.waitForCalls(3)
@@ -135,9 +133,9 @@ private struct Harness {
         let h = Harness([first] + steps)
         await h.start(interval: .seconds(120), activity: activity)
         await h.fetcher.waitForCalls(1)
-        _ = await eventually { h.sleeps(of: .seconds(60)) == 1 }
+        _ = await h.sleepsReach([.seconds(60): 1])
         h.advance(by: 60)
-        _ = await eventually { h.sleeps(of: .seconds(60)) == 2 }
+        _ = await h.sleepsReach([.seconds(60): 2])
         return h
     }
 
@@ -147,7 +145,7 @@ private struct Harness {
         // Not even an attempt that would join the one in flight.
         #expect(!(await eventually(within: .milliseconds(200)) { await h.coordinator.joinedWaiters > 0 }))
         await h.fetcher.releaseHeld()
-        #expect(await eventually { h.sleeps(of: .seconds(120)) == 1 })
+        #expect(await h.sleepsReach([.seconds(120): 1]))
         #expect(await h.fetcher.callCount == 1)
     }
 
@@ -159,7 +157,7 @@ private struct Harness {
         await h.fetcher.releaseHeld()
         // Right after the first, without waiting for the timer; then the timer counts from it.
         #expect(await eventually { await h.fetcher.callCount == 2 })
-        #expect(await eventually { h.sleeps(of: .seconds(120)) == 1 })
+        #expect(await h.sleepsReach([.seconds(120): 1]))
         #expect(await h.fetcher.callCount == 2)
     }
 
@@ -170,7 +168,7 @@ private struct Harness {
         await h.fetcher.releaseHeld()
         // Not a full interval later: the flagged activity is fetched right away.
         #expect(await eventually { await h.fetcher.callCount == 2 })
-        #expect(await eventually { h.sleeps(of: .seconds(120)) == 1 })
+        #expect(await h.sleepsReach([.seconds(120): 1]))
         #expect(await h.fetcher.callCount == 2)
     }
 
@@ -180,10 +178,10 @@ private struct Harness {
         ])
         let h = Harness([ok("a"), ok("b"), ok("c", hold: true)])
         await h.start(interval: .seconds(600), activity: activity)
-        #expect(await eventually { h.sleeps(of: .seconds(60)) == 1 && h.sleeps(of: .seconds(600)) == 1 })
+        #expect(await h.sleepsReach([.seconds(60): 1, .seconds(600): 1]))
         h.advance(by: 60)
         // Activity from before the last refresh started is already shown.
-        #expect(await eventually { h.sleeps(of: .seconds(60)) == 2 })
+        #expect(await h.sleepsReach([.seconds(60): 2]))
         #expect(!(await eventually(within: .milliseconds(200)) { await h.fetcher.callCount > 1 }))
         h.advance(by: 60)
         // Within Last-Modified's one-second precision it may be newer: refresh.
@@ -195,9 +193,9 @@ private struct Harness {
         let h = Harness([ok("a"), ok("b"), ok("c", hold: true)])
         await h.start(interval: .seconds(120), activity: activity)
         #expect(await eventually { await h.coordinator.heldStatus.activity == .unsupported })
-        #expect(await eventually { h.sleeps(of: .seconds(120)) == 1 })
+        #expect(await h.sleepsReach([.seconds(120): 1]))
         h.advance(by: 120)
-        #expect(await eventually { h.sleeps(of: .seconds(120)) == 2 })
+        #expect(await h.sleepsReach([.seconds(120): 2]))
         h.advance(by: 120)
         await h.fetcher.waitForCalls(3)
         #expect(await activity.callCount == 1)
@@ -208,12 +206,12 @@ private struct Harness {
         let activity = FakeActivity([.fail(APIError.network("offline")), .fail(APIError.server(502))])
         let h = Harness([ok("a"), ok("b", hold: true)])
         await h.start(interval: .seconds(120), activity: activity)
-        #expect(await eventually { h.sleeps(of: .seconds(60)) == 1 && h.sleeps(of: .seconds(120)) == 1 })
+        #expect(await h.sleepsReach([.seconds(60): 1, .seconds(120): 1]))
         let status = await h.coordinator.heldStatus
         #expect(status.error == nil)
         #expect(status.activity == .probing)
         h.advance(by: 60)
-        #expect(await eventually { h.sleeps(of: .seconds(60)) == 2 })
+        #expect(await h.sleepsReach([.seconds(60): 2]))
         h.advance(by: 60)
         #expect(await eventually { await h.coordinator.heldStatus.activity == .active })
         #expect(await activity.callCount == 3)
@@ -224,7 +222,7 @@ private struct Harness {
         let activity = FakeActivity([.fail(APIError.rateLimited(resetAt: t0.addingTimeInterval(600)))])
         let h = Harness([ok("a", hold: true)])
         await h.start(interval: .seconds(120), activity: activity)
-        #expect(await eventually { h.sleeps(of: .seconds(600)) == 1 })
+        #expect(await h.sleepsReach([.seconds(600): 1]))
         #expect(await h.coordinator.heldStatus.error == nil)
     }
 
@@ -232,11 +230,11 @@ private struct Harness {
         let activity = FakeActivity([.unchanged])
         let h = Harness([ok("a"), .init(result: .failure(APIError.network("offline")), hold: false), ok("b", hold: true)])
         await h.start(interval: .seconds(120), activity: activity)
-        #expect(await eventually { h.sleeps(of: .seconds(60)) == 1 && h.sleeps(of: .seconds(120)) == 1 })
+        #expect(await h.sleepsReach([.seconds(60): 1, .seconds(120): 1]))
         await h.coordinator.refreshNow()
         #expect(await h.coordinator.heldStatus.error == .offline)
         h.advance(by: 60)
-        #expect(await eventually { h.sleeps(of: .seconds(60)) == 2 })
+        #expect(await h.sleepsReach([.seconds(60): 2]))
         #expect(await activity.callCount == 1)
     }
 
@@ -254,7 +252,7 @@ private struct Harness {
         let activity = FakeActivity([])
         let h = Harness([ok("a")])
         await h.start(interval: .seconds(120), activity: activity)
-        #expect(await eventually { h.sleeps(of: .seconds(60)) == 1 && h.sleeps(of: .seconds(120)) == 1 })
+        #expect(await h.sleepsReach([.seconds(60): 1, .seconds(120): 1]))
         await h.coordinator.stop()
         #expect(h.clock.pendingSleepers == 0)
         h.advance(by: 600)
