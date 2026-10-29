@@ -19,6 +19,11 @@ public extension ProcessRunning {
 public struct SystemProcessRunner: ProcessRunning {
     private let timeout: Duration
 
+    /// Runs the blocking work (pipe reads, the exit wait) and the timeout. A queue of its own targets the
+    /// overcommit root queue, which adds a thread when its threads block; the global queue doesn't overcommit
+    /// and holds about one thread per core, so blocked reads could keep the timeout from firing on time.
+    private static let queue = DispatchQueue(label: "PullBull.process", attributes: .concurrent)
+
     /// A process still running after `timeout` (e.g. `gh` waiting on an unanswered Keychain prompt)
     /// is stopped and reported as `GhError.failed`, so a refresh can't hang forever.
     public init(timeout: Duration = .seconds(15)) {
@@ -52,19 +57,21 @@ public struct SystemProcessRunner: ProcessRunning {
             process.standardError = err
             process.standardInput = FileHandle.nullDevice
 
-            DispatchQueue.global().async {
+            Self.queue.async {
                 do {
                     try process.run()
                 } catch {
                     once.resume(with: .failure(error))
                     return
                 }
-                DispatchQueue.global().asyncAfter(deadline: .now() + seconds) {
+                Self.queue.asyncAfter(deadline: .now() + seconds) {
                     guard process.isRunning else { return }
-                    process.terminate()
-                    // Answer now: a child that inherited the pipes could keep the reads below blocked.
+                    // Answer before stopping it: once it ends, the exit wait below could resume first with
+                    // the signal's status. Answering now also covers a child that inherited the pipes and
+                    // keeps the reads below blocked.
                     once.resume(with: .failure(GhError.failed(timeoutMessage)))
-                    DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
+                    process.terminate()
+                    Self.queue.asyncAfter(deadline: .now() + 2) {
                         if process.isRunning { kill(process.processIdentifier, SIGKILL) }
                     }
                 }
@@ -72,7 +79,7 @@ public struct SystemProcessRunner: ProcessRunning {
                 let errBox = DataBox()
                 let group = DispatchGroup()
                 group.enter()
-                DispatchQueue.global().async {
+                Self.queue.async {
                     errBox.data = err.fileHandleForReading.readDataToEndOfFile()
                     group.leave()
                 }
