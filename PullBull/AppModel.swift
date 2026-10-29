@@ -5,7 +5,7 @@ import Observation
 import PullBullKit
 
 enum Route: Equatable {
-    case list, search, detail(PRKey), issueDetail(PRKey)
+    case list, search, ask, detail(PRKey), issueDetail(PRKey)
 }
 
 /// A tab in either mode, such as the one type-anywhere started a search on.
@@ -170,7 +170,7 @@ final class AppModel {
     private(set) var installCheckError: RefreshError?
 
     @ObservationIgnored private let settingsStore: SettingsStore
-    @ObservationIgnored private let snapshotStore: SnapshotStore
+    @ObservationIgnored let snapshotStore: SnapshotStore
     @ObservationIgnored private let gh: GhCLI
     @ObservationIgnored private let transport: any GraphQLTransport
     @ObservationIgnored private let httpTransport: any HTTPTransport
@@ -191,11 +191,29 @@ final class AppModel {
     /// Accounts whose token can't read notifications (the activity check), until they sign in or out
     /// again or the app restarts; their loops poll without the check.
     @ObservationIgnored private var activityUnsupported: Set<AccountRef> = []
-    @ObservationIgnored private var running: RunConfig?
+    @ObservationIgnored private var running: RunConfig? {
+        didSet { reconcileAsk() }
+    }
     @ObservationIgnored private var updatesTask: Task<Void, Never>?
     @ObservationIgnored private var bootstrapTask: Task<Void, Never>?
     @ObservationIgnored private var wakeObserver: (any NSObjectProtocol)?
     @ObservationIgnored private var activationObserver: (any NSObjectProtocol)?
+    // Ask (see Ask/AppModel+Ask.swift).
+    /// The Ask index's progress for Settings → Ask; nil while no index is open.
+    var askProgress: AskSyncProgress?
+    /// The Anthropic key's state for Settings → Ask.
+    var askKeyState: AskKeyState = .none
+    /// Why the Ask index couldn't open; nil after a successful open and while Ask is off.
+    var askOpenError: String?
+    /// Opens and closes the Ask index; created on first use.
+    @ObservationIgnored var askLifecycle: AskLifecycle<AskRuntime>?
+    /// The Ask behind the search field: the question in flight, its outcome and the no-key notice.
+    private(set) var askState = AskState()
+    /// The highlighted row of the Ask screen (↑/↓; Return opens it).
+    var askSelection: PRKey?
+    /// Where Back lands from each detail opened from the Ask screen, innermost last.
+    private(set) var askReturn = AskReturn()
+    @ObservationIgnored var askTask: Task<Void, Never>?
     /// Watches connectivity so a refresh runs as soon as the network is back (see `NetworkRecovery`);
     /// started by the main init only, cancelled in deinit.
     @ObservationIgnored private let pathMonitor = NWPathMonitor()
@@ -284,6 +302,9 @@ final class AppModel {
         var ref: AccountRef { AccountRef(login: account, source: source) }
     }
 
+    /// The running account and scope, which Ask indexes while it is on.
+    var runningAskTarget: AskTarget? { running.map { AskTarget(account: $0.ref, scope: $0.scope) } }
+
     /// "Use X from GitHub CLI": running, or the message of its failure.
     struct GhUse: Equatable {
         let login: String
@@ -352,6 +373,7 @@ final class AppModel {
                 case .signedOut: self.dropSignedOutData(account)
                 case .valid, .unsaved: if self.signedOutDropped == account { self.signedOutDropped = nil }
                 }
+                self.reconcileAsk()
             }
         }
         cacheTrimTask = Self.trimCaches(snapshotStore)
@@ -408,6 +430,8 @@ final class AppModel {
     func popoverDidOpen() {
         popoverOpens += 1
         reloadAccounts()
+        // The ⌥⌘↩ hint shows once a key is saved; reading the Keychain sends nothing.
+        if settings.askEnabled { loadAskKeyState() }
         if case .detail(let key) = route { loadDetail(key) }
         if case .issueDetail(let key) = route { loadIssueDetail(key) }
         if route == .search, searchResults == nil || searchResults?.phase != .done || searchField.isStale {
@@ -610,6 +634,8 @@ final class AppModel {
     func updateSearch(_ text: String, caret: Int? = nil, startedOnTab: ShownTab? = nil, debounced: Bool = true) {
         // Opening a detail unfocuses the field, which pushes its unchanged text back; that must not close the detail.
         if text == searchText, route != .list, route != .search { return }
+        // Editing or emptying the field cancels a running Ask and drops its line: back to normal search.
+        if text != searchText { clearAsk() }
         if let startedOnTab, route != .search { searchStartedOnTab = startedOnTab }
         // Whitespace-only text clears the origin; a bare "#" keeps it for the number that follows.
         if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { searchStartedOnTab = nil }
@@ -1294,7 +1320,7 @@ final class AppModel {
             installationID: installationID)
     }
 
-    private func api(for account: AccountRef) -> GitHubAPI {
+    func api(for account: AccountRef) -> GitHubAPI {
         GitHubAPI(transport: transport, auth: broker.source(for: account))
     }
 
@@ -1475,7 +1501,10 @@ final class AppModel {
         guard signedOutDropped != account else { return }
         signedOutDropped = account
         let store = snapshotStore
-        Task { try? await store.removeAll(account: account.login) }
+        Task { [weak self] in
+            await self?.settleAsk()
+            try? await store.removeAll(account: account.login)
+        }
     }
 
     /// Account or org changed: drops everything shown for the previous one.
@@ -1515,6 +1544,7 @@ final class AppModel {
         rebuildTabs()
         if route == .search, searchResults == nil, snapshot != nil { updateSearch(searchText) }
         prefetchAfterSuccessfulRefresh(status)
+        syncAskAfterRefresh(status)
         if !status.isRefreshing, status.error == nil { pickPersonalBoardIfNeeded() }
         // The token may lack the project scope that was assumed; scopes are read again (throttled).
         if snapshot?.boardError == RefreshError(APIError.insufficientScopes).message { reloadAccounts() }
@@ -1633,6 +1663,12 @@ extension AppModel {
 
     /// Shows the detail view for `key` with the cached detail at once, then refreshes it in place.
     func openDetail(_ key: PRKey) {
+        switch route {
+        case .ask: askReturn.open(from: .ask)
+        case .issueDetail: if !askReturn.isEmpty { askReturn.open(from: .issueDetail) }
+        case .list, .search: leaveAsk()
+        case .detail: break
+        }
         if case .detail = route {} else { detailReturnRoute = route }
         openedPR = pullRequest(for: key)
         closeCompletion()
@@ -1640,13 +1676,16 @@ extension AppModel {
         loadDetail(key)
     }
 
-    /// Back: the issue detail a linked PR was opened from (fetched again, since it may have changed
-    /// while the PR was open), the search (query kept) when the detail was opened from it, else the list.
+    /// Back: the Ask screen when Ask opened the detail, the issue detail a linked PR was opened from
+    /// (fetched again, since it may have changed while the PR was open), the search (query kept) when
+    /// the detail was opened from it, else the list.
     func closeDetail() {
         detailTask?.cancel()
         detailTask = nil
         detailFetch = nil
-        if case .issueDetail(let issue) = detailReturnRoute {
+        if !askReturn.isEmpty, askReturn.close() == .ask {
+            route = .ask
+        } else if case .issueDetail(let issue) = detailReturnRoute {
             route = detailReturnRoute
             loadIssueDetail(issue)
         } else {
@@ -1658,7 +1697,11 @@ extension AppModel {
     /// Whether Back from the detail on screen (through an issue detail, for a linked PR) ends in the
     /// search, so its query is kept while the popover is closed.
     var detailReturnsToSearch: Bool {
+        // Back through Ask ends in the search too: Esc on the Ask screen keeps the question.
+        if !askReturn.isEmpty { return true }
         switch route {
+        case .ask:
+            return true
         case .detail:
             if case .issueDetail = detailReturnRoute { return issueDetailReturnRoute == .search }
             return detailReturnRoute == .search
@@ -1710,6 +1753,7 @@ extension AppModel {
             } catch {
                 guard let self, !Task.isCancelled, self.detailFetch?.key == key else { return }
                 self.detailFetch = DetailFetch(key: key, isLoading: false, error: self.message(for: RefreshError(error)))
+                if case APIError.notFound = error { self.askItemNotFound(key) }
             }
         }
     }
@@ -1798,9 +1842,12 @@ extension AppModel {
         openedIssue = nil
         issueDetailReturnRoute = .list
         switch route {
-        case .detail, .issueDetail: route = .list
+        case .detail, .issueDetail, .ask: route = .list
         case .list, .search: break
         }
+        // Nothing the previous account asked about may show either.
+        clearAsk()
+        askReturn.reset()
     }
 }
 
@@ -1886,7 +1933,7 @@ extension AppModel {
             return (key, pullRequest(for: key)?.url ?? GitHubLinks.pullRequest(key))
         case .issueDetail(let key):
             return (key, (issueDetails[key]?.issue ?? issue(for: key))?.url ?? GitHubLinks.issue(key))
-        case .list, .search:
+        case .list, .search, .ask:
             return nil
         }
     }
@@ -1896,14 +1943,23 @@ extension AppModel {
         switch route {
         case .detail: closeDetail()
         case .issueDetail: closeIssueDetail()
-        case .list, .search: break
+        case .list, .search, .ask: break
         }
     }
 
     /// A reopen after a long while: drops the detail on screen, and any stacked under it, for the list
-    /// (the search, query kept, when Back would end there).
+    /// (the search, query kept, when Back would end there). The Ask screen, and details opened from it,
+    /// drop to the search with the question kept.
     func showListInsteadOfDetail() {
         let toSearch = detailReturnsToSearch && !searchText.isEmpty
+        askReturn.reset()
+        dropDetails()
+        route = toSearch ? .search : .list
+        searchAgainIfStale()
+    }
+
+    /// Stops the details' fetches and forgets where they return to.
+    fileprivate func dropDetails() {
         detailTask?.cancel()
         detailTask = nil
         detailFetch = nil
@@ -1912,8 +1968,6 @@ extension AppModel {
         issueDetailFetch = nil
         detailReturnRoute = .list
         issueDetailReturnRoute = .list
-        route = toSearch ? .search : .list
-        searchAgainIfStale()
     }
 
     /// ⌘R in a detail: fetches it again unless a fetch is already running.
@@ -1921,7 +1975,176 @@ extension AppModel {
         switch route {
         case .detail: if detailFetch?.isLoading != true { reloadDetail() }
         case .issueDetail: if issueDetailFetch?.isLoading != true { reloadIssueDetail() }
-        case .list, .search: break
+        case .list, .search, .ask: break
+        }
+    }
+}
+
+// MARK: - Ask screen
+
+extension AppModel {
+    /// ↩ or a click on an Ask row: switches to the item's mode and opens its detail, whose Back
+    /// returns to the Ask screen.
+    func openAskResult(_ key: PRKey) {
+        guard route == .ask, let item = askRows.first(where: { $0.key == key }) else { return }
+        askSelection = key
+        switch item.kind {
+        case .pr:
+            mode = .pullRequests
+            openDetail(key)
+        case .issue:
+            mode = .issues
+            openIssueDetail(key)
+        }
+    }
+
+    /// Return on the Ask screen: the highlighted row.
+    func openAskSelection() {
+        if let key = askSelection { openAskResult(key) }
+    }
+
+    /// Esc or ✕ on the Ask screen: the search field, with the question kept to edit and ask again. An
+    /// Ask running again from here stops.
+    func closeAsk() {
+        guard route == .ask else { return }
+        let landing = AskReturn.leavingAsk(question: askQuestion)
+        cancelAsk()
+        askReturn.reset()
+        showSearch(landing)
+    }
+
+    /// The Ask screen is on screen, or under the detail on screen.
+    var askOnScreen: Bool { route == .ask || !askReturn.isEmpty }
+
+    /// The popover opening again on the Ask screen or a detail opened from it: `AskReturn.reopen` decides
+    /// whether it stays or, after a long while, lands on the search with the question kept.
+    func reopenAsk(closedAt: Date, now: Date) {
+        guard askOnScreen else { return }
+        let place: AskReturn.Place = switch route {
+        case .detail: .pullRequestDetail
+        case .issueDetail: .issueDetail
+        case .list, .search, .ask: .ask
+        }
+        let landing = askReturn.reopen(at: place, question: askQuestion, closedAt: closedAt, now: now)
+        if landing.place == .search { showSearch(landing) }
+    }
+
+    /// Ask turned off: no Ask runs, and the Ask screen (with any detail opened from it) gives way to the
+    /// search with the question kept.
+    func leaveAskForSearch() {
+        let landing = AskReturn.leavingAsk(question: askQuestion)
+        let shown = askOnScreen
+        clearAsk()
+        askReturn.reset()
+        if shown { showSearch(landing) }
+    }
+
+    /// ⌥⌘↩ in the search field: asks the field's text.
+    func ask() {
+        guard route == .search else { return }
+        startAsk(searchText.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// Esc while asking, or a detail opening: the reply in flight is dropped.
+    func cancelAsk() {
+        askTask?.cancel()
+        askTask = nil
+        askState.cancel()
+    }
+
+    /// The field was edited or emptied: no Ask runs, and its line and notice go.
+    func clearAsk() {
+        askTask?.cancel()
+        askTask = nil
+        askState.clear()
+    }
+
+    /// A detail opening from the list or search: no Back leads to Ask, and a running Ask stops.
+    fileprivate func leaveAsk() {
+        askReturn.reset()
+        cancelAsk()
+    }
+
+    /// Asks `question` over the open Ask index with the saved key and model: the only way anything
+    /// reaches Anthropic's Messages API, and only from an explicit ⌥⌘↩. Without a key or an open index
+    /// nothing is sent and a notice says why. A later Ask or an edit drops this one's reply.
+    private func startAsk(_ question: String) {
+        guard settings.askEnabled, !question.isEmpty, !askState.isAsking(question) else { return }
+        askTask?.cancel()
+        askTask = nil
+        guard let key = (try? AnthropicKeyStore().load()) ?? nil else {
+            askKeyState = .none
+            refuseAsk(AskState.needsKeyNotice)
+            return
+        }
+        guard let runtime = askRuntime else {
+            refuseAsk(askOpenError ?? AskState.indexNotReadyNotice)
+            return
+        }
+        let target = runtime.target
+        let scopeName = switch target.scope {
+        case .org(let org): org
+        case .personal(let login, _): login
+        }
+        let model = AskModel.named(settings.askModel, in: askModelChoices)
+        let session = AskSession(
+            index: runtime.index,
+            client: AskClient(apiKey: key, model: model),
+            context: AskContext(scopeName: scopeName, isOrg: target.scope.org != nil, today: Date()),
+            excluded: askExcludedRepos(), scope: target.scope)
+        let focusedRepo = repoFocus?.repo
+        let stillSyncing = askProgress.flatMap { $0.backfilling ? $0.indexed : nil }
+        let token = askState.begin(question)
+        askTask = Task { [weak self] in
+            let outcome: AskOutcome?
+            do {
+                outcome = try await session.run(question, focusedRepo: focusedRepo, stillSyncing: stillSyncing)
+            } catch {
+                // `run` throws only cancellation; anything else would still be a failed Ask.
+                outcome = AskGeneration.isCancellation(error) ? nil : .failed(question: question, .server(0))
+            }
+            guard let self else { return }
+            if case .failed(_, .modelRetired) = outcome { self.retireAskModel(model.id) }
+            if let outcome { self.landAsk(outcome, token: token) } else { self.askState.cancelled(token: token) }
+        }
+    }
+
+    /// The notice shows over the search results, so from the Ask screen it goes back to the field first.
+    private func refuseAsk(_ notice: String) {
+        if route == .ask { closeAsk() }
+        askState.refuse(notice)
+    }
+
+    /// A reply arrived. An answer opens the Ask screen with its first row highlighted; a failure stays as
+    /// one line over the normal results (or in place of the answer on the Ask screen). Nothing lands once
+    /// the search and the Ask screen were left.
+    private func landAsk(_ outcome: AskOutcome, token: Int) {
+        guard route == .search || route == .ask else {
+            askState.cancelled(token: token)
+            return
+        }
+        let arrival = askState.land(outcome, token: token)
+        guard arrival != .ignored else { return }
+        askTask = nil
+        guard arrival == .screen else { return }
+        askSelection = askRows.first?.key
+        closeCompletion()
+        route = .ask
+    }
+
+    /// Leaves Ask and any detail for the search with `landing`'s text. Opening a result may have switched
+    /// the mode, which drops a narrowed tab, so the query is searched again for the scope shown.
+    private func showSearch(_ landing: AskReturn.Landing) {
+        dropDetails()
+        guard !landing.searchText.isEmpty else {
+            route = .list
+            return
+        }
+        if searchText.trimmingCharacters(in: .whitespacesAndNewlines) != landing.searchText {
+            updateSearch(landing.searchText, debounced: false)
+        } else {
+            route = .search
+            runSearch(searchQuery, debounced: false, keeping: searchSelection)
         }
     }
 }
@@ -1959,9 +2182,14 @@ extension AppModel {
     func openIssueDetail(_ key: PRKey) {
         switch route {
         case .list, .search:
+            leaveAsk()
+            issueDetailReturnRoute = route
+        case .ask:
+            askReturn.open(from: .ask)
             issueDetailReturnRoute = route
         case .detail:
             // From a PR detail (e.g. a notification): Back goes to the list, not into the PR.
+            askReturn.reset()
             detailTask?.cancel()
             detailTask = nil
             detailFetch = nil
@@ -1975,11 +2203,16 @@ extension AppModel {
         loadIssueDetail(key)
     }
 
-    /// Back: the search (query kept) when the issue detail was opened from it, else the list.
+    /// Back: the Ask screen when Ask opened the issue detail, the search (query kept) when the issue
+    /// detail was opened from it, else the list.
     func closeIssueDetail() {
         issueDetailTask?.cancel()
         issueDetailTask = nil
         issueDetailFetch = nil
+        if !askReturn.isEmpty, askReturn.close() == .ask {
+            route = .ask
+            return
+        }
         route = issueDetailReturnRoute == .search && !searchText.isEmpty ? .search : .list
         searchAgainIfStale()
     }
@@ -2017,6 +2250,7 @@ extension AppModel {
                 guard let self, !Task.isCancelled, self.issueDetailFetch?.key == key else { return }
                 self.issueDetailFetch = DetailFetch(
                     key: key, isLoading: false, error: self.message(for: RefreshError(error)))
+                if case APIError.notFound = error { self.askItemNotFound(key) }
             }
         }
     }
@@ -2204,6 +2438,7 @@ extension AppModel {
     /// The old login's caches after a rename, unless a `gh` login still uses that name.
     private func dropCaches(ofRenamed renamed: AccountSummary?) async {
         guard let renamed, !accounts.contains(where: { $0.login == renamed.login }) else { return }
+        await settleAsk()
         try? await snapshotStore.removeAll(account: renamed.login)
     }
 
@@ -2270,6 +2505,7 @@ extension AppModel {
             var avatars = await snapshotStore.avatarURLs(account: account.login)
             avatars.formUnion(CachedAvatars.own(login: account.login, avatarURL: summary?.avatarURL))
             AvatarCache.shared.remove(avatars)
+            await settleAsk()
             try? await snapshotStore.removeAll(account: account.login)
         }
         return removedFromKeychain

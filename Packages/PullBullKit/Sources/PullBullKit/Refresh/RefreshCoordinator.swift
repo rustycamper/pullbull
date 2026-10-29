@@ -28,7 +28,7 @@ public enum RefreshError: Equatable, Sendable {
             case .unauthorized: self = .unauthorized
             case .rateLimited(let resetAt): self = .rateLimited(resetAt)
             case .server(let status): self = .other("GitHub server error \(status)")
-            case .graphQL(let message): self = .other(message)
+            case .graphQL(let message), .notFound(let message): self = .other(message)
             case .insufficientScopes: self = .other("Token is missing a required scope")
             case .ssoRequired(let url): self = .ssoRequired(url)
             case .boardForbidden: self = .other("GitHub won't let this sign-in read the board")
@@ -370,7 +370,7 @@ private extension APIError {
     var failsThePoll: Bool {
         switch self {
         case .rateLimited, .unauthorized, .ssoRequired: true
-        case .network, .unreachable, .server, .forbidden, .graphQL, .insufficientScopes, .boardForbidden: false
+        case .network, .unreachable, .server, .forbidden, .graphQL, .insufficientScopes, .boardForbidden, .notFound: false
         }
     }
 }

@@ -33,7 +33,7 @@ extension AppModel {
         let title = switch route {
         case .detail(let key): pullRequest(for: key)?.title ?? linkedPR(for: key)?.title
         case .issueDetail(let key): (issueDetails[key]?.issue ?? issue(for: key))?.title
-        case .list, .search: String?.none
+        case .list, .search, .ask: String?.none
         }
         PRActions.copyMarkdownLink(title: title, key: link.key, url: link.url)
         return true

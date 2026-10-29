@@ -14,6 +14,7 @@ struct SearchResultsView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     contextLine
+                    askLine
                     if let results = model.searchResults, !results.isEmpty(in: model.mode) {
                         if let message = results.failure(in: model.mode) {
                             FailureBanner(message: message)
@@ -102,12 +103,43 @@ struct SearchResultsView: View {
                     .controlSize(.mini)
                     .accessibilityLabel("Searching GitHub")
             }
+            // Ask is offered only once a key is saved; ⌥⌘↩ is the one way to send anything to Anthropic.
+            if model.offersAsk {
+                Text("⌥⌘↩ Ask AI")
+                    .fixedSize()
+                    .accessibilityLabel("Option Command Return to Ask AI")
+            }
         }
         .font(.system(size: 11))
         .foregroundStyle(.secondary)
         .padding(.horizontal, 8)
         .padding(.top, 10)
         .frame(minHeight: 24)
+    }
+
+    /// "Asking…" while an Ask runs, else its failure or the no-key notice; the normal results stay below.
+    @ViewBuilder private var askLine: some View {
+        if model.asking != nil {
+            HStack(spacing: 6) {
+                ProgressView()
+                    .controlSize(.mini)
+                    .accessibilityHidden(true)
+                Text("Asking…")
+                Spacer(minLength: 0)
+            }
+            .askLineStyle()
+            .accessibilityElement(children: .combine)
+        } else if let line = model.askErrorLine ?? model.askNotice {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.circle")
+                    .accessibilityHidden(true)
+                Text(verbatim: line)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .askLineStyle()
+            .accessibilityElement(children: .combine)
+        }
     }
 
     /// The tab the results are narrowed to; nil for everything.
@@ -181,6 +213,14 @@ struct SearchResultsView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 if let unknown = unknownToken {
                     Text("\(unknown) isn't on anything PullBull has loaded")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                // With a key saved, Ask may find it from a looser description.
+                if model.offersAsk {
+                    Text("Try other words, or ⌥⌘↩ to Ask AI.")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -509,8 +549,8 @@ private struct SearchPRRow: View {
 
     @ViewBuilder private var trailing: some View {
         switch pr.state {
-        case .merged: Pill(symbol: nil, text: "Merged", foreground: Palette.mergedText, fill: Palette.mergedFill)
-        case .closed: Pill(symbol: nil, text: "Closed", foreground: Palette.closedText, fill: Palette.closedFill)
+        case .merged: EndedPill(merged: true)
+        case .closed: EndedPill(merged: false)
         case .open: CIGlyph(state: pr.ci)
         }
     }
@@ -629,5 +669,16 @@ private enum Highlight {
 
     static func repoName(_ repo: String) -> String {
         repo.split(separator: "/").last.map(String.init) ?? repo
+    }
+}
+
+private extension View {
+    /// The Ask line's place under the context line: small, muted, and as wide as the rows.
+    func askLineStyle() -> some View {
+        font(.system(size: 11))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.top, 4)
+            .frame(maxWidth: .infinity, minHeight: 20, alignment: .leading)
     }
 }

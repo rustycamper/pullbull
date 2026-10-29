@@ -48,11 +48,13 @@ struct PopoverView: View {
         self.model = model
         self.presence = presence
         _closedExpanded = State(initialValue: closedExpanded)
-        _layers = State(initialValue: DetailLayer.stack(for: model.route, returning: model.detailReturnRoute))
+        _layers = State(initialValue: DetailLayer.stack(for: model))
     }
 
     private var searching: Bool { model.route == .search }
-    private var searchOpen: Bool { searching || fieldOpen }
+    /// The search results stay drawn under the Ask AI screen, so its fade never shows the list swapping in.
+    private var searchShown: Bool { searching || model.route == .ask || layers.first == .ask }
+    private var searchOpen: Bool { searchShown || fieldOpen }
     /// The "@user", "~label" or "is:" list is on screen (only with the search field open).
     private var completionShown: Bool { model.completion != nil && searchOpen }
     /// The panel under the empty field takes the arrows, Return and Esc.
@@ -66,7 +68,13 @@ struct PopoverView: View {
     /// The PR detail on top, if any.
     private var detailKey: PRKey? { if case .pr(let key) = layers.last { key } else { nil } }
     /// The issue detail on screen, or the one under a linked PR's detail that Back returns to.
-    private var issueLayerKey: PRKey? { if case .issue(let key) = layers.first { key } else { nil } }
+    private var issueLayerKey: PRKey? {
+        layers.lazy.compactMap { if case .issue(let key) = $0 { key } else { nil } }.first
+    }
+    /// The Ask screen is on screen, or under the details opened from it.
+    private var askLayerShown: Bool { layers.first == .ask }
+    /// The Ask screen is the top layer, with no detail over it.
+    private var askShownAlone: Bool { layers == [.ask] }
     private var slides: Bool { !reduceMotion }
     /// The Board tab is on screen and its filter row names the board.
     private var boardPartShown: Bool {
@@ -74,13 +82,13 @@ struct PopoverView: View {
     }
     /// The row at the top of the list or search results; nil with nothing to filter.
     private var filterRow: FilterRow? {
-        let listsBuilt = switch (searching, model.mode) {
+        let listsBuilt = switch (searchShown, model.mode) {
         case (true, _): model.tabs != nil
         case (false, .pullRequests): model.contents(of: model.selectedTab) != nil
         case (false, .issues): model.issueTabs != nil
         }
         return FilterRow.make(
-            searching: searching, listsBuilt: listsBuilt,
+            searching: searchShown, listsBuilt: listsBuilt,
             focusName: model.repoFocus.map { model.displayName(of: $0.repo) },
             boardTitle: boardPartShown ? model.boardMenuTitle : nil)
     }
@@ -100,8 +108,24 @@ struct PopoverView: View {
         // at the same scroll position. A detail slides in from the trailing edge over it.
         ZStack {
             listAndSearch
-                .modifier(CoveredLayer(covered: !layers.isEmpty, slides: slides))
+                // The Ask screen replaces the search in place: a fade-through, never both half visible.
+                .modifier(CoveredLayer(covered: !layers.isEmpty, slides: slides && layers.first != .ask))
+                .animation(askShownAlone ? Self.fadeThroughOut : Self.fadeThroughIn, value: askShownAlone)
                 .zIndex(0)
+            if askLayerShown {
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    AskView(
+                        question: model.askQuestion, outcome: model.askOutcome, asking: model.asking != nil,
+                        selection: model.askSelection, now: context.date, onOpen: model.openAskResult,
+                        onBack: model.closeAsk)
+                }
+                .modifier(CoveredLayer(covered: layers.count > 1, slides: slides))
+                .transition(.asymmetric(
+                    insertion: .opacity.animation(Self.fadeThroughIn),
+                    removal: .opacity.animation(Self.fadeThroughOut).combined(with: .modifier(
+                        active: LeavingLayer(leaving: true), identity: LeavingLayer(leaving: false)))))
+                .zIndex(0.5)
+            }
             if let issueLayerKey {
                 // A replaced issue detail starts fresh too.
                 IssueDetailView(model: model, key: issueLayerKey)
@@ -130,7 +154,7 @@ struct PopoverView: View {
             presence.onHide = popoverDidHide
             if presence.isShown, let window = presence.window { popoverDidShow(window) }
         }
-        .onChange(of: DetailLayer.stack(for: model.route, returning: model.detailReturnRoute)) { _, _ in
+        .onChange(of: DetailLayer.stack(for: model)) { _, _ in
             syncLayers(animated: true)
         }
         .onChange(of: model.repoFocus) { _, new in
@@ -147,12 +171,16 @@ struct PopoverView: View {
         }
         .onChange(of: model.route) { old, new in
             // The hidden list keeps no focus, so typing in the detail never lands in the search field.
-            if Self.isDetail(new) {
+            if Self.isDetail(new) || new == .ask {
                 fieldFocused = false
                 saveName = nil
             }
-            // Back from a detail opened in search puts the caret back in the kept query.
-            if Self.isDetail(old), new == .search { DispatchQueue.main.async { fieldFocused = true } }
+            // Back from a detail opened in search, or Esc on the Ask screen, puts the caret back in the
+            // kept query.
+            if Self.isDetail(old) || old == .ask, new == .search {
+                fieldOpen = true
+                DispatchQueue.main.async { fieldFocused = true }
+            }
         }
         // Folding a group drops a highlight on one of its rows, so it doesn't come back on the next unfold.
         .onChange(of: closedExpanded) { _, expanded in if !expanded { dropHiddenListSelection() } }
@@ -214,7 +242,7 @@ struct PopoverView: View {
     private var tabsAndSearch: some View {
         VStack(spacing: 0) {
             HeaderView(
-                model: model, searching: searching, searchOpen: searchOpen, fieldFocused: $fieldFocused,
+                model: model, searching: searchShown, searchOpen: searchOpen, fieldFocused: $fieldFocused,
                 window: { [keyMonitor] in keyMonitor.window },
                 onCancelSearch: cancelSearch, onSwitchMode: switchMode(to:), onSaveSearch: openSaveRow)
             if searchOpen, saveName != nil {
@@ -236,7 +264,7 @@ struct PopoverView: View {
                 .background(MenuAnchorView(anchor: repoMenuAnchor))
                 TimelineView(.periodic(from: .now, by: 30)) { context in
                     VStack(spacing: 0) {
-                        if searching {
+                        if searchShown {
                             SearchResultsView(model: model, now: context.date)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                             footer { SearchFooter(model: model) }
@@ -295,9 +323,13 @@ struct PopoverView: View {
     private func popoverDidShow(_ window: NSWindow) {
         // Only the detail it was closed on goes stale: one a notification click opened while closed
         // shows as it is, even if it is the same PR or issue.
-        if let closedAt = closedOnDetail, !model.detailOpenedWhileClosed,
-           PopoverReopen.showsList(closedAt: closedAt, now: Date()) {
-            model.showListInsteadOfDetail()
+        if let closedAt = closedOnDetail, !model.detailOpenedWhileClosed {
+            // The Ask screen, and details opened from it, follow `AskReturn.reopen`.
+            if model.askOnScreen {
+                model.reopenAsk(closedAt: closedAt, now: Date())
+            } else if PopoverReopen.showsList(closedAt: closedAt, now: Date()) {
+                model.showListInsteadOfDetail()
+            }
         }
         shown = true
         closedOnDetail = nil
@@ -351,7 +383,7 @@ struct PopoverView: View {
         shown = false
         keyMonitor.remove()
         caretObserver.remove()
-        closedOnDetail = Self.isDetail(model.route) ? Date() : nil
+        closedOnDetail = Self.isDetail(model.route) || model.route == .ask ? Date() : nil
         syncLayers(animated: false)
         guard !searching else { return }
         fieldOpen = false
@@ -366,6 +398,10 @@ struct PopoverView: View {
     private static let pushAnimation = Animation.timingCurve(0.2, 0.9, 0.25, 1, duration: 0.22)
     private static let popAnimation = Animation.easeInOut(duration: 0.2)
     private static let fadeAnimation = Animation.easeInOut(duration: 0.15)
+    /// The Ask AI screen and the search it replaces fade through: the leaving one goes quickly, then the
+    /// arriving one comes in, so the two never show half on top of each other.
+    private static let fadeThroughOut = Animation.easeIn(duration: 0.1)
+    private static let fadeThroughIn = Animation.easeOut(duration: 0.22).delay(0.08)
 
     /// Slides in from, and back out to, the trailing edge; a crossfade with Reduce Motion. A layer on
     /// its way out takes no clicks.
@@ -379,7 +415,7 @@ struct PopoverView: View {
     /// fades); any other change, such as one detail replacing another, swaps at once. Nothing animates
     /// while the popover is closed, so reopening it never replays a slide.
     private func syncLayers(animated: Bool) {
-        let new = DetailLayer.stack(for: model.route, returning: model.detailReturnRoute)
+        let new = DetailLayer.stack(for: model)
         let old = layers
         guard new != old else { return }
         // A text view in a leaving detail would keep key focus for the slide, and with it "/" and
@@ -388,8 +424,12 @@ struct PopoverView: View {
             window.makeFirstResponder(nil)
         }
         var animation: Animation?
+        // The Ask screen fades in and out in place; details slide (or fade, with Reduce Motion).
+        let crossesAsk = old.contains(.ask) != new.contains(.ask)
         if animated, presence.isShown {
-            if new.count > old.count, new.starts(with: old) {
+            if crossesAsk, new.count != old.count {
+                animation = new.count > old.count ? Self.fadeThroughIn : Self.fadeThroughOut
+            } else if new.count > old.count, new.starts(with: old) {
                 animation = slides ? Self.pushAnimation : Self.fadeAnimation
             } else if new.count < old.count, old.starts(with: new) {
                 animation = slides ? Self.popAnimation : Self.fadeAnimation
@@ -403,7 +443,7 @@ struct PopoverView: View {
     private static func isDetail(_ route: Route) -> Bool {
         switch route {
         case .detail, .issueDetail: true
-        case .list, .search: false
+        case .list, .search, .ask: false
         }
     }
 
@@ -455,6 +495,7 @@ struct PopoverView: View {
             return true
         }
         if Self.isDetail(model.route) { return handleDetailKey(event, flags: flags, in: window) }
+        if model.route == .ask { return handleAskKey(event, flags: flags) }
         // The list's own keys work while no search is open and no text field has focus.
         let listKeys = !searchOpen && !(window.firstResponder is NSText)
             ? model.listKeys(closedExpanded: closedExpanded, doneExpanded: doneExpanded) : nil
@@ -465,6 +506,12 @@ struct PopoverView: View {
             if Self.isOptionCommandC(event, flags: flags) {
                 return searching ? model.copySearchSelectionMarkdownLink()
                     : listKeys.map(model.copyListSelectionMarkdownLink(in:)) ?? false
+            }
+            // ⌥⌘↩: Ask, whatever row is selected. Only from the open search field, never the save row.
+            if Self.isOptionCommandReturn(event, flags: flags) {
+                guard searchOpen, saveName == nil, model.settings.askEnabled else { return false }
+                model.ask()
+                return true
             }
             // Keypad Enter carries .numericPad and fn-Return .function; neither is a modifier here.
             guard flags.subtracting([.command, .shift, .capsLock, .numericPad, .function]).isEmpty else { return false }
@@ -592,7 +639,10 @@ struct PopoverView: View {
         }
         switch event.keyCode {
         case SearchKeyMonitor.escape:
-            if searchOpen {
+            if model.asking != nil {
+                // Esc while asking cancels the Ask; the results and the query stay.
+                model.cancelAsk()
+            } else if searchOpen {
                 cancelSearch()
             } else if model.repoFocus != nil {
                 model.focus(on: nil)
@@ -695,6 +745,46 @@ struct PopoverView: View {
         return true
     }
 
+    /// The Ask screen: ↑/↓ move the highlight, ↩ opens it in its mode, ⌘↩ opens it on GitHub, ⌘C copies
+    /// its link, ⌘⇧C its reference, ⌥⌘C its Markdown link, Esc goes back to the field with the question to
+    /// edit. Every other key passes through.
+    private func handleAskKey(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
+        let plain = flags.subtracting([.capsLock, .numericPad, .function])
+        if flags.contains(.command) {
+            if Self.isOptionCommandC(event, flags: flags) { return model.copyAskSelectionMarkdownLink() }
+            guard plain.subtracting([.command, .shift]).isEmpty else { return false }
+            if event.keyCode == SearchKeyMonitor.return || event.keyCode == SearchKeyMonitor.enter {
+                return !plain.contains(.shift) && model.openAskSelectionOnGitHub()
+            }
+            guard Self.commandKey(event) == "c" else { return false }
+            if plain.contains(.shift) { return model.copyAskSelectionReference() }
+            // Selected answer text copies as text; otherwise ⌘C copies the highlighted row's link.
+            let before = NSPasteboard.general.changeCount
+            NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil)
+            return NSPasteboard.general.changeCount != before || model.copyAskSelectionLink()
+        }
+        switch event.keyCode {
+        case SearchKeyMonitor.escape:
+            guard flags.isDisjoint(with: [.control, .option]) else { return false }
+            model.closeAsk()
+            return true
+        case SearchKeyMonitor.leftArrow:
+            guard plain.isEmpty else { return false }
+            model.closeAsk()
+            return true
+        case SearchKeyMonitor.upArrow, SearchKeyMonitor.downArrow:
+            guard plain.isEmpty else { return false }
+            model.moveAskSelection(by: event.keyCode == SearchKeyMonitor.downArrow ? 1 : -1)
+            return true
+        case SearchKeyMonitor.return, SearchKeyMonitor.enter:
+            guard plain.isEmpty else { return false }
+            model.openAskSelection()
+            return true
+        default:
+            return false
+        }
+    }
+
     /// The filter row's leading padding, so the menu lines up with the row's leading edge.
     private static let repoMenuInset: CGFloat = 14
 
@@ -707,6 +797,12 @@ struct PopoverView: View {
         // The anchor is flipped: its bottom edge is at y = height.
         let point = NSPoint(x: Self.repoMenuInset, y: view.bounds.height)
         RepoMenu.show(model: model, highlighting: repo, in: view, at: point)
+    }
+
+    /// ⌥⌘↩ (or keypad Enter) exactly: no ⇧ or ⌃.
+    private static func isOptionCommandReturn(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
+        flags.subtracting([.capsLock, .numericPad, .function]) == [.command, .option]
+            && (event.keyCode == SearchKeyMonitor.return || event.keyCode == SearchKeyMonitor.enter)
     }
 
     /// ⌥⌘C exactly: no ⇧ or ⌃.
@@ -1270,20 +1366,24 @@ private enum ListPane: Equatable {
     case pullRequests(PRTab), issues(IssueTab)
 }
 
-/// A detail view stacked over the list.
+/// A detail view, or the Ask screen, stacked over the list.
 private enum DetailLayer: Equatable {
-    case issue(PRKey), pr(PRKey)
+    case ask, issue(PRKey), pr(PRKey)
 
-    /// The layers a route shows, bottom to top: a linked PR's detail sits on the issue it was opened from.
-    static func stack(for route: Route, returning detailReturnRoute: Route) -> [DetailLayer] {
-        switch route {
+    /// The layers the model's route shows, bottom to top: a linked PR's detail sits on the issue it was
+    /// opened from, and details opened from Ask sit on the Ask screen.
+    @MainActor static func stack(for model: AppModel) -> [DetailLayer] {
+        let ask: [DetailLayer] = model.askReturn.isEmpty ? [] : [.ask]
+        switch model.route {
         case .list, .search:
             return []
+        case .ask:
+            return [.ask]
         case .issueDetail(let key):
-            return [.issue(key)]
+            return ask + [.issue(key)]
         case .detail(let key):
-            if case .issueDetail(let issue) = detailReturnRoute { return [.issue(issue), .pr(key)] }
-            return [.pr(key)]
+            if case .issueDetail(let issue) = model.detailReturnRoute { return ask + [.issue(issue), .pr(key)] }
+            return ask + [.pr(key)]
         }
     }
 }

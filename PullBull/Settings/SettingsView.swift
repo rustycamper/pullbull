@@ -4,7 +4,7 @@ import SwiftUI
 
 /// The tabs of the Settings window.
 enum SettingsTab: String {
-    case general, account, notifications, search
+    case general, account, notifications, search, ask
 }
 
 struct SettingsView: View {
@@ -40,6 +40,9 @@ struct SettingsView: View {
             SearchSettingsTab(model: model)
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(SettingsTab.search)
+            AskSettingsTab(model: model)
+                .tabItem { Label("Ask AI", systemImage: "text.magnifyingglass") }
+                .tag(SettingsTab.ask)
         }
         .frame(width: 520)
         .navigationTitle("PullBull Settings")
