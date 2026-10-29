@@ -1905,17 +1905,17 @@ extension AppModel {
         }
     }
 
-    /// The Board lanes among `groups` shown folded; none on other tabs or while a search is active.
+    /// The lanes among `groups` shown folded on `tab`; none while a search is active.
     func foldedLanes(_ groups: [IssueGroup], on tab: IssueTab) -> Set<IssueGroupKind> {
         settings.laneFolds.shownFolded(groups, tab: tab, board: settings.board, searching: route == .search)
     }
 
-    /// Folds or opens a Board lane of the tab on screen. A highlight in the lane moves to the next row
+    /// Folds or opens a lane of the Issues tab on screen. A highlight in the lane moves to the next row
     /// still shown, or clears.
-    func toggleLane(_ kind: IssueGroupKind, doneExpanded: Bool) {
+    func toggleLane(_ kind: IssueGroupKind, on tab: IssueTab, doneExpanded: Bool) {
         guard let board = settings.board else { return }
         let old = listKeys(closedExpanded: false, doneExpanded: doneExpanded)
-        settings.laneFolds.toggle(kind, on: board)
+        settings.laneFolds.toggle(kind, on: board, in: tab)
         let selection = ListNavigation.selection(
             listSelection, from: old, to: listKeys(closedExpanded: false, doneExpanded: doneExpanded))
         if selection != listSelection { listSelection = selection }

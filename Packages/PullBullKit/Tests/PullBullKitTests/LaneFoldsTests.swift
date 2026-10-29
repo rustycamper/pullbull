@@ -63,16 +63,47 @@ private let board = BoardRef.org("acme", 3)
         #expect(!folds.isFolded(.status(todo), on: .org("other", 3)))
     }
 
-    @Test func shownFoldedOnlyOnBoardTab() {
+    @Test func shownFoldedPerTab() {
         var folds = LaneFolds()
         folds.toggle(.status(todo), on: board)
+        folds.toggle(.status(doing), on: board, in: .assigned)
         let groups = [
             IssueGroup(kind: .status(todo), issues: [issue(1)], counted: true),
             IssueGroup(kind: .status(doing), issues: [issue(2)], counted: true),
         ]
         #expect(folds.shownFolded(groups, tab: .board, board: board, searching: false) == [.status(todo)])
-        #expect(folds.shownFolded(groups, tab: .assigned, board: board, searching: false).isEmpty)
+        #expect(folds.shownFolded(groups, tab: .assigned, board: board, searching: false) == [.status(doing)])
+        #expect(folds.shownFolded(groups, tab: .created, board: board, searching: false).isEmpty)
         #expect(folds.shownFolded(groups, tab: .board, board: nil, searching: false).isEmpty)
+    }
+
+    /// Folding a lane on Assigned leaves the same lane on Board open, and back.
+    @Test func tabsFoldSeparately() {
+        var folds = LaneFolds()
+        folds.toggle(.status(todo), on: board, in: .assigned)
+        #expect(folds.isFolded(.status(todo), on: board, in: .assigned))
+        #expect(!folds.isFolded(.status(todo), on: board, in: .board))
+        folds.toggle(.status(todo), on: board, in: .board)
+        folds.toggle(.status(todo), on: board, in: .assigned)
+        #expect(!folds.isFolded(.status(todo), on: board, in: .assigned))
+        #expect(folds.isFolded(.status(todo), on: board, in: .board))
+    }
+
+    /// Folds saved before Assigned folded are keyed by board alone; they stay Board's.
+    @Test func savedBoardFoldsStayOnBoard() throws {
+        let saved = #"{"org:acme#3":["opt-todo"]}"#
+        let folds = try JSONDecoder().decode(LaneFolds.self, from: Data(saved.utf8))
+        #expect(folds.isFolded(.status(todo), on: board, in: .board))
+        #expect(!folds.isFolded(.status(todo), on: board, in: .assigned))
+    }
+
+    /// Board keeps writing the bare board key; other tabs write theirs prefixed.
+    @Test func boardKeyStaysBare() throws {
+        var folds = LaneFolds()
+        folds.toggle(.status(todo), on: board)
+        folds.toggle(.status(doing), on: board, in: .assigned)
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(folds)) as? [String: [String]]
+        #expect(json == ["org:acme#3": ["opt-todo"], "assigned|org:acme#3": ["opt-doing"]])
     }
 
     /// A search shows every lane open and leaves the stored folds as they were.
@@ -97,6 +128,7 @@ private let board = BoardRef.org("acme", 3)
         var folds = LaneFolds()
         folds.toggle(.status(todo), on: board)
         folds.toggle(.noStatus, on: .user("me", 1))
+        folds.toggle(.status(doing), on: board, in: .assigned)
         let data = try JSONEncoder().encode(folds)
         #expect(try JSONDecoder().decode(LaneFolds.self, from: data) == folds)
     }

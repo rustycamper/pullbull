@@ -19,7 +19,7 @@ struct IssueListView: View {
     private var focus: RepoFocus? { model.repoFocus }
     private var listed: [IssueGroup] { contents.groups.filter { $0.kind != .done } }
     private var done: IssueGroup? { contents.groups.first { $0.kind == .done } }
-    /// Board lanes folded to their header; none while a search is active.
+    /// Board and Assigned lanes folded to their header; none while a search is active.
     private var foldedLanes: Set<IssueGroupKind> { model.foldedLanes(listed, on: tab) }
 
     var body: some View {
@@ -58,10 +58,10 @@ struct IssueListView: View {
                         Color.clear.frame(height: 6)
                     } else {
                         IssueGroupHeader(
-                            model: model, group: group, tinted: tab == .board,
+                            model: model, group: group,
                             fold: foldState(group, folded: folded)
                         ) {
-                            model.toggleLane(group.kind, doneExpanded: doneExpanded)
+                            model.toggleLane(group.kind, on: tab, doneExpanded: doneExpanded)
                         }
                     }
                     if !folded.contains(group.kind) {
@@ -80,9 +80,9 @@ struct IssueListView: View {
         .padding(.bottom, 6)
     }
 
-    /// Only Board lanes fold here (Status, No status, Not on board); nil for every other header.
+    /// Only lanes fold here (Status, No status, Not on board); nil for repo headers.
     private func foldState(_ group: IssueGroup, folded: Set<IssueGroupKind>) -> IssueGroupHeader.Fold? {
-        guard tab == .board, LaneFolds.laneID(group.kind) != nil else { return nil }
+        guard model.settings.board != nil, LaneFolds.laneID(group.kind) != nil else { return nil }
         return folded.contains(group.kind) ? .folded : .open
     }
 
@@ -150,9 +150,7 @@ private extension IssueGroup {
 private struct IssueGroupHeader: View {
     let model: AppModel
     let group: IssueGroup
-    /// Board lanes tint their glyph; Assigned's Status groups stay gray.
-    let tinted: Bool
-    /// A Board lane's fold; nil for headers that don't fold.
+    /// A lane's fold; nil for headers that don't fold.
     var fold: Fold? = nil
     var onToggle: () -> Void = {}
 
@@ -228,9 +226,9 @@ private struct IssueGroupHeader: View {
         .padding(.bottom, 4)
     }
 
-    /// Only Board lanes take the owner's Status colour; the colour is decorative, the title names the status.
+    /// Status lanes take the owner's Status colour; the colour is decorative, the title names the status.
     private var symbolColor: Color {
-        guard tinted, case .status(let option) = group.kind, let color = option.color else { return .secondary }
+        guard case .status(let option) = group.kind, let color = option.color else { return .secondary }
         return Palette.statusOptionColor(color)
     }
 
