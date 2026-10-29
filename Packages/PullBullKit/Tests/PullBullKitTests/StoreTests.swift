@@ -1044,3 +1044,11 @@ private func sample() -> Snapshot {
         #expect(s.org == "acme")
     }
 }
+
+@Test func askModelChoicesRoundTripAndDefaultEmpty() throws {
+    #expect(AppSettings().askModelChoices.isEmpty)
+    var settings = AppSettings()
+    settings.askModelChoices = [AskModel(id: "claude-sonnet-6", name: "Claude Sonnet 6")]
+    let decoded = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings))
+    #expect(decoded.askModelChoices == settings.askModelChoices)
+}

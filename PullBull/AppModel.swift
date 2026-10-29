@@ -2092,9 +2092,10 @@ extension AppModel {
         case .org(let org): org
         case .personal(let login, _): login
         }
+        let model = AskModel.named(settings.askModel, in: askModelChoices)
         let session = AskSession(
             index: runtime.index,
-            client: AskClient(apiKey: key, model: AskModel.named(settings.askModel)),
+            client: AskClient(apiKey: key, model: model),
             context: AskContext(scopeName: scopeName, isOrg: target.scope.org != nil, today: Date()),
             excluded: askExcludedRepos(), scope: target.scope)
         let focusedRepo = repoFocus?.repo
@@ -2109,6 +2110,7 @@ extension AppModel {
                 outcome = AskGeneration.isCancellation(error) ? nil : .failed(question: question, .server(0))
             }
             guard let self else { return }
+            if case .failed(_, .modelRetired) = outcome { self.retireAskModel(model.id) }
             if let outcome { self.landAsk(outcome, token: token) } else { self.askState.cancelled(token: token) }
         }
     }

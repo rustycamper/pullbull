@@ -124,6 +124,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var askEnabled = false
     /// The `AskModel` ID Ask uses; an unknown one reads as `AskModel.default`.
     public var askModel = AskModel.default.id
+    /// The models the last key check offered (newest Sonnet and Haiku); empty means `AskModel.all`.
+    public var askModelChoices: [AskModel] = []
     /// Repos (`owner/name`) Ask never indexes or sends.
     public var askExcludedRepos: [String] = []
 
@@ -131,7 +133,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case account, org, projectNumber, projectOwner, projectOrg, orgByAccount, grouping, compact,
             hideOlderThanTwoMonths, hideApprovedByMe, hideDrafts, badge, notify, refreshMinutes, lastTab, toggleHotkey, mode, lastIssueTab,
             countAssignedIssues, solidBackground, accountSource, appAccounts, signedOutByUser, laneFolds,
-            askEnabled, askModel, askExcludedRepos
+            askEnabled, askModel, askModelChoices, askExcludedRepos
     }
 
     public init() {}
@@ -186,6 +188,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         d.laneFolds = c.readable(LaneFolds.self, forKey: .laneFolds) ?? d.laneFolds
         d.askEnabled = c.readable(Bool.self, forKey: .askEnabled) ?? d.askEnabled
         d.askModel = c.readable(String.self, forKey: .askModel) ?? d.askModel
+        d.askModelChoices = c.readableElements(AskModel.self, forKey: .askModelChoices) ?? d.askModelChoices
         d.askExcludedRepos = c.readableElements(String.self, forKey: .askExcludedRepos) ?? d.askExcludedRepos
         self = d
     }
@@ -217,6 +220,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         try c.encode(laneFolds, forKey: .laneFolds)
         try c.encode(askEnabled, forKey: .askEnabled)
         try c.encode(askModel, forKey: .askModel)
+        try c.encode(askModelChoices, forKey: .askModelChoices)
         try c.encode(askExcludedRepos, forKey: .askExcludedRepos)
     }
 

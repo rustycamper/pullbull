@@ -356,7 +356,7 @@ private func toolResults(_ message: [String: Any]) -> [[String: Any]] {
         let ok = ScriptedTransport([.reply(200, #"{"data":[]}"#)])
         try await AskClient.checkKey("sk-ant-SECRET", transport: ok)
         let request = try #require(await ok.sent.first)
-        #expect(request.url.absoluteString == "https://api.anthropic.com/v1/models")
+        #expect(request.url.absoluteString == "https://api.anthropic.com/v1/models?limit=1000")
         #expect(request.method == "GET")
         #expect(request.header("x-api-key") == "sk-ant-SECRET")
         #expect(request.header("anthropic-version") == "2023-06-01")
@@ -364,6 +364,43 @@ private func toolResults(_ message: [String: Any]) -> [[String: Any]] {
 
         let bad = ScriptedTransport([.reply(401, #"{"type":"error"}"#)])
         await #expect(throws: AskError.unauthorized) { try await AskClient.checkKey("sk-ant-BAD", transport: bad) }
+    }
+
+    @Test func checkKeyReturnsTheListedModels() async throws {
+        let ok = ScriptedTransport([.reply(200, #"""
+            {"data":[{"id":"claude-sonnet-6","display_name":"Claude Sonnet 6","type":"model"},
+            {"id":"claude-opus-6","display_name":"Claude Opus 6"},{"id":""},{"display_name":"no id"}]}
+            """#)])
+        let listed = try await AskClient.checkKey("sk-ant-SECRET", transport: ok)
+        #expect(listed == [
+            AskModel(id: "claude-sonnet-6", name: "Claude Sonnet 6"),
+            AskModel(id: "claude-opus-6", name: "Claude Opus 6"),
+        ])
+        let garbled = ScriptedTransport([.reply(200, "not json")])
+        #expect(try await AskClient.checkKey("sk-ant-SECRET", transport: garbled) == [])
+    }
+
+    @Test func offeredPicksTheNewestOfEachFamily() {
+        let listed = [
+            AskModel(id: "claude-opus-6", name: "Claude Opus 6"),
+            AskModel(id: "claude-haiku-6", name: "Claude Haiku 6"),
+            AskModel(id: "claude-sonnet-6", name: "Claude Sonnet 6"),
+            AskModel(id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5"),
+            AskModel(id: "claude-haiku-5-5", name: "Claude Haiku 5.5"),
+        ]
+        #expect(AskModel.offered(from: listed).map(\.id) == ["claude-sonnet-6", "claude-haiku-6"])
+        #expect(AskModel.offered(from: [AskModel(id: "claude-opus-6", name: "Opus")]) == [])
+        #expect(AskModel.choices([]) == AskModel.all)
+        let haiku = AskModel(id: "claude-haiku-6", name: "Claude Haiku 6")
+        #expect(AskModel.named("claude-sonnet-5-5", in: [haiku]) == haiku)
+    }
+
+    @Test func unknownModelIsRetired() async throws {
+        let gone = ScriptedTransport([.reply(404, #"{"type":"error","error":{"type":"not_found_error"}}"#)])
+        await #expect(throws: AskError.modelRetired) { _ = try await ask(gone) }
+        // Any other status still reads as a server error.
+        let broken = ScriptedTransport([.reply(500, #"{"type":"error"}"#)])
+        await #expect(throws: AskError.server(500)) { _ = try await ask(broken) }
     }
 
     @Test func clientNeverRendersTheKey() {

@@ -73,6 +73,8 @@ struct PopoverView: View {
     }
     /// The Ask screen is on screen, or under the details opened from it.
     private var askLayerShown: Bool { layers.first == .ask }
+    /// The Ask screen is the top layer, with no detail over it.
+    private var askShownAlone: Bool { layers == [.ask] }
     private var slides: Bool { !reduceMotion }
     /// The Board tab is on screen and its filter row names the board.
     private var boardPartShown: Bool {
@@ -106,8 +108,9 @@ struct PopoverView: View {
         // at the same scroll position. A detail slides in from the trailing edge over it.
         ZStack {
             listAndSearch
-                // The Ask screen replaces the search in place, so the search fades under it.
+                // The Ask screen replaces the search in place: a fade-through, never both half visible.
                 .modifier(CoveredLayer(covered: !layers.isEmpty, slides: slides && layers.first != .ask))
+                .animation(askShownAlone ? Self.fadeThroughOut : Self.fadeThroughIn, value: askShownAlone)
                 .zIndex(0)
             if askLayerShown {
                 TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -117,8 +120,10 @@ struct PopoverView: View {
                         onBack: model.closeAsk)
                 }
                 .modifier(CoveredLayer(covered: layers.count > 1, slides: slides))
-                .transition(.asymmetric(insertion: .opacity, removal: .opacity.combined(with: .modifier(
-                    active: LeavingLayer(leaving: true), identity: LeavingLayer(leaving: false)))))
+                .transition(.asymmetric(
+                    insertion: .opacity.animation(Self.fadeThroughIn),
+                    removal: .opacity.animation(Self.fadeThroughOut).combined(with: .modifier(
+                        active: LeavingLayer(leaving: true), identity: LeavingLayer(leaving: false)))))
                 .zIndex(0.5)
             }
             if let issueLayerKey {
@@ -393,9 +398,10 @@ struct PopoverView: View {
     private static let pushAnimation = Animation.timingCurve(0.2, 0.9, 0.25, 1, duration: 0.22)
     private static let popAnimation = Animation.easeInOut(duration: 0.2)
     private static let fadeAnimation = Animation.easeInOut(duration: 0.15)
-    /// The Ask AI screen: a softer, slower fade in, a quicker one out.
-    private static let askFadeIn = Animation.easeOut(duration: 0.28)
-    private static let askFadeOut = Animation.easeIn(duration: 0.2)
+    /// The Ask AI screen and the search it replaces fade through: the leaving one goes quickly, then the
+    /// arriving one comes in, so the two never show half on top of each other.
+    private static let fadeThroughOut = Animation.easeIn(duration: 0.1)
+    private static let fadeThroughIn = Animation.easeOut(duration: 0.22).delay(0.08)
 
     /// Slides in from, and back out to, the trailing edge; a crossfade with Reduce Motion. A layer on
     /// its way out takes no clicks.
@@ -422,7 +428,7 @@ struct PopoverView: View {
         let crossesAsk = old.contains(.ask) != new.contains(.ask)
         if animated, presence.isShown {
             if crossesAsk, new.count != old.count {
-                animation = new.count > old.count ? Self.askFadeIn : Self.askFadeOut
+                animation = new.count > old.count ? Self.fadeThroughIn : Self.fadeThroughOut
             } else if new.count > old.count, new.starts(with: old) {
                 animation = slides ? Self.pushAnimation : Self.fadeAnimation
             } else if new.count < old.count, old.starts(with: new) {

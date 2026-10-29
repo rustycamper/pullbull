@@ -132,11 +132,11 @@ Settings → Ask AI.
 |---|---|
 | Ask on/off | Off |
 | Anthropic API key | Empty. Stored in the Keychain only |
-| Model | Sonnet 5.5. Haiku 5.5 is cheaper and less accurate |
+| Model | The newest Sonnet your key can use. The newest Haiku is cheaper and less accurate. The list updates when you save the key; a retired model switches to the next one |
 | Exclude from Ask AI | Empty. Pick from the repos of the current org or scope; excluded repos are never stored or sent |
 | Index | Shown while Ask is on: items indexed, backfill progress ("N of ~M") or last sync, **Rebuild** |
 
-- The key can be saved only while Ask is on. It is checked when you save it (`GET /v1/models`, free). A bad key never reaches a question
+- The key can be saved only while Ask is on. It is checked when you save it (`GET /v1/models`, free). A bad key never reaches a question. [Get a key](https://platform.claude.com/settings/keys)
 - Without a key, <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> says "Add an Anthropic API key in Settings → Ask AI" and sends nothing
 
 ### What is sent

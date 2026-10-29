@@ -9,6 +9,7 @@ extension AskError {
         case .refusal: "The model declined to answer."
         case .truncated: "Ask AI failed (answer cut off)."
         case .noAnswer: "Ask AI failed (no answer)."
+        case .modelRetired: "Anthropic retired this model. Ask AI switched to another; ask again, or pick one in Settings → Ask AI."
         case .server(let status): status > 0 ? "Ask AI failed (HTTP \(status))." : "Ask AI failed (unexpected error)."
         }
     }

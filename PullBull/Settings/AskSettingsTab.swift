@@ -9,6 +9,7 @@ struct AskSettingsTab: View {
     @State private var selectedRepo: String?
 
     private var isOn: Bool { model.settings.askEnabled }
+    private static let keysURL = URL(string: "https://platform.claude.com/settings/keys")!
 
     var body: some View {
         Form {
@@ -22,10 +23,13 @@ struct AskSettingsTab: View {
                 keyStatus
             } header: {
                 Text("Anthropic API key")
+            } footer: {
+                Link("Get a key in the Claude Console", destination: Self.keysURL)
+                    .font(.system(size: 11))
             }
             Section {
                 Picker("Model", selection: modelSelection) {
-                    ForEach(AskModel.all) { Text($0.name).tag($0.id) }
+                    ForEach(model.askModelChoices) { Text($0.name).tag($0.id) }
                 }
                 .disabled(!isOn)
             }
@@ -124,7 +128,7 @@ struct AskSettingsTab: View {
     /// An unknown saved ID shows as the model Ask actually uses.
     private var modelSelection: Binding<String> {
         Binding(
-            get: { AskModel.named(model.settings.askModel).id },
+            get: { AskModel.named(model.settings.askModel, in: model.askModelChoices).id },
             set: { model.settings.askModel = $0 })
     }
 

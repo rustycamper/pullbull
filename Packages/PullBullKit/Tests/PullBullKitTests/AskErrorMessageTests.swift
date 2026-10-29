@@ -8,6 +8,8 @@ import Testing
         #expect(AskError.rateLimited.message == "Rate limited by Anthropic. Try again shortly.")
         #expect(AskError.timeout.message == "No answer in 20 s.")
         #expect(AskError.refusal.message == "The model declined to answer.")
+        #expect(AskError.modelRetired.message
+            == "Anthropic retired this model. Ask AI switched to another; ask again, or pick one in Settings → Ask AI.")
         #expect(AskError.truncated.message == "Ask AI failed (answer cut off).")
         #expect(AskError.noAnswer.message == "Ask AI failed (no answer).")
     }

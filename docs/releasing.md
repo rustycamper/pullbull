@@ -25,11 +25,11 @@ Then [bump the Homebrew cask](#homebrew-cask).
 
 ## Ask model list
 
-Before each release, check `AskModel.all` (in `PullBullKit`) against [Anthropic's current model list](https://platform.claude.com/docs/en/models/overview):
+The app offers the newest Sonnet and Haiku that the user's key lists (`GET /v1/models` on key save), so a new or retired model needs no release. `AskModel.all` (in `PullBullKit`) is only the fallback before the first key check. Before each release, check it against [Anthropic's current model list](https://platform.claude.com/docs/en/models/overview):
 
 - Each ID still exists and is not deprecated
 - The default is still the intended Sonnet
-- Add or retire entries there only; nothing else holds model IDs
+- Nothing else holds model IDs
 
 ## Homebrew cask
 

@@ -45,6 +45,8 @@ public struct AskAnswer: Equatable, Sendable {
 
 public enum AskError: Error, Equatable, Sendable {
     case offline, unauthorized, rateLimited, timeout, refusal, truncated, noAnswer, server(Int)
+    /// The Messages API doesn't know the model any more (404).
+    case modelRetired
 }
 
 /// Asks Claude over the Messages API with two tools: `search_local` for more candidates (at most twice)
@@ -52,7 +54,7 @@ public enum AskError: Error, Equatable, Sendable {
 /// and never appears in any rendering of this value.
 public struct AskClient: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     static let messagesURL = URL(string: "https://api.anthropic.com/v1/messages")!
-    static let modelsURL = URL(string: "https://api.anthropic.com/v1/models")!
+    static let modelsURL = URL(string: "https://api.anthropic.com/v1/models?limit=1000")!
     static let apiVersion = "2023-06-01"
     static let firstCards = 20
     static let cardsPerSearch = 10
@@ -99,13 +101,22 @@ public struct AskClient: Sendable, CustomStringConvertible, CustomDebugStringCon
             cardsSent: outcome.cardsSent)
     }
 
-    /// `GET /v1/models`, which costs nothing: returns when the key works.
-    public static func checkKey(_ apiKey: String, transport: any HTTPTransport = URLSessionHTTPTransport()) async throws {
+    /// `GET /v1/models`, which costs nothing: returns the models the key can use (newest first, as the
+    /// API lists them) when the key works. An unreadable list is empty, not an error.
+    @discardableResult
+    public static func checkKey(
+        _ apiKey: String, transport: any HTTPTransport = URLSessionHTTPTransport()
+    ) async throws -> [AskModel] {
         var request = URLRequest(url: modelsURL)
         request.httpMethod = "GET"
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue(apiVersion, forHTTPHeaderField: "anthropic-version")
-        _ = try await perform(request, transport)
+        let (data, _) = try await perform(request, transport)
+        let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        return (root?["data"] as? [[String: Any]] ?? []).compactMap { entry in
+            guard let id = entry["id"] as? String, !id.isEmpty else { return nil }
+            return AskModel(id: id, name: entry["display_name"] as? String ?? id)
+        }
     }
 
     private struct Outcome: Sendable {
@@ -192,7 +203,12 @@ public struct AskClient: Sendable, CustomStringConvertible, CustomDebugStringCon
         request.setValue(Self.apiVersion, forHTTPHeaderField: "anthropic-version")
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, _) = try await Self.perform(request, transport)
+        let data: Data
+        do {
+            (data, _) = try await Self.perform(request, transport)
+        } catch AskError.server(404) {
+            throw AskError.modelRetired
+        }
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw AskError.noAnswer
         }

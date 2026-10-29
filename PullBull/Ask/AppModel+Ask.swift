@@ -242,8 +242,9 @@ extension AppModel {
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard settings.askEnabled, !key.isEmpty, askKeyState != .checking else { return }
         askKeyState = .checking
+        let listed: [AskModel]
         do {
-            try await AskClient.checkKey(key)
+            listed = try await AskClient.checkKey(key)
         } catch {
             askKeyState = .invalid(Self.askKeyCheckMessage(error))
             return
@@ -253,7 +254,23 @@ extension AppModel {
             askKeyState = .valid
         } catch {
             askKeyState = .invalid("Not saved: the Keychain refused the key.")
+            return
         }
+        // The newest Sonnet and Haiku the key can use; a choice that is gone moves to the best one.
+        let offered = AskModel.offered(from: listed)
+        guard !offered.isEmpty else { return }
+        settings.askModelChoices = offered
+        if !offered.contains(where: { $0.id == settings.askModel }) { settings.askModel = offered[0].id }
+    }
+
+    /// The models Settings → Ask AI offers.
+    var askModelChoices: [AskModel] { AskModel.choices(settings.askModelChoices) }
+
+    /// The Messages API no longer knows `id`: it leaves the choices and the next one takes over.
+    func retireAskModel(_ id: String) {
+        let remaining = askModelChoices.filter { $0.id != id }
+        settings.askModelChoices = remaining
+        settings.askModel = AskModel.named("", in: AskModel.choices(remaining)).id
     }
 
     func removeAskKey() {
