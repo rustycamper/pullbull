@@ -52,7 +52,9 @@ struct PopoverView: View {
     }
 
     private var searching: Bool { model.route == .search }
-    private var searchOpen: Bool { searching || fieldOpen }
+    /// The search results stay drawn under the Ask AI screen, so its fade never shows the list swapping in.
+    private var searchShown: Bool { searching || model.route == .ask || layers.first == .ask }
+    private var searchOpen: Bool { searchShown || fieldOpen }
     /// The "@user", "~label" or "is:" list is on screen (only with the search field open).
     private var completionShown: Bool { model.completion != nil && searchOpen }
     /// The panel under the empty field takes the arrows, Return and Esc.
@@ -78,13 +80,13 @@ struct PopoverView: View {
     }
     /// The row at the top of the list or search results; nil with nothing to filter.
     private var filterRow: FilterRow? {
-        let listsBuilt = switch (searching, model.mode) {
+        let listsBuilt = switch (searchShown, model.mode) {
         case (true, _): model.tabs != nil
         case (false, .pullRequests): model.contents(of: model.selectedTab) != nil
         case (false, .issues): model.issueTabs != nil
         }
         return FilterRow.make(
-            searching: searching, listsBuilt: listsBuilt,
+            searching: searchShown, listsBuilt: listsBuilt,
             focusName: model.repoFocus.map { model.displayName(of: $0.repo) },
             boardTitle: boardPartShown ? model.boardMenuTitle : nil)
     }
@@ -235,7 +237,7 @@ struct PopoverView: View {
     private var tabsAndSearch: some View {
         VStack(spacing: 0) {
             HeaderView(
-                model: model, searching: searching, searchOpen: searchOpen, fieldFocused: $fieldFocused,
+                model: model, searching: searchShown, searchOpen: searchOpen, fieldFocused: $fieldFocused,
                 window: { [keyMonitor] in keyMonitor.window },
                 onCancelSearch: cancelSearch, onSwitchMode: switchMode(to:), onSaveSearch: openSaveRow)
             if searchOpen, saveName != nil {
@@ -257,7 +259,7 @@ struct PopoverView: View {
                 .background(MenuAnchorView(anchor: repoMenuAnchor))
                 TimelineView(.periodic(from: .now, by: 30)) { context in
                     VStack(spacing: 0) {
-                        if searching {
+                        if searchShown {
                             SearchResultsView(model: model, now: context.date)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                             footer { SearchFooter(model: model) }
@@ -391,6 +393,9 @@ struct PopoverView: View {
     private static let pushAnimation = Animation.timingCurve(0.2, 0.9, 0.25, 1, duration: 0.22)
     private static let popAnimation = Animation.easeInOut(duration: 0.2)
     private static let fadeAnimation = Animation.easeInOut(duration: 0.15)
+    /// The Ask AI screen: a softer, slower fade in, a quicker one out.
+    private static let askFadeIn = Animation.easeOut(duration: 0.28)
+    private static let askFadeOut = Animation.easeIn(duration: 0.2)
 
     /// Slides in from, and back out to, the trailing edge; a crossfade with Reduce Motion. A layer on
     /// its way out takes no clicks.
@@ -417,7 +422,7 @@ struct PopoverView: View {
         let crossesAsk = old.contains(.ask) != new.contains(.ask)
         if animated, presence.isShown {
             if crossesAsk, new.count != old.count {
-                animation = Self.fadeAnimation
+                animation = new.count > old.count ? Self.askFadeIn : Self.askFadeOut
             } else if new.count > old.count, new.starts(with: old) {
                 animation = slides ? Self.pushAnimation : Self.fadeAnimation
             } else if new.count < old.count, old.starts(with: new) {
