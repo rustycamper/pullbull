@@ -101,7 +101,7 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 | Token | Matches |
 |---|---|
 | `@alice` `@me` | Author or reviewer. On issues: author or assignee |
-| `~bug` `~"good first issue"` | Label |
+| `~bug` `~"good first issue"` `label:bug` | Label |
 | `is:open` `is:closed` `is:merged` `is:draft` | State |
 | `status:prog` `status:"In progress"` | Status column on the board. Issues only |
 | `#123` | That number, every repo |
@@ -116,7 +116,7 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 - Matches in the other mode show a hint: <kbd>⌘</kbd><kbd>1</kbd> / <kbd>⌘</kbd><kbd>2</kbd>
 - Empty field shows saved searches and token hints. <kbd>↓</kbd> to walk them
 - Typing `@`, `~`, `label:`, `is:` or `status:` opens a completion list. `status:` lists the board's Status columns
-- Typing the start of `status:` or `label:` (`st`, `la`) shows the rest in grey; <kbd>Tab</kbd> writes it and opens its list. <kbd>Return</kbd> still searches the word
+- Typing the start of `status:` or `label:` (`st`, `la`) at the end of the field shows the rest in grey. Not `is:`, a common word; `status:` only when the board has Status columns
 - **Save:** bookmark icon in the field. Manage in Settings → Search
 
 | Completion list | |
@@ -124,6 +124,11 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 | <kbd>↑</kbd> <kbd>↓</kbd> | Choose |
 | <kbd>Return</kbd> · <kbd>Tab</kbd> | Complete |
 | <kbd>Esc</kbd> | Close |
+
+| Grey suggestion (`st` → `status:`) | |
+|---|---|
+| <kbd>Tab</kbd> | Write it and open its list |
+| <kbd>Return</kbd>, typing | Ignore it |
 
 ## Ask AI
 

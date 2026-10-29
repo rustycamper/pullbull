@@ -68,7 +68,7 @@ Keyboard-first · Native SwiftUI · Read-only
 | `#123` | That number, in every repo |
 | a GitHub link | Exactly that PR or issue |
 
-Combine `@`, `~`, `is:`, `status:` and words. Save the searches you repeat.
+Combine `@`, `~`, `is:`, `status:` and words. Type `st` or `la` and press <kbd>Tab</kbd> for `status:` or `label:`, with suggestions. Save the searches you repeat.
 
 Can't remember the words? [Ask AI](docs/manual.md#ask-ai) finds the item from a description. Off by default.
 
