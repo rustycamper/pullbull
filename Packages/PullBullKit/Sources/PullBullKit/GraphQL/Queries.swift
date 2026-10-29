@@ -14,7 +14,7 @@ enum Queries {
       commits(last:1){nodes{commit{oid committedDate statusCheckRollup{state contexts{\(rollupCounts)}}}}}
       latestReviews(first:20){nodes{author{login} state submittedAt commit{oid}}}
       reviewRequests(first:20){nodes{requestedReviewer{__typename ... on User{login} ... on Team{slug}}}}
-      labels(first:20){nodes{name}}
+      labels(first:20){nodes{name color}}
       mergedBy{login}
     }
     """

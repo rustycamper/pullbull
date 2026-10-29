@@ -131,6 +131,12 @@ struct PRDetailView: View {
                     BranchChip(name: pr.baseRef)
                 }
                 .padding(.top, 10)
+                if !pr.labels.isEmpty {
+                    DetailLabels(labels: pr.labels, color: pr.labelColor(at:))
+                        .padding(.top, 10)
+                        .accessibilityElement(children: .contain)
+                        .accessibilityLabel("Labels")
+                }
                 if pr.state == .open && pr.hasConflicts {
                     ConflictLine(baseRef: pr.baseRef)
                         .padding(.top, 8)

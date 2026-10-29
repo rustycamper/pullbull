@@ -32,6 +32,7 @@ public enum Decoding {
         let reviewNodes = (node["latestReviews"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
         let requestNodes = (node["reviewRequests"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
         let labelNodes = (node["labels"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
+        let labels = labelNodes.compactMap { label in (label["name"] as? String).map { ($0, label["color"] as? String) } }
 
         let stateRaw = try string(node, "state")
         guard let state = PRState(rawValue: stateRaw.lowercased()) else {
@@ -61,7 +62,7 @@ public enum Decoding {
             latestReviews: try reviewNodes.map(review),
             reviewRequests: requestNodes.compactMap(reviewer),
             headCommitOid: commit?["oid"] as? String,
-            labels: labelNodes.compactMap { $0["name"] as? String },
+            labels: labels.map(\.0), labelColors: labels.map(\.1),
             mergedBy: (node["mergedBy"] as? [String: Any])?["login"] as? String,
             mergeable: (node["mergeable"] as? String).flatMap(Mergeable.init(rawValue:))
         )

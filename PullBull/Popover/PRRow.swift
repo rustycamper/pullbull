@@ -87,10 +87,23 @@ struct PRRow: View {
     private var chips: RowChips { RowChips(row: row, tab: tab) }
 
     /// One line at a fixed height, so a row is as tall with a capsule as without one. Under pressure the
-    /// repo name gives way first, then the author and text info; the age and counts never truncate.
+    /// label chips drop off the end into "+N" first, then the repo name gives way, then the author and text
+    /// info; the age and counts never truncate.
     private var meta: some View {
         let chips = chips
-        return HStack(spacing: 5) {
+        let labels = LabelChipSet(pr, first: model.searchQuery.labels)
+        return ChipsThatFit(set: labels) { fitting in
+            metaLine(chips: chips, labels: labels, fitting: fitting)
+        }
+        .font(.system(size: 11))
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .frame(height: 16)
+    }
+
+    private func metaLine(chips: RowChips, labels: LabelChipSet, fitting: ChipFit) -> some View {
+        HStack(spacing: 5) {
             if pr.isDraft { DraftPill().fixedSize() }
             identifier
                 .layoutPriority(-1)
@@ -130,12 +143,8 @@ struct PRRow: View {
                 actionCapsule(action)
                     .padding(.leading, 4)
             }
+            LabelChips(set: labels, fit: fitting)
         }
-        .font(.system(size: 11))
-        .monospacedDigit()
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
-        .frame(height: 16)
     }
 
     /// The tier-1 capsule: the one thing on the row that asks for action.

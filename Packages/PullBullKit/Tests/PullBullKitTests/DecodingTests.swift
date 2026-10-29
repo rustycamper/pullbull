@@ -58,11 +58,16 @@ private func node(_ name: String) throws -> [String: Any] {
         {"number":5,"title":"t","url":"https://github.com/o/r/pull/5","isDraft":false,"state":"OPEN",\
         "createdAt":"2026-10-20T09:00:00Z","updatedAt":"2026-10-25T14:03:11Z","closedAt":null,\
         "headRefName":"a","baseRefName":"main","repository":{"nameWithOwner":"o/r"},"author":{"login":"al"},\
-        "labels":{"nodes":[{"name":"bug"},{"name":"good first issue"}]}}
+        "labels":{"nodes":[{"name":"bug","color":"d73a4a"},{"name":"good first issue"}]}}
         """
         let node = try #require(try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
-        #expect(try Decoding.pullRequest(from: node).labels == ["bug", "good first issue"])
-        #expect(Queries.prFields.contains("labels(first:20){nodes{name}}"))
+        let pr = try Decoding.pullRequest(from: node)
+        #expect(pr.labels == ["bug", "good first issue"])
+        #expect(pr.labelColors == ["d73a4a", nil])
+        #expect(pr.labelColor(at: 0) == "d73a4a")
+        #expect(pr.labelColor(at: 1) == nil)
+        #expect(pr.labelColor(at: 2) == nil)
+        #expect(Queries.prFields.contains("labels(first:20){nodes{name color}}"))
     }
 
     @Test func decodesWhoMergedAPR() throws {
@@ -87,9 +92,15 @@ private func node(_ name: String) throws -> [String: Any] {
             key: PRKey(repo: "o/r", number: 1), title: "t", url: URL(string: "https://x/1")!, author: "a",
             authorAvatarURL: nil, state: .open, isDraft: false, createdAt: .now, updatedAt: .now, closedAt: nil,
             headRef: "h", baseRef: "main", ci: .none, headCommitDate: nil, commentCount: 0, lastCommentAuthor: nil,
-            latestReviews: [], reviewRequests: [], labels: ["bug"])
+            latestReviews: [], reviewRequests: [], labels: ["bug"], labelColors: ["d73a4a"])
         var object = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(pr)) as? [String: Any])
         #expect(object["labels"] as? [String] == ["bug"])
+        let current = try JSONDecoder().decode(PullRequest.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(current.labelColor(at: 0) == "d73a4a")
+        object["labelColors"] = nil
+        let beforeColors = try JSONDecoder().decode(PullRequest.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(beforeColors.labels == ["bug"])
+        #expect(beforeColors.labelColor(at: 0) == nil)
         object["labels"] = nil
         let old = try JSONDecoder().decode(PullRequest.self, from: JSONSerialization.data(withJSONObject: object))
         #expect(old.labels == [])
