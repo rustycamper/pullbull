@@ -66,7 +66,7 @@ struct SearchResultsView: View {
 
     private var statuses: [BoardStatusFilter] { model.searchQuery.statuses }
 
-    private var viewer: String { model.snapshot?.org.viewer ?? "" }
+    private var viewer: String { model.snapshot?.org.viewer ?? model.settings.account ?? "" }
 
     /// The first `@` token's role on a row, as the muted suffix; nil without a token or a role.
     private func role(of pr: PullRequest) -> String? {
@@ -195,7 +195,8 @@ struct SearchResultsView: View {
             // Nothing to search yet because loading failed: say so instead of searching forever.
             failure(
                 model.message(for: error),
-                symbol: error == .offline ? "wifi.slash" : "exclamationmark.triangle", retry: { model.refresh() })
+                symbol: error == .offline ? "wifi.slash" : "exclamationmark.triangle", help: "Retry (⌘R)",
+                retry: { model.refresh() })
         } else if let fallback = model.searchFallback {
             fallbackLine(fallback)
         } else if let message = results?.failure(in: model.mode) {
@@ -259,10 +260,12 @@ struct SearchResultsView: View {
         return labels.first { !model.labels.contains($0) }.map(SearchQuery.labelToken)
     }
 
-    private func failure(_ message: String, symbol: String, retry: @escaping () -> Void) -> some View {
+    private func failure(
+        _ message: String, symbol: String, help: String? = nil, retry: @escaping () -> Void
+    ) -> some View {
         ListStateView(
             symbol: symbol, tone: .warning, title: message,
-            action: .init(title: "Retry", help: "Retry", perform: retry))
+            action: .init(title: "Retry", help: help, disabled: model.status.isRefreshing, perform: retry))
     }
 
     private func footerLine(_ text: String) -> some View {
@@ -620,6 +623,7 @@ private struct SearchIssueRow: View {
                         .multilineTextAlignment(.leading)
                         .foregroundStyle(issue.isOpen ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                         .fixedSize(horizontal: false, vertical: true)
+                        // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
                         .help(issue.title)
                     IssueMetaLine(issue: issue, now: now, role: role, wantedLabels: labels)
                         .padding(.top, 3)

@@ -85,10 +85,7 @@ public struct RowChips: Equatable, Sendable {
 
         switch tab {
         case .mine:
-            let action: Action? =
-                if ReviewRules.isReadyToMerge(pr) { .readyToMerge }
-                else if !changesRequestedBy.isEmpty { .changesRequested(by: changesRequestedBy) }
-                else { nil }
+            let action = Self.action(for: pr, readyToMerge: true, changesRequestedBy: changesRequestedBy)
             var info: [Info] = []
             if approvals > 0 { info.append(.approvals(approvals)) }
             if approvals == 0 && changesRequestedBy.isEmpty { info.append(.noReviews) }
@@ -127,10 +124,14 @@ public struct RowChips: Equatable, Sendable {
         }
         let changesRequestedBy = pr.latestReviews.filter { $0.state == .changesRequested }.map(\.author)
         let own = pr.author.caseInsensitiveCompare(viewer) == .orderedSame
-        let action: Action? =
-            if own && ReviewRules.isReadyToMerge(pr) { .readyToMerge }
-            else if !changesRequestedBy.isEmpty { .changesRequested(by: changesRequestedBy) }
-            else { nil }
+        let action = Self.action(for: pr, readyToMerge: own, changesRequestedBy: changesRequestedBy)
         self.init(action: action, info: pr.hasConflicts ? [.conflicts] : [])
+    }
+
+    /// The capsule for a PR's author: ready to merge (where `readyToMerge` allows it), else changes requested.
+    private static func action(for pr: PullRequest, readyToMerge: Bool, changesRequestedBy: [String]) -> Action? {
+        if readyToMerge && ReviewRules.isReadyToMerge(pr) { .readyToMerge }
+        else if !changesRequestedBy.isEmpty { .changesRequested(by: changesRequestedBy) }
+        else { nil }
     }
 }

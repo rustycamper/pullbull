@@ -53,7 +53,7 @@ struct ListStateView<Footer: View>: View {
                 .font(.system(size: 12))
             }
             if let action {
-                Button {
+                let button = Button {
                     action.perform()
                 } label: {
                     if let symbol = action.symbol {
@@ -64,8 +64,11 @@ struct ListStateView<Footer: View>: View {
                 }
                 .buttonStyle(IssueStateButtonStyle())
                 .disabled(action.disabled)
-                .help(action.help ?? "")
-                .padding(.top, 4)
+                if let help = action.help {
+                    button.help(help).padding(.top, 4)
+                } else {
+                    button.padding(.top, 4)
+                }
             }
             footer()
         }

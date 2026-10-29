@@ -26,7 +26,8 @@ public enum EndedAge {
         return "\(word) \(closedAt.formatted(style))"
     }
 
-    /// The app's relative ages ("just now", "12m ago", "3d ago") for the span a week allows.
+    /// The app's relative ages ("just now", "12m ago", "3d ago") for the span a week allows. The formats must
+    /// match `RelativeAge` in PullBull/Style/Palette.swift, which the app target owns.
     private static func relative(_ seconds: TimeInterval) -> String {
         switch seconds {
         case ..<60: return "just now"
