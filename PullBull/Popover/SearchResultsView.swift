@@ -332,7 +332,9 @@ struct SearchResultsView: View {
                 ) {
                     if PRActions.commandClicked { model.openSearchResultOnGitHub(pr) } else { model.openSearchResult(pr) }
                 }
-                .prContextMenu(pr)
+                .prContextMenu(
+                    pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
+                    person: .person(model: model, login: pr.author))
                 .id(pr.key)
             }
         }
@@ -348,7 +350,9 @@ struct SearchResultsView: View {
                 ) {
                     if PRActions.commandClicked { model.openSearchResultOnGitHub(issue) } else { model.openSearchResult(issue) }
                 }
-                .issueContextMenu(issue)
+                .issueContextMenu(
+                    issue, focus: FocusMenuItem(model: model, repo: issue.key.repo),
+                    person: .person(model: model, login: issue.author))
                 .id(issue.key)
             }
         }
@@ -516,7 +520,7 @@ private struct SearchPRRow: View {
 
     var body: some View {
         let open = pr.state == .open
-        SearchRowButton(selected: selected, flashing: flashing, help: pr.title, action: action) {
+        SearchRowButton(selected: selected, flashing: flashing, action: action) {
             HStack(alignment: .top, spacing: 10) {
                 glyph
                     .font(.system(size: 13))
@@ -529,6 +533,8 @@ private struct SearchPRRow: View {
                         .multilineTextAlignment(.leading)
                         .foregroundStyle(open && !pr.isDraft ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                         .fixedSize(horizontal: false, vertical: true)
+                        // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
+                        .help(pr.title)
                     meta
                         .padding(.top, 3)
                 }
@@ -629,7 +635,7 @@ private struct SearchIssueRow: View {
 
     var body: some View {
         let glyph = Palette.issueGlyph(issue.glyph)
-        SearchRowButton(selected: selected, flashing: flashing, help: issue.title, action: action) {
+        SearchRowButton(selected: selected, flashing: flashing, action: action) {
             HStack(alignment: .top, spacing: 10) {
                 Image(symbol: glyph.symbol)
                     .font(.system(size: 13))
@@ -644,6 +650,7 @@ private struct SearchIssueRow: View {
                         .multilineTextAlignment(.leading)
                         .foregroundStyle(issue.isOpen ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                         .fixedSize(horizontal: false, vertical: true)
+                        .help(issue.title)
                     IssueMetaLine(issue: issue, now: now, role: role, wantedLabels: labels)
                         .padding(.top, 3)
                 }
@@ -660,7 +667,6 @@ private struct SearchIssueRow: View {
 private struct SearchRowButton<Label: View>: View {
     let selected: Bool
     let flashing: Bool
-    let help: String
     let action: () -> Void
     @ViewBuilder let label: () -> Label
     @State private var hovering = false
@@ -676,7 +682,6 @@ private struct SearchRowButton<Label: View>: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help(help)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 }

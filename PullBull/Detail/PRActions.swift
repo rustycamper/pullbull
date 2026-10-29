@@ -86,7 +86,7 @@ extension FocusMenuItem {
 }
 
 extension View {
-    /// Right-click: the repo focus and person search items (list rows only), Copy Branch Name, Copy Link,
+    /// Right-click: the repo focus and person search items (list and search rows), Copy Branch Name, Copy Link,
     /// Copy as Markdown Link, Open on GitHub. VoiceOver gets Copy as Markdown Link as an action too.
     func prContextMenu(_ pr: PullRequest, focus: FocusMenuItem? = nil, person: FocusMenuItem? = nil) -> some View {
         contextMenu {
@@ -104,7 +104,7 @@ extension View {
         .accessibilityAction(named: "Copy as Markdown Link") { PRActions.copyMarkdownLink(pr) }
     }
 
-    /// Right-click on an issue: the repo focus and person search items (list rows only), Copy Link,
+    /// Right-click on an issue: the repo focus and person search items (list and search rows), Copy Link,
     /// Copy as Markdown Link, Open on GitHub. VoiceOver gets Copy as Markdown Link as an action too.
     func issueContextMenu(_ issue: BoardIssue, focus: FocusMenuItem? = nil, person: FocusMenuItem? = nil) -> some View {
         contextMenu {

@@ -122,6 +122,7 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 - With `status:`, PRs and issues not on the board don't match
 - `#123` and links work only on their own
 - Results span all tabs; click a tab to narrow
+- **Right-click a result:** copy link · open on GitHub · show only this repo · search author. Search author replaces the query; show only this repo keeps it and searches that repo
 - PR results show changes requested, conflicts and comments, and **Ready to merge** on yours. A failing check is gray on others' PRs, as on Team
 - Matches in the other mode show a hint: <kbd>⌘</kbd><kbd>1</kbd> / <kbd>⌘</kbd><kbd>2</kbd>
 - Empty field shows saved searches and token hints. <kbd>↓</kbd> to walk them
