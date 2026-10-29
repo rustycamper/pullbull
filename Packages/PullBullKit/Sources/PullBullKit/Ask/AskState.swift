@@ -27,6 +27,9 @@ public struct AskState: Equatable, Sendable {
 
     public init() {}
 
+    /// ⌥⌘↩ again while the same question is still in flight: nothing new is sent.
+    public func isAsking(_ question: String) -> Bool { asking == question }
+
     /// Starts asking `question`; only the returned token's reply can land.
     public mutating func begin(_ question: String) -> Int {
         asking = question

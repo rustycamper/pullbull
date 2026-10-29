@@ -104,7 +104,8 @@ struct PopoverView: View {
         // at the same scroll position. A detail slides in from the trailing edge over it.
         ZStack {
             listAndSearch
-                .modifier(CoveredLayer(covered: !layers.isEmpty, slides: slides))
+                // The Ask screen replaces the search in place, so the search fades under it.
+                .modifier(CoveredLayer(covered: !layers.isEmpty, slides: slides && layers.first != .ask))
                 .zIndex(0)
             if askLayerShown {
                 TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -113,9 +114,9 @@ struct PopoverView: View {
                         selection: model.askSelection, now: context.date, onOpen: model.openAskResult,
                         onBack: model.closeAsk)
                 }
-                .modifier(PushedLayer(slides: slides))
                 .modifier(CoveredLayer(covered: layers.count > 1, slides: slides))
-                .transition(layerTransition)
+                .transition(.asymmetric(insertion: .opacity, removal: .opacity.combined(with: .modifier(
+                    active: LeavingLayer(leaving: true), identity: LeavingLayer(leaving: false)))))
                 .zIndex(0.5)
             }
             if let issueLayerKey {
@@ -412,10 +413,12 @@ struct PopoverView: View {
             window.makeFirstResponder(nil)
         }
         var animation: Animation?
-        // Reduce Motion: the Ask screen comes and goes without any animation.
+        // The Ask screen fades in and out in place; details slide (or fade, with Reduce Motion).
         let crossesAsk = old.contains(.ask) != new.contains(.ask)
-        if animated, presence.isShown, slides || !crossesAsk {
-            if new.count > old.count, new.starts(with: old) {
+        if animated, presence.isShown {
+            if crossesAsk, new.count != old.count {
+                animation = Self.fadeAnimation
+            } else if new.count > old.count, new.starts(with: old) {
                 animation = slides ? Self.pushAnimation : Self.fadeAnimation
             } else if new.count < old.count, old.starts(with: new) {
                 animation = slides ? Self.popAnimation : Self.fadeAnimation

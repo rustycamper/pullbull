@@ -32,13 +32,10 @@ struct AskView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Button(action: onBack) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Back to search")
+            Image(systemName: "text.magnifyingglass")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             Text(verbatim: question)
                 .font(.system(size: 13, weight: .semibold))
                 .lineLimit(1)
@@ -50,6 +47,15 @@ struct AskView: View {
                 .padding(.horizontal, 4)
                 .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Palette.separator, lineWidth: 0.5))
                 .accessibilityHidden(true)
+            // Closes in place, like a search field's clear button: the Ask screen fades back to the search.
+            Button(action: onBack) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Close Ask AI (Esc)")
+            .accessibilityLabel("Close Ask AI")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)

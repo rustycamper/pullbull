@@ -2075,7 +2075,7 @@ extension AppModel {
     /// reaches Anthropic's Messages API, and only from an explicit ⌥⌘↩. Without a key or an open index
     /// nothing is sent and a notice says why. A later Ask or an edit drops this one's reply.
     private func startAsk(_ question: String) {
-        guard settings.askEnabled, !question.isEmpty else { return }
+        guard settings.askEnabled, !question.isEmpty, !askState.isAsking(question) else { return }
         askTask?.cancel()
         askTask = nil
         guard let key = (try? AnthropicKeyStore().load()) ?? nil else {

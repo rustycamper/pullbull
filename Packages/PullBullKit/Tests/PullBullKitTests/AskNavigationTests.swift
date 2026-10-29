@@ -198,3 +198,14 @@ private func answered(_ question: String) -> AskOutcome {
     #expect(state.asking == nil)
     #expect(state.land(answered("q"), token: token) == .ignored)
 }
+
+@Test func askAgainWhileTheSameQuestionRunsSendsNothing() {
+    var state = AskState()
+    #expect(!state.isAsking("q"))
+    let token = state.begin("q")
+    #expect(state.isAsking("q"))
+    // An edited question still replaces the one in flight.
+    #expect(!state.isAsking("q2"))
+    _ = state.land(.failed(question: "q", .timeout), token: token)
+    #expect(!state.isAsking("q"))
+}
