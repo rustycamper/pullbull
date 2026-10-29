@@ -1,14 +1,14 @@
 import Foundation
 
-/// The Board tab's folded lanes, kept per board and by Status option id, so a renamed lane keeps its
-/// state. Every lane starts open; Done keeps its own fold and is never a lane here.
+/// The folded lanes of the Board and Assigned tabs, kept per tab, per board and by Status option id, so
+/// a renamed lane keeps its state. Every lane starts open; Done keeps its own fold and is never a lane here.
 public struct LaneFolds: Codable, Equatable, Sendable {
-    /// Lane ids (`laneID`) folded on each board (`boardKey`).
+    /// Lane ids (`laneID`) folded on each tab of each board (`key`).
     private var folded: [String: Set<String>] = [:]
 
     public init() {}
 
-    /// The lane a group is on the Board tab: its Status option id, or a fixed id for "No status" and
+    /// The lane a group is on: its Status option id, or a fixed id for "No status" and
     /// "Not on board". Nil for groups that don't fold this way (repos, the ungrouped list, Done).
     public static func laneID(_ kind: IssueGroupKind) -> String? {
         switch kind {
@@ -24,27 +24,33 @@ public struct LaneFolds: Codable, Equatable, Sendable {
         "\(board.owner.isUser ? "user" : "org"):\(board.owner.login.lowercased())#\(board.number)"
     }
 
-    public func isFolded(_ kind: IssueGroupKind, on board: BoardRef) -> Bool {
+    /// A tab's key on a board: Board lanes use the bare board key, as saved before Assigned folded, and
+    /// other tabs prefix their name.
+    static func key(_ board: BoardRef, tab: IssueTab) -> String {
+        tab == .board ? boardKey(board) : "\(tab.rawValue)|\(boardKey(board))"
+    }
+
+    public func isFolded(_ kind: IssueGroupKind, on board: BoardRef, in tab: IssueTab = .board) -> Bool {
         guard let lane = Self.laneID(kind) else { return false }
-        return folded[Self.boardKey(board)]?.contains(lane) ?? false
+        return folded[Self.key(board, tab: tab)]?.contains(lane) ?? false
     }
 
     /// Folds an open lane and opens a folded one; groups that are not lanes are left alone.
-    public mutating func toggle(_ kind: IssueGroupKind, on board: BoardRef) {
+    public mutating func toggle(_ kind: IssueGroupKind, on board: BoardRef, in tab: IssueTab = .board) {
         guard let lane = Self.laneID(kind) else { return }
-        let key = Self.boardKey(board)
+        let key = Self.key(board, tab: tab)
         var lanes = folded[key] ?? []
         if lanes.remove(lane) == nil { lanes.insert(lane) }
         folded[key] = lanes.isEmpty ? nil : lanes
     }
 
-    /// The groups shown folded: none off the Board tab, without a board, or while a search is active
-    /// (results never hide inside a fold; the stored state is kept for when the search ends).
+    /// The groups shown folded: none without a board or while a search is active (results never hide
+    /// inside a fold; the stored state is kept for when the search ends). Created's repo groups never fold.
     public func shownFolded(
         _ groups: [IssueGroup], tab: IssueTab, board: BoardRef?, searching: Bool
     ) -> Set<IssueGroupKind> {
-        guard tab == .board, let board, !searching else { return [] }
-        return Set(groups.map(\.kind).filter { isFolded($0, on: board) })
+        guard let board, !searching else { return [] }
+        return Set(groups.map(\.kind).filter { isFolded($0, on: board, in: tab) })
     }
 
     public init(from decoder: Decoder) throws {
