@@ -87,12 +87,19 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
     public let headCommitOid: String?
     /// Label names; empty in snapshots cached before they were stored.
     public let labels: [String]
+    /// GitHub's 6-hex colour for each of `labels`, by position; nil where it's missing, and empty in
+    /// snapshots cached before it was stored. Read it through `labelColor(at:)`.
+    public let labelColors: [String?]
     /// Who merged it; nil while unmerged, for a deleted account, and in snapshots cached before it was stored.
     public let mergedBy: String?
     /// Nil when GitHub sent none or a value this build doesn't know, and in snapshots cached before it was stored.
     public let mergeable: Mergeable?
 
     public var glyph: PRGlyph { PRGlyph(state: state, isDraft: isDraft) }
+    /// The colour of the label at `index`, nil when GitHub gave none or the cache predates it.
+    public func labelColor(at index: Int) -> String? {
+        labelColors.indices.contains(index) ? labelColors[index] : nil
+    }
     /// Only a definite CONFLICTING counts; UNKNOWN and a missing value don't.
     public var hasConflicts: Bool { mergeable == .conflicting }
 
@@ -102,7 +109,7 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         headRef: String, baseRef: String, ci: CIState, headCommitDate: Date?,
         commentCount: Int, lastCommentAuthor: String?,
         latestReviews: [Review], reviewRequests: [Reviewer], headCommitOid: String? = nil, labels: [String] = [],
-        mergedBy: String? = nil, mergeable: Mergeable? = nil
+        labelColors: [String?] = [], mergedBy: String? = nil, mergeable: Mergeable? = nil
     ) {
         self.key = key
         self.title = title
@@ -124,6 +131,7 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         self.reviewRequests = reviewRequests
         self.headCommitOid = headCommitOid
         self.labels = labels
+        self.labelColors = labelColors
         self.mergedBy = mergedBy
         self.mergeable = mergeable
     }
@@ -151,6 +159,7 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         reviewRequests = try c.decode([Reviewer].self, forKey: .reviewRequests)
         headCommitOid = try c.decodeIfPresent(String.self, forKey: .headCommitOid)
         labels = try c.decodeIfPresent([String].self, forKey: .labels) ?? []
+        labelColors = try c.decodeIfPresent([String?].self, forKey: .labelColors) ?? []
         mergedBy = try c.decodeIfPresent(String.self, forKey: .mergedBy)
         mergeable = try c.decodeIfPresent(String.self, forKey: .mergeable).flatMap(Mergeable.init(rawValue:))
     }

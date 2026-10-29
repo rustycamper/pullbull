@@ -435,6 +435,15 @@ private func isRepo(_ group: IssueGroup) -> Bool {
         #expect(IssueRowRules.chips([]) == ([], 0))
     }
 
+    @Test func searchedLabelsLeadTheChips() {
+        let labels = ["bug", "backend", "Chore", "perf"]
+        #expect(IssueRowRules.chipOrder(labels, first: []) == [0, 1, 2, 3])
+        #expect(IssueRowRules.chipOrder(labels, first: ["chore"]) == [2, 0, 1, 3])
+        #expect(IssueRowRules.chipOrder(labels, first: ["perf", "BUG"]) == [0, 3, 1, 2])
+        #expect(IssueRowRules.chipOrder(labels, first: ["missing"]) == [0, 1, 2, 3])
+        #expect(IssueRowRules.chipOrder([], first: ["bug"]) == [])
+    }
+
     @Test func assignedHidesMeOthersKeepMe() {
         let me = Assignee(login: "Devon", avatarURL: nil)
         let other = Assignee(login: "dev-a", avatarURL: nil)

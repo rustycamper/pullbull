@@ -32,6 +32,7 @@ public enum Decoding {
         let reviewNodes = (node["latestReviews"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
         let requestNodes = (node["reviewRequests"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
         let labelNodes = (node["labels"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
+        let labels = labels(labelNodes)
 
         let stateRaw = try string(node, "state")
         guard let state = PRState(rawValue: stateRaw.lowercased()) else {
@@ -61,7 +62,7 @@ public enum Decoding {
             latestReviews: try reviewNodes.map(review),
             reviewRequests: requestNodes.compactMap(reviewer),
             headCommitOid: commit?["oid"] as? String,
-            labels: labelNodes.compactMap { $0["name"] as? String },
+            labels: labels.map(\.name), labelColors: labels.map(\.color),
             mergedBy: (node["mergedBy"] as? [String: Any])?["login"] as? String,
             mergeable: (node["mergeable"] as? String).flatMap(Mergeable.init(rawValue:))
         )
@@ -80,7 +81,7 @@ public enum Decoding {
               let repo = (node["repository"] as? [String: Any])?["nameWithOwner"] as? String
         else { return nil }
         let labelNodes = (node["labels"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
-        let labels = labelNodes.compactMap { label in (label["name"] as? String).map { ($0, label["color"] as? String) } }
+        let labels = labels(labelNodes)
         let assigneeNodes = (node["assignees"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
         return BoardIssue(
             key: PRKey(repo: repo, number: number), title: title, url: url,
@@ -91,7 +92,7 @@ public enum Decoding {
             updatedAt: lenientDate(node["updatedAt"]),
             closedAt: lenientDate(node["closedAt"]),
             commentCount: (node["comments"] as? [String: Any])?["totalCount"] as? Int ?? 0,
-            labels: labels.map(\.0), labelColors: labels.map(\.1),
+            labels: labels.map(\.name), labelColors: labels.map(\.color),
             assignees: assigneeNodes.compactMap { node in
                 guard let login = node["login"] as? String else { return nil }
                 return Assignee(login: login, avatarURL: (node["avatarUrl"] as? String).flatMap(URL.init(string:)))
@@ -100,6 +101,11 @@ public enum Decoding {
             boardItemId: boardItemId,
             myAssignment: viewer.flatMap { assignment(node, viewer: $0) }
         )
+    }
+
+    /// Each label node's name with its colour, in GitHub's order; a node without a name is left out.
+    private static func labels(_ nodes: [[String: Any]]) -> [(name: String, color: String?)] {
+        nodes.compactMap { label in (label["name"] as? String).map { ($0, label["color"] as? String) } }
     }
 
     /// An Ask search node (`Queries.askSearch`); nil without `__typename`, number, title, repo or a

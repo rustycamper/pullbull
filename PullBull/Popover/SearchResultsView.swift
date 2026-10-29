@@ -327,7 +327,7 @@ struct SearchResultsView: View {
             SearchGroupHeader(title: title, count: prs.count)
             ForEach(prs) { pr in
                 SearchPRRow(
-                    pr: pr, words: words, role: role(of: pr), now: now, selected: model.searchSelection == pr.key,
+                    pr: pr, words: words, labels: labels, role: role(of: pr), now: now, selected: model.searchSelection == pr.key,
                     flashing: model.rowFlash.key == pr.key
                 ) {
                     if PRActions.commandClicked { model.openSearchResultOnGitHub(pr) } else { model.openSearchResult(pr) }
@@ -343,7 +343,7 @@ struct SearchResultsView: View {
             SearchGroupHeader(title: title, count: issues.count)
             ForEach(issues) { issue in
                 SearchIssueRow(
-                    issue: issue, words: words, role: role(of: issue), now: now,
+                    issue: issue, words: words, labels: labels, role: role(of: issue), now: now,
                     selected: model.searchSelection == issue.key, flashing: model.rowFlash.key == issue.key
                 ) {
                     if PRActions.commandClicked { model.openSearchResultOnGitHub(issue) } else { model.openSearchResult(issue) }
@@ -503,6 +503,8 @@ private struct FailureBanner: View {
 private struct SearchPRRow: View {
     let pr: PullRequest
     let words: [String]
+    /// The labels a `~label` search asks for, whose chips lead.
+    let labels: [String]
     let role: String?
     let now: Date
     let selected: Bool
@@ -559,7 +561,19 @@ private struct SearchPRRow: View {
         }
     }
 
+    /// Label chips that don't fit drop off the end into "+N".
     private var meta: some View {
+        let chips = LabelChipSet(pr, first: labels)
+        return ChipsThatFit(set: chips) { fitting in
+            metaLine(chips: chips, fitting: fitting)
+        }
+        .font(.system(size: 11))
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+    }
+
+    private func metaLine(chips: LabelChipSet, fitting: ChipFit) -> some View {
         HStack(spacing: 5) {
             Text("\(Highlight.repoName(pr.key.repo)) #\(String(pr.key.number))")
                 .fontWeight(.semibold)
@@ -572,11 +586,8 @@ private struct SearchPRRow: View {
                 Text("·").accessibilityHidden(true)
                 Text(role)
             }
+            LabelChips(set: chips, fit: fitting)
         }
-        .font(.system(size: 11))
-        .monospacedDigit()
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
     }
 
     private var when: String {
@@ -595,6 +606,8 @@ private struct SearchPRRow: View {
 private struct SearchIssueRow: View {
     let issue: BoardIssue
     let words: [String]
+    /// The labels a `~label` search asks for, whose chips lead.
+    let labels: [String]
     let role: String?
     let now: Date
     let selected: Bool
@@ -618,7 +631,7 @@ private struct SearchIssueRow: View {
                         .multilineTextAlignment(.leading)
                         .foregroundStyle(issue.isOpen ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                         .fixedSize(horizontal: false, vertical: true)
-                    IssueMetaLine(issue: issue, now: now, role: role)
+                    IssueMetaLine(issue: issue, now: now, role: role, wantedLabels: labels)
                         .padding(.top, 3)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

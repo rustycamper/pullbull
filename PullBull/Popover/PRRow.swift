@@ -12,6 +12,8 @@ struct PRRow: View {
     let now: Date
     /// The keyboard highlight (↑/↓).
     var selected = false
+    /// The labels a `~label` search asks for, passed in so a row doesn't follow every keystroke.
+    var wantedLabels: [String] = []
     @State private var hovering = false
 
     private var pr: PullRequest { row.pr }
@@ -32,7 +34,6 @@ struct PRRow: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .accessibilityAddTraits(selected ? [.isSelected] : [])
-        .help(pr.title)
         .prContextMenu(
             pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
             person: .person(model: model, login: pr.author))
@@ -52,6 +53,8 @@ struct PRRow: View {
                     .multilineTextAlignment(.leading)
                     .foregroundStyle(titleStyle)
                     .fixedSize(horizontal: false, vertical: true)
+                    // On the title alone: a row-wide tip would cover the avatar's, chips' and glyphs' own.
+                    .help(pr.title)
                 meta
                     .padding(.top, 3)
             }
@@ -74,6 +77,7 @@ struct PRRow: View {
         } else {
             AvatarView(login: pr.author, url: pr.authorAvatarURL, size: 20)
                 .opacity(row.dimmed ? 0.45 : 1)
+                .help(pr.author)
         }
     }
 
@@ -87,20 +91,37 @@ struct PRRow: View {
     private var chips: RowChips { RowChips(row: row, tab: tab) }
 
     /// One line at a fixed height, so a row is as tall with a capsule as without one. Under pressure the
-    /// repo name gives way first, then the author and text info; the age and counts never truncate.
+    /// label chips drop off the end into "+N" first, then the author goes (its avatar names it on hover),
+    /// then the first chip shortens, then the repo name gives way, then the text info; the age and counts
+    /// never truncate.
     private var meta: some View {
         let chips = chips
-        return HStack(spacing: 5) {
+        let labels = LabelChipSet(pr, first: wantedLabels)
+        return ChipsThatFit(set: labels, canLean: tab != .mine) { fitting in
+            metaLine(chips: chips, labels: labels, fitting: fitting)
+        }
+        .font(.system(size: 11))
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .frame(height: 16)
+    }
+
+    private func metaLine(chips: RowChips, labels: LabelChipSet, fitting: ChipFit) -> some View {
+        HStack(spacing: 5) {
             if pr.isDraft { DraftPill().fixedSize() }
             identifier
                 .layoutPriority(-1)
             Text("·").foregroundStyle(.tertiary).accessibilityHidden(true)
-            if tab != .mine {
+            if tab != .mine && !fitting.lean {
                 Text(pr.author)
                 Text("·").foregroundStyle(.tertiary).accessibilityHidden(true)
             }
-            Text(RelativeAge.short(from: pr.updatedAt, to: now))
+            let age = RelativeAge.short(from: pr.updatedAt, to: now)
+            Text(age)
                 .fixedSize()
+                // The avatar, which names a left-out author on hover, is hidden from VoiceOver.
+                .accessibilityLabel(fitting.lean ? "\(pr.author), \(age)" : age)
             ForEach(chips.info.filter { !$0.isCount }, id: \.text) { info in
                 Text("·").foregroundStyle(.tertiary).accessibilityHidden(true)
                 Label { Text(info.text) } icon: {
@@ -130,12 +151,8 @@ struct PRRow: View {
                 actionCapsule(action)
                     .padding(.leading, 4)
             }
+            LabelChips(set: labels, fit: fitting)
         }
-        .font(.system(size: 11))
-        .monospacedDigit()
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
-        .frame(height: 16)
     }
 
     /// The tier-1 capsule: the one thing on the row that asks for action.
@@ -169,12 +186,14 @@ struct PRRow: View {
             } else {
                 AvatarView(login: pr.author, url: pr.authorAvatarURL, size: 16)
                     .opacity(row.dimmed ? 0.45 : 1)
+                    .help(pr.author)
             }
             Text((pr.isDraft ? "Draft: " : "") + pr.title)
                 .font(.system(size: 12.5))
                 .foregroundStyle(titleStyle)
                 .lineLimit(1)
                 .truncationMode(.tail)
+                .help(pr.title)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if case .changesRequested = chips.action {
                 Image(systemName: "arrow.uturn.backward")

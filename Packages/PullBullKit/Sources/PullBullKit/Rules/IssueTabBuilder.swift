@@ -341,6 +341,16 @@ public enum IssueRowRules {
         return (shown, labels.count - shown.count)
     }
 
+    /// The order a row shows `labels` in, as indices: those a `~label` search asks for first, so they
+    /// never drop into "+N", then the rest. Otherwise GitHub's order. Case is ignored.
+    public static func chipOrder(_ labels: [String], first wanted: [String]) -> [Int] {
+        let isWanted = { (label: String) in
+            wanted.contains { $0.caseInsensitiveCompare(label) == .orderedSame }
+        }
+        let indices = Array(labels.indices)
+        return indices.filter { isWanted(labels[$0]) } + indices.filter { !isWanted(labels[$0]) }
+    }
+
     /// The avatars on the right of a row. Assigned leaves out the viewer, who is on every row there.
     public static func avatars(_ issue: BoardIssue, tab: IssueTab, me: String) -> [Assignee] {
         guard tab == .assigned else { return issue.assignees }

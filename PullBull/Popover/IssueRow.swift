@@ -12,6 +12,8 @@ struct IssueRow: View {
     var selected = false
     /// Under a repo header, which already names the repo.
     var inRepoGroup = false
+    /// The labels a `~label` search asks for, passed in so a row doesn't follow every keystroke.
+    var wantedLabels: [String] = []
     @State private var hovering = false
 
     private var compact: Bool { model.settings.compact }
@@ -60,7 +62,7 @@ struct IssueRow: View {
                     .multilineTextAlignment(.leading)
                     .foregroundStyle(past ? .secondary : .primary)
                     .fixedSize(horizontal: false, vertical: true)
-                IssueMetaLine(issue: issue, now: now, showsRepo: !inRepoGroup)
+                IssueMetaLine(issue: issue, now: now, showsRepo: !inRepoGroup, wantedLabels: wantedLabels)
                     .padding(.top, 3)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -112,15 +114,13 @@ struct IssueMetaLine: View {
     let now: Date
     var showsRepo = true
     var role: String?
+    /// The labels a `~label` search asks for, whose chips lead.
+    var wantedLabels: [String] = []
 
     var body: some View {
-        let chips = IssueRowRules.chips(issue.labels)
-        ViewThatFits(in: .horizontal) {
-            ForEach((0...chips.shown.count).reversed(), id: \.self) { fitting in
-                line(chips: Array(chips.shown.prefix(fitting)), more: issue.labels.count - fitting)
-                    // The last resort truncates instead of overflowing.
-                    .fixedSize(horizontal: fitting > 0, vertical: false)
-            }
+        let chips = LabelChipSet(issue, first: wantedLabels)
+        ChipsThatFit(set: chips) { fitting in
+            line(chips: chips, fitting: fitting)
         }
         .font(.system(size: 11))
         .monospacedDigit()
@@ -128,7 +128,7 @@ struct IssueMetaLine: View {
         .lineLimit(1)
     }
 
-    private func line(chips: [String], more: Int) -> some View {
+    private func line(chips: LabelChipSet, fitting: ChipFit) -> some View {
         HStack(spacing: 5) {
             RepoNumber(key: issue.key, showsRepo: showsRepo)
             if let updatedAt = issue.updatedAt {
@@ -145,42 +145,8 @@ struct IssueMetaLine: View {
                 Text("·").accessibilityHidden(true)
                 Text(role)
             }
-            // By position: two labels can share a name, and a cut chip names its label in full.
-            ForEach(Array(chips.enumerated()), id: \.offset) { index, chip in
-                let name = issue.labels[index]
-                let color = LabelDotColor.parse(issue.labelColor(at: index))
-                if chip == name {
-                    LabelChip(text: chip, color: color).accessibilityLabel(name)
-                } else {
-                    LabelChip(text: chip, color: color).help(name).accessibilityLabel(name)
-                }
-            }
-            if more > 0 {
-                LabelChip(text: "+\(more)")
-                    .accessibilityLabel(more == 1 ? "1 more label" : "\(more) more labels")
-            }
+            LabelChips(set: chips, fit: fitting)
         }
-    }
-}
-
-/// A muted outline label chip, led by a dot in the label's GitHub colour when it has one. The text stays gray.
-private struct LabelChip: View {
-    let text: String
-    var color: UInt32?
-
-    var body: some View {
-        HStack(spacing: 4) {
-            if let color { LabelDot(color: color) }
-            Text(text)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Palette.secondaryText)
-                .lineLimit(1)
-        }
-        .fixedSize()
-        .padding(.horizontal, 6)
-        .frame(height: 16)
-        .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Palette.separator, lineWidth: 0.5))
-        .accessibilityElement(children: .combine)
     }
 }
 

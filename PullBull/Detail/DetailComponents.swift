@@ -234,3 +234,70 @@ struct PressableStyle: ButtonStyle {
         configuration.label.opacity(configuration.isPressed ? 0.75 : 1)
     }
 }
+
+/// An item's labels as chips, wrapping onto more lines; `color(i)` is the GitHub colour of `labels[i]`.
+struct DetailLabels: View {
+    let labels: [String]
+    let color: (Int) -> String?
+
+    var body: some View {
+        FlowLayout(spacing: 4, lineSpacing: 4) {
+            ForEach(Array(labels.enumerated()), id: \.offset) { index, label in
+                RowLabelChip(text: label, color: LabelDotColor.parse(color(index)), squeezable: true)
+            }
+        }
+    }
+}
+
+/// Lays children out left to right, wrapping to a new line when the width runs out.
+struct FlowLayout: Layout {
+    var spacing: CGFloat
+    var lineSpacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = rows(for: subviews, width: proposal.width ?? .infinity)
+        let width = rows.map(\.width).max() ?? 0
+        let height = rows.map(\.height).reduce(0, +) + lineSpacing * CGFloat(max(rows.count - 1, 0))
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in rows(for: subviews, width: bounds.width) {
+            var x = bounds.minX
+            for index in row.indices {
+                let size = subviews[index].sizeThatFits(.init(width: bounds.width, height: nil))
+                subviews[index].place(
+                    at: CGPoint(x: x, y: y + (row.height - size.height) / 2), anchor: .topLeading,
+                    proposal: .init(width: min(size.width, bounds.width), height: size.height))
+                x += min(size.width, bounds.width) + spacing
+            }
+            y += row.height + lineSpacing
+        }
+    }
+
+    private struct Row {
+        var indices: [Int] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+    }
+
+    private func rows(for subviews: Subviews, width maxWidth: CGFloat) -> [Row] {
+        var rows: [Row] = []
+        var current = Row()
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.init(width: maxWidth, height: nil))
+            let itemWidth = min(size.width, maxWidth)
+            let needed = current.indices.isEmpty ? itemWidth : current.width + spacing + itemWidth
+            if needed > maxWidth, !current.indices.isEmpty {
+                rows.append(current)
+                current = Row()
+            }
+            current.width = current.indices.isEmpty ? itemWidth : current.width + spacing + itemWidth
+            current.height = max(current.height, size.height)
+            current.indices.append(index)
+        }
+        if !current.indices.isEmpty { rows.append(current) }
+        return rows
+    }
+}
