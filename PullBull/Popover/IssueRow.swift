@@ -39,7 +39,6 @@ struct IssueRow: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .accessibilityAddTraits(selected ? [.isSelected] : [])
-        .help(issue.title)
         .issueContextMenu(
             issue, focus: FocusMenuItem(model: model, repo: issue.key.repo),
             person: .person(model: model, login: issue.author))
@@ -62,6 +61,8 @@ struct IssueRow: View {
                     .multilineTextAlignment(.leading)
                     .foregroundStyle(past ? .secondary : .primary)
                     .fixedSize(horizontal: false, vertical: true)
+                    // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
+                    .help(issue.title)
                 IssueMetaLine(issue: issue, now: now, showsRepo: !inRepoGroup, wantedLabels: wantedLabels)
                     .padding(.top, 3)
             }
@@ -89,6 +90,8 @@ struct IssueRow: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
+                .help(issue.title)
             Group {
                 RepoNumber(key: issue.key, showsRepo: !inRepoGroup, compact: true)
                     .fixedSize()
@@ -190,12 +193,12 @@ private struct AssigneeStack: View {
                                 }
                                 .compositingGroup()
                         }
+                        .help(assignee.login)
                     } else {
-                        avatar
+                        avatar.help(assignee.login)
                     }
                 }
             }
-            .help(label)
             .accessibilityElement()
             .accessibilityLabel(label)
         }
