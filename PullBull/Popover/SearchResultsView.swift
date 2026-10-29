@@ -12,7 +12,8 @@ struct SearchResultsView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
+                // Only the groups' headers pin; the context line, Ask line and banners scroll away.
+                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                     contextLine
                     askLine
                     if let results = model.searchResults, !results.isEmpty(in: model.mode) {
@@ -297,40 +298,52 @@ struct SearchResultsView: View {
 
     @ViewBuilder private func prGroup(_ title: String, _ prs: [PullRequest]) -> some View {
         if !prs.isEmpty {
-            SearchGroupHeader(title: title, count: prs.count)
-            ForEach(prs) { pr in
-                SearchPRRow(
-                    pr: pr, words: words, labels: labels, role: role(of: pr), viewer: viewer, now: now,
-                    compact: model.settings.compact,
-                    selected: model.searchSelection == pr.key, flashing: model.rowFlash.key == pr.key
-                ) {
-                    if PRActions.commandClicked { model.openSearchResultOnGitHub(pr) } else { model.openSearchResult(pr) }
+            Section {
+                ForEach(prs) { pr in
+                    SearchPRRow(
+                        pr: pr, words: words, labels: labels, role: role(of: pr), viewer: viewer, now: now,
+                        compact: model.settings.compact,
+                        selected: model.searchSelection == pr.key, flashing: model.rowFlash.key == pr.key
+                    ) {
+                        if PRActions.commandClicked { model.openSearchResultOnGitHub(pr) } else { model.openSearchResult(pr) }
+                    }
+                    .prContextMenu(
+                        pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
+                        person: .person(model: model, login: pr.author))
+                    .scrollTarget(pr.key, clearance: PinnedHeader.clearance)
                 }
-                .prContextMenu(
-                    pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
-                    person: .person(model: model, login: pr.author))
-                .id(pr.key)
+            } header: {
+                groupHeader(title, count: prs.count)
             }
         }
     }
 
     @ViewBuilder private func issueGroup(_ title: String, _ issues: [BoardIssue]) -> some View {
         if !issues.isEmpty {
-            SearchGroupHeader(title: title, count: issues.count)
-            ForEach(issues) { issue in
-                SearchIssueRow(
-                    issue: issue, words: words, labels: labels, role: role(of: issue), now: now,
-                    compact: model.settings.compact,
-                    selected: model.searchSelection == issue.key, flashing: model.rowFlash.key == issue.key
-                ) {
-                    if PRActions.commandClicked { model.openSearchResultOnGitHub(issue) } else { model.openSearchResult(issue) }
+            Section {
+                ForEach(issues) { issue in
+                    SearchIssueRow(
+                        issue: issue, words: words, labels: labels, role: role(of: issue), now: now,
+                        compact: model.settings.compact,
+                        selected: model.searchSelection == issue.key, flashing: model.rowFlash.key == issue.key
+                    ) {
+                        if PRActions.commandClicked { model.openSearchResultOnGitHub(issue) } else { model.openSearchResult(issue) }
+                    }
+                    .issueContextMenu(
+                        issue, focus: FocusMenuItem(model: model, repo: issue.key.repo),
+                        person: .person(model: model, login: issue.author))
+                    .scrollTarget(issue.key, clearance: PinnedHeader.clearance)
                 }
-                .issueContextMenu(
-                    issue, focus: FocusMenuItem(model: model, repo: issue.key.repo),
-                    person: .person(model: model, login: issue.author))
-                .id(issue.key)
+            } header: {
+                groupHeader(title, count: issues.count)
             }
         }
+    }
+
+    /// An open or closed group's header; search groups never fold.
+    private func groupHeader(_ title: String, count: Int) -> some View {
+        ListSectionHeader(glyph: nil, title: title, count: count)
+            .pinnedHeaderBackground()
     }
 }
 
@@ -432,29 +445,6 @@ struct Keycap<Content: View>: View {
 }
 
 // MARK: - Rows
-
-private struct SearchGroupHeader: View {
-    let title: String
-    let count: Int?
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Text(title)
-            if let count {
-                Text("\(count)")
-                    .fontWeight(.medium)
-                    .monospacedDigit()
-            }
-        }
-        .font(.system(size: 11, weight: .semibold))
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 8)
-        .padding(.top, 12)
-        .padding(.bottom, 4)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
-    }
-}
 
 private struct FailureBanner: View {
     let message: String
