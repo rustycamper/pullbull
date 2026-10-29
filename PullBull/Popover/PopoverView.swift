@@ -757,7 +757,11 @@ struct PopoverView: View {
                 return !plain.contains(.shift) && model.openAskSelectionOnGitHub()
             }
             guard Self.commandKey(event) == "c" else { return false }
-            return plain.contains(.shift) ? model.copyAskSelectionReference() : model.copyAskSelectionLink()
+            if plain.contains(.shift) { return model.copyAskSelectionReference() }
+            // Selected answer text copies as text; otherwise ⌘C copies the highlighted row's link.
+            let before = NSPasteboard.general.changeCount
+            NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil)
+            return NSPasteboard.general.changeCount != before || model.copyAskSelectionLink()
         }
         switch event.keyCode {
         case SearchKeyMonitor.escape:

@@ -130,13 +130,13 @@ Settings → Ask AI.
 
 | Control | Default |
 |---|---|
-| Ask on/off | Off |
+| Ask AI on/off | Off |
 | Anthropic API key | Empty. Stored in the Keychain only |
-| Model | The newest Sonnet your key can use. The newest Haiku is cheaper and less accurate. The list updates when you save the key; a retired model switches to the next one |
+| Model | The newest Sonnet your key can use. The newest Haiku is cheaper and less accurate. The list updates when you save the key; if Anthropic retires the chosen model, the next one takes over. Keys saved before this version keep the built-in list until saved again |
 | Exclude from Ask AI | Empty. Pick from the repos of the current org or scope; excluded repos are never stored or sent |
-| Index | Shown while Ask is on: items indexed, backfill progress ("N of ~M") or last sync, **Rebuild** |
+| Index | Shown while Ask AI is on: items indexed, backfill progress ("N of ~M") or last sync, **Rebuild** |
 
-- The key can be saved only while Ask is on. It is checked when you save it (`GET /v1/models`, free). A bad key never reaches a question. [Get a key](https://platform.claude.com/settings/keys)
+- The key can be saved only while Ask AI is on. It is checked when you save it (`GET /v1/models`, free). A bad key never reaches a question. [Get a key](https://platform.claude.com/settings/keys)
 - Without a key, <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> says "Add an Anthropic API key in Settings → Ask AI" and sends nothing
 
 ### What is sent
@@ -149,7 +149,7 @@ Settings → Ask AI.
 
 - Matching runs on this Mac. Only the best matches are sent
 - Excluded repos are never sent
-- Descriptions are untrusted text. Ask can't write to GitHub or act on anything; only items it was shown become links
+- Descriptions are untrusted text. Ask AI can't write to GitHub or act on anything; only items it was shown become links
 
 ### Asking
 
@@ -160,14 +160,14 @@ Settings → Ask AI.
 | Answer | Answer on top, then PRs and issues in one list, each with a line on why it matched |
 | Open | <kbd>Return</kbd> opens the item in its own mode. <kbd>Esc</kbd> or <kbd>←</kbd> in the detail returns to Ask AI |
 | GitHub · copy | <kbd>⌘</kbd><kbd>Return</kbd> opens on GitHub. Copy keys work as in the list |
-| Edit and re-ask | <kbd>Esc</kbd> or <kbd>←</kbd> on Ask returns to the field with the question kept |
+| Edit and re-ask | <kbd>Esc</kbd> or <kbd>←</kbd> on Ask AI returns to the field with the question kept |
 | Empty or edit the field | Back to normal search |
 
-- Each Ask stands alone; there are no follow-up questions
+- Each question stands alone; there are no follow-up questions
 - Questions about deployment ("is it on production?") are answered only from what descriptions and labels say. The answer says so when it can't confirm
 - "Nothing matched" is a valid answer; try other words
-- Errors show as one line in place of the answer: no network, key rejected, rate limited, no answer in 20 s, declined, answer cut off, no answer, HTTP error
-- While the index is still syncing, Ask runs on what is indexed and says so
+- Errors show as one line in place of the answer: no network, key rejected, rate limited, no answer in 20 s, declined, answer cut off, no answer, model retired, HTTP error
+- While the index is still syncing, Ask AI runs on what is indexed and says so
 
 ### Index
 
@@ -175,8 +175,8 @@ Settings → Ask AI.
 |---|---|
 | Contents | PRs and issues updated in the last 90 days in the account's scope, with full descriptions. No comments |
 | Where | This Mac, in the cache folder ([Data](#data)). Never sent as a whole |
-| Built | Turning Ask on starts a paced backfill; regular refresh goes first. Then it updates on each refresh |
-| Deleted | Ask off (every index file), sign-out, or a renamed login. **Rebuild** empties the index and refetches; the file stays |
+| Built | Turning Ask AI on starts a paced backfill; regular refresh goes first. Then it updates on each refresh |
+| Deleted | Ask AI off (every index file), sign-out, or a renamed login. **Rebuild** empties the index and refetches; the file stays |
 | Excluded repos | Never stored. Rows are deleted when you add a repo to the list; removing it backfills the repo |
 
 ### Cost
@@ -251,7 +251,7 @@ Click a notification to open the detail.
 | Cache | `~/Library/Application Support/io.github.rustycamper.pullbull/` |
 | Avatars | `~/Library/Caches/io.github.rustycamper.pullbull/` |
 | Settings | defaults domain `io.github.rustycamper.pullbull` |
-| Ask index | Same cache folder, one file per account and scope. Only while Ask is on |
+| Ask index | Same cache folder, one file per account and scope. Only while Ask AI is on |
 | Sign-in tokens | Keychain, this Mac only, not synced |
 | Anthropic API key | Keychain, this Mac only, not synced |
 | `gh` tokens | Not stored |

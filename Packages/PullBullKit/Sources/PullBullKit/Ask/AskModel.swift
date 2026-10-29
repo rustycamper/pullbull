@@ -36,6 +36,15 @@ public struct AskModel: Hashable, Sendable, Identifiable, Codable {
         checked.isEmpty ? all : checked
     }
 
+    /// The choices and chosen model after the Messages API reported `id` unknown: `id` leaves the choices,
+    /// and only when it was the chosen one does the next take over. Nil when it was the last choice, since
+    /// an empty list would bring back `all`; saving the key again refreshes it.
+    public static func retiring(_ id: String, from choices: [AskModel], chosen: String) -> (choices: [AskModel], chosen: String)? {
+        let remaining = choices.filter { $0.id != id }
+        guard !remaining.isEmpty else { return nil }
+        return (remaining, chosen == id ? remaining[0].id : chosen)
+    }
+
     /// The newest model of each family in `listed` (the Models API lists newest first), in family order.
     /// Empty when none of the families is listed.
     public static func offered(from listed: [AskModel]) -> [AskModel] {

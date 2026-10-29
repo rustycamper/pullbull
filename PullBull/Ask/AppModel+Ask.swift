@@ -266,11 +266,11 @@ extension AppModel {
     /// The models Settings → Ask AI offers.
     var askModelChoices: [AskModel] { AskModel.choices(settings.askModelChoices) }
 
-    /// The Messages API no longer knows `id`: it leaves the choices and the next one takes over.
+    /// The Messages API no longer knows `id`: see `AskModel.retiring`.
     func retireAskModel(_ id: String) {
-        let remaining = askModelChoices.filter { $0.id != id }
-        settings.askModelChoices = remaining
-        settings.askModel = AskModel.named("", in: AskModel.choices(remaining)).id
+        guard let next = AskModel.retiring(id, from: askModelChoices, chosen: settings.askModel) else { return }
+        settings.askModelChoices = next.choices
+        settings.askModel = next.chosen
     }
 
     func removeAskKey() {

@@ -395,9 +395,25 @@ private func toolResults(_ message: [String: Any]) -> [[String: Any]] {
         #expect(AskModel.named("claude-sonnet-5-5", in: [haiku]) == haiku)
     }
 
+    @Test func retiringKeepsTheUsersChoiceAndNeverEmptiesTheList() throws {
+        let sonnet = AskModel(id: "claude-sonnet-6", name: "Sonnet 6")
+        let haiku = AskModel(id: "claude-haiku-6", name: "Haiku 6")
+        let chosenGone = try #require(AskModel.retiring(sonnet.id, from: [sonnet, haiku], chosen: sonnet.id))
+        #expect(chosenGone.choices == [haiku])
+        #expect(chosenGone.chosen == haiku.id)
+        // The user picked Haiku while a Sonnet request was in flight: their pick stays.
+        let otherGone = try #require(AskModel.retiring(sonnet.id, from: [sonnet, haiku], chosen: haiku.id))
+        #expect(otherGone.chosen == haiku.id)
+        // The last choice is never dropped, so the built-in list can't come back and cycle.
+        #expect(AskModel.retiring(haiku.id, from: [haiku], chosen: haiku.id) == nil)
+    }
+
     @Test func unknownModelIsRetired() async throws {
         let gone = ScriptedTransport([.reply(404, #"{"type":"error","error":{"type":"not_found_error"}}"#)])
         await #expect(throws: AskError.modelRetired) { _ = try await ask(gone) }
+        // A 404 that isn't Anthropic's not_found_error (a proxy's page) is not a retired model.
+        let proxy = ScriptedTransport([.reply(404, "<html>Not Found</html>")])
+        await #expect(throws: AskError.server(404)) { _ = try await ask(proxy) }
         // Any other status still reads as a server error.
         let broken = ScriptedTransport([.reply(500, #"{"type":"error"}"#)])
         await #expect(throws: AskError.server(500)) { _ = try await ask(broken) }

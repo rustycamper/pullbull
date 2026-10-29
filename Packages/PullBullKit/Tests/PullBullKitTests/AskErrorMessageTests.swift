@@ -9,7 +9,7 @@ import Testing
         #expect(AskError.timeout.message == "No answer in 20 s.")
         #expect(AskError.refusal.message == "The model declined to answer.")
         #expect(AskError.modelRetired.message
-            == "Anthropic retired this model. Ask AI switched to another; ask again, or pick one in Settings → Ask AI.")
+            == "Anthropic retired this model. Pick another in Settings → Ask AI, or save the key again to refresh the list.")
         #expect(AskError.truncated.message == "Ask AI failed (answer cut off).")
         #expect(AskError.noAnswer.message == "Ask AI failed (no answer).")
     }

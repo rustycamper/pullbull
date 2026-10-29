@@ -203,20 +203,18 @@ public struct AskClient: Sendable, CustomStringConvertible, CustomDebugStringCon
         request.setValue(Self.apiVersion, forHTTPHeaderField: "anthropic-version")
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let data: Data
-        do {
-            (data, _) = try await Self.perform(request, transport)
-        } catch AskError.server(404) {
-            throw AskError.modelRetired
-        }
+        let (data, _) = try await Self.perform(request, transport, notFound: .modelRetired)
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw AskError.noAnswer
         }
         return root
     }
 
-    /// Sends `request`, mapping connection failures and non-2xx statuses to `AskError`.
-    private static func perform(_ request: URLRequest, _ transport: any HTTPTransport) async throws -> (Data, HTTPURLResponse) {
+    /// Sends `request`, mapping connection failures and non-2xx statuses to `AskError`. A 404 whose body is
+    /// Anthropic's `not_found_error` throws `notFound` when given; any other 404 (a proxy's page) is a server error.
+    private static func perform(
+        _ request: URLRequest, _ transport: any HTTPTransport, notFound: AskError? = nil
+    ) async throws -> (Data, HTTPURLResponse) {
         let data: Data
         let response: HTTPURLResponse
         do {
@@ -235,9 +233,16 @@ public struct AskClient: Sendable, CustomStringConvertible, CustomDebugStringCon
         switch response.statusCode {
         case 200..<300: return (data, response)
         case 401: throw AskError.unauthorized
+        case 404 where notFound != nil && isNotFoundError(data): throw notFound!
         case 429, 529: throw AskError.rateLimited
         default: throw AskError.server(response.statusCode)
         }
+    }
+
+    /// Anthropic's error body for an unknown resource: `{"type":"error","error":{"type":"not_found_error"}}`.
+    static func isNotFoundError(_ data: Data) -> Bool {
+        let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        return (root?["error"] as? [String: Any])?["type"] as? String == "not_found_error"
     }
 
     /// Items not yet shown, first occurrence only, up to `limit`.
