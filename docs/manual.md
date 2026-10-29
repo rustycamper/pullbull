@@ -74,6 +74,8 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 | Mine | Your PRs, review pills, checks, **Ready to merge**. Folded "Recently closed": yours closed or merged in the last 7 days |
 | Team | Other open PRs in the org |
 
+A PR with merge conflicts shows a **Conflicts** note on every tab.
+
 > [!NOTE]
 > Ready to merge = approved, no changes requested, checks green or none, no conflicts, not a draft. It doesn't see branch protection (required review count).
 

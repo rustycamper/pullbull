@@ -182,7 +182,7 @@ struct PRRow: View {
                     .help("Ready to merge")
                     .accessibilityLabel("Ready to merge")
             }
-            if tab == .review && !row.dimmed, let reason = chips.info.first {
+            if tab == .review && !row.dimmed, let reason = chips.info.first(where: { $0 != .conflicts }) {
                 Image(systemName: reason.symbol)
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.secondary)

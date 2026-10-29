@@ -76,10 +76,24 @@ import Testing
         }
     }
 
-    @Test func conflictsShowOnlyOnMine() {
-        #expect(!RowChips(row: Self.row(mergeable: .conflicting), tab: .team).info.contains(.conflicts))
+    @Test func conflictsShowOnEveryTab() {
+        #expect(RowChips(row: Self.row(mergeable: .conflicting), tab: .team).info == [.conflicts])
+        let withApproval = RowChips(row: Self.row(reviews: [("a", .approved)], mergeable: .conflicting), tab: .team)
+        #expect(withApproval.info == [.approvals(1), .conflicts])
         let review = RowChips(row: Self.row(reason: .reRequested, mergeable: .conflicting), tab: .review)
-        #expect(review.info == [.reRequested])
+        #expect(review.info == [.reRequested, .conflicts])
+        let viaTeam = RowChips(row: Self.row(reason: .teamRequested("core"), mergeable: .conflicting), tab: .review)
+        #expect(viaTeam.info == [.viaTeam("org/core"), .conflicts])
+        #expect(RowChips(row: Self.row(reason: .requested, mergeable: .conflicting), tab: .review).info == [.conflicts])
+        let dimmed = RowChips(row: Self.row(reviews: [("me", .approved)], dimmed: true, mergeable: .conflicting), tab: .review)
+        #expect(dimmed == RowChips(action: nil, info: [.youApprovedNotCounted, .conflicts]))
+    }
+
+    @Test func reviewUnknownOrMergeableShowsNoConflicts() {
+        for state: Mergeable? in [.unknown, .mergeable, nil] {
+            #expect(RowChips(row: Self.row(reason: .reRequested, mergeable: state), tab: .review).info == [.reRequested])
+            #expect(RowChips(row: Self.row(mergeable: state), tab: .team).info == [])
+        }
     }
 
     // MARK: Team

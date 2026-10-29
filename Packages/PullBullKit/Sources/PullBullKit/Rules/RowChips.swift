@@ -20,8 +20,7 @@ public struct RowChips: Equatable, Sendable {
         case newCommits
         /// Requested from a team of mine: `org/slug`, or the bare slug when the repo has no owner.
         case viaTeam(String)
-        /// GitHub reports merge conflicts with the base branch; Mine and search only, as on Review and Team
-        /// resolving them is someone else's job.
+        /// GitHub reports merge conflicts with the base branch; shown on every tab and in search, last in the row.
         case conflicts
 
         /// The SF Symbol drawn before the text.
@@ -96,20 +95,25 @@ public struct RowChips: Equatable, Sendable {
             if pr.hasConflicts { info.append(.conflicts) }
             self.init(action: action, info: info)
         case .team:
-            self.init(action: nil, info: approvals > 0 ? [.approvals(approvals)] : [])
+            var info: [Info] = []
+            if approvals > 0 { info.append(.approvals(approvals)) }
+            if pr.hasConflicts { info.append(.conflicts) }
+            self.init(action: nil, info: info)
         case .review:
-            if row.dimmed {
-                self.init(action: nil, info: [.youApprovedNotCounted])
-                return
+            let reason: Info? = if row.dimmed {
+                .youApprovedNotCounted
+            } else {
+                switch row.reviewReason {
+                case .reRequested: .reRequested
+                case .newCommitsSinceReview: .newCommits
+                case .teamRequested(let slug):
+                    .viaTeam((pr.key.repo.split(separator: "/").first.map { "\($0)/" } ?? "") + slug)
+                case .requested, nil: nil
+                }
             }
-            let info: Info? = switch row.reviewReason {
-            case .reRequested: .reRequested
-            case .newCommitsSinceReview: .newCommits
-            case .teamRequested(let slug):
-                .viaTeam((pr.key.repo.split(separator: "/").first.map { "\($0)/" } ?? "") + slug)
-            case .requested, nil: nil
-            }
-            self.init(action: nil, info: info.map { [$0] } ?? [])
+            var info = reason.map { [$0] } ?? []
+            if pr.hasConflicts { info.append(.conflicts) }
+            self.init(action: nil, info: info)
         }
     }
 
