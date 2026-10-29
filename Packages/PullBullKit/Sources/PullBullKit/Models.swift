@@ -248,6 +248,9 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
     public let updatedAt: Date?
     public let closedAt: Date?
     public let commentCount: Int
+    /// The newest comment's author; set only on Assigned and Created search results, nil for a deleted
+    /// (ghost) author and in issues cached before it was stored.
+    public let lastCommentAuthor: String?
     public let labels: [String]
     /// GitHub's 6-hex colour for each of `labels`, by position; nil where it's missing, and empty in
     /// issues cached before it was stored. Read it through `labelColor(at:)`.
@@ -277,8 +280,9 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
         key: PRKey, title: String, url: URL, isOpen: Bool,
         author: String? = nil, stateReason: IssueStateReason? = nil,
         createdAt: Date? = nil, updatedAt: Date? = nil, closedAt: Date? = nil,
-        commentCount: Int = 0, labels: [String] = [], labelColors: [String?] = [], assignees: [Assignee] = [],
-        status: BoardStatusValue? = nil, boardItemId: Int? = nil, myAssignment: Assignment? = nil
+        commentCount: Int = 0, lastCommentAuthor: String? = nil, labels: [String] = [], labelColors: [String?] = [],
+        assignees: [Assignee] = [], status: BoardStatusValue? = nil, boardItemId: Int? = nil,
+        myAssignment: Assignment? = nil
     ) {
         self.key = key
         self.title = title
@@ -290,6 +294,7 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
         self.updatedAt = updatedAt
         self.closedAt = closedAt
         self.commentCount = commentCount
+        self.lastCommentAuthor = lastCommentAuthor
         self.labels = labels
         self.labelColors = labelColors
         self.assignees = assignees
@@ -311,6 +316,7 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt)
         closedAt = try c.decodeIfPresent(Date.self, forKey: .closedAt)
         commentCount = try c.decodeIfPresent(Int.self, forKey: .commentCount) ?? 0
+        lastCommentAuthor = try c.decodeIfPresent(String.self, forKey: .lastCommentAuthor)
         labels = try c.decodeIfPresent([String].self, forKey: .labels) ?? []
         labelColors = try c.decodeIfPresent([String?].self, forKey: .labelColors) ?? []
         assignees = try c.decodeIfPresent([Assignee].self, forKey: .assignees) ?? []

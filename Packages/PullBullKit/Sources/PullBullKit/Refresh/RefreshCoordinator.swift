@@ -250,7 +250,9 @@ public struct LiveSnapshotFetcher: SnapshotFetching {
         _ query: String, list: String, assignmentFor viewer: String? = nil, previous: [BoardIssue]?
     ) async throws -> IssueList {
         do {
-            let found = try await api.searchIssues(query, maxPages: Self.issuePages, assignmentFor: viewer)
+            // Assigned and Created carry the newest comment's author, for comment notifications.
+            let found = try await api.searchIssues(
+                query, maxPages: Self.issuePages, assignmentFor: viewer, lastComment: true)
             guard !found.hasMore else { return (previous, "incomplete \(list) issues list") }
             return (found.issues, nil)
         } catch is CancellationError {

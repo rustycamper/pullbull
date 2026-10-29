@@ -251,19 +251,25 @@ Reopen within a minute and the detail is still there.
 |---|---|
 | General | Grouping, compact cards, background, filters (Review and Team), menu bar count, refresh interval, shortcut, launch at login, updates |
 | Account | Account, org, board, access notices |
-| Notifications | One toggle per event |
+| Notifications | One toggle per event, grouped: my pull requests · pull requests I review · issues assigned to me · issues I created |
 | Search | Saved searches: rename, edit the query, drag to reorder, **+** and **−**. Apply one from the empty search field |
 | Ask AI | [Ask AI](#ask-ai): on/off, key, model, exclude list, index |
 
-| Notification | Default |
-|---|---|
-| Review requested | on |
-| PR approved | on |
-| Changes requested | on |
-| CI failed | on |
-| New comment | on |
-| PR merged by someone else | on |
-| Issue assigned by someone else | off |
+| Group | Notification | Default |
+|---|---|---|
+| My pull requests | Approved | on |
+| | Changes requested | on |
+| | CI failed | on |
+| | New comment | on |
+| | Ready to merge: approved, checks green, no conflicts | off |
+| | Merged by someone else | on |
+| Pull requests I review | Review requested, re-requested, or new commits since your review | on |
+| | New comment on a PR you reviewed | off |
+| Issues assigned to me | Newly assigned by someone else | off |
+| | New comment | on |
+| Issues I created | New comment | off |
+
+Comments you write never notify. Several comments on one issue between refreshes make one notification ("3 new comments").
 
 Click a notification to open the detail.
 

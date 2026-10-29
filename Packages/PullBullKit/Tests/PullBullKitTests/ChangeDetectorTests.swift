@@ -324,3 +324,124 @@ private var issuesOn: NotificationToggles {
         ])
     }
 }
+
+// MARK: - Ready to merge, comments after my review
+
+@Suite struct ReadyAndReviewCommentTests {
+    private let approval = Review(author: "bob", state: .approved, submittedAt: now)
+    private let myReview = Review(author: "me", state: .commented, submittedAt: now)
+
+    private var on: NotificationToggles {
+        var t = NotificationToggles()
+        t.readyToMerge = true
+        t.commentAfterMyReview = true
+        return t
+    }
+
+    @Test func readyToMergeFiresOnceWhenMyPRTurnsReady() {
+        let waiting = snap(mine: [pr(1, author: "me", ci: .pending, reviews: [approval])])
+        let ready = snap(mine: [pr(1, author: "me", ci: .success, reviews: [approval])])
+        #expect(events(waiting, ready, toggles: on).map(\.kind) == [.readyToMerge])
+        #expect(events(ready, ready, toggles: on).isEmpty)
+        // Off by default.
+        #expect(events(waiting, ready).isEmpty)
+    }
+
+    @Test func commentAfterMyReviewFiresForOthersComments() {
+        let before = snap(review: [pr(1, comments: 2, reviews: [myReview])])
+        let after = snap(review: [pr(1, comments: 3, lastCommenter: "alice", reviews: [myReview])])
+        let e = events(before, after, toggles: on)
+        #expect(e.map(\.kind) == [.commentAfterMyReview])
+        #expect(e.first?.actor == "alice")
+        #expect(events(before, after).isEmpty)
+    }
+
+    @Test func commentAfterMyReviewIgnoresMineAndUnreviewed() {
+        // My own comment.
+        let before = snap(review: [pr(1, comments: 2, reviews: [myReview])])
+        let mine = snap(review: [pr(1, comments: 3, lastCommenter: "me", reviews: [myReview])])
+        #expect(events(before, mine, toggles: on).isEmpty)
+        // A PR I haven't reviewed (only requested): not "after my review".
+        let requested = snap(review: [pr(2, comments: 0, requests: [.user("me")])])
+        let commented = snap(review: [pr(2, comments: 1, lastCommenter: "alice", requests: [.user("me")])])
+        #expect(!events(requested, commented, toggles: on).contains { $0.kind == .commentAfterMyReview })
+    }
+}
+
+// MARK: - Issue comments
+
+private func commented(_ n: Int, comments: Int, by author: String? = "dev-b") -> BoardIssue {
+    BoardIssue(
+        key: PRKey(repo: "initech/gadgets", number: n), title: "Issue \(n)", url: URL(string: "https://x/i\(n)")!,
+        isOpen: true, commentCount: comments, lastCommentAuthor: author)
+}
+
+private func issueSnap(_ offset: TimeInterval, assigned: [BoardIssue]?, created: [BoardIssue]?) -> Snapshot {
+    Snapshot(
+        fetchedAt: t0.addingTimeInterval(offset),
+        org: OrgContext(org: "initech", viewer: "devon", members: [], myTeams: [], repos: []),
+        reviewCandidates: [], mine: [], team: [], recentlyClosed: [], boardIssues: [],
+        assignedIssues: assigned, createdIssues: created)
+}
+
+@Suite struct IssueCommentTests {
+    private func run(_ old: Snapshot, _ new: Snapshot, _ toggles: NotificationToggles = .init()) -> [IssueEvent] {
+        ChangeDetector.issueEvents(old: old, new: new, me: "devon", toggles: toggles)
+    }
+
+    @Test func commentOnAssignedIssueNotifiesByDefault() {
+        let old = issueSnap(0, assigned: [commented(1, comments: 1)], created: [])
+        let new = issueSnap(120, assigned: [commented(1, comments: 4, by: "dev-b")], created: [])
+        let e = run(old, new)
+        #expect(e.map(\.kind) == [.comment])
+        #expect(e.first?.count == 3)
+        #expect(e.first?.actor == "dev-b")
+        #expect(e.first?.notificationTitle == "gadgets #1 · 3 new comments")
+    }
+
+    @Test func myOwnCommentIsSilent() {
+        let old = issueSnap(0, assigned: [commented(1, comments: 1)], created: [])
+        let new = issueSnap(120, assigned: [commented(1, comments: 2, by: "devon")], created: [])
+        #expect(run(old, new).isEmpty)
+    }
+
+    @Test func createdIssueCommentsAreOffByDefault() {
+        let old = issueSnap(0, assigned: [], created: [commented(2, comments: 0)])
+        let new = issueSnap(120, assigned: [], created: [commented(2, comments: 1)])
+        #expect(run(old, new).isEmpty)
+        var t = NotificationToggles()
+        t.createdIssueComment = true
+        #expect(run(old, new, t).map(\.issue.key.number) == [2])
+    }
+
+    /// An issue both assigned to me and mine notifies once.
+    @Test func assignedAndCreatedNotifyOnce() {
+        var t = NotificationToggles()
+        t.createdIssueComment = true
+        let old = issueSnap(0, assigned: [commented(3, comments: 0)], created: [commented(3, comments: 0)])
+        let new = issueSnap(120, assigned: [commented(3, comments: 1)], created: [commented(3, comments: 1)])
+        #expect(run(old, new, t).count == 1)
+    }
+
+    @Test func searchDecodesTheNewestCommentAuthor() {
+        let node: [String: Any] = [
+            "number": 7, "title": "t", "url": "https://github.com/o/r/issues/7", "state": "OPEN",
+            "repository": ["nameWithOwner": "o/r"], "comments": ["totalCount": 2],
+            "lastComment": ["nodes": [["author": ["login": "dev-b"]]]],
+        ]
+        let issue = Decoding.issue(from: node)
+        #expect(issue?.commentCount == 2)
+        #expect(issue?.lastCommentAuthor == "dev-b")
+        #expect(Queries.issueSearch(withAssignment: false, withLastComment: true).contains(Queries.lastCommentAuthor))
+        #expect(!Queries.issueSearch(withAssignment: false).contains("lastComment"))
+    }
+
+    /// A newly listed issue's comments aren't news, and neither is a list that wasn't fetched.
+    @Test func newlyListedOrUnfetchedIsSilent() {
+        let old = issueSnap(0, assigned: [], created: nil)
+        let new = issueSnap(120, assigned: [commented(4, comments: 5)], created: [commented(5, comments: 2)])
+        var t = NotificationToggles()
+        t.createdIssueComment = true
+        #expect(run(old, new, t).isEmpty)
+    }
+}

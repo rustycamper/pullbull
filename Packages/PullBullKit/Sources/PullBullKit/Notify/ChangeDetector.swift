@@ -1,7 +1,9 @@
 import Foundation
 
 public enum PREventKind: String, Sendable, CaseIterable {
-    case reviewRequested, approved, changesRequested, ciFailed, newComment, merged
+    case reviewRequested, approved, changesRequested, ciFailed, newComment, readyToMerge, merged
+    /// Someone else commented on a PR I reviewed.
+    case commentAfterMyReview
 }
 
 public struct PREvent: Equatable, Sendable {
@@ -18,17 +20,22 @@ public struct PREvent: Equatable, Sendable {
 
 public enum IssueEventKind: String, Sendable, CaseIterable {
     case assigned
+    /// New comments on an issue assigned to me or that I created.
+    case comment
 }
 
 public struct IssueEvent: Equatable, Sendable {
     public let kind: IssueEventKind
     public let issue: BoardIssue
     public let actor: String?
+    /// For `comment`: how many arrived since the previous poll.
+    public let count: Int
 
-    public init(kind: IssueEventKind, issue: BoardIssue, actor: String?) {
+    public init(kind: IssueEventKind, issue: BoardIssue, actor: String?, count: Int = 1) {
         self.kind = kind
         self.issue = issue
         self.actor = actor
+        self.count = count
     }
 }
 
@@ -72,6 +79,24 @@ public enum ChangeDetector {
                 !same(pr.lastCommentAuthor ?? "", me)
             {
                 result.append(PREvent(kind: .newComment, pr: pr, actor: pr.lastCommentAuthor))
+            }
+            if toggles.readyToMerge, ReviewRules.isReadyToMerge(pr), !ReviewRules.isReadyToMerge(prev) {
+                result.append(PREvent(kind: .readyToMerge, pr: pr, actor: nil))
+            }
+        }
+
+        // Others' PRs I reviewed: a comment after my review (a reply, a question) is for me.
+        if toggles.commentAfterMyReview {
+            let before = Dictionary(old.reviewCandidates.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
+            var seen = Set<PRKey>()
+            for pr in new.reviewCandidates
+            where !same(pr.author, me) && pr.latestReviews.contains(where: { same($0.author, me) })
+                && seen.insert(pr.key).inserted
+            {
+                guard let prev = before[pr.key], pr.commentCount > prev.commentCount,
+                      !same(pr.lastCommentAuthor ?? "", me)
+                else { continue }
+                result.append(PREvent(kind: .commentAfterMyReview, pr: pr, actor: pr.lastCommentAuthor))
             }
         }
 
@@ -120,14 +145,55 @@ public enum ChangeDetector {
     /// search can return a fresh assignment a poll or two late.
     public static let assignmentLag: TimeInterval = 600
 
+    /// The issue events between two polls: new assignments, then new comments.
+    public static func issueEvents(
+        old: Snapshot?, new: Snapshot, me: String, toggles: NotificationToggles
+    ) -> [IssueEvent] {
+        guard let old else { return [] }
+        let events = assignedEvents(old: old, new: new, me: me, toggles: toggles)
+            + commentEvents(old: old, new: new, me: me, toggles: toggles)
+        let order = Dictionary(uniqueKeysWithValues: IssueEventKind.allCases.enumerated().map { ($1, $0) })
+        return events.sorted {
+            if $0.kind != $1.kind { return order[$0.kind]! < order[$1.kind]! }
+            if $0.issue.key.repo != $1.issue.key.repo { return $0.issue.key.repo < $1.issue.key.repo }
+            return $0.issue.key.number < $1.issue.key.number
+        }
+    }
+
+    /// New comments by someone else on open issues assigned to me or that I created, one event per issue
+    /// with the count. Only issues both polls listed: a newly listed issue's comments aren't news (its
+    /// assignment is). An issue both assigned to me and mine notifies once, when either toggle is on.
+    private static func commentEvents(
+        old: Snapshot, new: Snapshot, me: String, toggles: NotificationToggles
+    ) -> [IssueEvent] {
+        var lists: [(before: [BoardIssue]?, now: [BoardIssue]?)] = []
+        if toggles.assignedIssueComment { lists.append((old.assignedIssues, new.assignedIssues)) }
+        if toggles.createdIssueComment { lists.append((old.createdIssues, new.createdIssues)) }
+        var seen = Set<PRKey>()
+        var result: [IssueEvent] = []
+        for (before, now) in lists {
+            guard let before, let now else { continue }
+            let previous = Dictionary(before.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
+            for issue in now where issue.isOpen {
+                guard let prev = previous[issue.key], issue.commentCount > prev.commentCount,
+                      !same(issue.lastCommentAuthor ?? "", me), seen.insert(issue.key).inserted
+                else { continue }
+                result.append(IssueEvent(
+                    kind: .comment, issue: issue, actor: issue.lastCommentAuthor,
+                    count: issue.commentCount - prev.commentCount))
+            }
+        }
+        return result
+    }
+
     /// Issues someone else newly assigned to `me`. Silent when the previous snapshot never fetched
     /// assigned issues (first load, or a cache from before the Issues mode), when the assignment
     /// event is unknown, for old assignments that reappear (reopened or transferred issues), and for
     /// closed issues a lagging search still returns, which the Assigned list drops too.
-    public static func issueEvents(
-        old: Snapshot?, new: Snapshot, me: String, toggles: NotificationToggles
+    private static func assignedEvents(
+        old: Snapshot, new: Snapshot, me: String, toggles: NotificationToggles
     ) -> [IssueEvent] {
-        guard toggles.issueAssigned, let old, let before = old.assignedIssues, let now = new.assignedIssues
+        guard toggles.issueAssigned, let before = old.assignedIssues, let now = new.assignedIssues
         else { return [] }
         let known = Set(before.map(\.key))
         // A failed Assigned search carries the list forward under a newer `fetchedAt`; measure from
@@ -140,9 +206,6 @@ public enum ChangeDetector {
             if let actor = assignment.actor, same(actor, me) { continue }
             result.append(IssueEvent(kind: .assigned, issue: issue, actor: assignment.actor))
         }
-        return result.sorted {
-            if $0.issue.key.repo != $1.issue.key.repo { return $0.issue.key.repo < $1.issue.key.repo }
-            return $0.issue.key.number < $1.issue.key.number
-        }
+        return result
     }
 }

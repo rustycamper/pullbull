@@ -92,6 +92,8 @@ public enum Decoding {
             updatedAt: lenientDate(node["updatedAt"]),
             closedAt: lenientDate(node["closedAt"]),
             commentCount: (node["comments"] as? [String: Any])?["totalCount"] as? Int ?? 0,
+            lastCommentAuthor: (((node["lastComment"] as? [String: Any])?["nodes"] as? [[String: Any]])?.last?["author"]
+                as? [String: Any])?["login"] as? String,
             labels: labels.map(\.name), labelColors: labels.map(\.color),
             assignees: assigneeNodes.compactMap { node in
                 guard let login = node["login"] as? String else { return nil }

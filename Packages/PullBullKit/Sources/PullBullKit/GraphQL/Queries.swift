@@ -121,12 +121,16 @@ enum Queries {
     }
     """
 
-    static func issueSearch(withAssignment: Bool) -> String {
-        """
+    /// The newest comment's author, aliased: `issueRowFields` already selects `comments{totalCount}`.
+    static let lastCommentAuthor = "lastComment: comments(last:1){nodes{author{login}}}"
+
+    static func issueSearch(withAssignment: Bool, withLastComment: Bool = false) -> String {
+        let extra = (withAssignment ? " " + assignedEvents : "") + (withLastComment ? " " + lastCommentAuthor : "")
+        return """
         query($q:String!,$after:String,$first:Int=50){
           search(query:$q, type:ISSUE, first:$first, after:$after){
             pageInfo{endCursor hasNextPage}
-            nodes{... on Issue{...issueRowFields\(withAssignment ? " " + assignedEvents : "")}}
+            nodes{... on Issue{...issueRowFields\(extra)}}
           }
         }
         \(issueRowFields)

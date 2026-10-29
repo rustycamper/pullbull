@@ -38,7 +38,9 @@ extension PREvent {
         case .changesRequested: "Changes requested"
         case .ciFailed: "CI failed"
         case .newComment: "New comment"
+        case .readyToMerge: "Ready to merge"
         case .merged: "Merged"
+        case .commentAfterMyReview: "New comment since your review"
         }
     }
 }
@@ -58,6 +60,7 @@ extension IssueEvent {
     private var eventName: String {
         switch kind {
         case .assigned: "Assigned to you"
+        case .comment: count == 1 ? "New comment" : "\(count) new comments"
         }
     }
 }

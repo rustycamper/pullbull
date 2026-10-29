@@ -468,11 +468,12 @@ public struct GitHubAPI: Sendable {
 
     /// Issue search, up to `maxPages` pages of `pageSize`; `hasMore` when GitHub has further results. Nodes
     /// that are not decodable issues are skipped. With a `viewer`, each issue carries the viewer's
-    /// latest assignment.
+    /// latest assignment. `lastComment` adds each issue's newest comment author, for comment notifications.
     public func searchIssues(
-        _ query: String, maxPages: Int = 20, pageSize: Int = 50, assignmentFor viewer: String? = nil
+        _ query: String, maxPages: Int = 20, pageSize: Int = 50, assignmentFor viewer: String? = nil,
+        lastComment: Bool = false
     ) async throws -> (issues: [BoardIssue], hasMore: Bool) {
-        let graphQL = Queries.issueSearch(withAssignment: viewer != nil)
+        let graphQL = Queries.issueSearch(withAssignment: viewer != nil, withLastComment: lastComment)
         var result: [BoardIssue] = []
         var after: String?
         for _ in 0..<maxPages {

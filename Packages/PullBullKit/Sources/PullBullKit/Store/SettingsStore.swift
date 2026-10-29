@@ -20,6 +20,14 @@ public struct NotificationToggles: Codable, Equatable, Sendable {
     public var merged = true
     /// Off by default: an issue newly assigned to me by someone else.
     public var issueAssigned = false
+    /// Off by default: my pull request became ready to merge (approved, checks green, no conflicts).
+    public var readyToMerge = false
+    /// Off by default: someone else commented on a pull request I reviewed.
+    public var commentAfterMyReview = false
+    /// Someone else commented on an open issue assigned to me.
+    public var assignedIssueComment = true
+    /// Off by default: someone else commented on an open issue I created.
+    public var createdIssueComment = false
 
     public init() {}
 
@@ -34,6 +42,10 @@ public struct NotificationToggles: Codable, Equatable, Sendable {
         d.newComment = c.readable(Bool.self, forKey: .newComment) ?? d.newComment
         d.merged = c.readable(Bool.self, forKey: .merged) ?? d.merged
         d.issueAssigned = c.readable(Bool.self, forKey: .issueAssigned) ?? d.issueAssigned
+        d.readyToMerge = c.readable(Bool.self, forKey: .readyToMerge) ?? d.readyToMerge
+        d.commentAfterMyReview = c.readable(Bool.self, forKey: .commentAfterMyReview) ?? d.commentAfterMyReview
+        d.assignedIssueComment = c.readable(Bool.self, forKey: .assignedIssueComment) ?? d.assignedIssueComment
+        d.createdIssueComment = c.readable(Bool.self, forKey: .createdIssueComment) ?? d.createdIssueComment
         self = d
     }
 }
