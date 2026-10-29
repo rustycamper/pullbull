@@ -14,7 +14,7 @@ struct AskSettingsTab: View {
         Form {
             Section {
                 Toggle(isOn: Binding(get: { isOn }, set: { model.setAskEnabled($0) })) {
-                    RowLabel("Ask", note: "Find PRs and issues by description, answered by Claude with your own key.")
+                    RowLabel("Ask AI", note: "Find PRs and issues by description, answered by Claude with your own key.")
                 }
             }
             Section {
@@ -35,14 +35,14 @@ struct AskSettingsTab: View {
                     .listRowInsets(EdgeInsets())
                     .disabled(!isOn)
             } header: {
-                Text("Exclude from Ask")
+                Text("Exclude from Ask AI")
             } footer: {
                 Text("Excluded repositories are never indexed or sent.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
             Section {
-                Text("Ask sends your question and up to 40 matching PR and issue descriptions to Anthropic. Nothing is sent until you ask, except a check of the key when you save it.")
+                Text("Ask AI sends your question and up to 40 matching PR and issue descriptions to Anthropic. Nothing is sent until you ask, except a check of the key when you save it.")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -88,7 +88,7 @@ struct AskSettingsTab: View {
     private var keyStatus: some View {
         switch model.askKeyState {
         case .none:
-            Text(isOn ? "No key saved." : "Turn Ask on to save a key.")
+            Text(isOn ? "No key saved." : "Turn Ask AI on to save a key.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         case .checking:

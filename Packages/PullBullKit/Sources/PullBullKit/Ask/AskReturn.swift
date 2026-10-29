@@ -26,7 +26,7 @@ public struct AskReturn: Equatable, Sendable {
     public mutating func close() -> Place { openers.popLast() ?? .list }
 
     /// The back button's title for the innermost detail: "Ask results" only when Ask opened it.
-    public var backTitle: String? { openers.last == .ask ? "Ask results" : nil }
+    public var backTitle: String? { openers.last == .ask ? "Ask AI results" : nil }
 
     /// Leaving Ask or the popover closing drops every open detail.
     public mutating func reset() { openers.removeAll() }

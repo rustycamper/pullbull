@@ -8,12 +8,12 @@ private let closedAt = Date(timeIntervalSince1970: 1_800_000_000)
     var route = AskReturn()
     // Ask opens an issue; the issue opens a linked PR.
     route.open(from: .ask)
-    #expect(route.backTitle == "Ask results")
+    #expect(route.backTitle == "Ask AI results")
     route.open(from: .issueDetail)
     #expect(route.backTitle == nil)
     // Closing the PR comes back through the issue, then to Ask.
     #expect(route.close() == .issueDetail)
-    #expect(route.backTitle == "Ask results")
+    #expect(route.backTitle == "Ask AI results")
     #expect(route.close() == .ask)
     // Nothing open: the list.
     #expect(route.close() == .list)
@@ -146,7 +146,7 @@ private func answered(_ question: String) -> AskOutcome {
     var state = AskState()
     let token = state.begin("q")
     state.needsKey()
-    #expect(state.notice == "Add an Anthropic API key in Settings → Ask")
+    #expect(state.notice == "Add an Anthropic API key in Settings → Ask AI")
     #expect(state.asking == nil)
     #expect(state.outcome == nil)
     #expect(state.land(answered("q"), token: token) == .ignored)
@@ -194,7 +194,7 @@ private func answered(_ question: String) -> AskOutcome {
     var state = AskState()
     let token = state.begin("q")
     state.refuse(AskState.indexNotReadyNotice)
-    #expect(state.notice == "Ask index isn't ready yet.")
+    #expect(state.notice == "Ask AI index isn't ready yet.")
     #expect(state.asking == nil)
     #expect(state.land(answered("q"), token: token) == .ignored)
 }

@@ -13,9 +13,9 @@ public struct AskState: Equatable, Sendable {
         case ignored
     }
 
-    public static let needsKeyNotice = "Add an Anthropic API key in Settings → Ask"
+    public static let needsKeyNotice = "Add an Anthropic API key in Settings → Ask AI"
     /// A key is saved but the index hasn't opened (and reported no error).
-    public static let indexNotReadyNotice = "Ask index isn't ready yet."
+    public static let indexNotReadyNotice = "Ask AI index isn't ready yet."
 
     /// The question in flight; nil when none runs.
     public private(set) var asking: String?

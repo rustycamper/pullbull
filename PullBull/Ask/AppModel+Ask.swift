@@ -194,7 +194,7 @@ extension AppModel {
             index = try AskIndex(fileURL: url)
         } catch {
             let reason = (error as? AskIndex.IndexError)?.message ?? error.localizedDescription
-            askOpenError = "Couldn't open the Ask index (\(reason))."
+            askOpenError = "Couldn't open the Ask AI index (\(reason))."
             throw error
         }
         askOpenError = nil

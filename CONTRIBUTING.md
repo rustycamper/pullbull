@@ -29,7 +29,7 @@ CI on PRs from forks waits for a maintainer's approval.
 | | Why |
 |---|---|
 | Writing to GitHub (merge, comment, approve) | PullBull is read-only |
-| Telemetry, analytics, crash SDKs | No data leaves the Mac except to GitHub, and to Anthropic when you use Ask |
+| Telemetry, analytics, crash SDKs | No data leaves the Mac except to GitHub, and to Anthropic when you use Ask AI |
 | New third-party dependencies | Sparkle is the only one |
 | Web views | Native SwiftUI and AppKit only |
 

@@ -41,7 +41,7 @@ struct SettingsView: View {
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(SettingsTab.search)
             AskSettingsTab(model: model)
-                .tabItem { Label("Ask", systemImage: "text.magnifyingglass") }
+                .tabItem { Label("Ask AI", systemImage: "text.magnifyingglass") }
                 .tag(SettingsTab.ask)
         }
         .frame(width: 520)

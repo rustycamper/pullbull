@@ -69,7 +69,7 @@ Keyboard-first · Native SwiftUI · Read-only
 
 Combine `@`, `~`, `is:` and words. Save the searches you repeat.
 
-Can't remember the words? [Ask](docs/manual.md#ask) finds the item from a description. Off by default.
+Can't remember the words? [Ask AI](docs/manual.md#ask-ai) finds the item from a description. Off by default.
 
 ## Keys
 

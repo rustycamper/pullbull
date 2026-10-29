@@ -105,9 +105,9 @@ struct SearchResultsView: View {
             }
             // Ask is offered only once a key is saved; ⌥⌘↩ is the one way to send anything to Anthropic.
             if model.offersAsk {
-                Text("⌥⌘↩ Ask")
+                Text("⌥⌘↩ Ask AI")
                     .fixedSize()
-                    .accessibilityLabel("Option Command Return to Ask")
+                    .accessibilityLabel("Option Command Return to Ask AI")
             }
         }
         .font(.system(size: 11))
@@ -220,7 +220,7 @@ struct SearchResultsView: View {
                 }
                 // With a key saved, Ask may find it from a looser description.
                 if model.offersAsk {
-                    Text("Try other words, or ⌥⌘↩ to Ask.")
+                    Text("Try other words, or ⌥⌘↩ to Ask AI.")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)

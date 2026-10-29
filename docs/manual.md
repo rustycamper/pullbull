@@ -2,7 +2,7 @@
 
 Every tab, key and setting. Overview: [README](../README.md).
 
-[Install](#install) · [Sign in](#sign-in) · [Pull Requests](#pull-requests) · [Issues](#issues) · [Search](#search) · [Ask](#ask) · [Keyboard](#keyboard) · [One repo](#one-repo) · [Settings](#settings) · [Data](#data) · [Build](#build-from-source)
+[Install](#install) · [Sign in](#sign-in) · [Pull Requests](#pull-requests) · [Issues](#issues) · [Search](#search) · [Ask AI](#ask-ai) · [Keyboard](#keyboard) · [One repo](#one-repo) · [Settings](#settings) · [Data](#data) · [Build](#build-from-source)
 
 ## Install
 
@@ -120,24 +120,24 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 | <kbd>Return</kbd> · <kbd>Tab</kbd> | Complete |
 | <kbd>Esc</kbd> | Close |
 
-## Ask
+## Ask AI
 
 <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> in the search field. Finds a PR or issue from a loose description ("the one that fixed the login redirect, last week") and answers a short question about it, using Anthropic's API with your own key. Off by default.
 
 ### Set up
 
-Settings → Ask.
+Settings → Ask AI.
 
 | Control | Default |
 |---|---|
 | Ask on/off | Off |
 | Anthropic API key | Empty. Stored in the Keychain only |
 | Model | Sonnet 5.5. Haiku 5.5 is cheaper and less accurate |
-| Exclude from Ask | Empty. Pick from the repos of the current org or scope; excluded repos are never stored or sent |
+| Exclude from Ask AI | Empty. Pick from the repos of the current org or scope; excluded repos are never stored or sent |
 | Index | Shown while Ask is on: items indexed, backfill progress ("N of ~M") or last sync, **Rebuild** |
 
 - The key can be saved only while Ask is on. It is checked when you save it (`GET /v1/models`, free). A bad key never reaches a question
-- Without a key, <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> says "Add an Anthropic API key in Settings → Ask" and sends nothing
+- Without a key, <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> says "Add an Anthropic API key in Settings → Ask AI" and sends nothing
 
 ### What is sent
 
@@ -158,7 +158,7 @@ Settings → Ask.
 | Ask | Type the description, press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd>. Normal results stay on screen; an "Asking…" row shows at the top |
 | Cancel | <kbd>Esc</kbd>, or edit the field |
 | Answer | Answer on top, then PRs and issues in one list, each with a line on why it matched |
-| Open | <kbd>Return</kbd> opens the item in its own mode. <kbd>Esc</kbd> or <kbd>←</kbd> in the detail returns to Ask |
+| Open | <kbd>Return</kbd> opens the item in its own mode. <kbd>Esc</kbd> or <kbd>←</kbd> in the detail returns to Ask AI |
 | GitHub · copy | <kbd>⌘</kbd><kbd>Return</kbd> opens on GitHub. Copy keys work as in the list |
 | Edit and re-ask | <kbd>Esc</kbd> or <kbd>←</kbd> on Ask returns to the field with the question kept |
 | Empty or edit the field | Back to normal search |
@@ -195,7 +195,7 @@ Settings → Ask.
 | <kbd>⌘</kbd><kbd>C</kbd> | Copy link |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd> | Copy `owner/repo#123` |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy Markdown link |
-| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | [Ask](#ask), from the search field |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | [Ask AI](#ask-ai), from the search field |
 | <kbd>⌘</kbd><kbd>1</kbd> · <kbd>⌘</kbd><kbd>2</kbd> | Pull Requests · Issues |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> | Repo menu |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> | Board menu |
@@ -230,7 +230,7 @@ Reopen within a minute and the detail is still there.
 | Account | Account, org, board, access notices |
 | Notifications | One toggle per event |
 | Search | Saved searches |
-| Ask | [Ask](#ask): on/off, key, model, exclude list, index |
+| Ask AI | [Ask AI](#ask-ai): on/off, key, model, exclude list, index |
 
 | Notification | Default |
 |---|---|
