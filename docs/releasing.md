@@ -17,7 +17,7 @@ Then [bump the Homebrew cask](#homebrew-cask).
 3. **Sign:** export with Developer ID (`scripts/ExportOptions.plist`), check signature, keychain entitlement, version and Sparkle key
 4. **dSYM:** check its UUIDs against the app, zip it
 5. **Notarise:** notarise and staple
-6. **Package:** zip, sign the zip for Sparkle, write `appcast.xml`
+6. **Package:** zip, sign the zip for Sparkle, write `appcast.xml` with the release notes as the item's Markdown `<description>`
 7. **Tag:** annotated `v<version>`, local only
 
 - Output: `build/release/`
@@ -35,6 +35,8 @@ Written by hand for each release, for users rather than as a PR list, in `build/
 - End with `**Full changelog**: https://github.com/rustycamper/pullbull/compare/v<previous>...v<version>`
 
 Start from `git log --oneline v<previous>..origin/main` and the PR descriptions. Get the owner's OK on the draft before building.
+
+The same file is the GitHub release's description and the notes in Sparkle's update dialog: `release.sh` embeds it in the appcast item as `<description sparkle:format="markdown">` (Sparkle 2.9+, macOS 12+). Keep it to Markdown the dialog renders well: headings, lists, bold, links; no images or HTML.
 
 ## Ask model list
 

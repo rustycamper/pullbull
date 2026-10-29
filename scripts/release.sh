@@ -3,7 +3,8 @@
 # build number, exports it signed with Developer ID, notarises and staples it, zips it, signs the zip for
 # Sparkle, zips the dSYM and writes appcast.xml. Only once all of that succeeds does it tag v<VERSION> locally (an
 # annotated tag) and print the push and `gh release create` commands. It never commits, pushes or publishes.
-# The release notes are written by hand beforehand, in build/release/notes-VERSION.md (see docs/releasing.md).
+# The release notes are written by hand beforehand, in build/release/notes-VERSION.md (see docs/releasing.md); they
+# become the GitHub release's description and, as Markdown in appcast.xml, the notes Sparkle's update dialog shows.
 #
 #   scripts/release.sh VERSION           e.g. scripts/release.sh 1.0.0
 #   scripts/release.sh --check VERSION   preflight only: reports every problem and changes nothing
@@ -26,7 +27,7 @@ version=
 for arg in "$@"; do
   case $arg in
     --check) check_only=true ;;
-    -h|--help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "Unknown option: $arg" >&2; exit 2 ;;
     *) version=$arg ;;
   esac
@@ -113,9 +114,13 @@ else
   previous_feed=
 fi
 
-[[ -s $NOTES ]] \
-  || fail "No release notes in $NOTES. Write them first: what's new for users, grouped by feature, then
+if [[ -s $NOTES ]]; then
+  # They go into appcast.xml inside CDATA, which this would end.
+  ! grep -q ']]>' "$NOTES" || fail "$NOTES contains ']]>', which would break appcast.xml. Reword that line."
+else
+  fail "No release notes in $NOTES. Write them first: what's new for users, grouped by feature, then
   fixes, ending with the full changelog link (see docs/releasing.md)."
+fi
 
 for tool in xcodegen xcodebuild ditto curl; do
   command -v "$tool" > /dev/null || fail "$tool is not installed."
@@ -231,6 +236,9 @@ cat > "$item" <<ITEM
       <sparkle:version>$build</sparkle:version>
       <sparkle:shortVersionString>$version</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description sparkle:format="markdown"><![CDATA[
+$(<"$NOTES")
+]]></description>
       <enclosure url="$REPO_URL/releases/download/$tag/PullBull-$version.zip" type="application/octet-stream" $enclosure_signature/>
     </item>
 ITEM
