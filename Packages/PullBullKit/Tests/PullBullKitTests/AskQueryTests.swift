@@ -23,6 +23,14 @@ struct AskQueryTests {
         #expect(AskQuery.match("(naïve) ^ünï-col:x") == #""naïve" OR "ünï" OR "col""#)
     }
 
+    @Test func matchSplitsSyntaxOutOfGraphemeClusters() throws {
+        // U+0D4E is a prepend letter, so it and the following `"` form one Character.
+        let question = "\u{0D4E}\"xy ab*\u{0301}cd"
+        let match = try #require(AskQuery.match(question))
+        #expect(match == #""xy" OR "ab" OR "\#u{0301}cd""#)
+        #expect(match.unicodeScalars.filter { $0 == "\"" }.count == 6)
+    }
+
     @Test func askKeyRoundTrips() {
         #expect(PRKey(repo: "o/r", number: 5).askKey == "o/r#5")
         #expect(PRKey(askKey: "o/r#5") == PRKey(repo: "o/r", number: 5))

@@ -19,9 +19,10 @@ public enum AskQuery {
             if current.count >= 2, !stopwords.contains(current) { words.append(current) }
             current = ""
         }
-        for character in question.lowercased() {
-            if character.isLetter || character.isNumber {
-                current.append(character)
+        // Per scalar, not per Character: a grapheme cluster can start with a letter and still carry a `"`.
+        for scalar in question.lowercased().unicodeScalars {
+            if isWordScalar(scalar) {
+                current.unicodeScalars.append(scalar)
             } else {
                 flush()
             }
@@ -29,5 +30,15 @@ public enum AskQuery {
         flush()
         guard !words.isEmpty else { return nil }
         return words.map { "\"\($0)\"" }.joined(separator: " OR ")
+    }
+
+    /// Letters, numbers and combining marks; never FTS5 syntax.
+    static func isWordScalar(_ scalar: Unicode.Scalar) -> Bool {
+        let properties = scalar.properties
+        if properties.isAlphabetic || properties.numericType != nil { return true }
+        switch properties.generalCategory {
+        case .nonspacingMark, .spacingMark, .enclosingMark: return true
+        default: return false
+        }
     }
 }
