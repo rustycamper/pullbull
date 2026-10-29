@@ -195,43 +195,24 @@ struct SearchResultsView: View {
             // Nothing to search yet because loading failed: say so instead of searching forever.
             failure(
                 model.message(for: error),
-                symbol: error == .offline ? "wifi.slash" : "exclamationmark.triangle")
+                symbol: error == .offline ? "wifi.slash" : "exclamationmark.triangle", retry: { model.refresh() })
         } else if let fallback = model.searchFallback {
             fallbackLine(fallback)
         } else if let message = results?.failure(in: model.mode) {
-            failure(message, symbol: "wifi.slash")
+            failure(message, symbol: "wifi.slash", retry: { model.retrySearch() })
         } else if let scopeTitle, let results, results.phase == .done, results.isEmpty(in: model.mode) {
             narrowedEmpty(scopeTitle)
         } else if let message = results?.emptyMessage(
             org: focusName ?? org, query: model.searchQuery, scope: model.snapshot?.scope, mode: model.mode) {
-            VStack(spacing: 10) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 48, height: 48)
-                    .background(Circle().fill(Palette.fill))
-                    .accessibilityHidden(true)
-                Text(message)
-                    .font(.system(size: 13, weight: .medium))
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
+            ListStateView(symbol: "magnifyingglass", title: message) {
                 if let unknown = unknownToken {
-                    Text("\(unknown) isn't on anything PullBull has loaded")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
+                    footerLine("\(unknown) isn't on anything PullBull has loaded")
                 }
                 // With a key saved, Ask may find it from a looser description.
                 if model.offersAsk {
-                    Text("Try other words, or ⌥⌘↩ to Ask AI.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
+                    footerLine("Try other words, or ⌥⌘↩ to Ask AI.")
                 }
             }
-            .padding(.horizontal, 40)
         } else {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
@@ -244,24 +225,13 @@ struct SearchResultsView: View {
 
     /// No match among the narrowed tab's items, with the way back to everything.
     private func narrowedEmpty(_ tab: String) -> some View {
-        VStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 20))
-                .foregroundStyle(.secondary)
-                .frame(width: 48, height: 48)
-                .background(Circle().fill(Palette.fill))
-                .accessibilityHidden(true)
-            Text(SearchContext.noMatches(inTab: tab))
-                .font(.system(size: 13, weight: .medium))
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+        ListStateView(symbol: "magnifyingglass", title: SearchContext.noMatches(inTab: tab)) {
             Button("Search everything") { model.searchEverything() }
                 .buttonStyle(.link)
                 .font(.system(size: 11))
                 .help(model.mode == .issues
                     ? "Search every issue for this query" : "Search every pull request for this query")
         }
-        .padding(.horizontal, 40)
     }
 
     /// Only the other mode's kind matches: one quiet line in the empty message's place, which switches
@@ -289,18 +259,18 @@ struct SearchResultsView: View {
         return labels.first { !model.labels.contains($0) }.map(SearchQuery.labelToken)
     }
 
-    private func failure(_ message: String, symbol: String) -> some View {
-        VStack(spacing: 10) {
-            Image(systemName: symbol)
-                .font(.system(size: 20))
-                .foregroundStyle(Palette.amberGlyph)
-                .accessibilityHidden(true)
-            Text(message)
-                .font(.system(size: 13, weight: .medium))
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 40)
+    private func failure(_ message: String, symbol: String, retry: @escaping () -> Void) -> some View {
+        ListStateView(
+            symbol: symbol, tone: .warning, title: message,
+            action: .init(title: "Retry", help: "Retry", perform: retry))
+    }
+
+    private func footerLine(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: Groups

@@ -161,24 +161,7 @@ private struct EmptyTabView: View {
     let now: Date
 
     var body: some View {
-        VStack(spacing: 10) {
-            Image(symbol: symbol)
-                .font(.system(size: 20, weight: .regular))
-                .foregroundStyle(.secondary)
-                .frame(width: 48, height: 48)
-                .background(Circle().fill(Palette.fill))
-            Text(title)
-                .font(.system(size: 14, weight: .semibold))
-                .padding(.top, 4)
-            // At least two lines held, so the one-line "You cleared…" copy doesn't move the view.
-            ZStack {
-                Text(verbatim: " \n ").hidden()
-                Text(subtitle)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .font(.system(size: 12))
+        ListStateView(symbol: symbol, title: title, detail: subtitle) {
             if tab == .review && model.settings.hideApprovedByMe && model.hiddenApprovedCount > 0 {
                 let n = model.hiddenApprovedCount
                 HStack(spacing: 4) {
@@ -188,11 +171,9 @@ private struct EmptyTabView: View {
                         .buttonStyle(.link)
                 }
                 .font(.system(size: 11))
-                .padding(.top, 6)
+                .padding(.top, 2)
             }
         }
-        .padding(.horizontal, 40)
-        .frame(maxWidth: .infinity)
     }
 
     private var symbol: String {

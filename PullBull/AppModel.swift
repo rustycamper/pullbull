@@ -843,6 +843,11 @@ final class AppModel {
         runSearch(searchQuery, debounced: false)
     }
 
+    /// "Retry" on a failed search: the same query again, without the typing delay.
+    func retrySearch() {
+        runSearch(searchQuery, debounced: false)
+    }
+
     /// `searchMatchCounts` for `query`, from the current lists and focus.
     private func refreshSearchMatchCounts(for query: SearchQuery) {
         searchMatchCounts = SearchNarrowing.counts(
