@@ -235,6 +235,50 @@ public struct Assignment: Codable, Sendable, Hashable {
     }
 }
 
+/// Someone closing or reopening an issue, from its timeline.
+public struct IssueStateChange: Codable, Sendable, Hashable {
+    /// Nil for a deleted (ghost) actor.
+    public let actor: String?
+    public let at: Date
+
+    public init(actor: String?, at: Date) {
+        self.actor = actor
+        self.at = at
+    }
+}
+
+/// A card's Status moving on a board, from the issue's timeline. `from` is nil when the card was just
+/// added to the board.
+public struct StatusMove: Codable, Sendable, Hashable {
+    public let actor: String?
+    /// The actor is an app or workflow (GitHub's `Bot`), such as the board's own automation; nil in
+    /// moves cached before it was stored.
+    public let byBot: Bool?
+    public let from: String?
+    public let to: String?
+    public let at: Date
+    public let project: Int
+    /// The board owner's login.
+    public let owner: String
+
+    public init(
+        actor: String?, byBot: Bool? = false, from: String?, to: String?, at: Date, project: Int, owner: String
+    ) {
+        self.actor = actor
+        self.byBot = byBot
+        self.from = from
+        self.to = to
+        self.at = at
+        self.project = project
+        self.owner = owner
+    }
+
+    /// Whether the move happened on `project` of `owner`, which GitHub compares without regard to case.
+    public func isOn(project: Int, owner: String) -> Bool {
+        self.project == project && self.owner.caseInsensitiveCompare(owner) == .orderedSame
+    }
+}
+
 public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
     public var id: PRKey { key }
     public let key: PRKey
@@ -248,6 +292,9 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
     public let updatedAt: Date?
     public let closedAt: Date?
     public let commentCount: Int
+    /// The newest comment's author; set only on Assigned and Created search results, nil for a deleted
+    /// (ghost) author and in issues cached before it was stored.
+    public let lastCommentAuthor: String?
     public let labels: [String]
     /// GitHub's 6-hex colour for each of `labels`, by position; nil where it's missing, and empty in
     /// issues cached before it was stored. Read it through `labelColor(at:)`.
@@ -259,6 +306,13 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
     public let boardItemId: Int?
     /// Set only on Assigned search results.
     public let myAssignment: Assignment?
+    /// The latest Status moves on any board, oldest first; set only on Assigned and Created search
+    /// results, empty otherwise and in issues cached before it was stored.
+    public let statusMoves: [StatusMove]
+    /// The latest reopening; set only on Assigned and Created search results.
+    public let lastReopen: IssueStateChange?
+    /// The latest closing; set only on issues looked up after they left Assigned or Created.
+    public let lastClose: IssueStateChange?
 
     /// The colour of the label at `index`, nil when GitHub gave none or the cache predates it.
     public func labelColor(at index: Int) -> String? {
@@ -277,8 +331,10 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
         key: PRKey, title: String, url: URL, isOpen: Bool,
         author: String? = nil, stateReason: IssueStateReason? = nil,
         createdAt: Date? = nil, updatedAt: Date? = nil, closedAt: Date? = nil,
-        commentCount: Int = 0, labels: [String] = [], labelColors: [String?] = [], assignees: [Assignee] = [],
-        status: BoardStatusValue? = nil, boardItemId: Int? = nil, myAssignment: Assignment? = nil
+        commentCount: Int = 0, lastCommentAuthor: String? = nil, labels: [String] = [], labelColors: [String?] = [],
+        assignees: [Assignee] = [], status: BoardStatusValue? = nil, boardItemId: Int? = nil,
+        myAssignment: Assignment? = nil, statusMoves: [StatusMove] = [], lastReopen: IssueStateChange? = nil,
+        lastClose: IssueStateChange? = nil
     ) {
         self.key = key
         self.title = title
@@ -290,12 +346,16 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
         self.updatedAt = updatedAt
         self.closedAt = closedAt
         self.commentCount = commentCount
+        self.lastCommentAuthor = lastCommentAuthor
         self.labels = labels
         self.labelColors = labelColors
         self.assignees = assignees
         self.status = status
         self.boardItemId = boardItemId
         self.myAssignment = myAssignment
+        self.statusMoves = statusMoves
+        self.lastReopen = lastReopen
+        self.lastClose = lastClose
     }
 
     /// Issues cached before the Issues mode hold only key, title, url and isOpen.
@@ -311,11 +371,15 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt)
         closedAt = try c.decodeIfPresent(Date.self, forKey: .closedAt)
         commentCount = try c.decodeIfPresent(Int.self, forKey: .commentCount) ?? 0
+        lastCommentAuthor = try c.decodeIfPresent(String.self, forKey: .lastCommentAuthor)
         labels = try c.decodeIfPresent([String].self, forKey: .labels) ?? []
         labelColors = try c.decodeIfPresent([String?].self, forKey: .labelColors) ?? []
         assignees = try c.decodeIfPresent([Assignee].self, forKey: .assignees) ?? []
         status = try c.decodeIfPresent(BoardStatusValue.self, forKey: .status)
         boardItemId = try c.decodeIfPresent(Int.self, forKey: .boardItemId)
         myAssignment = try c.decodeIfPresent(Assignment.self, forKey: .myAssignment)
+        statusMoves = try c.decodeIfPresent([StatusMove].self, forKey: .statusMoves) ?? []
+        lastReopen = try c.decodeIfPresent(IssueStateChange.self, forKey: .lastReopen)
+        lastClose = try c.decodeIfPresent(IssueStateChange.self, forKey: .lastClose)
     }
 }

@@ -7,14 +7,14 @@ private let now = Date(timeIntervalSince1970: 1_800_000_000)
 private func pr(
     _ n: Int, author: String = "alice", ci: CIState = .none, comments: Int = 0,
     lastCommenter: String? = nil, reviews: [Review] = [], requests: [Reviewer] = [],
-    draft: Bool = false, updated: Date = now
+    draft: Bool = false, updated: Date = now, mergeable: Mergeable? = nil
 ) -> PullRequest {
     PullRequest(
         key: PRKey(repo: "r", number: n), title: "t\(n)", url: URL(string: "https://x/\(n)")!,
         author: author, authorAvatarURL: nil, state: .open, isDraft: draft,
         createdAt: now, updatedAt: updated, closedAt: nil, headRef: "h", baseRef: "main", ci: ci,
         headCommitDate: nil, commentCount: comments, lastCommentAuthor: lastCommenter,
-        latestReviews: reviews, reviewRequests: requests)
+        latestReviews: reviews, reviewRequests: requests, mergeable: mergeable)
 }
 
 private func snap(review: [PullRequest] = [], mine: [PullRequest] = []) -> Snapshot {
@@ -322,5 +322,307 @@ private var issuesOn: NotificationToggles {
         #expect(run(old, next).map { "\($0.issue.key.repo)#\($0.issue.key.number)" } == [
             "initech/gadgets#231", "initech/gadgets#300", "initech/widgets#9",
         ])
+    }
+}
+
+// MARK: - Ready to merge, comments after my review
+
+@Suite struct ReadyAndReviewCommentTests {
+    private let approval = Review(author: "bob", state: .approved, submittedAt: now)
+    private let myReview = Review(author: "me", state: .commented, submittedAt: now)
+
+    private var on: NotificationToggles {
+        var t = NotificationToggles()
+        t.readyToMerge = true
+        t.commentAfterMyReview = true
+        return t
+    }
+
+    @Test func readyToMergeFiresOnceWhenMyPRTurnsReady() {
+        let waiting = snap(mine: [pr(1, author: "me", ci: .pending, reviews: [approval])])
+        let ready = snap(mine: [pr(1, author: "me", ci: .success, reviews: [approval])])
+        #expect(events(waiting, ready, toggles: on).map(\.kind) == [.readyToMerge])
+        #expect(events(ready, ready, toggles: on).isEmpty)
+        // Off by default.
+        #expect(events(waiting, ready).isEmpty)
+    }
+
+    /// GitHub recomputing mergeability after a push isn't ready: it may still be conflicting.
+    @Test func readyToMergeWaitsForMergeability() {
+        let conflicting = snap(mine: [pr(1, author: "me", ci: .success, reviews: [approval], mergeable: .conflicting)])
+        let computing = snap(mine: [pr(1, author: "me", ci: .success, reviews: [approval], mergeable: .unknown)])
+        let clean = snap(mine: [pr(1, author: "me", ci: .success, reviews: [approval], mergeable: .mergeable)])
+        #expect(events(conflicting, computing, toggles: on).isEmpty)
+        #expect(events(computing, clean, toggles: on).isEmpty)
+        #expect(events(conflicting, clean, toggles: on).map(\.kind) == [.readyToMerge])
+    }
+
+    /// A push clears the checks until they start; that gap isn't ready, so it doesn't fire a second time.
+    @Test func readyToMergeIgnoresChecksNotYetStarted() {
+        let passed = snap(mine: [pr(1, author: "me", ci: .success, reviews: [approval])])
+        let pushed = snap(mine: [pr(1, author: "me", ci: .none, reviews: [approval])])
+        let failed = snap(mine: [pr(1, author: "me", ci: .failure, reviews: [approval])])
+        #expect(!events(failed, pushed, toggles: on).contains { $0.kind == .readyToMerge })
+        #expect(events(passed, pushed, toggles: on).isEmpty)
+        // A repo without checks is ready on approval.
+        let unapproved = snap(mine: [pr(2, author: "me")])
+        let approved = snap(mine: [pr(2, author: "me", reviews: [approval])])
+        #expect(events(unapproved, approved, toggles: on).map(\.kind).contains(.readyToMerge))
+    }
+
+    @Test func commentAfterMyReviewFiresForOthersComments() {
+        let before = snap(review: [pr(1, comments: 2, reviews: [myReview])])
+        let after = snap(review: [pr(1, comments: 3, lastCommenter: "alice", reviews: [myReview])])
+        let e = events(before, after, toggles: on)
+        #expect(e.map(\.kind) == [.commentAfterMyReview])
+        #expect(e.first?.actor == "alice")
+        #expect(events(before, after).isEmpty)
+    }
+
+    @Test func commentAfterMyReviewIgnoresMineAndUnreviewed() {
+        // My own comment.
+        let before = snap(review: [pr(1, comments: 2, reviews: [myReview])])
+        let mine = snap(review: [pr(1, comments: 3, lastCommenter: "me", reviews: [myReview])])
+        #expect(events(before, mine, toggles: on).isEmpty)
+        // A PR I haven't reviewed (only requested): not "after my review".
+        // A draft review of mine I haven't submitted.
+        let draft = Review(author: "me", state: .pending, submittedAt: now)
+        let drafted = snap(review: [pr(3, comments: 0, reviews: [draft])])
+        let replied = snap(review: [pr(3, comments: 1, lastCommenter: "alice", reviews: [draft])])
+        #expect(events(drafted, replied, toggles: on).isEmpty)
+        let requested = snap(review: [pr(2, comments: 0, requests: [.user("me")])])
+        let commented = snap(review: [pr(2, comments: 1, lastCommenter: "alice", requests: [.user("me")])])
+        #expect(!events(requested, commented, toggles: on).contains { $0.kind == .commentAfterMyReview })
+    }
+}
+
+// MARK: - Issue comments
+
+private func commented(_ n: Int, comments: Int, by author: String? = "dev-b") -> BoardIssue {
+    BoardIssue(
+        key: PRKey(repo: "initech/gadgets", number: n), title: "Issue \(n)", url: URL(string: "https://x/i\(n)")!,
+        isOpen: true, commentCount: comments, lastCommentAuthor: author)
+}
+
+private func issueSnap(_ offset: TimeInterval, assigned: [BoardIssue]?, created: [BoardIssue]?) -> Snapshot {
+    Snapshot(
+        fetchedAt: t0.addingTimeInterval(offset),
+        org: OrgContext(org: "initech", viewer: "devon", members: [], myTeams: [], repos: []),
+        reviewCandidates: [], mine: [], team: [], recentlyClosed: [], boardIssues: [],
+        assignedIssues: assigned, createdIssues: created)
+}
+
+@Suite struct IssueCommentTests {
+    private func run(_ old: Snapshot, _ new: Snapshot, _ toggles: NotificationToggles = .init()) -> [IssueEvent] {
+        ChangeDetector.issueEvents(old: old, new: new, me: "devon", toggles: toggles)
+    }
+
+    @Test func commentOnAssignedIssueNotifiesByDefault() {
+        let old = issueSnap(0, assigned: [commented(1, comments: 1)], created: [])
+        let new = issueSnap(120, assigned: [commented(1, comments: 4, by: "dev-b")], created: [])
+        let e = run(old, new)
+        #expect(e.map(\.kind) == [.comment])
+        #expect(e.first?.count == 3)
+        #expect(e.first?.actor == "dev-b")
+        #expect(e.first?.notificationTitle == "gadgets #1 · 3 new comments")
+    }
+
+    @Test func myOwnCommentIsSilent() {
+        let old = issueSnap(0, assigned: [commented(1, comments: 1)], created: [])
+        let new = issueSnap(120, assigned: [commented(1, comments: 2, by: "devon")], created: [])
+        #expect(run(old, new).isEmpty)
+    }
+
+    @Test func createdIssueCommentsAreOffByDefault() {
+        let old = issueSnap(0, assigned: [], created: [commented(2, comments: 0)])
+        let new = issueSnap(120, assigned: [], created: [commented(2, comments: 1)])
+        #expect(run(old, new).isEmpty)
+        var t = NotificationToggles()
+        t.createdIssueComment = true
+        #expect(run(old, new, t).map(\.issue.key.number) == [2])
+    }
+
+    /// An issue both assigned to me and mine notifies once.
+    @Test func assignedAndCreatedNotifyOnce() {
+        var t = NotificationToggles()
+        t.createdIssueComment = true
+        let old = issueSnap(0, assigned: [commented(3, comments: 0)], created: [commented(3, comments: 0)])
+        let new = issueSnap(120, assigned: [commented(3, comments: 1)], created: [commented(3, comments: 1)])
+        #expect(run(old, new, t).count == 1)
+    }
+
+    @Test func searchDecodesTheNewestCommentAuthor() {
+        let node: [String: Any] = [
+            "number": 7, "title": "t", "url": "https://github.com/o/r/issues/7", "state": "OPEN",
+            "repository": ["nameWithOwner": "o/r"], "comments": ["totalCount": 2],
+            "lastComment": ["nodes": [["author": ["login": "dev-b"]]]],
+        ]
+        let issue = Decoding.issue(from: node)
+        #expect(issue?.commentCount == 2)
+        #expect(issue?.lastCommentAuthor == "dev-b")
+        #expect(Queries.issueSearch(withAssignment: false, withActivity: true).contains(Queries.lastCommentAuthor))
+        #expect(!Queries.issueSearch(withAssignment: false).contains("lastComment"))
+    }
+
+    /// A failed search carries an older list (at launch, the cached one) forward; its counts aren't a baseline.
+    @Test func failedPreviousSearchIsNoBaseline() {
+        var old = issueSnap(0, assigned: [commented(1, comments: 1)], created: [])
+        old.assignedIssuesError = "timed out"
+        let new = issueSnap(120, assigned: [commented(1, comments: 6)], created: [])
+        #expect(run(old, new).isEmpty)
+        let next = issueSnap(240, assigned: [commented(1, comments: 7)], created: [])
+        #expect(run(new, next).map(\.count) == [1])
+    }
+
+    /// A newly listed issue's comments aren't news, and neither is a list that wasn't fetched.
+    @Test func newlyListedOrUnfetchedIsSilent() {
+        let old = issueSnap(0, assigned: [], created: nil)
+        let new = issueSnap(120, assigned: [commented(4, comments: 5)], created: [commented(5, comments: 2)])
+        var t = NotificationToggles()
+        t.createdIssueComment = true
+        #expect(run(old, new, t).isEmpty)
+    }
+}
+
+// MARK: - Issue status, closed, reopened
+
+private func tracked(
+    _ n: Int, moves: [StatusMove] = [], reopen: IssueStateChange? = nil, close: IssueStateChange? = nil,
+    open: Bool = true, reason: IssueStateReason? = nil
+) -> BoardIssue {
+    BoardIssue(
+        key: PRKey(repo: "initech/gadgets", number: n), title: "Issue \(n)", url: URL(string: "https://x/i\(n)")!,
+        isOpen: open, stateReason: reason, statusMoves: moves, lastReopen: reopen, lastClose: close)
+}
+
+private func move(
+    _ from: String?, _ to: String?, by actor: String? = "dev-b", at offset: TimeInterval = 60, project: Int = 4,
+    owner: String = "initech"
+) -> StatusMove {
+    StatusMove(actor: actor, from: from, to: to, at: t0.addingTimeInterval(offset), project: project, owner: owner)
+}
+
+private func boardSnap(
+    _ offset: TimeInterval, assigned: [BoardIssue]?, created: [BoardIssue]? = [], closed: [BoardIssue]? = nil
+) -> Snapshot {
+    var snap = issueSnap(offset, assigned: assigned, created: created)
+    snap.boardProject = 4
+    snap.closedIssues = closed
+    return snap
+}
+
+@Suite struct IssueStateTests {
+    private func run(_ old: Snapshot, _ new: Snapshot, _ toggles: NotificationToggles = .init()) -> [IssueEvent] {
+        ChangeDetector.issueEvents(old: old, new: new, me: "devon", toggles: toggles)
+    }
+
+    @Test func statusMoveOnTheBoardNotifiesOnce() {
+        let old = boardSnap(0, assigned: [tracked(1, moves: [move(nil, "Todo", at: -500)])])
+        let new = boardSnap(120, assigned: [tracked(1, moves: [move(nil, "Todo", at: -500), move("Todo", "In Review")])])
+        let e = run(old, new)
+        #expect(e.map(\.kind) == [.statusChanged])
+        #expect(e.first?.notificationTitle == "gadgets #1 · Todo → In Review")
+        #expect(e.first?.actor == "dev-b")
+        // The next poll still lists the same move.
+        #expect(run(new, boardSnap(240, assigned: new.assignedIssues)).isEmpty)
+    }
+
+    @Test func statusMoveIsSilentForMeAutomationOtherBoardsAndNewCards() {
+        let old = boardSnap(0, assigned: [tracked(1), tracked(2), tracked(3), tracked(4), tracked(5)])
+        let new = boardSnap(120, assigned: [
+            tracked(1, moves: [move("Todo", "Done", by: "devon")]),
+            tracked(2, moves: [move("In Progress", "Done", by: "github-project-automation")]),
+            tracked(5, moves: [StatusMove(
+                actor: "board-sync", byBot: true, from: "Todo", to: "Doing", at: t0.addingTimeInterval(60),
+                project: 4, owner: "initech")]),
+            tracked(3, moves: [move("Todo", "Doing", project: 9)]),
+            tracked(4, moves: [move(nil, "Todo")]),
+        ])
+        #expect(run(old, new).isEmpty)
+        // No board at all.
+        var unboarded = new
+        unboarded.boardProject = nil
+        #expect(run(old, unboarded).isEmpty)
+    }
+
+    /// A move from before the previous poll (a cache without moves) isn't news.
+    @Test func oldMoveIsNotNews() {
+        let old = boardSnap(0, assigned: [tracked(1)])
+        let new = boardSnap(120, assigned: [tracked(1, moves: [move("Todo", "Doing", at: -3_600)])])
+        #expect(run(old, new).isEmpty)
+    }
+
+    @Test func createdIssueStatusIsOffByDefault() {
+        let old = boardSnap(0, assigned: [], created: [tracked(5)])
+        let new = boardSnap(120, assigned: [], created: [tracked(5, moves: [move("Todo", "Doing")])])
+        #expect(run(old, new).isEmpty)
+        var t = NotificationToggles()
+        t.createdIssueStatus = true
+        #expect(run(old, new, t).map(\.kind) == [.statusChanged])
+    }
+
+    @Test func closedBySomeoneElseNotifies() {
+        let old = boardSnap(0, assigned: [tracked(1), tracked(2)], created: [tracked(3)])
+        let closer = IssueStateChange(actor: "dev-b", at: t0.addingTimeInterval(60))
+        let mine = IssueStateChange(actor: "devon", at: t0.addingTimeInterval(60))
+        let new = boardSnap(120, assigned: [], created: [], closed: [
+            tracked(1, close: closer, open: false, reason: .notPlanned),
+            tracked(2, close: mine, open: false),
+            tracked(3, close: closer, open: false, reason: .completed),
+        ])
+        let e = run(old, new)
+        #expect(e.map(\.issue.key.number) == [1, 3])
+        #expect(e.map(\.notificationTitle) == ["gadgets #1 · Closed as not planned", "gadgets #3 · Closed"])
+        var t = NotificationToggles()
+        t.assignedIssueClosed = false
+        t.createdIssueClosed = false
+        #expect(run(old, new, t).isEmpty)
+    }
+
+    @Test func reopenedBySomeoneElseNotifies() {
+        let old = boardSnap(0, assigned: [])
+        let new = boardSnap(120, assigned: [
+            tracked(1, reopen: IssueStateChange(actor: "dev-b", at: t0.addingTimeInterval(60))),
+            tracked(2, reopen: IssueStateChange(actor: "devon", at: t0.addingTimeInterval(60))),
+            // Reopened long ago, newly assigned now: the assignment's news, not this.
+            tracked(3, reopen: IssueStateChange(actor: "dev-b", at: t0.addingTimeInterval(-86_400))),
+        ])
+        let e = run(old, new)
+        #expect(e.map(\.kind) == [.reopened])
+        #expect(e.first?.issue.key.number == 1)
+    }
+
+    /// Reopened and assigned to me in one go: one banner, the assignment.
+    @Test func reopenAndAssignNotifiesOnce() {
+        var t = NotificationToggles()
+        t.issueAssigned = true
+        let old = boardSnap(0, assigned: [])
+        let at = t0.addingTimeInterval(60)
+        let issue = BoardIssue(
+            key: PRKey(repo: "initech/gadgets", number: 8), title: "Issue 8", url: URL(string: "https://x/i8")!,
+            isOpen: true, myAssignment: Assignment(actor: "dev-b", at: at),
+            lastReopen: IssueStateChange(actor: "dev-b", at: at))
+        #expect(run(old, boardSnap(120, assigned: [issue]), t).map(\.kind) == [.assigned])
+    }
+
+    @Test func searchDecodesMovesAndReopen() {
+        let node: [String: Any] = [
+            "number": 7, "title": "t", "url": "https://github.com/o/r/issues/7", "state": "OPEN",
+            "repository": ["nameWithOwner": "o/r"],
+            "statusMoves": ["nodes": [
+                ["createdAt": "2026-10-27T13:53:32Z", "actor": ["__typename": "Bot", "login": "github-project-automation"],
+                 "previousStatus": "", "status": "Todo",
+                 "project": ["number": 3, "owner": ["login": "o"]]],
+                ["createdAt": "2026-10-27T14:00:00Z", "actor": ["login": "dev-b"], "previousStatus": "Todo",
+                 "status": "Doing", "project": ["number": 3, "owner": ["login": "o"]]],
+            ]],
+            "lastReopen": ["nodes": [["createdAt": "2026-10-27T15:00:00Z", "actor": ["login": "dev-c"]]]],
+        ]
+        let issue = Decoding.issue(from: node)
+        #expect(issue?.statusMoves.map(\.from) == [nil, "Todo"])
+        #expect(issue?.statusMoves.map(\.byBot) == [true, false])
+        #expect(issue?.statusMoves.last?.isOn(project: 3, owner: "O") == true)
+        #expect(issue?.lastReopen?.actor == "dev-c")
+        #expect(Queries.issueSearch(withAssignment: false, withActivity: true).contains("PROJECT_V2_ITEM_STATUS_CHANGED_EVENT"))
     }
 }

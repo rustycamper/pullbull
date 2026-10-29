@@ -106,7 +106,7 @@ Full list in the [manual](docs/manual.md#keyboard).
 |---|---|
 | General | Grouping, compact cards, filters, menu bar count, refresh interval, shortcut, launch at login, updates |
 | Account | Account, org, board |
-| Notifications | A separate toggle each: review requested · approved · changes requested · CI failed · new comment · merged · issue assigned |
+| Notifications | A separate toggle for each event on your PRs, PRs you review, issues assigned to you and issues you created: reviews, CI, comments, ready to merge, merged, assigned, status changes, closed or reopened |
 | Search | Saved searches: rename, edit, reorder, delete |
 | Ask AI | On/off, Anthropic API key, model, repos to exclude |
 

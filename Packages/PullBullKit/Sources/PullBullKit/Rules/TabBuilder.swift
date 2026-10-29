@@ -34,6 +34,13 @@ public struct Snapshot: Codable, Sendable, Equatable {
     public var assignedIssuesFetchedAt: Date?
     /// The same for the Created search and `createdIssues`.
     public var createdIssuesFetchedAt: Date?
+    /// Issues that left Assigned or Created since the previous snapshot because they were closed, each
+    /// with who closed it; nil when not looked up (no previous snapshot of this org) and in caches from
+    /// before it was stored.
+    public var closedIssues: [BoardIssue]?
+    /// Issues that left Assigned or Created whose lookup failed or didn't fit this poll, as last
+    /// listed; the next poll looks them up again. Nil when there are none.
+    public var pendingClosedLookups: [BoardIssue]?
 
     public init(
         fetchedAt: Date, org: OrgContext, reviewCandidates: [PullRequest], mine: [PullRequest],
@@ -42,7 +49,8 @@ public struct Snapshot: Codable, Sendable, Equatable {
         assignedIssues: [BoardIssue]? = nil, createdIssues: [BoardIssue]? = nil,
         boardStatusOptions: [StatusOption]? = nil, assignedIssuesError: String? = nil,
         createdIssuesError: String? = nil, assignedIssuesFetchedAt: Date? = nil,
-        createdIssuesFetchedAt: Date? = nil, boardOwner: BoardOwner? = nil
+        createdIssuesFetchedAt: Date? = nil, boardOwner: BoardOwner? = nil, closedIssues: [BoardIssue]? = nil,
+        pendingClosedLookups: [BoardIssue]? = nil
     ) {
         self.fetchedAt = fetchedAt
         self.org = org
@@ -62,6 +70,8 @@ public struct Snapshot: Codable, Sendable, Equatable {
         self.createdIssuesError = createdIssuesError
         self.assignedIssuesFetchedAt = assignedIssuesFetchedAt
         self.createdIssuesFetchedAt = createdIssuesFetchedAt
+        self.closedIssues = closedIssues
+        self.pendingClosedLookups = pendingClosedLookups
     }
 
     /// Why the Assigned or Created list on screen did not update; nil for Board, which has `boardError`.
@@ -100,6 +110,8 @@ public struct Snapshot: Codable, Sendable, Equatable {
         snapshot.boardIssues = issues(boardIssues)
         snapshot.assignedIssues = assignedIssues.map(issues)
         snapshot.createdIssues = createdIssues.map(issues)
+        snapshot.closedIssues = closedIssues.map(issues)
+        snapshot.pendingClosedLookups = pendingClosedLookups.map(issues)
         return snapshot
     }
 

@@ -20,6 +20,22 @@ public struct NotificationToggles: Codable, Equatable, Sendable {
     public var merged = true
     /// Off by default: an issue newly assigned to me by someone else.
     public var issueAssigned = false
+    /// Off by default: my pull request became ready to merge (approved, checks green, no conflicts).
+    public var readyToMerge = false
+    /// Off by default: someone else commented on a pull request I reviewed.
+    public var commentAfterMyReview = false
+    /// Someone else commented on an open issue assigned to me.
+    public var assignedIssueComment = true
+    /// Off by default: someone else commented on an open issue I created.
+    public var createdIssueComment = false
+    /// Someone else moved an issue assigned to me on the board.
+    public var assignedIssueStatus = true
+    /// Off by default: someone else moved an issue I created on the board.
+    public var createdIssueStatus = false
+    /// Someone else closed or reopened an issue assigned to me.
+    public var assignedIssueClosed = true
+    /// Someone else closed or reopened an issue I created.
+    public var createdIssueClosed = true
 
     public init() {}
 
@@ -34,6 +50,14 @@ public struct NotificationToggles: Codable, Equatable, Sendable {
         d.newComment = c.readable(Bool.self, forKey: .newComment) ?? d.newComment
         d.merged = c.readable(Bool.self, forKey: .merged) ?? d.merged
         d.issueAssigned = c.readable(Bool.self, forKey: .issueAssigned) ?? d.issueAssigned
+        d.readyToMerge = c.readable(Bool.self, forKey: .readyToMerge) ?? d.readyToMerge
+        d.commentAfterMyReview = c.readable(Bool.self, forKey: .commentAfterMyReview) ?? d.commentAfterMyReview
+        d.assignedIssueComment = c.readable(Bool.self, forKey: .assignedIssueComment) ?? d.assignedIssueComment
+        d.createdIssueComment = c.readable(Bool.self, forKey: .createdIssueComment) ?? d.createdIssueComment
+        d.assignedIssueStatus = c.readable(Bool.self, forKey: .assignedIssueStatus) ?? d.assignedIssueStatus
+        d.createdIssueStatus = c.readable(Bool.self, forKey: .createdIssueStatus) ?? d.createdIssueStatus
+        d.assignedIssueClosed = c.readable(Bool.self, forKey: .assignedIssueClosed) ?? d.assignedIssueClosed
+        d.createdIssueClosed = c.readable(Bool.self, forKey: .createdIssueClosed) ?? d.createdIssueClosed
         self = d
     }
 }
