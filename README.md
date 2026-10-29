@@ -14,7 +14,7 @@ Keyboard-first · Native SwiftUI · Read-only
 [![Homebrew](https://img.shields.io/badge/brew-rustycamper%2Ftap-141518?style=flat-square&logo=homebrew&logoColor=white)](#install)
 [![License: MIT](https://img.shields.io/badge/license-MIT-141518?style=flat-square)](LICENSE)
 
-[Install](#install) · [Tabs](#tabs) · [Search](#search) · [Keys](#keys) · [Privacy](#privacy) · [Manual](docs/manual.md)
+[Install](#install) · [Tabs](#tabs) · [Search](#search) · [Keys](#keys) · [Settings](#settings) · [Privacy](#privacy) · [Manual](docs/manual.md)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/media/popover-dark.png">
@@ -51,11 +51,19 @@ Keyboard-first · Native SwiftUI · Read-only
 | &emsp;&emsp;&emsp; | Mode | Tab | Shows |
 |:-:|---|---|---|
 | <kbd>⌘</kbd><kbd>1</kbd> | **Pull Requests** | Review | PRs requesting your or your team's review, re-requests, new commits since your review |
-| | | Mine | Your open PRs, review pills, checks, *Ready to merge* |
+| | | Mine | Your open PRs, review pills, checks, *Ready to merge*. Folded *Recently closed*: last 7 days |
 | | | Team | Other open PRs in the org |
-| <kbd>⌘</kbd><kbd>2</kbd> | **Issues** | Assigned | Your issues, grouped by board Status (by repo without a board) |
+| <kbd>⌘</kbd><kbd>2</kbd> | **Issues** | Assigned | Your issues, grouped by board Status (by repo without a board). Folded *Done*: done on the board, still open |
 | | | Created | Issues you opened |
-| | | Board | All open issues on the board |
+| | | Board | All open issues on the board, by Status. Folded *Done*: last 14 days |
+
+- **Fold a lane:** click a Status header on Board or Assigned. Folds are kept per tab and board
+- **Labels:** chips with the label's colour dot on each row (not in compact cards), all of them in the detail
+- **One repo:** right-click a repo header or row → **Show Only *repo***, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd>
+- **Right-click a row:** copy branch (PRs), link or Markdown link · open on GitHub · search the author
+- **Switch board:** <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> on the Board tab
+
+More in the [manual](docs/manual.md#issues).
 
 ## Search
 
@@ -68,9 +76,9 @@ Keyboard-first · Native SwiftUI · Read-only
 | `#123` | That number, in every repo |
 | a GitHub link | Exactly that PR or issue |
 
-Combine `@`, `~`, `is:`, `status:` and words. Type `st` or `la` and press <kbd>Tab</kbd> for `status:` or `label:`, with suggestions. Save the searches you repeat.
+Combine `@`, `~`, `is:`, `status:` and words. Type `st` or `la` and press <kbd>Tab</kbd> for `status:` or `label:`, with suggestions. Save the searches you repeat with the bookmark icon; manage them in Settings → Search.
 
-Can't remember the words? [Ask AI](docs/manual.md#ask-ai) finds the item from a description. Off by default.
+Can't remember the words? [Ask AI](docs/manual.md#ask-ai) finds the item from a description. Off by default; turn it on in Settings → Ask AI.
 
 ## Keys
 
@@ -81,14 +89,25 @@ Can't remember the words? [Ask AI](docs/manual.md#ask-ai) finds the item from a 
 | <kbd>Return</kbd> · <kbd>⌘</kbd><kbd>Return</kbd> | Open detail · open on GitHub |
 | <kbd>⌘</kbd><kbd>1</kbd> · <kbd>⌘</kbd><kbd>2</kbd> | Pull Requests · Issues |
 | <kbd>/</kbd> or just type | Search |
+| <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> | Repo menu · board menu |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Ask (once turned on) |
 | <kbd>Esc</kbd> | Back, clear, close |
 
 Full list in the [manual](docs/manual.md#keyboard).
 
-## Notifications
+## Settings
 
-Each is a separate toggle: review requested · approved · changes requested · CI failed · new comment · merged · issue assigned.
+<kbd>⌘</kbd><kbd>,</kbd> or the footer gear.
+
+| Tab | |
+|---|---|
+| General | Grouping, compact cards, filters, menu bar count, refresh interval, shortcut, launch at login, updates |
+| Account | Account, org, board |
+| Notifications | A separate toggle each: review requested · approved · changes requested · CI failed · new comment · merged · issue assigned |
+| Search | Saved searches: rename, edit, reorder, delete |
+| Ask AI | On/off, Anthropic API key, model, repos to exclude |
+
+Details in the [manual](docs/manual.md#settings).
 
 ## Requirements
 
