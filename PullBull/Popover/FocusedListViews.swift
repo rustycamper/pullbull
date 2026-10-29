@@ -10,16 +10,7 @@ struct FocusedEmptyView: View {
     let hiddenCount: Int
 
     var body: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "line.3.horizontal.decrease")
-                .font(.system(size: 20, weight: .regular))
-                .foregroundStyle(.secondary)
-                .frame(width: 48, height: 48)
-                .background(Circle().fill(Palette.fill))
-            Text("Nothing in \(repoName) on \(tabTitle)")
-                .font(.system(size: 14, weight: .semibold))
-                .multilineTextAlignment(.center)
-                .padding(.top, 4)
+        ListStateView(symbol: "line.3.horizontal.decrease", title: "Nothing in \(repoName) on \(tabTitle)") {
             HStack(spacing: 4) {
                 if hiddenCount > 0 {
                     Text("\(hiddenCount) in other repos ·")
@@ -30,8 +21,6 @@ struct FocusedEmptyView: View {
             }
             .font(.system(size: 11))
         }
-        .padding(.horizontal, 40)
-        .frame(maxWidth: .infinity)
     }
 }
 

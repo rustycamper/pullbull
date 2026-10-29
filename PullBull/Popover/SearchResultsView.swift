@@ -66,7 +66,7 @@ struct SearchResultsView: View {
 
     private var statuses: [BoardStatusFilter] { model.searchQuery.statuses }
 
-    private var viewer: String { model.snapshot?.org.viewer ?? "" }
+    private var viewer: String { model.snapshot?.org.viewer ?? model.settings.account ?? "" }
 
     /// The first `@` token's role on a row, as the muted suffix; nil without a token or a role.
     private func role(of pr: PullRequest) -> String? {
@@ -195,43 +195,25 @@ struct SearchResultsView: View {
             // Nothing to search yet because loading failed: say so instead of searching forever.
             failure(
                 model.message(for: error),
-                symbol: error == .offline ? "wifi.slash" : "exclamationmark.triangle")
+                symbol: error == .offline ? "wifi.slash" : "exclamationmark.triangle", help: "Retry (⌘R)",
+                retry: { model.refresh() })
         } else if let fallback = model.searchFallback {
             fallbackLine(fallback)
         } else if let message = results?.failure(in: model.mode) {
-            failure(message, symbol: "wifi.slash")
+            failure(message, symbol: "wifi.slash", retry: { model.retrySearch() })
         } else if let scopeTitle, let results, results.phase == .done, results.isEmpty(in: model.mode) {
             narrowedEmpty(scopeTitle)
         } else if let message = results?.emptyMessage(
             org: focusName ?? org, query: model.searchQuery, scope: model.snapshot?.scope, mode: model.mode) {
-            VStack(spacing: 10) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 48, height: 48)
-                    .background(Circle().fill(Palette.fill))
-                    .accessibilityHidden(true)
-                Text(message)
-                    .font(.system(size: 13, weight: .medium))
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
+            ListStateView(symbol: "magnifyingglass", title: message) {
                 if let unknown = unknownToken {
-                    Text("\(unknown) isn't on anything PullBull has loaded")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
+                    footerLine("\(unknown) isn't on anything PullBull has loaded")
                 }
                 // With a key saved, Ask may find it from a looser description.
                 if model.offersAsk {
-                    Text("Try other words, or ⌥⌘↩ to Ask AI.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
+                    footerLine("Try other words, or ⌥⌘↩ to Ask AI.")
                 }
             }
-            .padding(.horizontal, 40)
         } else {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
@@ -244,24 +226,13 @@ struct SearchResultsView: View {
 
     /// No match among the narrowed tab's items, with the way back to everything.
     private func narrowedEmpty(_ tab: String) -> some View {
-        VStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 20))
-                .foregroundStyle(.secondary)
-                .frame(width: 48, height: 48)
-                .background(Circle().fill(Palette.fill))
-                .accessibilityHidden(true)
-            Text(SearchContext.noMatches(inTab: tab))
-                .font(.system(size: 13, weight: .medium))
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+        ListStateView(symbol: "magnifyingglass", title: SearchContext.noMatches(inTab: tab)) {
             Button("Search everything") { model.searchEverything() }
                 .buttonStyle(.link)
                 .font(.system(size: 11))
                 .help(model.mode == .issues
                     ? "Search every issue for this query" : "Search every pull request for this query")
         }
-        .padding(.horizontal, 40)
     }
 
     /// Only the other mode's kind matches: one quiet line in the empty message's place, which switches
@@ -289,18 +260,20 @@ struct SearchResultsView: View {
         return labels.first { !model.labels.contains($0) }.map(SearchQuery.labelToken)
     }
 
-    private func failure(_ message: String, symbol: String) -> some View {
-        VStack(spacing: 10) {
-            Image(systemName: symbol)
-                .font(.system(size: 20))
-                .foregroundStyle(Palette.amberGlyph)
-                .accessibilityHidden(true)
-            Text(message)
-                .font(.system(size: 13, weight: .medium))
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 40)
+    private func failure(
+        _ message: String, symbol: String, help: String? = nil, retry: @escaping () -> Void
+    ) -> some View {
+        ListStateView(
+            symbol: symbol, tone: .warning, title: message,
+            action: .init(title: "Retry", help: help, disabled: model.status.isRefreshing, perform: retry))
+    }
+
+    private func footerLine(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: Groups
@@ -327,12 +300,14 @@ struct SearchResultsView: View {
             SearchGroupHeader(title: title, count: prs.count)
             ForEach(prs) { pr in
                 SearchPRRow(
-                    pr: pr, words: words, labels: labels, role: role(of: pr), now: now, selected: model.searchSelection == pr.key,
-                    flashing: model.rowFlash.key == pr.key
+                    pr: pr, words: words, labels: labels, role: role(of: pr), viewer: viewer, now: now,
+                    selected: model.searchSelection == pr.key, flashing: model.rowFlash.key == pr.key
                 ) {
                     if PRActions.commandClicked { model.openSearchResultOnGitHub(pr) } else { model.openSearchResult(pr) }
                 }
-                .prContextMenu(pr)
+                .prContextMenu(
+                    pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
+                    person: .person(model: model, login: pr.author))
                 .id(pr.key)
             }
         }
@@ -348,7 +323,9 @@ struct SearchResultsView: View {
                 ) {
                     if PRActions.commandClicked { model.openSearchResultOnGitHub(issue) } else { model.openSearchResult(issue) }
                 }
-                .issueContextMenu(issue)
+                .issueContextMenu(
+                    issue, focus: FocusMenuItem(model: model, repo: issue.key.repo),
+                    person: .person(model: model, login: issue.author))
                 .id(issue.key)
             }
         }
@@ -506,6 +483,7 @@ private struct SearchPRRow: View {
     /// The labels a `~label` search asks for, whose chips lead.
     let labels: [String]
     let role: String?
+    let viewer: String
     let now: Date
     let selected: Bool
     let flashing: Bool
@@ -513,19 +491,21 @@ private struct SearchPRRow: View {
 
     var body: some View {
         let open = pr.state == .open
-        SearchRowButton(selected: selected, flashing: flashing, help: pr.title, action: action) {
+        SearchRowButton(selected: selected, flashing: flashing, action: action) {
             HStack(alignment: .top, spacing: 10) {
                 glyph
                     .font(.system(size: 13))
                     .frame(width: 20, height: 20)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(Highlight.title((pr.isDraft ? "Draft: " : "") + pr.title, words: words))
+                    Text(Highlight.title(pr.title, words: words))
                         .font(.system(size: 13))
                         .lineSpacing(1)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                         .foregroundStyle(open && !pr.isDraft ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                         .fixedSize(horizontal: false, vertical: true)
+                        // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
+                        .help(pr.title)
                     meta
                         .padding(.top, 3)
                 }
@@ -561,43 +541,52 @@ private struct SearchPRRow: View {
         }
     }
 
-    /// Label chips that don't fit drop off the end into "+N".
+    /// One line at a fixed height, like a tab row's: the review signals that hold on any tab, then label
+    /// chips, which drop off the end into "+N". Under pressure the repo name gives way first; the age and
+    /// counts never truncate.
     private var meta: some View {
-        let chips = LabelChipSet(pr, first: labels)
-        return ChipsThatFit(set: chips) { fitting in
-            metaLine(chips: chips, fitting: fitting)
+        let chips = RowChips(searchResult: pr, viewer: viewer)
+        let labels = LabelChipSet(pr, first: self.labels)
+        return ChipsThatFit(set: labels) { fitting in
+            metaLine(chips: chips, labels: labels, fitting: fitting)
         }
-        .font(.system(size: 11))
-        .monospacedDigit()
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
+        .metaLineStyle()
+        .frame(height: 16)
     }
 
-    private func metaLine(chips: LabelChipSet, fitting: ChipFit) -> some View {
+    private func metaLine(chips: RowChips, labels: LabelChipSet, fitting: ChipFit) -> some View {
         HStack(spacing: 5) {
-            Text("\(Highlight.repoName(pr.key.repo)) #\(String(pr.key.number))")
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-            Text("·").accessibilityHidden(true)
+            if pr.isDraft { DraftPill().fixedSize() }
+            RepoNumber(key: pr.key)
+                .layoutPriority(-1)
+            MetaDot()
             Text(pr.author)
-            Text("·").accessibilityHidden(true)
+            MetaDot()
             Text(when)
+                .fixedSize()
             if let role {
-                Text("·").accessibilityHidden(true)
+                MetaDot()
                 Text(role)
             }
-            LabelChips(set: chips, fit: fitting)
+            ForEach(chips.info, id: \.text) { info in
+                MetaDot()
+                MetaInfo(info: info)
+            }
+            if pr.commentCount > 0 {
+                CommentCount(count: pr.commentCount)
+                    .padding(.leading, 4)
+            }
+            if let action = chips.action {
+                ActionCapsule(action: action)
+                    .padding(.leading, 4)
+            }
+            LabelChips(set: labels, fit: fitting)
         }
     }
 
     private var when: String {
-        guard pr.state != .open, let closedAt = pr.closedAt else {
-            return RelativeAge.short(from: pr.updatedAt, to: now)
-        }
-        let sameYear = Calendar.current.isDate(closedAt, equalTo: now, toGranularity: .year)
-        return sameYear
-            ? closedAt.formatted(.dateTime.month(.abbreviated).day())
-            : closedAt.formatted(.dateTime.month(.abbreviated).day().year())
+        EndedAge.text(state: pr.state, closedAt: pr.closedAt, now: now)
+            ?? RelativeAge.short(from: pr.updatedAt, to: now)
     }
 }
 
@@ -616,7 +605,7 @@ private struct SearchIssueRow: View {
 
     var body: some View {
         let glyph = Palette.issueGlyph(issue.glyph)
-        SearchRowButton(selected: selected, flashing: flashing, help: issue.title, action: action) {
+        SearchRowButton(selected: selected, flashing: flashing, action: action) {
             HStack(alignment: .top, spacing: 10) {
                 Image(symbol: glyph.symbol)
                     .font(.system(size: 13))
@@ -631,6 +620,8 @@ private struct SearchIssueRow: View {
                         .multilineTextAlignment(.leading)
                         .foregroundStyle(issue.isOpen ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                         .fixedSize(horizontal: false, vertical: true)
+                        // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
+                        .help(issue.title)
                     IssueMetaLine(issue: issue, now: now, role: role, wantedLabels: labels)
                         .padding(.top, 3)
                 }
@@ -647,7 +638,6 @@ private struct SearchIssueRow: View {
 private struct SearchRowButton<Label: View>: View {
     let selected: Bool
     let flashing: Bool
-    let help: String
     let action: () -> Void
     @ViewBuilder let label: () -> Label
     @State private var hovering = false
@@ -663,7 +653,6 @@ private struct SearchRowButton<Label: View>: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help(help)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 }
@@ -682,10 +671,6 @@ private enum Highlight {
             }
         }
         return attributed
-    }
-
-    static func repoName(_ repo: String) -> String {
-        repo.split(separator: "/").last.map(String.init) ?? repo
     }
 }
 

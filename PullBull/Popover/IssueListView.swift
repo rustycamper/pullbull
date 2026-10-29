@@ -272,43 +272,19 @@ private struct IssueEmptyView: View {
     private var loadError: String? { model.snapshot?.issuesError(for: tab) }
 
     var body: some View {
-        VStack(spacing: 6) {
-            Image(symbol: loadError == nil ? "pullbull.issue" : "exclamationmark.triangle")
-                .font(.system(size: 26, weight: .light))
-                .foregroundStyle(loadError == nil ? Palette.tertiary : Palette.amberGlyph)
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .multilineTextAlignment(.center)
-                .padding(.top, 8)
-            if let subtitle {
-                // At least two lines held, so the one-line "You cleared…" copy doesn't move the view.
-                ZStack {
-                    Text(verbatim: " \n ").hidden()
-                    Text(subtitle)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .font(.system(size: 12))
-            }
-            if loadError != nil {
-                Button("Retry") { model.refresh() }
-                    .buttonStyle(IssueStateButtonStyle())
-                    .disabled(model.status.isRefreshing)
-                    .help("Retry (⌘R)")
-                    .padding(.top, 10)
-            } else if tab == .assigned, model.settings.org != nil {
-                Button {
-                    model.selectedIssueTab = .board
-                } label: {
-                    Label("Browse \(boardTitle)", systemImage: "rectangle.split.3x1")
-                }
-                .buttonStyle(IssueStateButtonStyle())
-                .padding(.top, 10)
-            }
+        ListStateView(
+            symbol: loadError == nil ? "pullbull.issue" : "exclamationmark.triangle",
+            tone: loadError == nil ? .neutral : .warning, title: title, detail: subtitle, action: action)
+    }
+
+    private var action: ListStateView<EmptyView>.Action? {
+        if loadError != nil {
+            return .init(title: "Retry", help: "Retry (⌘R)", disabled: model.status.isRefreshing) { model.refresh() }
         }
-        .padding(.horizontal, 40)
-        .frame(maxWidth: .infinity)
+        if tab == .assigned, model.settings.org != nil {
+            return .init(title: "Browse \(boardTitle)", symbol: "rectangle.split.3x1") { model.selectedIssueTab = .board }
+        }
+        return nil
     }
 
     private var title: String {
@@ -348,26 +324,10 @@ struct IssueListNotLoadedView: View {
     var body: some View {
         Group {
             if let error {
-                VStack(spacing: 6) {
-                    Image(systemName: model.status.error == .offline ? "wifi.slash" : "exclamationmark.triangle")
-                        .font(.system(size: 26, weight: .light))
-                        .foregroundStyle(Palette.amberGlyph)
-                    Text("Issues couldn't load")
-                        .font(.system(size: 13, weight: .semibold))
-                        .multilineTextAlignment(.center)
-                        .padding(.top, 8)
-                    Text(error)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Button("Retry") { model.refresh() }
-                        .buttonStyle(IssueStateButtonStyle())
-                        .help("Retry (⌘R)")
-                        .padding(.top, 10)
-                }
-                .padding(.horizontal, 40)
-                .padding(.bottom, 30)
+                ListStateView(
+                    symbol: model.status.error == .offline ? "wifi.slash" : "exclamationmark.triangle", tone: .warning,
+                    title: "Issues couldn't load", detail: error,
+                    action: .init(title: "Retry", help: "Retry (⌘R)") { model.refresh() })
             } else {
                 SkeletonList.issues(model, tab: tab)
             }
@@ -414,22 +374,7 @@ struct BoardUnavailableView: View {
     }
 
     private func placeholder(_ title: String, detail: String? = nil) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: "rectangle.split.3x1")
-                .font(.system(size: 24, weight: .light))
-                .foregroundStyle(Palette.tertiary)
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .multilineTextAlignment(.center)
-                .padding(.top, 8)
-            if let detail {
-                Text(detail)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-        }
-        .padding(.horizontal, 40)
+        ListStateView(symbol: "rectangle.split.3x1", title: title, detail: detail)
     }
 
     /// No-org mode: GitHub gives apps no access to personal boards, so the board needs a GitHub CLI login
@@ -593,53 +538,8 @@ struct BoardUnavailableView: View {
     }
 
     private func errorBody(_ error: String) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 22, weight: .light))
-                .foregroundStyle(Palette.amberGlyph)
-            Text("\(boardTitle) couldn't load")
-                .font(.system(size: 13, weight: .semibold))
-                .multilineTextAlignment(.center)
-                .padding(.top, 8)
-            Text(error)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-            Button("Retry") { model.refresh() }
-                .buttonStyle(IssueStateButtonStyle())
-                .disabled(model.status.isRefreshing)
-                .help("Retry (⌘R)")
-                .padding(.top, 10)
-        }
-        .padding(.horizontal, 40)
-        .padding(.bottom, 30)
-    }
-}
-
-/// The gray action button of the Issues empty and unavailable states.
-private struct IssueStateButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .labelStyle(ButtonLabelStyle())
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 12)
-            .frame(height: 28)
-            .background(
-                RoundedRectangle(cornerRadius: 7)
-                    .fill(Palette.strongFill.opacity(configuration.isPressed ? 1.6 : 1)))
-            .opacity(isEnabled ? 1 : 0.5)
-    }
-}
-
-private struct ButtonLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 6) {
-            configuration.icon.font(.system(size: 11, weight: .medium))
-            configuration.title
-        }
+        ListStateView(
+            symbol: "exclamationmark.triangle", tone: .warning, title: "\(boardTitle) couldn't load", detail: error,
+            action: .init(title: "Retry", help: "Retry (⌘R)", disabled: model.status.isRefreshing) { model.refresh() })
     }
 }

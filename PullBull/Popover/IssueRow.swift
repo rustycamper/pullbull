@@ -39,7 +39,6 @@ struct IssueRow: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .accessibilityAddTraits(selected ? [.isSelected] : [])
-        .help(issue.title)
         .issueContextMenu(
             issue, focus: FocusMenuItem(model: model, repo: issue.key.repo),
             person: .person(model: model, login: issue.author))
@@ -62,6 +61,8 @@ struct IssueRow: View {
                     .multilineTextAlignment(.leading)
                     .foregroundStyle(past ? .secondary : .primary)
                     .fixedSize(horizontal: false, vertical: true)
+                    // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
+                    .help(issue.title)
                 IssueMetaLine(issue: issue, now: now, showsRepo: !inRepoGroup, wantedLabels: wantedLabels)
                     .padding(.top, 3)
             }
@@ -89,6 +90,8 @@ struct IssueRow: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
+                .help(issue.title)
             Group {
                 RepoNumber(key: issue.key, showsRepo: !inRepoGroup, compact: true)
                     .fixedSize()
@@ -122,27 +125,30 @@ struct IssueMetaLine: View {
         ChipsThatFit(set: chips) { fitting in
             line(chips: chips, fitting: fitting)
         }
-        .font(.system(size: 11))
-        .monospacedDigit()
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
+        .metaLineStyle()
+    }
+
+    /// "closed 3d ago" for a closed issue; otherwise the time since its last update.
+    private var age: String? {
+        if !issue.isOpen, let ended = EndedAge.text(state: .closed, closedAt: issue.closedAt, now: now) {
+            return ended
+        }
+        return issue.updatedAt.map { RelativeAge.short(from: $0, to: now) }
     }
 
     private func line(chips: LabelChipSet, fitting: ChipFit) -> some View {
         HStack(spacing: 5) {
             RepoNumber(key: issue.key, showsRepo: showsRepo)
-            if let updatedAt = issue.updatedAt {
-                Text("·").foregroundStyle(.tertiary).accessibilityHidden(true)
-                Text(RelativeAge.short(from: updatedAt, to: now))
+            if let age {
+                MetaDot()
+                Text(age)
             }
             if issue.commentCount > 0 {
-                Label { Text("\(issue.commentCount)") } icon: { Image(systemName: "bubble.left") }
-                    .labelStyle(TightLabelStyle(spacing: 3))
+                CommentCount(count: issue.commentCount)
                     .padding(.leading, 2)
-                    .accessibilityLabel(issue.commentCount == 1 ? "1 comment" : "\(issue.commentCount) comments")
             }
             if let role {
-                Text("·").accessibilityHidden(true)
+                MetaDot()
                 Text(role)
             }
             LabelChips(set: chips, fit: fitting)
@@ -187,12 +193,12 @@ private struct AssigneeStack: View {
                                 }
                                 .compositingGroup()
                         }
+                        .help(assignee.login)
                     } else {
-                        avatar
+                        avatar.help(assignee.login)
                     }
                 }
             }
-            .help(label)
             .accessibilityElement()
             .accessibilityLabel(label)
         }
