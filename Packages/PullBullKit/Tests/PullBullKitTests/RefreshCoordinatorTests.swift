@@ -12,7 +12,7 @@ actor FakeFetcher: SnapshotFetching {
 
     private var steps: [Step]
     private var held: [CheckedContinuation<Void, Never>] = []
-    private var callWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private var callWaiters: [(id: UUID, count: Int, continuation: CheckedContinuation<Bool, Never>)] = []
     private(set) var calls: [(account: String, previous: Snapshot?, board: BoardRef?, canReadProjects: Bool)] = []
     private(set) var scopes: [FetchScope] = []
     var callCount: Int { calls.count }
@@ -26,7 +26,7 @@ actor FakeFetcher: SnapshotFetching {
         scopes.append(scope)
         let due = callWaiters.filter { $0.count <= calls.count }
         callWaiters.removeAll { $0.count <= calls.count }
-        due.forEach { $0.continuation.resume() }
+        due.forEach { $0.continuation.resume(returning: true) }
         guard !steps.isEmpty else {
             await withCheckedContinuation { held.append($0) }
             throw CancellationError()
@@ -36,9 +36,28 @@ actor FakeFetcher: SnapshotFetching {
         return try step.result.get()
     }
 
-    func waitForCalls(_ count: Int) async {
+    /// Suspends until `count` fetches have started. Past `timeout` (real time) it records an issue and
+    /// returns, so a fetch that never comes fails the test instead of hanging the run.
+    func waitForCalls(
+        _ count: Int, timeout: Duration = testWaitLimit, sourceLocation: SourceLocation = #_sourceLocation
+    ) async {
         if calls.count >= count { return }
-        await withCheckedContinuation { callWaiters.append((count, $0)) }
+        let id = UUID()
+        let met = await withCheckedContinuation { continuation in
+            callWaiters.append((id, count, continuation))
+            Task {
+                try? await Task.sleep(for: timeout)
+                self.expireCallWaiter(id)
+            }
+        }
+        if !met {
+            Issue.record("\(count) fetches did not start within \(timeout)", sourceLocation: sourceLocation)
+        }
+    }
+
+    private func expireCallWaiter(_ id: UUID) {
+        guard let index = callWaiters.firstIndex(where: { $0.id == id }) else { return }
+        callWaiters.remove(at: index).continuation.resume(returning: false)
     }
 
     func releaseHeld() {
@@ -106,20 +125,6 @@ private func nextSettled(_ iterator: inout AsyncStream<Update>.Iterator) async -
         if !update.1.isRefreshing { return update }
     }
     return nil
-}
-
-/// Polls `condition` on the real clock until it holds or `timeout` passes, so a loaded machine
-/// gets the same wall-clock allowance as an idle one.
-private func eventually(
-    within timeout: Duration = .seconds(2), _ condition: () async -> Bool
-) async -> Bool {
-    let clock = ContinuousClock()
-    let deadline = clock.now + timeout
-    while clock.now < deadline {
-        if await condition() { return true }
-        try? await clock.sleep(for: .milliseconds(1))
-    }
-    return await condition()
 }
 
 private struct Harness {
@@ -223,7 +228,7 @@ private func withBoard(_ snap: Snapshot) -> Snapshot {
         let coordinator = h.coordinator
         async let first: Void = coordinator.refreshNow()
         async let second: Void = coordinator.refreshNow()
-        #expect(await eventually { await coordinator.joinedWaiters == 2 }, "two waiters did not join within 2 s")
+        #expect(await eventually { await coordinator.joinedWaiters == 2 }, "two waiters did not join")
         await h.fetcher.releaseHeld()
         _ = await (first, second)
         #expect(await h.fetcher.callCount == 1)
@@ -389,7 +394,7 @@ private func withBoard(_ snap: Snapshot) -> Snapshot {
         #expect(await h.fetcher.calls.map(\.account) == ["a", "b"])
 
         await h.fetcher.releaseHeld()
-        #expect(await eventually { await h.coordinator.droppedResults == 1 }, "the stale result was not dropped within 2 s")
+        #expect(await eventually { await h.coordinator.droppedResults == 1 }, "the stale result was not dropped")
         #expect(await h.store.load(account: "a", scope: .org("o")) == nil)
         #expect(await h.store.load(account: "b", scope: .org("o")) == b)
 
@@ -781,7 +786,7 @@ private func withBoard(_ snap: Snapshot) -> Snapshot {
             await h.coordinator.update(board: .org("o", 3), canReadProjects: false, interval: .seconds(120))
             #expect(
                 await eventually { await h.coordinator.heldSnapshot?.boardIssues.isEmpty == true },
-                "the board was still held 2 s after it was turned off")
+                "the board was still held after it was turned off")
             await h.coordinator.stop()
         }
     }
@@ -900,7 +905,7 @@ private func withBoard(_ snap: Snapshot) -> Snapshot {
         #expect(await h.clock.waitForSleeps(1) == [.seconds(2)])
         h.clock.advance(by: .seconds(2))
         let coordinator = h.coordinator
-        #expect(await eventually { await coordinator.joinedWaiters == 1 }, "the recovery did not join within 2 s")
+        #expect(await eventually { await coordinator.joinedWaiters == 1 }, "the recovery did not join")
         await h.fetcher.releaseHeld()
         #expect(await eventually { await coordinator.joinedWaiters == 0 })
         #expect(await h.fetcher.callCount == 1)
@@ -932,7 +937,7 @@ private func withBoard(_ snap: Snapshot) -> Snapshot {
         #expect(await h.clock.waitForSleeps(1) == [.seconds(2)])
         h.clock.advance(by: .seconds(2))
         let coordinator = h.coordinator
-        #expect(await eventually { await coordinator.joinedWaiters == 1 }, "the recovery did not join within 2 s")
+        #expect(await eventually { await coordinator.joinedWaiters == 1 }, "the recovery did not join")
         await h.fetcher.releaseHeld()
         #expect(await h.clock.waitForSleeps(3).sorted() == [.seconds(2), .seconds(2), .seconds(15)])
         h.clock.advance(by: .seconds(2))
@@ -1047,7 +1052,7 @@ private func withBoard(_ snap: Snapshot) -> Snapshot {
         await h.coordinator.networkPathChanged(satisfied: true)
         _ = await h.clock.waitForSleeps(2)
         await h.coordinator.stop()
-        #expect(await eventually { h.clock.pendingSleepers == 0 }, "sleepers were still pending after 2 s")
+        #expect(await eventually { h.clock.pendingSleepers == 0 }, "sleepers were still pending")
         h.clock.advance(by: .seconds(2))
         #expect(await !eventually(within: .milliseconds(200)) { await h.fetcher.callCount > 1 })
     }
@@ -1071,7 +1076,7 @@ private func withBoard(_ snap: Snapshot) -> Snapshot {
         await h.start()
         _ = await h.clock.waitForSleeps(1)
         await h.coordinator.stop()
-        #expect(await eventually { h.clock.pendingSleepers == 0 }, "sleepers were still pending after 2 s")
+        #expect(await eventually { h.clock.pendingSleepers == 0 }, "sleepers were still pending")
         h.clock.advance(by: .seconds(600))
         await h.coordinator.refreshNow()
         #expect(await h.fetcher.callCount == 1)

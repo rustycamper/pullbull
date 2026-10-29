@@ -1,4 +1,5 @@
 import Foundation
+import Testing
 
 /// A manually advanced clock. `sleep` suspends until `advance(by:)` moves `now` past the deadline.
 final class TestClock: Clock, @unchecked Sendable {
@@ -20,7 +21,12 @@ final class TestClock: Clock, @unchecked Sendable {
     private var cancelledIDs: Set<Int> = []
     private var nextID = 0
     private var requested: [Duration] = []
-    private var requestWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private var requestWaiters: [Int: RequestWaiter] = [:]
+
+    private struct RequestWaiter {
+        let condition: @Sendable ([Duration]) -> Bool
+        let continuation: CheckedContinuation<Bool, Never>
+    }
 
     var now: Instant { lock.withLock { current } }
     var minimumResolution: Duration { .zero }
@@ -36,16 +42,16 @@ final class TestClock: Clock, @unchecked Sendable {
         }
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
-                let (ready, waiters) = lock.withLock { () -> (Result<Void, any Error>?, [CheckedContinuation<Void, Never>]) in
+                let (ready, waiters) = lock.withLock { () -> (Result<Void, any Error>?, [CheckedContinuation<Bool, Never>]) in
                     if cancelledIDs.remove(id) != nil { return (.failure(CancellationError()), []) }
                     requested.append(current.duration(to: deadline))
-                    let due = requestWaiters.filter { $0.count <= requested.count }.map(\.continuation)
-                    requestWaiters.removeAll { $0.count <= requested.count }
-                    if deadline <= current { return (.success(()), due) }
+                    let due = requestWaiters.filter { $0.value.condition(requested) }
+                    for id in due.keys { requestWaiters.removeValue(forKey: id) }
+                    if deadline <= current { return (.success(()), due.values.map(\.continuation)) }
                     sleepers[id] = Sleeper(deadline: deadline, continuation: continuation)
-                    return (nil, due)
+                    return (nil, due.values.map(\.continuation))
                 }
-                waiters.forEach { $0.resume() }
+                waiters.forEach { $0.resume(returning: true) }
                 if let ready { continuation.resume(with: ready) }
             }
         } onCancel: {
@@ -69,15 +75,37 @@ final class TestClock: Clock, @unchecked Sendable {
     }
 
     /// Suspends until at least `count` sleeps have been requested, then returns all requests.
-    func waitForSleeps(_ count: Int) async -> [Duration] {
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            let ready = lock.withLock { () -> Bool in
-                if requested.count >= count { return true }
-                requestWaiters.append((count, continuation))
-                return false
-            }
-            if ready { continuation.resume() }
-        }
+    func waitForSleeps(
+        _ count: Int, timeout: Duration = testWaitLimit, sourceLocation: SourceLocation = #_sourceLocation
+    ) async -> [Duration] {
+        await waitForSleeps(timeout: timeout, sourceLocation: sourceLocation) { $0.count >= count }
         return requestedSleeps
+    }
+
+    /// Suspends until the sleeps requested so far satisfy `condition`, checked at each new request rather
+    /// than on the wall clock. Past `timeout` (real time) it records an issue and returns false, so a
+    /// sleep that never comes fails the test instead of hanging the run.
+    @discardableResult
+    func waitForSleeps(
+        timeout: Duration = testWaitLimit, sourceLocation: SourceLocation = #_sourceLocation,
+        until condition: @escaping @Sendable ([Duration]) -> Bool
+    ) async -> Bool {
+        let met = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            let id = lock.withLock { () -> Int? in
+                if condition(requested) { return nil }
+                nextID += 1
+                requestWaiters[nextID] = RequestWaiter(condition: condition, continuation: continuation)
+                return nextID
+            }
+            guard let id else { return continuation.resume(returning: true) }
+            Task {
+                try? await Task.sleep(for: timeout)
+                lock.withLock { requestWaiters.removeValue(forKey: id) }?.continuation.resume(returning: false)
+            }
+        }
+        if !met {
+            Issue.record("the expected sleeps were not requested within \(timeout)", sourceLocation: sourceLocation)
+        }
+        return met
     }
 }
