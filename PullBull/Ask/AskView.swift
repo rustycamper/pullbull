@@ -32,22 +32,7 @@ struct AskView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Image(systemName: "text.magnifyingglass")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-            Text(verbatim: question)
-                .font(.system(size: 13, weight: .semibold))
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text("Esc")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 4)
-                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Palette.separator, lineWidth: 0.5))
-                .accessibilityHidden(true)
-            // Closes in place, like a search field's clear button: the Ask screen fades back to the search.
+            // Where Back sits on the details, but ✕: the Ask screen closes in place, fading back to the search.
             Button(action: onBack) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 13))
@@ -56,6 +41,11 @@ struct AskView: View {
             .buttonStyle(.plain)
             .help("Close Ask AI (Esc)")
             .accessibilityLabel("Close Ask AI")
+            Text(verbatim: question)
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
