@@ -180,10 +180,11 @@
       `${ciGlyph(pr.ci)}</div>`;
   }
 
-  /** PRListView.GroupHeader */
+  /** ListSectionHeader for a repo group: the glyph in the icon column, the title on the row titles' edge, 28 pt tall. */
   function groupHeader(repo, count) {
-    return `<div class="hstack group-header f11 w-semibold">${sym("book.closed", 10)}<span>${esc(repo)}</span>` +
-      (count > 0 ? `<span class="w-medium mono">${count}</span>` : "") + `</div>`;
+    return `<div class="hstack group-header f11 w-semibold"><span class="icon-col">${sym("book.closed", 11)}</span>` +
+      `<span class="hstack"><span>${esc(repo)}</span>` +
+      (count > 0 ? `<span class="w-medium mono">${count}</span>` : "") + `</span></div>`;
   }
 
   /** ClosedRow */
@@ -195,7 +196,7 @@
   }
 
   function closedSection(rc) {
-    const chevron = `<span style="display:inline-flex;transform:rotate(${rc.expanded ? 90 : 0}deg)">${sym("chevron.right", 9, "bold")}</span>`;
+    const chevron = `<span class="lane-chevron" style="transform:rotate(${rc.expanded ? 90 : 0}deg)">${sym("chevron.right", 9, "bold")}</span>`;
     let html = `<div class="hairline closed-rule"></div><div class="hstack closed-header f11 w-semibold">${chevron}<span>Recently closed</span>` +
       `<span class="w-medium mono">${rc.count}</span><span class="spacer"></span><span style="font-weight:400">Last 7 days</span></div>`;
     if (rc.expanded) html += rc.rows.map(closedRow).join("");

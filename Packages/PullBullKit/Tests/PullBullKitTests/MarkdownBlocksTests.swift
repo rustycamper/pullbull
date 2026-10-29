@@ -504,10 +504,16 @@ private func parse(_ source: String) -> [MarkdownBlock] { MarkdownBlock.parse(so
         ("details sections", 1_500, { String(repeating: "<details><summary>s</summary>\nx\n</details>\n", count: $0) }),
     ]
 
-    /// Fastest of a few runs, which drops scheduler noise from parallel tests and busy CI runners.
-    private static func bestParseTime(_ source: String) -> Duration {
+    /// The fastest of several runs of each size, which drops scheduler noise from parallel tests and busy CI
+    /// runners. The sizes take turns, so a slow stretch slows both rather than skewing their ratio.
+    private static func bestParseTimes(small: String, large: String) -> (small: Duration, large: Duration) {
         let clock = ContinuousClock()
-        return (0..<3).map { _ in clock.measure { _ = MarkdownBlock.parse(source) } }.min()!
+        var best = (small: Duration.seconds(Int64.max), large: Duration.seconds(Int64.max))
+        for _ in 0..<5 {
+            best.small = min(best.small, clock.measure { _ = MarkdownBlock.parse(small) })
+            best.large = min(best.large, clock.measure { _ = MarkdownBlock.parse(large) })
+        }
+        return best
     }
 
     /// Parsing 4x the input must cost well under the 16x a quadratic parser would. Linear is about 4x, so 10x
@@ -515,8 +521,7 @@ private func parse(_ source: String) -> [MarkdownBlock] { MarkdownBlock.parse(so
     /// time keeps the test independent of machine speed. A run too short to time reliably passes outright.
     @Test(arguments: hostileInputs)
     func hostileInputScalesLinearly(input: HostileInput) {
-        let small = Self.bestParseTime(input.make(input.full / 4))
-        let large = Self.bestParseTime(input.make(input.full))
+        let (small, large) = Self.bestParseTimes(small: input.make(input.full / 4), large: input.make(input.full))
         #expect(large < .seconds(2), "\(input.name) took \(large)")
         guard large > .milliseconds(20) else { return }
         let ratio = large / max(small, .milliseconds(1))

@@ -285,7 +285,8 @@ body {
 
 .list { flex: 1 1 auto; overflow: hidden; padding: 0 6px 6px; }
 
-.group-header { padding: 10px 8px 4px; gap: 6px; color: var(--secondary); }
+.group-header { height: 28px; padding: 0 8px; gap: 10px; color: var(--secondary); }
+.group-header > .hstack { gap: 6px; }
 
 .row { display: flex; align-items: flex-start; gap: 10px; padding: 7px 8px 8px; border-radius: 7px; }
 .row.hover { background: var(--row-hover); }
@@ -324,7 +325,8 @@ body {
 
 /* Mine's folded "Recently closed" section */
 .closed-rule { margin: 6px 8px 0; }
-.closed-header { height: 30px; margin-top: 2px; padding: 0 8px; gap: 6px; color: var(--secondary); }
+.closed-header { position: relative; height: 28px; padding: 0 8px; gap: 6px; color: var(--secondary); }
+.closed-header .lane-chevron { position: absolute; left: 0; top: 0; bottom: 0; }
 .closed-row { gap: 10px; padding: 5px 8px; border-radius: 7px; }
 .closed-row .glyph { width: 20px; display: flex; justify-content: center; flex: none; }
 .closed-row .body { flex: 1 1 auto; gap: 1px; color: var(--secondary); }
@@ -356,9 +358,9 @@ body {
 .label-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 0.5px var(--separator); }
 
 /* IssueGroupHeader: glyph in the rows' 20 pt icon column, 10 before the title; the fold chevron hangs in the 8 pt inset. */
-.lane-header { position: relative; padding: 10px 8px 4px; gap: 10px; color: var(--secondary); }
-.lane-header .lane-chevron { position: absolute; left: 0; top: 10px; height: 14px; }
-.done-header { position: relative; height: 32px; margin-top: 2px; padding: 0 8px; gap: 10px; color: var(--secondary); }
+.lane-header { position: relative; height: 28px; padding: 0 8px; gap: 10px; color: var(--secondary); }
+.lane-header .lane-chevron { position: absolute; left: 0; top: 0; bottom: 0; }
+.done-header { position: relative; height: 28px; padding: 0 8px; gap: 10px; color: var(--secondary); }
 .done-header .lane-chevron { position: absolute; left: 0; top: 0; bottom: 0; }
 .lane-chevron { width: 8px; display: flex; align-items: center; justify-content: center; }
 .icon-col { width: 20px; display: flex; justify-content: center; flex: none; }
@@ -429,7 +431,7 @@ body {
 
 .below-header { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .search-context { padding: 10px 8px 0; min-height: 24px; gap: 6px; color: var(--secondary); }
-.search-group { padding: 12px 8px 4px; gap: 6px; color: var(--secondary); }
+.search-group { height: 28px; padding: 0 8px; gap: 6px; color: var(--secondary); }
 .search-row-pr .meta { gap: 5px; }
 .search-row-pr strong { font-weight: 700; }
 .caret { display: inline-block; width: 1.5px; height: 14px; margin-left: 1px; vertical-align: -2px; background: var(--accent); border-radius: 1px; }

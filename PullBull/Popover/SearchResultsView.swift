@@ -12,7 +12,8 @@ struct SearchResultsView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
+                // Only the groups' headers pin; the context line, Ask line and banners scroll away.
+                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                     contextLine
                     askLine
                     if let results = model.searchResults, !results.isEmpty(in: model.mode) {
@@ -297,38 +298,47 @@ struct SearchResultsView: View {
 
     @ViewBuilder private func prGroup(_ title: String, _ prs: [PullRequest]) -> some View {
         if !prs.isEmpty {
-            SearchGroupHeader(title: title, count: prs.count)
-            ForEach(prs) { pr in
-                SearchPRRow(
-                    pr: pr, words: words, labels: labels, role: role(of: pr), viewer: viewer, now: now,
-                    selected: model.searchSelection == pr.key, flashing: model.rowFlash.key == pr.key
-                ) {
-                    if PRActions.commandClicked { model.openSearchResultOnGitHub(pr) } else { model.openSearchResult(pr) }
+            Section {
+                ForEach(prs) { pr in
+                    PRRow(
+                        model: model, row: Row(pr: pr, dimmed: false, counted: false),
+                        context: .search(words: words, role: role(of: pr), viewer: viewer),
+                        compact: model.settings.compact, now: now,
+                        selected: model.searchSelection == pr.key, wantedLabels: labels)
+                    .scrollTarget(pr.key, clearance: PinnedHeader.clearance)
                 }
-                .prContextMenu(
-                    pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
-                    person: .person(model: model, login: pr.author))
-                .id(pr.key)
+            } header: {
+                groupHeader(title, count: prs.count)
             }
         }
     }
 
     @ViewBuilder private func issueGroup(_ title: String, _ issues: [BoardIssue]) -> some View {
         if !issues.isEmpty {
-            SearchGroupHeader(title: title, count: issues.count)
-            ForEach(issues) { issue in
-                SearchIssueRow(
-                    issue: issue, words: words, labels: labels, role: role(of: issue), now: now,
-                    selected: model.searchSelection == issue.key, flashing: model.rowFlash.key == issue.key
-                ) {
-                    if PRActions.commandClicked { model.openSearchResultOnGitHub(issue) } else { model.openSearchResult(issue) }
+            Section {
+                ForEach(issues) { issue in
+                    SearchIssueRow(
+                        issue: issue, words: words, labels: labels, role: role(of: issue), now: now,
+                        compact: model.settings.compact,
+                        selected: model.searchSelection == issue.key, flashing: model.rowFlash.key == issue.key
+                    ) {
+                        if PRActions.commandClicked { model.openSearchResultOnGitHub(issue) } else { model.openSearchResult(issue) }
+                    }
+                    .issueContextMenu(
+                        issue, focus: FocusMenuItem(model: model, repo: issue.key.repo),
+                        person: .person(model: model, login: issue.author))
+                    .scrollTarget(issue.key, clearance: PinnedHeader.clearance)
                 }
-                .issueContextMenu(
-                    issue, focus: FocusMenuItem(model: model, repo: issue.key.repo),
-                    person: .person(model: model, login: issue.author))
-                .id(issue.key)
+            } header: {
+                groupHeader(title, count: issues.count)
             }
         }
+    }
+
+    /// An open or closed group's header; search groups never fold.
+    private func groupHeader(_ title: String, count: Int) -> some View {
+        ListSectionHeader(glyph: nil, title: title, count: count, compact: model.settings.compact)
+            .pinnedHeaderBackground()
     }
 }
 
@@ -431,29 +441,6 @@ struct Keycap<Content: View>: View {
 
 // MARK: - Rows
 
-private struct SearchGroupHeader: View {
-    let title: String
-    let count: Int?
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Text(title)
-            if let count {
-                Text("\(count)")
-                    .fontWeight(.medium)
-                    .monospacedDigit()
-            }
-        }
-        .font(.system(size: 11, weight: .semibold))
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 8)
-        .padding(.top, 12)
-        .padding(.bottom, 4)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
-    }
-}
-
 private struct FailureBanner: View {
     let message: String
     var symbol = "wifi.slash"
@@ -477,119 +464,6 @@ private struct FailureBanner: View {
     }
 }
 
-private struct SearchPRRow: View {
-    let pr: PullRequest
-    let words: [String]
-    /// The labels a `~label` search asks for, whose chips lead.
-    let labels: [String]
-    let role: String?
-    let viewer: String
-    let now: Date
-    let selected: Bool
-    let flashing: Bool
-    let action: () -> Void
-
-    var body: some View {
-        let open = pr.state == .open
-        SearchRowButton(selected: selected, flashing: flashing, action: action) {
-            HStack(alignment: .top, spacing: 10) {
-                glyph
-                    .font(.system(size: 13))
-                    .frame(width: 20, height: 20)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(Highlight.title(pr.title, words: words))
-                        .font(.system(size: 13))
-                        .lineSpacing(1)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                        .foregroundStyle(open && !pr.isDraft ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-                        .fixedSize(horizontal: false, vertical: true)
-                        // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
-                        .help(pr.title)
-                    meta
-                        .padding(.top, 3)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                trailing
-                    .padding(.top, 1)
-            }
-        }
-    }
-
-    @ViewBuilder private var glyph: some View {
-        switch pr.state {
-        case .merged:
-            Image(symbol: Palette.prGlyph(pr.glyph))
-                .foregroundStyle(Palette.mergedText)
-                .accessibilityLabel("Merged pull request")
-        case .closed:
-            Image(symbol: Palette.prGlyph(pr.glyph))
-                .foregroundStyle(Palette.closedText)
-                .accessibilityLabel("Closed pull request")
-        case .open:
-            Image(symbol: Palette.prGlyph(pr.glyph))
-                .foregroundStyle(.secondary)
-                .accessibilityLabel(pr.isDraft ? "Draft pull request" : "Open pull request")
-        }
-    }
-
-    @ViewBuilder private var trailing: some View {
-        switch pr.state {
-        case .merged: EndedPill(merged: true)
-        case .closed: EndedPill(merged: false)
-        case .open: CIGlyph(state: pr.ci)
-        }
-    }
-
-    /// One line at a fixed height, like a tab row's: the review signals that hold on any tab, then label
-    /// chips, which drop off the end into "+N". Under pressure the repo name gives way first; the age and
-    /// counts never truncate.
-    private var meta: some View {
-        let chips = RowChips(searchResult: pr, viewer: viewer)
-        let labels = LabelChipSet(pr, first: self.labels)
-        return ChipsThatFit(set: labels) { fitting in
-            metaLine(chips: chips, labels: labels, fitting: fitting)
-        }
-        .metaLineStyle()
-        .frame(height: 16)
-    }
-
-    private func metaLine(chips: RowChips, labels: LabelChipSet, fitting: ChipFit) -> some View {
-        HStack(spacing: 5) {
-            if pr.isDraft { DraftPill().fixedSize() }
-            RepoNumber(key: pr.key)
-                .layoutPriority(-1)
-            MetaDot()
-            Text(pr.author)
-            MetaDot()
-            Text(when)
-                .fixedSize()
-            if let role {
-                MetaDot()
-                Text(role)
-            }
-            ForEach(chips.info, id: \.text) { info in
-                MetaDot()
-                MetaInfo(info: info)
-            }
-            if pr.commentCount > 0 {
-                CommentCount(count: pr.commentCount)
-                    .padding(.leading, 4)
-            }
-            if let action = chips.action {
-                ActionCapsule(action: action)
-                    .padding(.leading, 4)
-            }
-            LabelChips(set: labels, fit: fitting)
-        }
-    }
-
-    private var when: String {
-        EndedAge.text(state: pr.state, closedAt: pr.closedAt, now: now)
-            ?? RelativeAge.short(from: pr.updatedAt, to: now)
-    }
-}
-
 /// An issue result: the state glyph, the highlighted title, the Issues list's meta line and a muted
 /// board Status pill (search results are not grouped by Status).
 private struct SearchIssueRow: View {
@@ -599,43 +473,83 @@ private struct SearchIssueRow: View {
     let labels: [String]
     let role: String?
     let now: Date
+    let compact: Bool
     let selected: Bool
     let flashing: Bool
     let action: () -> Void
 
+    private var glyph: (symbol: String, color: Color, label: String) { Palette.issueGlyph(issue.glyph) }
+
     var body: some View {
-        let glyph = Palette.issueGlyph(issue.glyph)
-        SearchRowButton(selected: selected, flashing: flashing, action: action) {
-            HStack(alignment: .top, spacing: 10) {
-                Image(symbol: glyph.symbol)
+        SearchRowButton(compact: compact, selected: selected, flashing: flashing, action: action) {
+            if compact { compactBody } else { fullBody }
+        }
+    }
+
+    private var fullBody: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(symbol: glyph.symbol)
+                .font(.system(size: 13))
+                .foregroundStyle(glyph.color)
+                .frame(width: 20, height: 20)
+                .accessibilityLabel(glyph.label)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(Highlight.title(issue.title, words: words))
                     .font(.system(size: 13))
-                    .foregroundStyle(glyph.color)
-                    .frame(width: 20, height: 20)
-                    .accessibilityLabel(glyph.label)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(Highlight.title(issue.title, words: words))
-                        .font(.system(size: 13))
-                        .lineSpacing(1)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                        .foregroundStyle(issue.isOpen ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-                        .fixedSize(horizontal: false, vertical: true)
-                        // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
-                        .help(issue.title)
-                    IssueMetaLine(issue: issue, now: now, role: role, wantedLabels: labels)
-                        .padding(.top, 3)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                if let status = issue.status?.name {
-                    Pill(symbol: nil, text: status, foreground: Palette.secondaryText, fill: Palette.fill)
-                        .accessibilityLabel("Status: \(status)")
-                }
+                    .lineSpacing(1)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .foregroundStyle(titleStyle)
+                    .fixedSize(horizontal: false, vertical: true)
+                    // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
+                    .help(issue.title)
+                IssueMetaLine(issue: issue, now: now, role: role, wantedLabels: labels)
+                    .padding(.top, 3)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            statusPill
+        }
+    }
+
+    /// The tab rows' compact line, with the Status pill where a tab row has its assignees.
+    private var compactBody: some View {
+        CompactRowLayout(
+            repoNumber: RepoNumber(key: issue.key, compact: true),
+            age: IssueMetaLine.age(of: issue, now: now), ageWidth: issue.isOpen ? 24 : nil
+        ) {
+            Image(symbol: glyph.symbol)
+                .font(.system(size: 11))
+                .foregroundStyle(glyph.color)
+                .frame(width: 16)
+                .accessibilityLabel(glyph.label)
+        } title: {
+            Text(Highlight.title(issue.title, words: words))
+                .foregroundStyle(titleStyle)
+                .help(issue.title)
+        } badges: {
+            EmptyView()
+        } trailing: {
+            // Sized to fit, so the title truncates first.
+            statusPill
+                .fixedSize()
+        }
+    }
+
+    private var titleStyle: AnyShapeStyle {
+        issue.isOpen ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)
+    }
+
+    @ViewBuilder private var statusPill: some View {
+        if let status = issue.status?.name {
+            Pill(symbol: nil, text: status, foreground: Palette.secondaryText, fill: Palette.fill)
+                .accessibilityLabel("Status: \(status)")
         }
     }
 }
 
 private struct SearchRowButton<Label: View>: View {
+    /// A compact label brings its own height and padding (`CompactRowLayout`).
+    let compact: Bool
     let selected: Bool
     let flashing: Bool
     let action: () -> Void
@@ -645,11 +559,12 @@ private struct SearchRowButton<Label: View>: View {
     var body: some View {
         Button(action: action) {
             label()
-                .padding(.horizontal, 8)
-                .padding(.top, 7)
-                .padding(.bottom, 8)
+                .padding(.horizontal, compact ? 0 : 8)
+                .padding(.top, compact ? 0 : 7)
+                .padding(.bottom, compact ? 0 : 8)
                 .contentShape(Rectangle())
-                .modifier(RowFill(cornerRadius: 7, selected: selected, hovering: hovering, flashing: flashing))
+                .modifier(RowFill(
+                    cornerRadius: compact ? 6 : 7, selected: selected, hovering: hovering, flashing: flashing))
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
@@ -657,7 +572,7 @@ private struct SearchRowButton<Label: View>: View {
     }
 }
 
-private enum Highlight {
+enum Highlight {
     /// The title with every query word in bold.
     static func title(_ title: String, words: [String]) -> AttributedString {
         var attributed = AttributedString(title)

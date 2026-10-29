@@ -2,12 +2,21 @@ import AppKit
 import SwiftUI
 import PullBullKit
 
-/// One PR in a list. Review and Team rows lead with the author's avatar; Mine rows lead with a state
-/// glyph. Review state sits in the meta line (`RowChips`). Compact rows fit on one line.
+/// Where a PR row sits: on a tab, whose rules give its review state, or in the search results.
+enum RowContext {
+    case tab(PRTab)
+    /// `role` is the meta line's suffix; `viewer` decides whose PR is ready to merge.
+    case search(words: [String], role: String?, viewer: String)
+}
+
+/// One PR in a list. Review and Team rows lead with the author's avatar, Mine rows with a state glyph,
+/// and search results with a state glyph coloured once the PR has ended, which also trails a Merged or
+/// Closed pill (full rows only). Review state sits in the meta line (`RowChips`). Compact rows fit on
+/// one line.
 struct PRRow: View {
     let model: AppModel
     let row: Row
-    let tab: PRTab
+    let context: RowContext
     let compact: Bool
     let now: Date
     /// The keyboard highlight (↑/↓).
@@ -20,8 +29,7 @@ struct PRRow: View {
 
     var body: some View {
         Button {
-            model.listSelection = pr.key
-            if PRActions.commandClicked { PRActions.openOnGitHub(pr) } else { model.openRowDetail(pr.key) }
+            open()
         } label: {
             Group {
                 if compact { compactBody } else { fullBody }
@@ -39,14 +47,28 @@ struct PRRow: View {
             person: .person(model: model, login: pr.author))
     }
 
+    /// A search result moves `searchSelection`, a tab row `listSelection`.
+    private func open() {
+        switch context {
+        case .tab:
+            model.listSelection = pr.key
+            if PRActions.commandClicked { PRActions.openOnGitHub(pr) } else { model.openRowDetail(pr.key) }
+        case .search:
+            if PRActions.commandClicked { model.openSearchResultOnGitHub(pr) } else { model.openSearchResult(pr) }
+        }
+    }
+
+    private var tab: PRTab? {
+        if case .tab(let tab) = context { tab } else { nil }
+    }
+
     // MARK: Full
 
     private var fullBody: some View {
         HStack(alignment: .top, spacing: 10) {
             leading
-                .padding(.top, 1)
             VStack(alignment: .leading, spacing: 0) {
-                Text(pr.title)
+                Text(title)
                     .font(.system(size: 13))
                     .lineSpacing(1)
                     .lineLimit(2)
@@ -59,7 +81,7 @@ struct PRRow: View {
                     .padding(.top, 3)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            CIGlyph(state: pr.ci)
+            trailing
                 .padding(.top, 1)
         }
         .padding(.horizontal, 8)
@@ -68,36 +90,89 @@ struct PRRow: View {
     }
 
     @ViewBuilder private var leading: some View {
-        if tab == .mine {
+        switch context {
+        case .search:
+            stateGlyph
+                .font(.system(size: 13))
+                .frame(width: 20, height: 20)
+        case .tab(.mine):
             Image(symbol: Palette.prGlyph(pr.glyph))
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .frame(width: 20, height: 20)
                 .accessibilityLabel(pr.isDraft ? "Draft" : "Open")
-        } else {
+                .padding(.top, 1)
+        case .tab:
             AvatarView(login: pr.author, url: pr.authorAvatarURL, size: 20)
                 .opacity(row.dimmed ? 0.45 : 1)
                 .help(pr.author)
+                .padding(.top, 1)
         }
     }
 
+    /// A search result's state glyph, coloured once the PR has ended.
+    @ViewBuilder private var stateGlyph: some View {
+        switch pr.state {
+        case .merged:
+            Image(symbol: Palette.prGlyph(pr.glyph))
+                .foregroundStyle(Palette.mergedText)
+                .accessibilityLabel("Merged pull request")
+        case .closed:
+            Image(symbol: Palette.prGlyph(pr.glyph))
+                .foregroundStyle(Palette.closedText)
+                .accessibilityLabel("Closed pull request")
+        case .open:
+            Image(symbol: Palette.prGlyph(pr.glyph))
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(pr.isDraft ? "Draft pull request" : "Open pull request")
+        }
+    }
+
+    @ViewBuilder private var trailing: some View {
+        switch pr.state {
+        case .merged: EndedPill(merged: true)
+        case .closed: EndedPill(merged: false)
+        case .open: CIGlyph(state: pr.ci)
+        }
+    }
+
+    /// The title, a search's words in bold.
+    private var title: AttributedString {
+        guard case .search(let words, _, _) = context else { return AttributedString(pr.title) }
+        return Highlight.title(pr.title, words: words)
+    }
+
     private var titleStyle: AnyShapeStyle {
-        if row.dimmed { return AnyShapeStyle(.secondary) }
-        if pr.isDraft { return AnyShapeStyle(.secondary) }
+        if row.dimmed || pr.isDraft || pr.state != .open { return AnyShapeStyle(.secondary) }
         return AnyShapeStyle(.primary)
     }
 
     /// Review state in two tiers: a capsule only when the PR needs acting on, glyph-and-text otherwise.
-    private var chips: RowChips { RowChips(row: row, tab: tab) }
+    /// A search result shows only what holds whichever tab the PR sits on.
+    private var chips: RowChips {
+        switch context {
+        case .tab(let tab): RowChips(row: row, tab: tab)
+        case .search(_, _, let viewer): RowChips(searchResult: pr, viewer: viewer)
+        }
+    }
+
+    /// `repo #num`, or `#num` under a repo header; search results have no repo headers, so they always show the repo.
+    private var showsRepo: Bool { tab == nil || model.rowsShowRepo }
+
+    /// The relative age, or an ended PR's "merged Oct 12".
+    private var age: String {
+        EndedAge.text(state: pr.state, closedAt: pr.closedAt, now: now)
+            ?? RelativeAge.short(from: pr.updatedAt, to: now)
+    }
 
     /// One line at a fixed height, so a row is as tall with a capsule as without one. Under pressure the
-    /// label chips drop off the end into "+N" first, then the author goes (its avatar names it on hover),
-    /// then the first chip shortens, then the repo name gives way, then the text info; the age and counts
-    /// never truncate.
+    /// label chips drop off the end into "+N" first, then (on Review and Team) the author goes (its avatar
+    /// names it on hover), then the first chip shortens, then the repo name gives way, then the text info;
+    /// the age and counts never truncate.
     private var meta: some View {
         let chips = chips
         let labels = LabelChipSet(pr, first: wantedLabels)
-        return ChipsThatFit(set: labels, canLean: tab != .mine) { fitting in
+        return ChipsThatFit(set: labels, canLean: tab != nil && tab != .mine) { fitting in
             metaLine(chips: chips, labels: labels, fitting: fitting)
         }
         .metaLineStyle()
@@ -107,18 +182,21 @@ struct PRRow: View {
     private func metaLine(chips: RowChips, labels: LabelChipSet, fitting: ChipFit) -> some View {
         HStack(spacing: 5) {
             if pr.isDraft { DraftPill().fixedSize() }
-            identifier
+            RepoNumber(key: pr.key, showsRepo: showsRepo)
                 .layoutPriority(-1)
             MetaDot()
             if tab != .mine && !fitting.lean {
                 Text(pr.author)
                 MetaDot()
             }
-            let age = RelativeAge.short(from: pr.updatedAt, to: now)
             Text(age)
                 .fixedSize()
                 // The avatar, which names a left-out author on hover, is hidden from VoiceOver.
                 .accessibilityLabel(fitting.lean ? "\(pr.author), \(age)" : age)
+            if case .search(_, let role?, _) = context {
+                MetaDot()
+                Text(role)
+            }
             ForEach(chips.info.filter { !$0.isCount }, id: \.text) { info in
                 MetaDot()
                 MetaInfo(info: info)
@@ -143,72 +221,42 @@ struct PRRow: View {
         }
     }
 
-    /// `repo #num`, or `#num` under a repo header.
-    private var identifier: some View {
-        RepoNumber(key: pr.key, showsRepo: model.rowsShowRepo)
-    }
-
     // MARK: Compact
 
+    /// An ended search result's glyph colour and "merged Oct 12" stand in for its pill.
     private var compactBody: some View {
-        HStack(spacing: 8) {
-            if tab == .mine {
+        CompactRowLayout(
+            repoNumber: RepoNumber(key: pr.key, showsRepo: showsRepo, compact: true),
+            age: age, ageWidth: pr.state == .open ? 24 : nil
+        ) {
+            switch context {
+            case .search:
+                stateGlyph
+                    .font(.system(size: 11))
+                    .frame(width: 16)
+            case .tab(.mine):
                 Image(symbol: Palette.prGlyph(pr.glyph))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .frame(width: 16)
-            } else {
+                    .accessibilityLabel(pr.isDraft ? "Draft" : "Open")
+            case .tab:
                 AvatarView(login: pr.author, url: pr.authorAvatarURL, size: 16)
                     .opacity(row.dimmed ? 0.45 : 1)
                     .help(pr.author)
             }
-            Text((pr.isDraft ? "Draft: " : "") + pr.title)
-                .font(.system(size: 12.5))
+        } title: {
+            Text(pr.isDraft ? AttributedString("Draft: ") + title : title)
                 .foregroundStyle(titleStyle)
-                .lineLimit(1)
-                .truncationMode(.tail)
                 .help(pr.title)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if case .changesRequested = chips.action {
-                Image(systemName: "arrow.uturn.backward")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Palette.changesRequested)
-                    .accessibilityLabel("Changes requested")
-            }
-            if chips.action == .readyToMerge {
-                Image(systemName: "arrow.triangle.merge")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Palette.secondaryText)
-                    .help("Ready to merge")
-                    .accessibilityLabel("Ready to merge")
-            }
-            if tab == .review && !row.dimmed, let reason = chips.info.first(where: { $0 != .conflicts }) {
-                Image(systemName: reason.symbol)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .help(reason.label)
-                    .accessibilityLabel(reason.label)
-            }
-            if chips.info.contains(.conflicts) {
-                Image(systemName: RowChips.Info.conflicts.symbol)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Palette.amberGlyph)
-                    .help(RowChips.Info.conflicts.label)
-                    .accessibilityLabel(RowChips.Info.conflicts.label)
-            }
-            Group {
-                RepoNumber(key: pr.key, showsRepo: model.rowsShowRepo, compact: true)
-                    .fixedSize()
-                Text(RelativeAge.short(from: pr.updatedAt, to: now))
-                    .frame(width: 24, alignment: .trailing)
-            }
-            .font(.system(size: 11))
-            .monospacedDigit()
-            .foregroundStyle(.secondary)
-            CIGlyph(state: pr.ci)
+        } badges: {
+            let chips = chips
+            CompactChipGlyphs(
+                chips: chips,
+                reason: tab == .review && !row.dimmed ? chips.info.first(where: { $0 != .conflicts }) : nil)
+        } trailing: {
+            if pr.state == .open { CIGlyph(state: pr.ci) }
         }
-        .padding(.horizontal, 8)
-        .frame(height: 26)
     }
 }
 

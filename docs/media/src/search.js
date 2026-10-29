@@ -15,11 +15,11 @@
     return html;
   }
 
-  /** SearchGroupHeader: 11 pt semibold title and medium count, 12 above, 4 below. */
+  /** ListSectionHeader without a glyph: 11 pt semibold title and medium count, 28 pt tall, title at the rows' glyph edge. */
   const groupHeader = (title, count) =>
     `<div class="hstack search-group f11 w-semibold">${esc(title)}<span class="w-medium mono">${count}</span></div>`;
 
-  /** SearchPRRow: state glyph, highlighted title, "repo #num · author · when"; CI glyph or Merged/Closed pill. */
+  /** PRRow(context: .search): state glyph, highlighted title, "repo #num · author · when"; CI glyph or Merged/Closed pill. */
   function prRow(pr, words) {
     const glyph = {
       open: ["pullbull.pullrequest", "var(--secondary)"],
@@ -69,5 +69,5 @@
     return `<div class="list">${html}</div>`;
   }
 
-  Object.assign(P, { highlight, searchPRRow: prRow, completionList, completionFooter, searchFooter, searchBody });
+  Object.assign(P, { highlight, completionList, completionFooter, searchFooter, searchBody });
 })();

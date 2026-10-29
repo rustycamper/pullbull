@@ -6,7 +6,6 @@ import PullBullKit
 /// empty state, and the folded "Done" group (Board: the last 14 days; Assigned: still open).
 struct IssueListView: View {
     @Bindable var model: AppModel
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var compact: Bool { model.settings.compact }
     let tab: IssueTab
     let scoped: ScopedIssueTab
@@ -64,13 +63,8 @@ struct IssueListView: View {
                                 rows(group.issues, inRepoGroup: group.isRepo)
                             }
                         } header: {
-                            IssueGroupHeader(
-                                model: model, group: group,
-                                fold: foldState(group, folded: folded)
-                            ) {
-                                model.toggleLane(group.kind, on: tab, doneExpanded: doneExpanded)
-                            }
-                            .pinnedHeaderBackground()
+                            IssueGroupHeader(model: model, group: group, fold: fold(group, folded: folded))
+                                .pinnedHeaderBackground()
                         }
                     }
                 }
@@ -87,9 +81,11 @@ struct IssueListView: View {
     }
 
     /// Only lanes fold here (Status, No status, Not on board); nil for repo headers.
-    private func foldState(_ group: IssueGroup, folded: Set<IssueGroupKind>) -> IssueGroupHeader.Fold? {
+    private func fold(_ group: IssueGroup, folded: Set<IssueGroupKind>) -> ListSectionHeader.Fold? {
         guard model.settings.board != nil, LaneFolds.laneID(group.kind) != nil else { return nil }
-        return folded.contains(group.kind) ? .folded : .open
+        return .init(isOpen: !folded.contains(group.kind)) {
+            model.toggleLane(group.kind, on: tab, doneExpanded: doneExpanded)
+        }
     }
 
     private func rows(
@@ -115,43 +111,9 @@ struct IssueListView: View {
     }
 
     private func doneHeader(_ group: IssueGroup) -> some View {
-        Button {
-            doneExpanded.toggle()
-        } label: {
-            // Laid out like a lane header: the chevron hangs in the leading inset, the checkmark sits in
-            // the rows' icon column and the title on the row title edge.
-            HStack(spacing: compact ? 8 : 10) {
-                Image(systemName: "checkmark.circle")
-                    .font(.system(size: compact ? 10 : 11))
-                    .frame(width: compact ? 16 : 20)
-                HStack(spacing: 6) {
-                    Text("Done")
-                    Text("\(group.issues.count)")
-                        .fontWeight(.medium)
-                        .monospacedDigit()
-                    Text("· \(doneNote)")
-                        .fontWeight(.regular)
-                }
-                Spacer(minLength: 0)
-            }
-            .overlay(alignment: .leading) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .bold))
-                    .rotationEffect(.degrees(doneExpanded ? 90 : 0))
-                    .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: doneExpanded)
-                    .frame(width: 8)
-                    .offset(x: -8)
-            }
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .frame(height: 32)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .padding(.top, 2)
-        .accessibilityLabel("Done, \(group.issues.count), \(doneNote)")
-        .accessibilityValue(doneExpanded ? "expanded" : "collapsed")
+        ListSectionHeader(
+            glyph: "checkmark.circle", title: "Done", count: group.issues.count, note: doneNote,
+            fold: .init(isOpen: doneExpanded) { doneExpanded.toggle() }, compact: compact)
     }
 }
 
@@ -163,16 +125,12 @@ private extension IssueGroup {
     }
 }
 
+/// A group's header: its Status, "No status", "Not on board" or repo, with the lane's fold.
 private struct IssueGroupHeader: View {
     let model: AppModel
     let group: IssueGroup
     /// A lane's fold; nil for headers that don't fold.
-    var fold: Fold? = nil
-    var onToggle: () -> Void = {}
-
-    enum Fold { case open, folded }
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var fold: ListSectionHeader.Fold? = nil
 
     /// Only a repo group's header offers the repo focus.
     private var focusItem: FocusMenuItem? {
@@ -180,64 +138,11 @@ private struct IssueGroupHeader: View {
         return FocusMenuItem(model: model, repo: repo)
     }
 
-    private var compact: Bool { model.settings.compact }
-
     var body: some View {
-        if let fold {
-            // The whole header toggles, like Done's; the chevron hangs in the leading inset, left of the
-            // icon column, so the glyph and title keep their columns.
-            Button(action: onToggle) {
-                label
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .overlay(alignment: .leading) {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.secondary)
-                            .rotationEffect(.degrees(fold == .open ? 90 : 0))
-                            .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: fold == .open)
-                            .frame(width: 8)
-                    }
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(accessibilityTitle)
-            .accessibilityValue(fold == .open ? "expanded" : "collapsed")
-            .accessibilityAddTraits(.isHeader)
+        ListSectionHeader(
+            glyph: symbol, glyphColor: symbolColor, title: group.title,
+            count: group.counted ? group.issues.count : nil, fold: fold, compact: model.settings.compact)
             .focusContextMenu(focusItem)
-        } else {
-            label
-                .accessibilityElement(children: .combine)
-                .accessibilityAddTraits(.isHeader)
-                .focusContextMenu(focusItem)
-        }
-    }
-
-    private var accessibilityTitle: String {
-        group.counted ? "\(group.title), \(group.issues.count)" : group.title
-    }
-
-    /// The glyph sits in the rows' icon column, so header and row circles share one axis and the title
-    /// starts on the row titles' edge. At 11pt the SF circle matches the 13pt issue glyph's diameter.
-    private var label: some View {
-        HStack(spacing: compact ? 8 : 10) {
-            Image(systemName: symbol)
-                .font(.system(size: compact ? 10 : 11))
-                .foregroundStyle(symbolColor)
-                .frame(width: compact ? 16 : 20)
-            HStack(spacing: 6) {
-                Text(group.title)
-                if group.counted {
-                    Text("\(group.issues.count)")
-                        .fontWeight(.medium)
-                        .monospacedDigit()
-                }
-            }
-        }
-        .font(.system(size: 11, weight: .semibold))
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
     }
 
     /// Status lanes take the owner's Status colour; the colour is decorative, the title names the status.

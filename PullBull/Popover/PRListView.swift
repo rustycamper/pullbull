@@ -48,7 +48,7 @@ struct PRListView: View {
                     Section {
                         rows(group.rows)
                     } header: {
-                        GroupHeader(model: model, repo: group.repo, count: group.rows.filter(\.counted).count)
+                        repoHeader(group.repo, count: group.rows.filter(\.counted).count)
                             .pinnedHeaderBackground()
                     }
                 }
@@ -71,7 +71,7 @@ struct PRListView: View {
         let wantedLabels = model.searchQuery.labels
         return ForEach(rows) { row in
             PRRow(
-                model: model, row: row, tab: tab, compact: model.settings.compact, now: now,
+                model: model, row: row, context: .tab(tab), compact: model.settings.compact, now: now,
                 selected: model.listSelection == row.pr.key, wantedLabels: wantedLabels)
             // Ungrouped rows have no header to clear.
             .scrollTarget(row.pr.key, clearance: model.listGroupedByRepo ? PinnedHeader.clearance : 0)
@@ -101,57 +101,17 @@ struct PRListView: View {
     }
 
     private var closedHeader: some View {
-        Button {
-            closedExpanded.toggle()
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .bold))
-                    .rotationEffect(.degrees(closedExpanded ? 90 : 0))
-                Text("Recently closed")
-                Text("\(recentlyClosed.count)")
-                    .fontWeight(.medium)
-                    .monospacedDigit()
-                Spacer()
-                Text("Last 7 days")
-                    .fontWeight(.regular)
-            }
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .frame(height: 30)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .padding(.top, 2)
-        .accessibilityLabel("Recently closed, \(recentlyClosed.count)")
-        .accessibilityValue(closedExpanded ? "expanded" : "collapsed")
+        ListSectionHeader(
+            glyph: nil, title: "Recently closed", count: recentlyClosed.count, trailing: "Last 7 days",
+            fold: .init(isOpen: closedExpanded) { closedExpanded.toggle() }, compact: model.settings.compact)
     }
-}
 
-private struct GroupHeader: View {
-    let model: AppModel
-    let repo: String
-    let count: Int
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "book.closed")
-                .font(.system(size: 10))
-            Text(repo.split(separator: "/").last.map(String.init) ?? repo)
-            if count > 0 {
-                Text("\(count)")
-                    .fontWeight(.medium)
-                    .monospacedDigit()
-            }
-        }
-        .font(.system(size: 11, weight: .semibold))
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
-        .focusContextMenu(FocusMenuItem(model: model, repo: repo))
+    /// A repo group's header, counting what the tab counts; it offers the repo focus.
+    private func repoHeader(_ repo: String, count: Int) -> some View {
+        ListSectionHeader(
+            glyph: "book.closed", title: repo.split(separator: "/").last.map(String.init) ?? repo,
+            count: count > 0 ? count : nil, compact: model.settings.compact)
+            .focusContextMenu(FocusMenuItem(model: model, repo: repo))
     }
 }
 

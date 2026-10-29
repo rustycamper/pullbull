@@ -38,12 +38,11 @@ struct SkeletonList: View {
         .accessibilityLabel("Loading…")
     }
 
-    /// `GroupHeader` / `IssueGroupHeader`: an 11pt semibold line.
+    /// `ListSectionHeader`: an 11pt semibold line.
     private var headerRow: some View {
         bar(.system(size: 11, weight: .semibold), width: .fixed(72), height: 9)
             .padding(.horizontal, 8)
-            .padding(.top, 10)
-            .padding(.bottom, 4)
+            .frame(height: ListSectionHeader.height)
     }
 
     /// `PRRow.fullBody` / `IssueRow.fullBody` with a one-line title.
@@ -70,7 +69,7 @@ struct SkeletonList: View {
         .padding(.bottom, 8)
     }
 
-    /// `PRRow.compactBody` / `IssueRow.compactBody`.
+    /// `CompactRowLayout`, as the tab rows use it.
     private func compactRow(_ index: Int) -> some View {
         HStack(spacing: 8) {
             Circle()

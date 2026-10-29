@@ -22,7 +22,7 @@ let list: [(String, CGFloat, String)] = [
     ("xmark", 7, "bold"),
     ("bookmark", 11, "regular"),
     ("bookmark.fill", 11, "regular"),
-    ("book.closed", 10, "regular"),
+    ("book.closed", 11, "regular"),
     ("chevron.right", 9, "bold"),
     ("checkmark.circle", 13, "regular"),
     ("xmark.circle", 13, "regular"),
