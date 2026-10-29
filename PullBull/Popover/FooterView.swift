@@ -197,12 +197,15 @@ private struct FooterButtonStyle: ButtonStyle {
 
 /// Who PullBull reads GitHub as, with the org or "personal"; opens the account menu to switch account. A
 /// spinner takes the avatar's place while a switch loads. When the bar is tight the scope goes first, then
-/// the whole label.
+/// the whole label. Hover fills it like the footer's icon buttons; the fill reaches into the gutter, so
+/// the avatar stays on the list's leading edge.
 private struct AccountButton: View {
     let model: AppModel
     let login: String
     let scope: String
     let anchor: MenuAnchor
+    @State private var hovering = false
+    private static let inset: CGFloat = 5
 
     var body: some View {
         Button {
@@ -214,8 +217,16 @@ private struct AccountButton: View {
                 label("\(login) ▾")
                 Color.clear.frame(width: 0, height: 0)
             }
+            .padding(.horizontal, Self.inset)
+            .frame(height: 24)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(hovering ? Palette.fill : .clear))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .padding(.leading, -Self.inset)
         .background(MenuAnchorView(anchor: anchor))
         .help("Switch account (⌘⇧A)")
         .accessibilityLabel("Signed in as \(login), \(scope)")
