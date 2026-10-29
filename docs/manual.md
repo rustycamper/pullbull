@@ -267,9 +267,13 @@ Reopen within a minute and the detail is still there.
 | | New comment on a PR you reviewed | off |
 | Issues assigned to me | Newly assigned by someone else | off |
 | | New comment | on |
+| | Status changed on the board | on |
+| | Closed or reopened | on |
 | Issues I created | New comment | off |
+| | Status changed on the board | off |
+| | Closed or reopened | on |
 
-Comments you write never notify. Several comments on one issue between refreshes make one notification ("3 new comments").
+Your own comments, moves and closes never notify. Several comments on one issue between refreshes make one notification ("3 new comments"). Status changes count on the board the Board tab shows, as "In Progress → In Review"; moves the board's automation makes after a close or a merge don't notify, the close does.
 
 Click a notification to open the detail.
 

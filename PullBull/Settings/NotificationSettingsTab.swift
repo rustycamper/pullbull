@@ -39,9 +39,17 @@ struct NotificationSettingsTab: View {
                         RowLabel("Newly assigned", note: issueAssignedNote)
                     }
                     Toggle("New comment", isOn: $model.settings.notify.assignedIssueComment)
+                    Toggle(isOn: $model.settings.notify.assignedIssueStatus) {
+                        RowLabel("Status changed", note: statusNote)
+                    }
+                    Toggle("Closed or reopened", isOn: $model.settings.notify.assignedIssueClosed)
                 }
                 Section("Issues I created") {
                     Toggle("New comment", isOn: $model.settings.notify.createdIssueComment)
+                    Toggle(isOn: $model.settings.notify.createdIssueStatus) {
+                        RowLabel("Status changed", note: statusNote)
+                    }
+                    Toggle("Closed or reopened", isOn: $model.settings.notify.createdIssueClosed)
                 }
             }
             .disabled(permission.state == .denied)
@@ -58,6 +66,12 @@ struct NotificationSettingsTab: View {
         } label: {
             Label("Notifications are off for PullBull in System Settings", systemImage: "exclamationmark.triangle")
         }
+    }
+
+    /// Status moves count only on the board the Board tab shows.
+    private var statusNote: String {
+        guard let title = model.snapshot?.boardTitle else { return "On the board shown on the Board tab" }
+        return "On \(title)"
     }
 
     private var issueAssignedNote: String {

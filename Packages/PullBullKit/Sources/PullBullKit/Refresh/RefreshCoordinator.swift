@@ -151,6 +151,8 @@ public struct LiveSnapshotFetcher: SnapshotFetching {
     private let orgCache = OrgContextCache()
     /// Pages of 50: GitHub search returns at most 1,000 results.
     private static let issuePages = 20
+    /// The most issues that left Assigned or Created one poll looks up.
+    private static let closedLookups = 10
 
     public init(api: GitHubAPI, now: @escaping @Sendable () -> Date = Date.init) {
         self.api = api
@@ -205,6 +207,8 @@ public struct LiveSnapshotFetcher: SnapshotFetching {
             return parts
         }
         guard let resolved = parts.context else { throw CancellationError() }
+        let closed = await closedIssues(
+            previous: sameOrg ? previous : nil, assigned: parts.assigned, created: parts.created)
         return Snapshot(
             fetchedAt: started,
             org: resolved,
@@ -225,8 +229,42 @@ public struct LiveSnapshotFetcher: SnapshotFetching {
                 parts.assigned, started: started, previous: previous, previousAt: previous?.assignedIssuesFetchedAt),
             createdIssuesFetchedAt: Self.fetchedAt(
                 parts.created, started: started, previous: previous, previousAt: previous?.createdIssuesFetchedAt),
-            boardOwner: boardRef?.owner
+            boardOwner: boardRef?.owner,
+            closedIssues: closed
         ).limited(to: scope)
+    }
+
+    /// The issues that left Assigned or Created since `previous` and are now closed, looked up one by
+    /// one: leaving a list can also mean an unassignment or a transfer. A list is compared only when
+    /// both its searches succeeded, as a failed one carries an older list forward. Nil without a
+    /// previous snapshot of this org. A lookup that fails is skipped; these are secondary.
+    private func closedIssues(previous: Snapshot?, assigned: IssueList, created: IssueList) async -> [BoardIssue]? {
+        guard let previous else { return nil }
+        let pairs = [
+            (previous.assignedIssues, previous.assignedIssuesError, assigned),
+            (previous.createdIssues, previous.createdIssuesError, created),
+        ]
+        var gone: [PRKey] = []
+        var seen = Set<PRKey>()
+        for (before, beforeError, now) in pairs {
+            guard let before, beforeError == nil, let issues = now.issues, now.error == nil else { continue }
+            let still = Set(issues.map(\.key))
+            for issue in before where issue.isOpen && !still.contains(issue.key) && seen.insert(issue.key).inserted {
+                gone.append(issue.key)
+            }
+        }
+        guard !gone.isEmpty else { return [] }
+        let api = api
+        return await withTaskGroup(of: BoardIssue?.self) { group in
+            for key in gone.prefix(Self.closedLookups) {
+                group.addTask { try? await api.closedIssue(key) }
+            }
+            var found: [BoardIssue] = []
+            for await issue in group {
+                if let issue, !issue.isOpen { found.append(issue) }
+            }
+            return found
+        }
     }
 
     /// `started` when the issue search succeeded. A failed one keeps the previous list, and with it
@@ -250,9 +288,9 @@ public struct LiveSnapshotFetcher: SnapshotFetching {
         _ query: String, list: String, assignmentFor viewer: String? = nil, previous: [BoardIssue]?
     ) async throws -> IssueList {
         do {
-            // Assigned and Created carry the newest comment's author, for comment notifications.
+            // Assigned and Created carry what issue notifications read.
             let found = try await api.searchIssues(
-                query, maxPages: Self.issuePages, assignmentFor: viewer, lastComment: true)
+                query, maxPages: Self.issuePages, assignmentFor: viewer, activity: true)
             guard !found.hasMore else { return (previous, "incomplete \(list) issues list") }
             return (found.issues, nil)
         } catch is CancellationError {

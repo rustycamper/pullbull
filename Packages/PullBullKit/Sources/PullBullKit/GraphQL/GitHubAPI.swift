@@ -468,12 +468,12 @@ public struct GitHubAPI: Sendable {
 
     /// Issue search, up to `maxPages` pages of `pageSize`; `hasMore` when GitHub has further results. Nodes
     /// that are not decodable issues are skipped. With a `viewer`, each issue carries the viewer's
-    /// latest assignment. `lastComment` adds each issue's newest comment author, for comment notifications.
+    /// latest assignment. `activity` adds what issue notifications read (`Queries.issueSearch`).
     public func searchIssues(
         _ query: String, maxPages: Int = 20, pageSize: Int = 50, assignmentFor viewer: String? = nil,
-        lastComment: Bool = false
+        activity: Bool = false
     ) async throws -> (issues: [BoardIssue], hasMore: Bool) {
-        let graphQL = Queries.issueSearch(withAssignment: viewer != nil, withLastComment: lastComment)
+        let graphQL = Queries.issueSearch(withAssignment: viewer != nil, withActivity: activity)
         var result: [BoardIssue] = []
         var after: String?
         for _ in 0..<maxPages {
@@ -633,6 +633,17 @@ public struct GitHubAPI: Sendable {
             additions: pr["additions"] as? Int,
             deletions: pr["deletions"] as? Int,
             checkCount: checkCount)
+    }
+
+    /// Issue `key` with who last closed it; nil when it is gone (deleted, transferred, no access) or
+    /// doesn't decode.
+    public func closedIssue(_ key: PRKey) async throws -> BoardIssue? {
+        let parts = key.repo.split(separator: "/", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { return nil }
+        let (data, _) = try await executeReportingErrors(
+            Queries.closedIssue, ["owner": parts[0], "name": parts[1], "n": key.number])
+        guard let node = (data["repository"] as? [String: Any])?["issue"] as? [String: Any] else { return nil }
+        return Decoding.issue(from: node)
     }
 
     public func issueDetail(_ key: PRKey) async throws -> IssueDetail {

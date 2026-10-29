@@ -101,8 +101,38 @@ public enum Decoding {
             },
             status: status,
             boardItemId: boardItemId,
-            myAssignment: viewer.flatMap { assignment(node, viewer: $0) }
+            myAssignment: viewer.flatMap { assignment(node, viewer: $0) },
+            statusMoves: timeline(node, "statusMoves").compactMap(statusMove),
+            lastReopen: timeline(node, "lastReopen").last.flatMap(stateChange),
+            lastClose: timeline(node, "lastClose").last.flatMap(stateChange)
         )
+    }
+
+    /// The nodes of the timeline connection aliased `alias`; empty when it wasn't selected.
+    private static func timeline(_ node: [String: Any], _ alias: String) -> [[String: Any]] {
+        (node[alias] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
+    }
+
+    /// A ProjectV2ItemStatusChangedEvent; nil without a date or project. An empty status (the card was
+    /// just added, or its Status cleared) reads as none.
+    private static func statusMove(_ node: [String: Any]) -> StatusMove? {
+        guard let at = lenientDate(node["createdAt"]),
+              let project = node["project"] as? [String: Any],
+              let number = project["number"] as? Int,
+              let owner = (project["owner"] as? [String: Any])?["login"] as? String
+        else { return nil }
+        let from = (node["previousStatus"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        let to = (node["status"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        return StatusMove(
+            actor: (node["actor"] as? [String: Any])?["login"] as? String,
+            from: from, to: to, at: at, project: number, owner: owner)
+    }
+
+    /// A ClosedEvent or ReopenedEvent; nil without a date.
+    private static func stateChange(_ node: [String: Any]) -> IssueStateChange? {
+        lenientDate(node["createdAt"]).map {
+            IssueStateChange(actor: (node["actor"] as? [String: Any])?["login"] as? String, at: $0)
+        }
     }
 
     /// Each label node's name with its colour, in GitHub's order; a node without a name is left out.

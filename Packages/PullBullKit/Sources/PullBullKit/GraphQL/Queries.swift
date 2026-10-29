@@ -33,6 +33,19 @@ enum Queries {
     createdAt actor{login} assignee{__typename ... on User{login}}}}}
     """
 
+    /// An issue that left Assigned or Created, with who last closed it.
+    static let closedIssue = """
+    query($owner:String!,$name:String!,$n:Int!){
+      repository(owner:$owner, name:$name){
+        issue(number:$n){
+          ...issueRowFields
+          lastClose: timelineItems(itemTypes:[CLOSED_EVENT], last:1){nodes{... on ClosedEvent{createdAt actor{login}}}}
+        }
+      }
+    }
+    \(issueRowFields)
+    """
+
     static let viewer = "query{viewer{login}}"
 
     static let organizations = "query{viewer{organizations(first:100){nodes{login}}}}"
@@ -124,8 +137,20 @@ enum Queries {
     /// The newest comment's author, aliased: `issueRowFields` already selects `comments{totalCount}`.
     static let lastCommentAuthor = "lastComment: comments(last:1){nodes{author{login}}}"
 
-    static func issueSearch(withAssignment: Bool, withLastComment: Bool = false) -> String {
-        let extra = (withAssignment ? " " + assignedEvents : "") + (withLastComment ? " " + lastCommentAuthor : "")
+    /// The latest Status moves on any board (a few, as the last may be on another board) and the latest
+    /// reopening, for issue notifications.
+    static let stateActivity = """
+    statusMoves: timelineItems(itemTypes:[PROJECT_V2_ITEM_STATUS_CHANGED_EVENT], last:5){nodes{\
+    ... on ProjectV2ItemStatusChangedEvent{createdAt actor{login} previousStatus status \
+    project{number owner{... on Organization{login} ... on User{login}}}}}} \
+    lastReopen: timelineItems(itemTypes:[REOPENED_EVENT], last:1){nodes{... on ReopenedEvent{createdAt actor{login}}}}
+    """
+
+    /// `withActivity` adds what issue notifications read: the newest comment's author, Status moves and
+    /// the latest reopening.
+    static func issueSearch(withAssignment: Bool, withActivity: Bool = false) -> String {
+        let extra = (withAssignment ? " " + assignedEvents : "")
+            + (withActivity ? " " + lastCommentAuthor + " " + stateActivity : "")
         return """
         query($q:String!,$after:String,$first:Int=50){
           search(query:$q, type:ISSUE, first:$first, after:$after){

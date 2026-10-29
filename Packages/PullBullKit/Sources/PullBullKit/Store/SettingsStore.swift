@@ -28,6 +28,14 @@ public struct NotificationToggles: Codable, Equatable, Sendable {
     public var assignedIssueComment = true
     /// Off by default: someone else commented on an open issue I created.
     public var createdIssueComment = false
+    /// Someone else moved an issue assigned to me on the board.
+    public var assignedIssueStatus = true
+    /// Off by default: someone else moved an issue I created on the board.
+    public var createdIssueStatus = false
+    /// Someone else closed or reopened an issue assigned to me.
+    public var assignedIssueClosed = true
+    /// Someone else closed or reopened an issue I created.
+    public var createdIssueClosed = true
 
     public init() {}
 
@@ -46,6 +54,10 @@ public struct NotificationToggles: Codable, Equatable, Sendable {
         d.commentAfterMyReview = c.readable(Bool.self, forKey: .commentAfterMyReview) ?? d.commentAfterMyReview
         d.assignedIssueComment = c.readable(Bool.self, forKey: .assignedIssueComment) ?? d.assignedIssueComment
         d.createdIssueComment = c.readable(Bool.self, forKey: .createdIssueComment) ?? d.createdIssueComment
+        d.assignedIssueStatus = c.readable(Bool.self, forKey: .assignedIssueStatus) ?? d.assignedIssueStatus
+        d.createdIssueStatus = c.readable(Bool.self, forKey: .createdIssueStatus) ?? d.createdIssueStatus
+        d.assignedIssueClosed = c.readable(Bool.self, forKey: .assignedIssueClosed) ?? d.assignedIssueClosed
+        d.createdIssueClosed = c.readable(Bool.self, forKey: .createdIssueClosed) ?? d.createdIssueClosed
         self = d
     }
 }

@@ -61,6 +61,14 @@ extension IssueEvent {
         switch kind {
         case .assigned: "Assigned to you"
         case .comment: count == 1 ? "New comment" : "\(count) new comments"
+        case .statusChanged: "\(move?.from ?? "No Status") → \(move?.to ?? "No Status")"
+        case .closed:
+            switch issue.stateReason {
+            case .notPlanned: "Closed as not planned"
+            case .duplicate: "Closed as duplicate"
+            default: "Closed"
+            }
+        case .reopened: "Reopened"
         }
     }
 }

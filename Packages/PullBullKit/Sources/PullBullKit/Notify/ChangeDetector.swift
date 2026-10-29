@@ -22,6 +22,10 @@ public enum IssueEventKind: String, Sendable, CaseIterable {
     case assigned
     /// New comments on an issue assigned to me or that I created.
     case comment
+    /// The issue's card moved to another Status on the board.
+    case statusChanged
+    case closed
+    case reopened
 }
 
 public struct IssueEvent: Equatable, Sendable {
@@ -30,12 +34,15 @@ public struct IssueEvent: Equatable, Sendable {
     public let actor: String?
     /// For `comment`: how many arrived since the previous poll.
     public let count: Int
+    /// For `statusChanged`: the move.
+    public let move: StatusMove?
 
-    public init(kind: IssueEventKind, issue: BoardIssue, actor: String?, count: Int = 1) {
+    public init(kind: IssueEventKind, issue: BoardIssue, actor: String?, count: Int = 1, move: StatusMove? = nil) {
         self.kind = kind
         self.issue = issue
         self.actor = actor
         self.count = count
+        self.move = move
     }
 }
 
@@ -160,6 +167,9 @@ public enum ChangeDetector {
         guard let old else { return [] }
         let events = assignedEvents(old: old, new: new, me: me, toggles: toggles)
             + commentEvents(old: old, new: new, me: me, toggles: toggles)
+            + statusEvents(old: old, new: new, me: me, toggles: toggles)
+            + closedEvents(old: old, new: new, me: me, toggles: toggles)
+            + reopenedEvents(old: old, new: new, me: me, toggles: toggles)
         let order = Dictionary(uniqueKeysWithValues: IssueEventKind.allCases.enumerated().map { ($1, $0) })
         return events.sorted {
             if $0.kind != $1.kind { return order[$0.kind]! < order[$1.kind]! }
@@ -198,6 +208,94 @@ public enum ChangeDetector {
             }
         }
         return result
+    }
+
+    /// The Assigned and Created lists whose `on` toggle is set, each before and now, with the time
+    /// the previous one was fetched (a failed search carries it forward with its list).
+    private static func lists(
+        old: Snapshot, new: Snapshot, assigned: Bool, created: Bool
+    ) -> [(before: [BoardIssue], now: [BoardIssue], since: Date)] {
+        var result: [(before: [BoardIssue], now: [BoardIssue], since: Date)] = []
+        if assigned, let before = old.assignedIssues, let now = new.assignedIssues {
+            result.append((before, now, (old.assignedIssuesFetchedAt ?? old.fetchedAt).addingTimeInterval(-assignmentLag)))
+        }
+        if created, let before = old.createdIssues, let now = new.createdIssues {
+            result.append((before, now, (old.createdIssuesFetchedAt ?? old.fetchedAt).addingTimeInterval(-assignmentLag)))
+        }
+        return result
+    }
+
+    /// Someone other than me, and not automation, moved the card of an open issue assigned to me or
+    /// that I created to another Status on the board PullBull shows, since the previous poll. One
+    /// event per issue, for its latest move there. Silent without a board, for a card just added to
+    /// it, for an issue the previous poll didn't list, and for a move the previous poll already had.
+    private static func statusEvents(
+        old: Snapshot, new: Snapshot, me: String, toggles: NotificationToggles
+    ) -> [IssueEvent] {
+        guard let project = new.boardProject else { return [] }
+        let owner = new.boardOwner?.login ?? new.org.org
+        let latest = { (issue: BoardIssue) in issue.statusMoves.last { $0.isOn(project: project, owner: owner) } }
+        var seen = Set<PRKey>()
+        var result: [IssueEvent] = []
+        for (before, now, since) in lists(
+            old: old, new: new, assigned: toggles.assignedIssueStatus, created: toggles.createdIssueStatus)
+        {
+            let previous = Dictionary(before.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
+            for issue in now where issue.isOpen {
+                guard let prev = previous[issue.key], let move = latest(issue),
+                      move.from != nil, move.to != nil, move.at >= since, latest(prev) != move,
+                      !isAutomation(move.actor), !same(move.actor ?? "", me), seen.insert(issue.key).inserted
+                else { continue }
+                result.append(IssueEvent(kind: .statusChanged, issue: issue, actor: move.actor, move: move))
+            }
+        }
+        return result
+    }
+
+    /// Issues assigned to me or that I created which someone else closed since the previous poll (the
+    /// snapshot's `closedIssues`, looked up when they left the lists).
+    private static func closedEvents(
+        old: Snapshot, new: Snapshot, me: String, toggles: NotificationToggles
+    ) -> [IssueEvent] {
+        let assigned = toggles.assignedIssueClosed ? Set((old.assignedIssues ?? []).map(\.key)) : []
+        let created = toggles.createdIssueClosed ? Set((old.createdIssues ?? []).map(\.key)) : []
+        var seen = Set<PRKey>()
+        var result: [IssueEvent] = []
+        for issue in new.closedIssues ?? []
+        where (assigned.contains(issue.key) || created.contains(issue.key)) && seen.insert(issue.key).inserted {
+            let actor = issue.lastClose?.actor
+            if let actor, same(actor, me) { continue }
+            result.append(IssueEvent(kind: .closed, issue: issue, actor: actor))
+        }
+        return result
+    }
+
+    /// Issues assigned to me or that I created which someone else reopened since the previous poll:
+    /// back in the list with a reopening after the previous fetch.
+    private static func reopenedEvents(
+        old: Snapshot, new: Snapshot, me: String, toggles: NotificationToggles
+    ) -> [IssueEvent] {
+        var seen = Set<PRKey>()
+        var result: [IssueEvent] = []
+        for (before, now, since) in lists(
+            old: old, new: new, assigned: toggles.assignedIssueClosed, created: toggles.createdIssueClosed)
+        {
+            let known = Set(before.map(\.key))
+            for issue in now where issue.isOpen && !known.contains(issue.key) {
+                guard let reopen = issue.lastReopen, reopen.at >= since, !same(reopen.actor ?? "", me),
+                      seen.insert(issue.key).inserted
+                else { continue }
+                result.append(IssueEvent(kind: .reopened, issue: issue, actor: reopen.actor))
+            }
+        }
+        return result
+    }
+
+    /// A board's own workflows (`github-project-automation`) and apps: their moves follow a close or
+    /// a merge that notifies on its own.
+    private static func isAutomation(_ actor: String?) -> Bool {
+        guard let actor else { return false }
+        return same(actor, "github-project-automation") || actor.hasSuffix("[bot]")
     }
 
     /// Issues someone else newly assigned to `me`. Silent when the previous snapshot never fetched
