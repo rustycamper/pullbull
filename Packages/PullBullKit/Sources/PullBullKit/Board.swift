@@ -20,6 +20,9 @@ public enum BoardOwner: Hashable, Sendable {
     public func matches(_ other: BoardOwner) -> Bool {
         isUser == other.isUser && login.caseInsensitiveCompare(other.login) == .orderedSame
     }
+
+    /// The owner's kind and login, which GitHub compares without regard to case: "org:acme", "user:me".
+    public var key: String { "\(isUser ? "user" : "org"):\(login.lowercased())" }
 }
 
 extension BoardOwner: Codable {

@@ -8,6 +8,8 @@ import PullBullKit
 struct FooterView: View {
     let model: AppModel
     let now: Date
+    /// Where the account menu pops up, for the account button and ⌘⇧A.
+    let accountAnchor: MenuAnchor
 
     var body: some View {
         VStack(spacing: 0) {
@@ -59,7 +61,8 @@ struct FooterView: View {
         let link = footerLink
         return HStack(spacing: 4) {
             if let login = model.settings.account {
-                AccountButton(login: login, scope: model.settings.org ?? "personal")
+                AccountButton(
+                    model: model, login: login, scope: model.settings.org ?? "personal", anchor: accountAnchor)
             }
             Spacer(minLength: 8)
             // The age shows only once the data is stale; "Copied" takes its place for a moment.
@@ -192,31 +195,53 @@ private struct FooterButtonStyle: ButtonStyle {
     }
 }
 
-/// Who PullBull reads GitHub as, with the org or "personal"; opens Settings › Account. When the bar is tight
-/// the scope goes first, then the whole label.
+/// Who PullBull reads GitHub as, with the org or "personal"; opens the account menu to switch account. A
+/// spinner takes the avatar's place while a switch loads. When the bar is tight the scope goes first, then
+/// the whole label. Hover fills it like the footer's icon buttons; the fill reaches into the gutter, so
+/// the avatar stays on the list's leading edge.
 private struct AccountButton: View {
+    let model: AppModel
     let login: String
     let scope: String
+    let anchor: MenuAnchor
+    @State private var hovering = false
+    private static let inset: CGFloat = 5
 
     var body: some View {
         Button {
-            UserDefaults.standard.set(SettingsTab.account.rawValue, forKey: "settings.tab")
-            SettingsOpener.open()
+            guard let view = anchor.view else { return }
+            AccountMenu.show(model: model, in: view, at: .zero)
         } label: {
             ViewThatFits(in: .horizontal) {
-                label("\(login) · \(scope)")
-                label(login)
+                label("\(login) · \(scope) ▾")
+                label("\(login) ▾")
                 Color.clear.frame(width: 0, height: 0)
             }
+            .padding(.horizontal, Self.inset)
+            .frame(height: 24)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(hovering ? Palette.fill : .clear))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("Account settings")
+        .onHover { hovering = $0 }
+        .padding(.leading, -Self.inset)
+        .background(MenuAnchorView(anchor: anchor))
+        .help("Switch account (⌘⇧A)")
         .accessibilityLabel("Signed in as \(login), \(scope)")
+        .accessibilityHint("Switch account")
     }
 
     private func label(_ text: String) -> some View {
         HStack(spacing: 5) {
-            AvatarView(login: login, url: CachedAvatars.profileImageURL(login), size: 14)
+            if model.isSwitchingAccount {
+                ProgressView()
+                    .controlSize(.mini)
+                    .frame(width: 14, height: 14)
+            } else {
+                AvatarView(login: login, url: CachedAvatars.profileImageURL(login), size: 14)
+            }
             Text(text).lineLimit(1)
         }
         .fixedSize()

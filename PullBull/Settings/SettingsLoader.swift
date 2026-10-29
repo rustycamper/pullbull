@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import PullBullKit
 
-/// Loads what the Settings pickers offer (orgs, boards) and runs the account switch.
+/// Loads what the Settings pickers offer (orgs, boards) and lists the orgs an account switch loads.
 /// Settings themselves stay in `AppModel.settings`.
 @Observable @MainActor
 final class SettingsLoader {
@@ -15,8 +15,6 @@ final class SettingsLoader {
     /// loaded, or when the token cannot read projects.
     private(set) var boards: [BoardSummary]?
     private(set) var boardsError: String?
-    private(set) var accountError: String?
-    private(set) var isSwitchingAccount = false
 
     func loadOrgs(_ model: AppModel) async {
         guard let account = model.settings.accountRef else {
@@ -64,39 +62,18 @@ final class SettingsLoader {
         }
     }
 
-    /// Switches to `account` with the org last chosen for it, else the current org if that account is
-    /// in it, else its first org (`AppSettings.preferredOrg`). An app account chooses among its
-    /// installed orgs and then its other orgs, so a remembered org that hasn't approved PullBull comes
-    /// back with its approval message.
-    /// An account without an org is switched to with no org: no-org mode.
-    /// A signed-out app account is switched to with its remembered org.
-    /// `personal` keeps no-org mode, for the personal board's "Use X from GitHub CLI".
+    /// Switches account through `AppModel.selectAccount`, then lists the orgs it loaded.
     func selectAccount(_ account: AccountRef, model: AppModel, personal: Bool = false) async {
-        guard account != model.settings.accountRef, !isSwitchingAccount else { return }
-        isSwitchingAccount = true
-        defer { isSwitchingAccount = false }
-        accountError = nil
-        do {
-            let orgs = try await model.organizations(for: account)
-            let members = account.source == .gitHubApp
-                ? ((try? await model.memberOrganizations(for: account)) ?? []) : []
-            let candidates = account.source == .gitHubApp
-                ? OrgPicker.candidates(installed: orgs, memberOrgs: members) : orgs
-            let org = personal ? nil : model.settings.preferredOrg(for: account.login, among: candidates)
-            self.orgs = orgs
-            memberOrgs = members
-            orgsError = nil
-            model.switchAccount(to: account, org: org)
-        } catch is CancellationError {
-        } catch AuthError.signedOut(let signedOut) where signedOut == account {
-            // A signed-out app account is still reachable: with its remembered org, the popover offers
-            // Sign In and Settings offers Sign Out….
-            orgs = []
-            memberOrgs = []
-            orgsError = nil
-            model.switchAccount(to: account, org: model.settings.orgByAccount[account.login])
-        } catch {
-            accountError = "Couldn't load \(account.login)'s organizations: \(RefreshError(error).message(org: nil, source: account.source))"
-        }
+        guard let loaded = await model.selectAccount(account, personal: personal) else { return }
+        orgs = loaded.installed
+        memberOrgs = loaded.members
+        orgsError = nil
     }
+}
+
+/// The orgs an account switch loaded: for `gh` every org of the login, for an app account the orgs that
+/// installed PullBull and its other orgs.
+struct AccountOrgs {
+    let installed: [String]
+    let members: [String]
 }

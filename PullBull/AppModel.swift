@@ -39,6 +39,7 @@ final class AppModel {
             var reconciled = settings
             let boardCleared = reconciled.reconcileBoard()
             reconciled.rememberOrg()
+            reconciled.rememberBoard()
             reconciled.reconcileTab()
             if reconciled != settings { settings = reconciled }
             settingsStore.save(settings)
@@ -150,6 +151,10 @@ final class AppModel {
     private(set) var checkingAccess = false
     /// GitHub App accounts' sign-in states, as the broker reports them.
     private(set) var authStates: [AccountRef: AuthState] = [:]
+    /// An account switch is loading the new account's orgs; another waits for it to finish.
+    private(set) var isSwitchingAccount = false
+    /// Why the last account switch didn't happen; nil once a switch starts.
+    private(set) var accountSwitchError: String?
     /// The GitHub App's access for the current app account, by org; empty for a `gh` account.
     private(set) var orgAccess: [String: OrgAccess] = [:]
     /// The current app account's installation on its own account, for no-org mode; nil for `gh` and
@@ -338,6 +343,9 @@ final class AppModel {
             gh: gh)
         var loaded = settingsStore.load()
         loaded.reconcileTab()
+        // Settings saved before boards were remembered: the board in use is remembered for its owner
+        // before the first switch moves away from it.
+        loaded.rememberBoard()
         // Settings saved in no-org mode before personal boards have a board number with no owner.
         _ = loaded.reconcileBoard()
         self.settings = loaded
@@ -2303,6 +2311,56 @@ extension AppModel {
         let boards = try await api(for: account).projects(owner: owner)
         boardList.loaded(boards, account: account, owner: owner, at: Date())
         return boards
+    }
+
+    /// Switches to `account` with the org last chosen for it, else the current org if that account is
+    /// in it, else its first org (`AppSettings.preferredOrg`). An app account chooses among its
+    /// installed orgs and then its other orgs, so a remembered org that hasn't approved PullBull comes
+    /// back with its approval message.
+    /// An account without an org is switched to with no org: no-org mode.
+    /// A signed-out app account is switched to with its remembered org.
+    /// `personal` keeps no-org mode, for the personal board's "Use X from GitHub CLI".
+    /// Settings and the footer's account menu both switch here, one switch at a time. A switch chosen
+    /// while launch is still finding the account waits for it, so launch can't undo the choice; one that
+    /// a sign-in, a sign-out or another account change overtakes while the orgs load is dropped.
+    /// Returns the orgs loaded on the way, for Settings' org picker; nil when nothing was switched.
+    @discardableResult
+    func selectAccount(_ account: AccountRef, personal: Bool = false) async -> AccountOrgs? {
+        guard account != settings.accountRef, !isSwitchingAccount else { return nil }
+        isSwitchingAccount = true
+        defer { isSwitchingAccount = false }
+        accountSwitchError = nil
+        await bootstrapTask?.value
+        let from = settings.accountRef
+        guard account != from, !signingIn, !signingOut else { return nil }
+        /// Nothing changed the account meanwhile, and an app account wasn't signed out of.
+        func stillWanted() -> Bool {
+            settings.accountRef == from && !signingIn && !signingOut
+                && (account.source == .gh || settings.appAccounts.contains { $0.ref == account })
+        }
+        do {
+            let orgs = try await organizations(for: account)
+            let members = account.source == .gitHubApp
+                ? ((try? await memberOrganizations(for: account)) ?? []) : []
+            guard stillWanted() else { return nil }
+            let candidates = account.source == .gitHubApp
+                ? OrgPicker.candidates(installed: orgs, memberOrgs: members) : orgs
+            let org = personal ? nil : settings.preferredOrg(for: account.login, among: candidates)
+            switchAccount(to: account, org: org)
+            return AccountOrgs(installed: orgs, members: members)
+        } catch is CancellationError {
+            return nil
+        } catch AuthError.signedOut(let signedOut) where signedOut == account {
+            // A signed-out app account is still reachable: with its remembered org, the popover offers
+            // Sign In and Settings offers Sign Out….
+            guard stillWanted() else { return nil }
+            switchAccount(to: account, org: settings.orgByAccount[account.login])
+            return AccountOrgs(installed: [], members: [])
+        } catch {
+            accountSwitchError = "Couldn't load \(account.login)'s organizations: "
+                + RefreshError(error).message(org: nil, source: account.source)
+            return nil
+        }
     }
 
     /// Changes account and org in one settings write, so the coordinator restarts once.

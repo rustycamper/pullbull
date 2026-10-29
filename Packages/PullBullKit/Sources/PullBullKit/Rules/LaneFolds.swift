@@ -21,7 +21,7 @@ public struct LaneFolds: Codable, Equatable, Sendable {
 
     /// A board's key: its owner's kind and login (GitHub logins ignore case) and its number.
     static func boardKey(_ board: BoardRef) -> String {
-        "\(board.owner.isUser ? "user" : "org"):\(board.owner.login.lowercased())#\(board.number)"
+        "\(board.owner.key)#\(board.number)"
     }
 
     /// A tab's key on a board: Board lanes use the bare board key, as saved before Assigned folded, and

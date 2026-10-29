@@ -28,12 +28,13 @@ Keyboard-first · Native SwiftUI · Read-only
 | &emsp;&emsp; | Problem | PullBull |
 |:-:|---|---|
 | <img src="docs/media/icons/bell-badge.png" width="22" height="22" alt=""> | Review requests get lost among CI, mentions and bot comments | **Review** tab with only PRs waiting on you or your team. Count in the menu bar |
+| <img src="docs/media/icons/text-magnifyingglass.png" width="22" height="22" alt=""> | You remember what a PR or issue was about, not its title or number; a chat mentions one loosely | **Ask AI**: describe it in your own words (<kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd>), answered by Anthropic with your own API key. Off by default |
 | <img src="docs/media/icons/sparkles.png" width="22" height="22" alt=""> | Agents open PRs faster than you can track them | **Mine** tab: review state, checks, *Ready to merge* when approved and green |
 | <img src="docs/media/icons/arrow-triangle-2-circlepath.png" width="22" height="22" alt=""> | Re-requests and new commits after your review go unnoticed | Both land back in **Review**, marked with why |
 | <img src="docs/media/icons/rectangle-split-3x1.png" width="22" height="22" alt=""> | The Projects board is slow for a quick look | **Assigned** and **Board** tabs, grouped by board Status |
 | <img src="docs/media/icons/link.png" width="22" height="22" alt=""> | Finding the PR that closes an issue takes clicks | Issue detail lists its linked PRs. Open one, <kbd>Esc</kbd> returns |
 | <img src="docs/media/icons/bolt.png" width="22" height="22" alt=""> | "Where is #123?" means opening a browser | <kbd>⌃</kbd><kbd>⌥</kbd><kbd>P</kbd>, type `#123` or paste the link, <kbd>Return</kbd> |
-| <img src="docs/media/icons/text-magnifyingglass.png" width="22" height="22" alt=""> | A chat mentions a PR or issue loosely: no link, no number | **Ask**: describe it in your own words (<kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd>), answered by Anthropic with your own API key. Off by default |
+| <img src="docs/media/icons/person-2.png" width="22" height="22" alt=""> | Work and personal GitHub accounts mean signing out and back in | Switch accounts on the fly from the footer (<kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>). Each comes back with its own org and board |
 | <img src="docs/media/icons/slider-horizontal-3.png" width="22" height="22" alt=""> | Notifications are all or nothing | Toggle each event separately |
 | <img src="docs/media/icons/keyboard.png" width="22" height="22" alt=""> | Web UIs make you reach for the mouse | Keyboard-first. Every action has a key; start typing anywhere to search |
 | <img src="docs/media/icons/macwindow.png" width="22" height="22" alt=""> | Most dev tools are web apps in a window | Native SwiftUI and AppKit, no web views. System materials, light and dark, VoiceOver, Reduce Motion |
@@ -62,6 +63,7 @@ Keyboard-first · Native SwiftUI · Read-only
 - **One repo:** right-click a repo header or row → **Show Only *repo***, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd>
 - **Right-click a row:** copy branch (PRs), link or Markdown link · open on GitHub · search the author
 - **Switch board:** <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> on the Board tab
+- **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Each account keeps its org and board
 
 More in the [manual](docs/manual.md#issues).
 
@@ -78,7 +80,8 @@ More in the [manual](docs/manual.md#issues).
 
 Combine `@`, `~`, `is:`, `status:` and words. Type `st` or `la` and press <kbd>Tab</kbd> for `status:` or `label:`, with suggestions. Save the searches you repeat with the bookmark icon; manage them in Settings → Search.
 
-Can't remember the words? [Ask AI](docs/manual.md#ask-ai) finds the item from a description. Off by default; turn it on in Settings → Ask AI.
+> [!TIP]
+> **Can't remember the words?** [Ask AI](docs/manual.md#ask-ai) finds the item from a description (<kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd>). Off by default; turn it on in Settings → Ask AI.
 
 ## Keys
 
@@ -89,7 +92,7 @@ Can't remember the words? [Ask AI](docs/manual.md#ask-ai) finds the item from a 
 | <kbd>Return</kbd> · <kbd>⌘</kbd><kbd>Return</kbd> | Open detail · open on GitHub |
 | <kbd>⌘</kbd><kbd>1</kbd> · <kbd>⌘</kbd><kbd>2</kbd> | Pull Requests · Issues |
 | <kbd>/</kbd> or just type | Search |
-| <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> | Repo menu · board menu |
+| <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd> | Repo menu · board menu · account menu |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Ask (once turned on) |
 | <kbd>Esc</kbd> | Back, clear, close |
 

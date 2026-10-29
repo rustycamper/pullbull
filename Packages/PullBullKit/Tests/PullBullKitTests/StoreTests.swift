@@ -791,6 +791,86 @@ private func sample() -> Snapshot {
         #expect(s.projectOwner == .org("other"))
     }
 
+    /// Each owner's board comes back with its scope: switching accounts or orgs and back keeps the
+    /// board chosen there instead of falling back to the owner's first.
+    @Test func boardComesBackWithItsOwner() {
+        var s = AppSettings()
+        s.account = "me"
+        s.org = "initech"
+        _ = s.reconcileBoard()
+        s.board = .org("initech", 5)
+        s.rememberBoard()
+
+        // Another account in another org: nothing remembered there yet, so the caller picks.
+        s.choose(AccountRef(login: "work", source: .gitHubApp), org: "acme")
+        #expect(s.reconcileBoard() == true)
+        #expect(s.board == nil)
+        s.board = .org("acme", 2)
+        s.rememberBoard()
+
+        // Back: initech's board returns, and nothing needs picking.
+        s.choose(AccountRef(login: "me", source: .gh), org: "initech")
+        #expect(s.reconcileBoard() == false)
+        #expect(s.board == .org("initech", 5))
+
+        // No-org mode keeps the user's own board the same way.
+        s.org = nil
+        #expect(s.reconcileBoard() == true)
+        s.board = .user("me", 1)
+        s.rememberBoard()
+        s.org = "acme"
+        #expect(s.reconcileBoard() == false)
+        #expect(s.board == .org("acme", 2))
+        s.org = nil
+        #expect(s.reconcileBoard() == false)
+        #expect(s.board == .user("me", 1))
+    }
+
+    /// Owners are remembered as GitHub compares them: kind and login, without regard to case.
+    @Test func rememberedBoardIgnoresLoginCase() {
+        var s = AppSettings()
+        s.account = "me"
+        s.org = "Initech"
+        _ = s.reconcileBoard()
+        s.board = .org("Initech", 4)
+        s.rememberBoard()
+        #expect(s.boardByOwner == ["org:initech": 4])
+        s.org = "other"
+        _ = s.reconcileBoard()
+        s.org = "INITECH"
+        #expect(s.reconcileBoard() == false)
+        #expect(s.projectNumber == 4)
+        // A user and an org of the same name are different owners.
+        s.org = nil
+        s.account = "initech"
+        #expect(s.reconcileBoard() == true)
+    }
+
+    /// Settings saved before boards were remembered: remembering the board at load (as launch does)
+    /// keeps it for its owner through the first switch away and back.
+    @Test func boardInUseBeforeUpgradeComesBack() throws {
+        let saved = #"{"account":"me","org":"initech","projectNumber":7,"projectOwner":{"kind":"org","login":"initech"}}"#
+        var s = try JSONDecoder().decode(AppSettings.self, from: Data(saved.utf8))
+        s.rememberBoard()
+        s.org = "acme"
+        #expect(s.reconcileBoard() == true)
+        s.org = "initech"
+        #expect(s.reconcileBoard() == false)
+        #expect(s.board == .org("initech", 7))
+    }
+
+    @Test func rememberedBoardsRoundTrip() throws {
+        let store = SettingsStore(defaults: defaults())
+        var s = AppSettings()
+        s.account = "me"
+        s.boardByOwner = ["org:initech": 4, "user:me": 1]
+        store.save(s)
+        #expect(store.load().boardByOwner == s.boardByOwner)
+        // Settings saved before boards were remembered load with none.
+        let old = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"account":"me"}"#.utf8))
+        #expect(old.boardByOwner.isEmpty)
+    }
+
     /// No-org mode shows only the user's own boards; org mode never does.
     @Test func scopeChangesReconcileTheBoardOwner() {
         var s = AppSettings()
