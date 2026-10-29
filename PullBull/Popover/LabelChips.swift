@@ -32,23 +32,29 @@ struct LabelChipSet {
     }
 }
 
-/// How many of a set's chips a meta line shows, and whether the first may shorten to fit.
+/// How many of a set's chips a meta line shows, whether the first may shorten to fit, and whether the line
+/// leaves out what it can spare (a PR's author, which its avatar names on hover).
 struct ChipFit: Hashable {
     let count: Int
     let squeezed: Bool
+    var lean = false
 }
 
 /// `line(fit)` with as many chips of `set` as fit at full width: chips drop off the end into "+N", so the
-/// rest of the line always shows. The last resort keeps one chip, shortened, so a row with labels always
-/// shows a colour; it gives way before the rest of the line does.
+/// rest of the line always shows. With `canLean`, the line next tries leaving out what it can spare before
+/// any chip shortens. The last resort keeps one chip, shortened, so a row with labels always shows a
+/// colour; it gives way before the rest of the line does.
 struct ChipsThatFit<Line: View>: View {
     let set: LabelChipSet
+    var canLean = false
     @ViewBuilder let line: (ChipFit) -> Line
 
     private var fits: [ChipFit] {
         guard !set.chips.isEmpty else { return [ChipFit(count: 0, squeezed: false)] }
-        return (1...set.chips.count).reversed().map { ChipFit(count: $0, squeezed: false) }
-            + [ChipFit(count: 1, squeezed: true)]
+        let counts = (1...set.chips.count).reversed()
+        let full = counts.map { ChipFit(count: $0, squeezed: false) }
+        let lean = canLean ? counts.map { ChipFit(count: $0, squeezed: false, lean: true) } : []
+        return full + lean + [ChipFit(count: 1, squeezed: true, lean: canLean)]
     }
 
     var body: some View {
