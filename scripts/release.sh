@@ -3,6 +3,7 @@
 # build number, exports it signed with Developer ID, notarises and staples it, zips it, signs the zip for
 # Sparkle, zips the dSYM and writes appcast.xml. Only once all of that succeeds does it tag v<VERSION> locally (an
 # annotated tag) and print the push and `gh release create` commands. It never commits, pushes or publishes.
+# The release notes are written by hand beforehand, in build/release/notes-VERSION.md (see docs/releasing.md).
 #
 #   scripts/release.sh VERSION           e.g. scripts/release.sh 1.0.0
 #   scripts/release.sh --check VERSION   preflight only: reports every problem and changes nothing
@@ -25,7 +26,7 @@ version=
 for arg in "$@"; do
   case $arg in
     --check) check_only=true ;;
-    -h|--help) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "Unknown option: $arg" >&2; exit 2 ;;
     *) version=$arg ;;
   esac
@@ -34,6 +35,7 @@ if [[ -z $version ]]; then
   echo "Usage: scripts/release.sh [--check] VERSION   (e.g. 1.0.0)" >&2
   exit 2
 fi
+NOTES=$OUT/notes-$version.md
 
 problems=0
 # In --check mode a failure is listed and the checks go on; otherwise the first one stops the release.
@@ -110,6 +112,10 @@ if [[ $previous_feed == *'</channel>'* ]]; then
 else
   previous_feed=
 fi
+
+[[ -s $NOTES ]] \
+  || fail "No release notes in $NOTES. Write them first: what's new for users, grouped by feature, then
+  fixes, ending with the full changelog link (see docs/releasing.md)."
 
 for tool in xcodegen xcodebuild ditto curl; do
   command -v "$tool" > /dev/null || fail "$tool is not installed."
@@ -263,5 +269,5 @@ Its dSYM, for symbolicating crash reports (keep it with the release):
 
 Publish it with:
   git push origin $tag
-  gh release create $tag "$zip" "$dsym_zip" "$OUT/appcast.xml" --title "PullBull $version" --generate-notes
+  gh release create $tag "$zip" "$dsym_zip" "$OUT/appcast.xml" --title "PullBull $version" --notes-file "$NOTES"
 DONE

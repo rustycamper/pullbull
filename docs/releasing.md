@@ -1,5 +1,7 @@
 # Releasing
 
+Write the [release notes](#release-notes) to `build/release/notes-1.0.0.md` first; the script checks for them.
+
 ```bash
 scripts/release.sh --check 1.0.0   # preflight only, changes nothing
 scripts/release.sh 1.0.0           # build, sign, notarise, tag
@@ -10,7 +12,7 @@ Then [bump the Homebrew cask](#homebrew-cask).
 
 ## What the script does
 
-1. **Preflight:** on `main`, clean tree, HEAD = `origin/main`, tag is new (local and origin), build number above the published appcast's, certificate, notary profile, Sparkle key and team present
+1. **Preflight:** on `main`, clean tree, HEAD = `origin/main`, tag is new (local and origin), build number above the published appcast's, release notes written, certificate, notary profile, Sparkle key and team present
 2. **Build:** archive Release as `VERSION`, build number = commit count of `main`
 3. **Sign:** export with Developer ID (`scripts/ExportOptions.plist`), check signature, keychain entitlement, version and Sparkle key
 4. **dSYM:** check its UUIDs against the app, zip it
@@ -20,8 +22,19 @@ Then [bump the Homebrew cask](#homebrew-cask).
 
 - Output: `build/release/`
 - Commits, pushes and publishes nothing
-- The printed `gh release create` attaches the zip, `appcast.xml` and the dSYM zip (for symbolicating crash reports)
+- The printed `gh release create` attaches the zip, `appcast.xml` and the dSYM zip (for symbolicating crash reports), with the notes file as the release's description
 - The feed is `releases/latest/download/appcast.xml`, so every release must be marked latest, not pre-release
+
+## Release notes
+
+Written by hand for each release, for users rather than as a PR list, in `build/release/notes-<version>.md` (git-ignored):
+
+- One `##` section per feature, biggest first: what it does and how to reach it (setting, shortcut, where to click)
+- New settings with their defaults
+- A `## Fixes` section for bug fixes users could notice; leave out CI-only and test changes
+- End with `**Full changelog**: https://github.com/rustycamper/pullbull/compare/v<previous>...v<version>`
+
+Start from `git log --oneline v<previous>..origin/main` and the PR descriptions. Get the owner's OK on the draft before building.
 
 ## Ask model list
 
