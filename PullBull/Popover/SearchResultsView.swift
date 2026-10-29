@@ -64,6 +64,8 @@ struct SearchResultsView: View {
 
     private var states: [StateFilter] { model.searchQuery.states }
 
+    private var statuses: [BoardStatusFilter] { model.searchQuery.statuses }
+
     private var viewer: String { model.snapshot?.org.viewer ?? "" }
 
     /// The first `@` token's role on a row, as the muted suffix; nil without a token or a role.
@@ -154,9 +156,10 @@ struct SearchResultsView: View {
         }
         // A pasted link names its own repository, whatever the focus.
         if case .item(let repo, let n) = model.searchQuery { return "\(model.displayName(of: repo)) #\(n)" }
-        if !logins.isEmpty || !labels.isEmpty || !states.isEmpty {
+        if !logins.isEmpty || !labels.isEmpty || !states.isEmpty || !statuses.isEmpty {
             return SearchContext.text(
-                logins: logins, labels: labels, states: states, words: words, org: org, repo: focusName,
+                logins: logins, labels: labels, states: states, statuses: statuses, words: words, org: org,
+                repo: focusName,
                 startedOnTab: model.searchStartedOnTab?.title)
         }
         // The filter row above names the focus too.
@@ -180,9 +183,10 @@ struct SearchResultsView: View {
             return SearchContext.narrowedAccessibilityLabel(
                 model.searchQuery, tab: scopeTitle, matches: matchCount, repo: focusName)
         }
-        guard !logins.isEmpty || !labels.isEmpty || !states.isEmpty else { return contextText }
+        guard !logins.isEmpty || !labels.isEmpty || !states.isEmpty || !statuses.isEmpty else { return contextText }
         return SearchContext.accessibilityLabel(
-            logins: logins, labels: labels, states: states, words: words, org: org, repo: focusName)
+            logins: logins, labels: labels, states: states, statuses: statuses, words: words, org: org,
+            repo: focusName)
     }
 
     @ViewBuilder private var stateMessage: some View {

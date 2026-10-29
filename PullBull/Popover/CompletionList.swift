@@ -1,7 +1,8 @@
 import SwiftUI
 import PullBullKit
 
-/// The "@user", "~label" or "is:" completion: people, labels or states matching the token at the caret,
+/// The "@user", "~label", "is:" or "status:" completion: people, labels, states or board Status columns
+/// matching the token at the caret,
 /// drawn over the top of the hints or results. Focus stays in the search field; the keys are handled in
 /// `PopoverView.handleKey`.
 struct CompletionList: View {
@@ -43,6 +44,20 @@ struct CompletionList: View {
                     } else {
                         ForEach(Array(states.candidates.enumerated()), id: \.element.id) { index, candidate in
                             StateCompletionRow(candidate: candidate, selected: index == states.selection) {
+                                pick(index, in: completion)
+                            }
+                        }
+                    }
+                case .statuses(let statuses):
+                    if model.snapshot == nil {
+                        message("Status columns appear once PullBull has loaded")
+                    } else if statuses.candidates.isEmpty {
+                        message(statuses.token.prefix.isEmpty
+                            ? "The board has no Status columns · ↩ to search anyway"
+                            : "No Status column called “\(statuses.token.prefix)” on the board · ↩ to search anyway")
+                    } else {
+                        ForEach(Array(statuses.candidates.enumerated()), id: \.element.id) { index, candidate in
+                            StatusCompletionRow(candidate: candidate, selected: index == statuses.selection) {
                                 pick(index, in: completion)
                             }
                         }
@@ -181,6 +196,45 @@ private struct StateCompletionRow: View {
                 Text(candidate.state.summary)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .frame(height: 26)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(selected ? Palette.selection : hovering ? Palette.rowHover : .clear))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(CompletionSpeech.label(candidate))
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : [.isButton])
+    }
+}
+
+private struct StatusCompletionRow: View {
+    let candidate: StatusCandidate
+    let selected: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: "rectangle.split.3x1")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18, height: 18)
+                Text(candidate.name)
+                    .font(.system(size: 13))
+                Spacer(minLength: 8)
+                if candidate.openCount > 0 {
+                    Text("· \(candidate.openCount)")
+                        .font(.system(size: 11))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
             }
             .lineLimit(1)
             .padding(.horizontal, 8)

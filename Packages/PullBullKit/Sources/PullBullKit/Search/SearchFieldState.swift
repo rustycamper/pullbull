@@ -1,9 +1,9 @@
 import Foundation
 
-/// The search field's text, its "@user", "~label" or "is:state" completion and the query searched for.
+/// The search field's text, its "@user", "~label", "is:state" or "status:column" completion and the query searched for.
 /// Each change returns the query to search for, or nil when the results stay as they are.
 ///
-/// - Typing at the end of an `@`, `~` or `is:` token opens its list; the token is left out of the query
+/// - Typing at the end of an `@`, `~`, `is:` or `status:` token opens its list; the token is left out of the query
 ///   while it is picked, so typing inside it never changes the results.
 /// - A caret move can close the list (the token then counts as typed) but never opens it.
 /// - Esc closes the list and searches with the token; it stays closed on that token until text
@@ -12,7 +12,7 @@ import Foundation
 ///   the next rerun has a different query.
 public struct SearchFieldState: Equatable, Sendable {
     public private(set) var text = ""
-    /// The open list, people, labels or states.
+    /// The open list, people, labels, states or Status columns.
     public private(set) var searchCompletion: SearchCompletion?
     /// The query last searched for.
     public private(set) var query: SearchQuery = .empty
@@ -41,6 +41,12 @@ public struct SearchFieldState: Equatable, Sendable {
         return nil
     }
 
+    /// The open "status:" list; nil when none is open or the list is of another kind.
+    public var statusCompletion: StatusCompletion? {
+        if case .statuses(let completion) = searchCompletion { return completion }
+        return nil
+    }
+
     /// Whether the text, read without an open completion, asks for a different query than the last one.
     public var isStale: Bool { pendingQuery != query }
 
@@ -48,7 +54,8 @@ public struct SearchFieldState: Equatable, Sendable {
     /// a caret, a text change closes the list and the same text searches again.
     @discardableResult
     public mutating func edit(
-        _ text: String, caret: Int?, people: PeopleIndex, labels: LabelIndex = .empty
+        _ text: String, caret: Int?, people: PeopleIndex, labels: LabelIndex = .empty,
+        statuses: StatusIndex = .empty
     ) -> SearchQuery? {
         let changed = text != self.text
         if changed, let start = dismissedStart, !Self.dismissalHolds(at: start, kind: dismissedKind, in: text) {
@@ -59,7 +66,8 @@ public struct SearchFieldState: Equatable, Sendable {
         if let caret {
             searchCompletion = Self.merge(
                 SearchCompletion.open(
-                    text: text, caret: caret, dismissedStart: dismissedStart, people: people, labels: labels),
+                    text: text, caret: caret, dismissedStart: dismissedStart, people: people, labels: labels,
+                    statuses: statuses),
                 into: searchCompletion)
         } else if changed {
             searchCompletion = nil
@@ -69,10 +77,13 @@ public struct SearchFieldState: Equatable, Sendable {
 
     /// The caret moved without a text change: keeps the list on the same token or closes it.
     @discardableResult
-    public mutating func caretMoved(to caret: Int, people: PeopleIndex, labels: LabelIndex = .empty) -> SearchQuery? {
+    public mutating func caretMoved(
+        to caret: Int, people: PeopleIndex, labels: LabelIndex = .empty, statuses: StatusIndex = .empty
+    ) -> SearchQuery? {
         guard let current = searchCompletion else { return nil }
         let fresh = SearchCompletion.open(
-            text: text, caret: caret, dismissedStart: dismissedStart, people: people, labels: labels)
+            text: text, caret: caret, dismissedStart: dismissedStart, people: people, labels: labels,
+            statuses: statuses)
         searchCompletion = fresh?.token.start == current.token.start ? Self.merge(fresh, into: current) : nil
         return search(rerun: false)
     }
@@ -106,11 +117,13 @@ public struct SearchFieldState: Equatable, Sendable {
         dismissedKind = nil
     }
 
-    /// New people and labels (a refresh): the open list takes their candidates and keeps the selected row.
-    public mutating func refresh(people: PeopleIndex, labels: LabelIndex = .empty) {
+    /// New people, labels and Status columns (a refresh): the open list takes their candidates and keeps
+    /// the selected row.
+    public mutating func refresh(people: PeopleIndex, labels: LabelIndex = .empty, statuses: StatusIndex = .empty) {
         guard let open = searchCompletion,
               let fresh = SearchCompletion.open(
-                text: text, caret: open.token.end, dismissedStart: nil, people: people, labels: labels),
+                text: text, caret: open.token.end, dismissedStart: nil, people: people, labels: labels,
+                statuses: statuses),
               !fresh.hasSameCandidates(as: open) else { return }
         searchCompletion = fresh.selecting(open.selectedID)
     }

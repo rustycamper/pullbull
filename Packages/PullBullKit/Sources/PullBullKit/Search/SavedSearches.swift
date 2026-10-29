@@ -218,10 +218,12 @@ extension SearchFieldState {
     /// Fills the field with a saved search's query and a trailing space, the caret at the end, as if it
     /// were typed, and returns the query to search for.
     @discardableResult
-    public mutating func apply(_ saved: SavedSearch, people: PeopleIndex, labels: LabelIndex) -> SearchQuery? {
+    public mutating func apply(
+        _ saved: SavedSearch, people: PeopleIndex, labels: LabelIndex, statuses: StatusIndex = .empty
+    ) -> SearchQuery? {
         forgetCompletion()
         let text = saved.fieldText
-        let query = edit(text, caret: text.utf16.count, people: people, labels: labels)
+        let query = edit(text, caret: text.utf16.count, people: people, labels: labels, statuses: statuses)
         forgetCompletion()
         return query
     }

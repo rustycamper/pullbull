@@ -64,10 +64,11 @@ Keyboard-first · Native SwiftUI · Read-only
 | `@alice` | PRs alice authored or reviews, issues they opened or are assigned |
 | `~bug` | Items with that label |
 | `is:open` `is:closed` `is:merged` `is:draft` | Items in that state |
+| `status:prog` `status:"In progress"` | Issues in that Status column on the board |
 | `#123` | That number, in every repo |
 | a GitHub link | Exactly that PR or issue |
 
-Combine `@`, `~`, `is:` and words. Save the searches you repeat.
+Combine `@`, `~`, `is:`, `status:` and words. Save the searches you repeat.
 
 Can't remember the words? [Ask AI](docs/manual.md#ask-ai) finds the item from a description. Off by default.
 

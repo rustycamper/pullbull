@@ -122,7 +122,7 @@ struct SearchHints: View {
     }
 
     private var tokens: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             ForEach(SearchHint.all, id: \.self) { hint in
                 PanelButton(look: .outlined, radius: 5, selected: selection == .hint(hint), action: {
                     pick(.hint(hint))
@@ -131,12 +131,14 @@ struct SearchHints: View {
                         Text(hint.sigil)
                             .font(.system(size: 12, weight: .semibold, design: .monospaced))
                             .foregroundStyle(.primary)
-                        Text(hint.word)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
+                        if hint.showsWord {
+                            Text(hint.word)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     .lineLimit(1)
-                    .padding(.horizontal, 7)
+                    .padding(.horizontal, 5)
                     .frame(height: 22)
                 }
                 .accessibilityLabel(hint.accessibilityLabel)
