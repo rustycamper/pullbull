@@ -80,7 +80,7 @@ struct IssueRow: View {
     private var compactBody: some View {
         CompactRowLayout(
             repoNumber: RepoNumber(key: issue.key, showsRepo: !inRepoGroup, compact: true),
-            age: issue.updatedAt.map { RelativeAge.short(from: $0, to: now) }
+            age: IssueMetaLine.age(of: issue, now: now), ageWidth: issue.isOpen ? 24 : nil
         ) {
             Image(symbol: glyph.symbol)
                 .font(.system(size: 11))
