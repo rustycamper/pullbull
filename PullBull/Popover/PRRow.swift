@@ -9,9 +9,10 @@ enum RowContext {
     case search(words: [String], role: String?, viewer: String)
 }
 
-/// One PR in a list. Review and Team rows lead with the author's avatar; Mine rows lead with a state
-/// glyph, and search rows with a coloured one, an ended PR's pill trailing. Review state sits in the meta
-/// line (`RowChips`). Compact rows fit on one line.
+/// One PR in a list. Review and Team rows lead with the author's avatar, Mine rows with a state glyph,
+/// and search results with a state glyph coloured once the PR has ended, which also trails a Merged or
+/// Closed pill (full rows only). Review state sits in the meta line (`RowChips`). Compact rows fit on
+/// one line.
 struct PRRow: View {
     let model: AppModel
     let row: Row
@@ -155,7 +156,7 @@ struct PRRow: View {
         }
     }
 
-    /// `repo #num`, or `#num` under a repo header; search results have none.
+    /// `repo #num`, or `#num` under a repo header; search results have no repo headers, so they always show the repo.
     private var showsRepo: Bool { tab == nil || model.rowsShowRepo }
 
     /// The relative age, or an ended PR's "merged Oct 12".
@@ -188,7 +189,6 @@ struct PRRow: View {
                 Text(pr.author)
                 MetaDot()
             }
-            let age = age
             Text(age)
                 .fixedSize()
                 // The avatar, which names a left-out author on hover, is hidden from VoiceOver.
@@ -239,6 +239,7 @@ struct PRRow: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .frame(width: 16)
+                    .accessibilityLabel(pr.isDraft ? "Draft" : "Open")
             case .tab:
                 AvatarView(login: pr.author, url: pr.authorAvatarURL, size: 16)
                     .opacity(row.dimmed ? 0.45 : 1)

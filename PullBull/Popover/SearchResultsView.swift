@@ -337,7 +337,7 @@ struct SearchResultsView: View {
 
     /// An open or closed group's header; search groups never fold.
     private func groupHeader(_ title: String, count: Int) -> some View {
-        ListSectionHeader(glyph: nil, title: title, count: count)
+        ListSectionHeader(glyph: nil, title: title, count: count, compact: model.settings.compact)
             .pinnedHeaderBackground()
     }
 }

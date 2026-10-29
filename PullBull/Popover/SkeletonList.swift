@@ -42,8 +42,7 @@ struct SkeletonList: View {
     private var headerRow: some View {
         bar(.system(size: 11, weight: .semibold), width: .fixed(72), height: 9)
             .padding(.horizontal, 8)
-            .padding(.top, 10)
-            .padding(.bottom, 4)
+            .frame(height: ListSectionHeader.height)
     }
 
     /// `PRRow.fullBody` / `IssueRow.fullBody` with a one-line title.
