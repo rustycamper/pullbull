@@ -12,6 +12,8 @@ struct ListSectionHeader: View {
     var count: Int? = nil
     /// Quiet text after the count, as in "Done 4 · last 14 days".
     var note: String? = nil
+    /// Quiet text at the trailing edge, as in "Recently closed"'s "Last 7 days"; not read out.
+    var trailing: String? = nil
     /// Nil for headers that don't fold.
     var fold: Fold? = nil
     /// The rows' icon column: compact rows have a narrower one.
@@ -24,7 +26,7 @@ struct ListSectionHeader: View {
 
     /// Every header's height, so a list's headers line up whatever they show; `PinnedHeader.clearance`
     /// covers it.
-    static let height: CGFloat = 28
+    nonisolated static let height: CGFloat = 28
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -80,6 +82,10 @@ struct ListSectionHeader: View {
                 }
             }
             Spacer(minLength: 0)
+            if let trailing {
+                Text(trailing)
+                    .fontWeight(.regular)
+            }
         }
         .font(.system(size: 11, weight: .semibold))
         .foregroundStyle(.secondary)

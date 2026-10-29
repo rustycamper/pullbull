@@ -102,7 +102,7 @@ struct PRListView: View {
 
     private var closedHeader: some View {
         ListSectionHeader(
-            glyph: nil, title: "Recently closed", count: recentlyClosed.count, note: "last 7 days",
+            glyph: nil, title: "Recently closed", count: recentlyClosed.count, trailing: "Last 7 days",
             fold: .init(isOpen: closedExpanded) { closedExpanded.toggle() }, compact: model.settings.compact)
     }
 

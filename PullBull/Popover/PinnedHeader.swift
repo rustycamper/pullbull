@@ -4,8 +4,8 @@ import SwiftUI
 /// pushes them off, so the repo or lane of the rows in view stays named.
 enum PinnedHeader {
     /// Room kept above a row scrolled to, so it lands below the pinned header rather than under it: a
-    /// `ListSectionHeader` (28pt) and a little air.
-    static let clearance: CGFloat = 34
+    /// `ListSectionHeader` and 6pt of air.
+    static let clearance: CGFloat = ListSectionHeader.height + 6
 }
 
 extension View {
