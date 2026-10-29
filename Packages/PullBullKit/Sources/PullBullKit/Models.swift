@@ -251,6 +251,9 @@ public struct IssueStateChange: Codable, Sendable, Hashable {
 /// added to the board.
 public struct StatusMove: Codable, Sendable, Hashable {
     public let actor: String?
+    /// The actor is an app or workflow (GitHub's `Bot`), such as the board's own automation; nil in
+    /// moves cached before it was stored.
+    public let byBot: Bool?
     public let from: String?
     public let to: String?
     public let at: Date
@@ -258,8 +261,11 @@ public struct StatusMove: Codable, Sendable, Hashable {
     /// The board owner's login.
     public let owner: String
 
-    public init(actor: String?, from: String?, to: String?, at: Date, project: Int, owner: String) {
+    public init(
+        actor: String?, byBot: Bool? = false, from: String?, to: String?, at: Date, project: Int, owner: String
+    ) {
         self.actor = actor
+        self.byBot = byBot
         self.from = from
         self.to = to
         self.at = at

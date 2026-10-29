@@ -123,8 +123,9 @@ public enum Decoding {
         else { return nil }
         let from = (node["previousStatus"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         let to = (node["status"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        let actor = node["actor"] as? [String: Any]
         return StatusMove(
-            actor: (node["actor"] as? [String: Any])?["login"] as? String,
+            actor: actor?["login"] as? String, byBot: actor?["__typename"] as? String == "Bot",
             from: from, to: to, at: at, project: number, owner: owner)
     }
 

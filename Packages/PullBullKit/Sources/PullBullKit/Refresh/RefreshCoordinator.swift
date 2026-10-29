@@ -230,40 +230,54 @@ public struct LiveSnapshotFetcher: SnapshotFetching {
             createdIssuesFetchedAt: Self.fetchedAt(
                 parts.created, started: started, previous: previous, previousAt: previous?.createdIssuesFetchedAt),
             boardOwner: boardRef?.owner,
-            closedIssues: closed
+            closedIssues: closed?.found,
+            pendingClosedLookups: closed.flatMap { $0.pending.isEmpty ? nil : $0.pending }
         ).limited(to: scope)
     }
 
     /// The issues that left Assigned or Created since `previous` and are now closed, looked up one by
-    /// one: leaving a list can also mean an unassignment or a transfer. A list is compared only when
-    /// both its searches succeeded, as a failed one carries an older list forward. Nil without a
-    /// previous snapshot of this org. A lookup that fails is skipped; these are secondary.
-    private func closedIssues(previous: Snapshot?, assigned: IssueList, created: IssueList) async -> [BoardIssue]? {
+    /// one: leaving a list can also mean an unassignment or a transfer. An issue the open search still
+    /// returns closed (it lags) has left too. A list is compared only when both its searches
+    /// succeeded, as a failed one carries an older list forward. A lookup that fails, and any past
+    /// `closedLookups`, is `pending`, tried again next poll with `previous`'s pending ones. Nil
+    /// without a previous snapshot of this org.
+    private func closedIssues(
+        previous: Snapshot?, assigned: IssueList, created: IssueList
+    ) async -> (found: [BoardIssue], pending: [BoardIssue])? {
         guard let previous else { return nil }
         let pairs = [
             (previous.assignedIssues, previous.assignedIssuesError, assigned),
             (previous.createdIssues, previous.createdIssuesError, created),
         ]
-        var gone: [PRKey] = []
-        var seen = Set<PRKey>()
+        var gone = previous.pendingClosedLookups ?? []
+        var seen = Set(gone.map(\.key))
         for (before, beforeError, now) in pairs {
             guard let before, beforeError == nil, let issues = now.issues, now.error == nil else { continue }
-            let still = Set(issues.map(\.key))
+            let still = Set(issues.filter(\.isOpen).map(\.key))
             for issue in before where issue.isOpen && !still.contains(issue.key) && seen.insert(issue.key).inserted {
-                gone.append(issue.key)
+                gone.append(issue)
             }
         }
-        guard !gone.isEmpty else { return [] }
+        guard !gone.isEmpty else { return ([], []) }
         let api = api
-        return await withTaskGroup(of: BoardIssue?.self) { group in
-            for key in gone.prefix(Self.closedLookups) {
-                group.addTask { try? await api.closedIssue(key) }
+        let batch = Array(gone.prefix(Self.closedLookups))
+        return await withTaskGroup(of: (BoardIssue, Result<BoardIssue?, any Error>).self) { group in
+            for issue in batch {
+                group.addTask {
+                    do { return (issue, .success(try await api.closedIssue(issue.key))) }
+                    catch { return (issue, .failure(error)) }
+                }
             }
             var found: [BoardIssue] = []
-            for await issue in group {
-                if let issue, !issue.isOpen { found.append(issue) }
+            var pending = Array(gone.dropFirst(Self.closedLookups))
+            for await (listed, result) in group {
+                switch result {
+                case .success(let issue?) where !issue.isOpen: found.append(issue)
+                case .success: break
+                case .failure: pending.append(listed)
+                }
             }
-            return found
+            return (found, pending)
         }
     }
 

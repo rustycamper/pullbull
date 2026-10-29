@@ -165,11 +165,15 @@ public enum ChangeDetector {
         old: Snapshot?, new: Snapshot, me: String, toggles: NotificationToggles
     ) -> [IssueEvent] {
         guard let old else { return [] }
-        let events = assignedEvents(old: old, new: new, me: me, toggles: toggles)
+        // Reopened and assigned to me in one go: the assignment says it.
+        let assigned = assignedEvents(old: old, new: new, me: me, toggles: toggles)
+        let events = assigned
             + commentEvents(old: old, new: new, me: me, toggles: toggles)
             + statusEvents(old: old, new: new, me: me, toggles: toggles)
             + closedEvents(old: old, new: new, me: me, toggles: toggles)
-            + reopenedEvents(old: old, new: new, me: me, toggles: toggles)
+            + reopenedEvents(old: old, new: new, me: me, toggles: toggles).filter { reopen in
+                !assigned.contains { $0.issue.key == reopen.issue.key }
+            }
         let order = Dictionary(uniqueKeysWithValues: IssueEventKind.allCases.enumerated().map { ($1, $0) })
         return events.sorted {
             if $0.kind != $1.kind { return order[$0.kind]! < order[$1.kind]! }
@@ -244,7 +248,7 @@ public enum ChangeDetector {
             for issue in now where issue.isOpen {
                 guard let prev = previous[issue.key], let move = latest(issue),
                       move.from != nil, move.to != nil, move.at >= since, latest(prev) != move,
-                      !isAutomation(move.actor), !same(move.actor ?? "", me), seen.insert(issue.key).inserted
+                      !isAutomation(move), !same(move.actor ?? "", me), seen.insert(issue.key).inserted
                 else { continue }
                 result.append(IssueEvent(kind: .statusChanged, issue: issue, actor: move.actor, move: move))
             }
@@ -253,16 +257,21 @@ public enum ChangeDetector {
     }
 
     /// Issues assigned to me or that I created which someone else closed since the previous poll (the
-    /// snapshot's `closedIssues`, looked up when they left the lists).
+    /// snapshot's `closedIssues`, looked up when they left the lists). Which list it was in comes from
+    /// the previous lists or, for a lookup retried from an earlier poll, the issue's author and assignees.
     private static func closedEvents(
         old: Snapshot, new: Snapshot, me: String, toggles: NotificationToggles
     ) -> [IssueEvent] {
-        let assigned = toggles.assignedIssueClosed ? Set((old.assignedIssues ?? []).map(\.key)) : []
-        let created = toggles.createdIssueClosed ? Set((old.createdIssues ?? []).map(\.key)) : []
+        let assigned = Set((old.assignedIssues ?? []).map(\.key))
+        let created = Set((old.createdIssues ?? []).map(\.key))
+        let wanted = { (issue: BoardIssue) in
+            (toggles.assignedIssueClosed
+                && (assigned.contains(issue.key) || issue.assignees.contains { same($0.login, me) }))
+                || (toggles.createdIssueClosed && (created.contains(issue.key) || same(issue.author ?? "", me)))
+        }
         var seen = Set<PRKey>()
         var result: [IssueEvent] = []
-        for issue in new.closedIssues ?? []
-        where (assigned.contains(issue.key) || created.contains(issue.key)) && seen.insert(issue.key).inserted {
+        for issue in new.closedIssues ?? [] where wanted(issue) && seen.insert(issue.key).inserted {
             let actor = issue.lastClose?.actor
             if let actor, same(actor, me) { continue }
             result.append(IssueEvent(kind: .closed, issue: issue, actor: actor))
@@ -291,11 +300,10 @@ public enum ChangeDetector {
         return result
     }
 
-    /// A board's own workflows (`github-project-automation`) and apps: their moves follow a close or
-    /// a merge that notifies on its own.
-    private static func isAutomation(_ actor: String?) -> Bool {
-        guard let actor else { return false }
-        return same(actor, "github-project-automation") || actor.hasSuffix("[bot]")
+    /// A board's own workflows (`github-project-automation`), Actions and apps: their moves follow a
+    /// close, a merge or a rule, not a person. The login check covers moves cached before `byBot`.
+    private static func isAutomation(_ move: StatusMove) -> Bool {
+        move.byBot == true || same(move.actor ?? "", "github-project-automation")
     }
 
     /// Issues someone else newly assigned to `me`. Silent when the previous snapshot never fetched

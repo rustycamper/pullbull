@@ -528,10 +528,13 @@ private func boardSnap(
     }
 
     @Test func statusMoveIsSilentForMeAutomationOtherBoardsAndNewCards() {
-        let old = boardSnap(0, assigned: [tracked(1), tracked(2), tracked(3), tracked(4)])
+        let old = boardSnap(0, assigned: [tracked(1), tracked(2), tracked(3), tracked(4), tracked(5)])
         let new = boardSnap(120, assigned: [
             tracked(1, moves: [move("Todo", "Done", by: "devon")]),
             tracked(2, moves: [move("In Progress", "Done", by: "github-project-automation")]),
+            tracked(5, moves: [StatusMove(
+                actor: "board-sync", byBot: true, from: "Todo", to: "Doing", at: t0.addingTimeInterval(60),
+                project: 4, owner: "initech")]),
             tracked(3, moves: [move("Todo", "Doing", project: 9)]),
             tracked(4, moves: [move(nil, "Todo")]),
         ])
@@ -589,12 +592,26 @@ private func boardSnap(
         #expect(e.first?.issue.key.number == 1)
     }
 
+    /// Reopened and assigned to me in one go: one banner, the assignment.
+    @Test func reopenAndAssignNotifiesOnce() {
+        var t = NotificationToggles()
+        t.issueAssigned = true
+        let old = boardSnap(0, assigned: [])
+        let at = t0.addingTimeInterval(60)
+        let issue = BoardIssue(
+            key: PRKey(repo: "initech/gadgets", number: 8), title: "Issue 8", url: URL(string: "https://x/i8")!,
+            isOpen: true, myAssignment: Assignment(actor: "dev-b", at: at),
+            lastReopen: IssueStateChange(actor: "dev-b", at: at))
+        #expect(run(old, boardSnap(120, assigned: [issue]), t).map(\.kind) == [.assigned])
+    }
+
     @Test func searchDecodesMovesAndReopen() {
         let node: [String: Any] = [
             "number": 7, "title": "t", "url": "https://github.com/o/r/issues/7", "state": "OPEN",
             "repository": ["nameWithOwner": "o/r"],
             "statusMoves": ["nodes": [
-                ["createdAt": "2026-10-27T13:53:32Z", "actor": ["login": "bot"], "previousStatus": "", "status": "Todo",
+                ["createdAt": "2026-10-27T13:53:32Z", "actor": ["__typename": "Bot", "login": "github-project-automation"],
+                 "previousStatus": "", "status": "Todo",
                  "project": ["number": 3, "owner": ["login": "o"]]],
                 ["createdAt": "2026-10-27T14:00:00Z", "actor": ["login": "dev-b"], "previousStatus": "Todo",
                  "status": "Doing", "project": ["number": 3, "owner": ["login": "o"]]],
@@ -603,6 +620,7 @@ private func boardSnap(
         ]
         let issue = Decoding.issue(from: node)
         #expect(issue?.statusMoves.map(\.from) == [nil, "Todo"])
+        #expect(issue?.statusMoves.map(\.byBot) == [true, false])
         #expect(issue?.statusMoves.last?.isOn(project: 3, owner: "O") == true)
         #expect(issue?.lastReopen?.actor == "dev-c")
         #expect(Queries.issueSearch(withAssignment: false, withActivity: true).contains("PROJECT_V2_ITEM_STATUS_CHANGED_EVENT"))

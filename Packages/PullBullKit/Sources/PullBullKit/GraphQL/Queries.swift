@@ -141,7 +141,7 @@ enum Queries {
     /// reopening, for issue notifications.
     static let stateActivity = """
     statusMoves: timelineItems(itemTypes:[PROJECT_V2_ITEM_STATUS_CHANGED_EVENT], last:5){nodes{\
-    ... on ProjectV2ItemStatusChangedEvent{createdAt actor{login} previousStatus status \
+    ... on ProjectV2ItemStatusChangedEvent{createdAt actor{__typename login} previousStatus status \
     project{number owner{... on Organization{login} ... on User{login}}}}}} \
     lastReopen: timelineItems(itemTypes:[REOPENED_EVENT], last:1){nodes{... on ReopenedEvent{createdAt actor{login}}}}
     """

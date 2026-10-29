@@ -21,14 +21,20 @@ private final class RoutingTransport: GraphQLTransport, @unchecked Sendable {
     private let endlessIssueSearch: String?
     /// How long each board page and endless issue search page takes, like a slow network.
     private let pageDelay: Duration?
+    /// Issues issue searches return already closed (a lagging `is:open` search), and issues a closed
+    /// lookup finds closed; any other lookup finds the issue open. Lookups of `failingLookups` fail.
+    private let closed: Set<Int>
+    private let failingLookups: Set<Int>
 
     init(
         members: [String], searchResults: [String: [Int]] = [:], issueResults: [String: [Int]] = [:],
         boardFails: Bool = false, boardFailStatus: Int = 502, boardScopeError: Bool = false, boardPages: Int = 1,
         failingIssueSearch: String? = nil, failingIssueStatus: Int = 502, endlessIssueSearch: String? = nil,
-        pageDelay: Duration? = nil
+        pageDelay: Duration? = nil, closed: Set<Int> = [], failingLookups: Set<Int> = []
     ) {
         self.pageDelay = pageDelay
+        self.closed = closed
+        self.failingLookups = failingLookups
         self.failingIssueSearch = failingIssueSearch
         self.failingIssueStatus = failingIssueStatus
         self.endlessIssueSearch = endlessIssueSearch
@@ -87,13 +93,18 @@ private final class RoutingTransport: GraphQLTransport, @unchecked Sendable {
             "content":{"__typename":"Issue","number":\(number),"title":"Fresh","url":"https://github.com/o/r/issues/\(number)",\
             "state":"OPEN","repository":{"nameWithOwner":"o/r"}}}]}}}}}
             """
+        } else if query == Queries.closedIssue {
+            let number = variables["n"] as? Int ?? 0
+            if failingLookups.contains(number) { return (Data(), Self.response(502)) }
+            let node = Self.issueNode(number, closed: closed.contains(number))
+            json = #"{"data":{"repository":{"issue":\#(node)}}}"#
         } else if query.contains("fragment issueRowFields") {
             let q = variables["q"] as? String ?? ""
             if let failingIssueSearch, q.contains(failingIssueSearch) {
                 return (Data(), Self.response(failingIssueStatus))
             }
             let numbers = issueResults.first { q.contains($0.key) }?.value ?? []
-            let nodes = numbers.map(Self.issueNode).joined(separator: ",")
+            let nodes = numbers.map { Self.issueNode($0, closed: closed.contains($0)) }.joined(separator: ",")
             let more = endlessIssueSearch.map { q.contains($0) } ?? false
             if more, let pageDelay { try await Task.sleep(for: pageDelay) }
             json = #"{"data":{"search":{"pageInfo":{"endCursor":"I","hasNextPage":\#(more)},"nodes":[\#(nodes)]}}}"#
@@ -111,10 +122,11 @@ private final class RoutingTransport: GraphQLTransport, @unchecked Sendable {
                         httpVersion: nil, headerFields: nil)!
     }
 
-    private static func issueNode(_ number: Int) -> String {
+    private static func issueNode(_ number: Int, closed: Bool = false) -> String {
         """
         {"number":\(number),"title":"Issue \(number)","url":"https://github.com/o/r/issues/\(number)",\
-        "state":"OPEN","stateReason":null,"createdAt":"2026-10-20T09:00:00Z","updatedAt":"2026-10-25T14:03:11Z",\
+        "lastClose":{"nodes":[{"createdAt":"2026-10-26T11:58:00Z","actor":{"login":"alice"}}]},\
+        "state":"\(closed ? "CLOSED" : "OPEN")","stateReason":null,"createdAt":"2026-10-20T09:00:00Z","updatedAt":"2026-10-25T14:03:11Z",\
         "closedAt":null,"repository":{"nameWithOwner":"o/r"},"author":{"login":"alice"},"comments":{"totalCount":0},\
         "labels":{"nodes":[]},"assignees":{"nodes":[{"login":"devon","avatarUrl":null}]},"timelineItems":{"nodes":[]}}
         """
@@ -851,5 +863,51 @@ private struct SignedOutOnRejection: TokenSource {
             account: "devon", scope: .org("o"), board: .org("o", 3), canReadProjects: true, previous: previous)
         #expect(same.boardIssues == [old])
         #expect(same.board == .org("o", 3))
+    }
+
+    // MARK: Closed issues
+
+    private func twoPolls(
+        first: [Int], second: [Int], closed: Set<Int> = [], failing: Set<Int> = []
+    ) async throws -> (Snapshot, Snapshot) {
+        let clock = Clockwork(noon)
+        let before = try await fetcher(RoutingTransport(members: ["alice"], issueResults: ["assignee:@me": first]), clock)
+            .fetch(account: "devon", scope: .org("o"), board: nil, canReadProjects: true, previous: nil)
+        clock.advance(120)
+        let transport = RoutingTransport(
+            members: ["alice"], issueResults: ["assignee:@me": second], closed: closed, failingLookups: failing)
+        let after = try await fetcher(transport, clock)
+            .fetch(account: "devon", scope: .org("o"), board: nil, canReadProjects: true, previous: before)
+        return (before, after)
+    }
+
+    @Test func issueThatLeftAListIsLookedUpAndKeptWhenClosed() async throws {
+        let (_, after) = try await twoPolls(first: [231, 232, 233], second: [231], closed: [232])
+        // 233 left because it was unassigned: still open.
+        #expect(after.closedIssues?.map(\.key.number) == [232])
+        #expect(after.closedIssues?.first?.lastClose?.actor == "alice")
+        #expect(after.pendingClosedLookups == nil)
+    }
+
+    /// The open search can still return an issue just closed; it has left the list all the same.
+    @Test func closedIssueALaggingSearchStillReturnsIsLookedUp() async throws {
+        let (_, after) = try await twoPolls(first: [231, 232], second: [231, 232], closed: [232])
+        #expect(after.closedIssues?.map(\.key.number) == [232])
+    }
+
+    @Test func failedLookupIsTriedAgainNextPoll() async throws {
+        let (_, after) = try await twoPolls(first: [231, 232], second: [231], closed: [232], failing: [232])
+        #expect(after.closedIssues == [])
+        #expect(after.pendingClosedLookups?.map(\.key.number) == [232])
+
+        let clock = Clockwork(noon.addingTimeInterval(240))
+        let retry = try await fetcher(
+            RoutingTransport(members: ["alice"], issueResults: ["assignee:@me": [231]], closed: [232]), clock)
+            .fetch(account: "devon", scope: .org("o"), board: nil, canReadProjects: true, previous: after)
+        #expect(retry.closedIssues?.map(\.key.number) == [232])
+        #expect(retry.pendingClosedLookups == nil)
+        // Routed by its assignees, since the previous Assigned list no longer has it.
+        let events = ChangeDetector.issueEvents(old: after, new: retry, me: "devon", toggles: .init())
+        #expect(events.map(\.kind) == [.closed])
     }
 }
