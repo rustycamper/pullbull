@@ -3,8 +3,8 @@ import SwiftUI
 /// Group headers pin to the top of the list while their group scrolls under them, until the next header
 /// pushes them off, so the repo or lane of the rows in view stays named.
 enum PinnedHeader {
-    /// Room kept above a row scrolled to, so it lands below the pinned header rather than under it: the
-    /// tallest header, Done's (32pt and 2pt above it).
+    /// Room kept above a row scrolled to, so it lands below the pinned header rather than under it: a
+    /// `ListSectionHeader` (28pt) and a little air.
     static let clearance: CGFloat = 34
 }
 

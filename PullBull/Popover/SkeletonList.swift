@@ -38,7 +38,7 @@ struct SkeletonList: View {
         .accessibilityLabel("Loading…")
     }
 
-    /// `GroupHeader` / `IssueGroupHeader`: an 11pt semibold line.
+    /// `ListSectionHeader`: an 11pt semibold line.
     private var headerRow: some View {
         bar(.system(size: 11, weight: .semibold), width: .fixed(72), height: 9)
             .padding(.horizontal, 8)
