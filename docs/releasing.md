@@ -29,9 +29,9 @@ Then [bump the Homebrew cask](#homebrew-cask).
 
 Written by hand for each release, for users rather than as a PR list, in `build/release/notes-<version>.md` (git-ignored):
 
-- One `##` section per feature, biggest first: what it does and how to reach it (setting, shortcut, where to click)
-- New settings with their defaults
-- A `## Fixes` section for bug fixes users could notice; leave out CI-only and test changes
+- One `##` section per feature, biggest first: what it does and how to reach it (setting, shortcut, where to click), in at most three lines. No long lists: details, such as each new setting's default, belong in the manual
+- A `## Fixes` section for bug fixes users could notice, one line each; leave out CI-only and test changes
+- Short enough to read in Sparkle's update dialog without much scrolling: aim for 20 lines in all
 - End with `**Full changelog**: https://github.com/rustycamper/pullbull/compare/v<previous>...v<version>`
 
 Start from `git log --oneline v<previous>..origin/main` and the PR descriptions. Get the owner's OK on the draft before building.
