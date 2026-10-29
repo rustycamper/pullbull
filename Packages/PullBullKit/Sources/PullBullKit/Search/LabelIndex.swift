@@ -90,7 +90,7 @@ public struct LabelIndex: Equatable, Sendable {
         positions[name.lowercased()].map { labels[$0].name } ?? name
     }
 
-    private static func tier(of name: String, for p: String) -> Int? {
+    static func tier(of name: String, for p: String) -> Int? {
         if name == p { return 1 }
         if name.hasPrefix(p) { return 2 }
         let parts = name.split { $0.isWhitespace || $0 == "-" || $0 == "_" || $0 == "/" || $0 == ":" }

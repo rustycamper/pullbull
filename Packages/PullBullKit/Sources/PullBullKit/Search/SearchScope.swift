@@ -55,10 +55,12 @@ public enum SearchNarrowing {
         tabs.contents(tab)?.issues ?? []
     }
 
-    /// The results of `q` within `scope`, in the usual search order; nil for `.everything`.
+    /// The results of `q` within `scope`, in the usual search order; nil for `.everything`. With `snap`, an
+    /// issue tab's copies take their board copy's Status first, as search results do, so a `status:` token
+    /// matches it and the rows show it.
     public static func results(
         _ q: SearchQuery, scope: SearchScope, tabs: BuiltTabs?, issueTabs: BuiltIssueTabs?, focus: RepoFocus?,
-        viewer: String
+        viewer: String, snap: Snapshot? = nil
     ) -> SearchResults? {
         switch scope {
         case .everything:
@@ -67,16 +69,18 @@ public enum SearchNarrowing {
             let prs = matching(q, tabs.map { items(of: tab, in: $0) } ?? [], focus: focus, viewer: viewer)
             return SearchEngine.assemble(prs: prs, issues: [], phase: .done)
         case .issues(let tab):
-            let issues = matching(q, issueTabs.map { items(of: tab, in: $0) } ?? [], focus: focus, viewer: viewer)
+            let listed = issueTabs.map { items(of: tab, in: $0, snap: snap) } ?? []
+            let issues = matching(q, listed, focus: focus, viewer: viewer)
             return SearchEngine.assemble(prs: [], issues: issues, phase: .done)
         }
     }
 
     /// Each shown tab's matches for `q`, keeping how its count reads: a stale list's matches stay stale,
     /// a list that isn't there stays unavailable. Tabs without lists yet are left out; empty for no query.
+    /// `snap` as for `results`.
     public static func counts(
         _ q: SearchQuery, prTabs: [PRTab], tabs: BuiltTabs?, issueTabs: BuiltIssueTabs?, focus: RepoFocus?,
-        viewer: String
+        viewer: String, snap: Snapshot? = nil
     ) -> [SearchScope: IssueTabCount] {
         guard q != .empty else { return [:] }
         var counts: [SearchScope: IssueTabCount] = [:]
@@ -88,7 +92,8 @@ public enum SearchNarrowing {
         }
         if let issueTabs {
             for tab in IssueTab.allCases {
-                let n = uniqueCount(matching(q, items(of: tab, in: issueTabs), focus: focus, viewer: viewer).map(\.key))
+                let n = uniqueCount(
+                    matching(q, items(of: tab, in: issueTabs, snap: snap), focus: focus, viewer: viewer).map(\.key))
                 counts[.issues(tab)] = switch issueTabs.count(tab) {
                 case .current: .current(n)
                 case .stale(_, let error, let since): .stale(n, error: error, since: since)
@@ -103,6 +108,12 @@ public enum SearchNarrowing {
         _ q: SearchQuery, _ prs: [PullRequest], focus: RepoFocus?, viewer: String
     ) -> [PullRequest] {
         prs.filter { q.matches($0, viewer: viewer) && SearchEngine.inFocus($0.key, q.keeping(focus)) }
+    }
+
+    /// The tab's items, with their board copy's Status when `snap` is given.
+    private static func items(of tab: IssueTab, in tabs: BuiltIssueTabs, snap: Snapshot?) -> [BoardIssue] {
+        let listed = items(of: tab, in: tabs)
+        return snap.map { SearchEngine.onBoard(listed, in: $0) } ?? listed
     }
 
     private static func matching(
@@ -124,8 +135,8 @@ extension SearchContext {
         case .number(let n): what = "#\(n)"
         case .item(let repo, let n): what = "\(repo) #\(n)"
         case .text(let words): what = "“\(words.joined(separator: " "))”"
-        case .filtered(let logins, let labels, let words, let states):
-            var tokens = SearchQuery.tokenList(logins: logins, labels: labels, states: states)
+        case .filtered(let logins, let labels, let words, let states, let statuses):
+            var tokens = SearchQuery.tokenList(logins: logins, labels: labels, states: states, statuses: statuses)
             if !words.isEmpty { tokens += " · “\(words.joined(separator: " "))”" }
             what = tokens
         case .empty: what = ""
@@ -144,8 +155,9 @@ extension SearchContext {
         case .number(let n): label = "#\(n) in \(tab)"
         case .item(let repo, let n): label = "\(repo) #\(n) in \(tab)"
         case .text(let words): label = "Titles matching \(words.joined(separator: " ")) in \(tab)"
-        case .filtered(let logins, let labels, let words, let states):
-            label = filterDescription(logins: logins, labels: labels, states: states, words: words) + ", in \(tab)"
+        case .filtered(let logins, let labels, let words, let states, let statuses):
+            label = filterDescription(
+                logins: logins, labels: labels, states: states, statuses: statuses, words: words) + ", in \(tab)"
         case .empty: label = "In \(tab)"
         }
         // An item names its own repository.

@@ -5,13 +5,16 @@ public enum SearchQuery: Equatable, Sendable {
     /// One PR or issue by its repository (`owner/name`) and number, from a pasted link or `o/r#12`.
     case item(repo: String, number: Int)
     case text([String])
-    /// `@login`, `~label` and `is:` terms ANDed with title words. Logins and labels keep the case typed,
-    /// deduplicated case-insensitively; `me` is always lowercase. Words are lowercased. States are
-    /// deduplicated; two that contradict match nothing.
-    case filtered(logins: [String], labels: [String], words: [String], states: [StateFilter] = [])
+    /// `@login`, `~label`, `is:` and `status:` terms ANDed with title words. Logins and labels keep the case
+    /// typed, deduplicated case-insensitively; `me` is always lowercase. Words are lowercased. States are
+    /// deduplicated; two that contradict match nothing. Statuses keep the case typed, deduplicated
+    /// case-insensitively; any status keeps the search to board issues.
+    case filtered(
+        logins: [String], labels: [String], words: [String], states: [StateFilter] = [],
+        statuses: [BoardStatusFilter] = [])
     case empty
 
-    /// `pending` is a range of `raw` (an `@`, `~` or `is:` token still being completed) that is left out of
+    /// `pending` is a range of `raw` (an `@`, `~`, `is:` or `status:` token still being completed) that is left out of
     /// the query. An `is:` with a value that isn't a state is a word.
     public static func parse(_ raw: String, excluding pending: Range<String.Index>? = nil) -> SearchQuery {
         var source = raw
@@ -29,6 +32,7 @@ public enum SearchQuery: Equatable, Sendable {
         var labels: [String] = []
         var words: [String] = []
         var states: [StateFilter] = []
+        var statuses: [BoardStatusFilter] = []
         for term in QueryScanner.terms(in: trimmed) {
             switch term.kind {
             case .person:
@@ -53,12 +57,17 @@ public enum SearchQuery: Equatable, Sendable {
                     continue
                 }
                 words.append(trimmed[term.range].lowercased())
+            case .status:
+                let name = term.value.trimmingCharacters(in: .whitespaces)
+                if name.isEmpty { continue }
+                let status = BoardStatusFilter(name: name, exact: term.quoted)
+                if !statuses.contains(where: { $0.isSame(as: status) }) { statuses.append(status) }
             case .word:
                 words.append(trimmed[term.range].lowercased())
             }
         }
-        if !logins.isEmpty || !labels.isEmpty || !states.isEmpty {
-            return .filtered(logins: logins, labels: labels, words: words, states: states)
+        if !logins.isEmpty || !labels.isEmpty || !states.isEmpty || !statuses.isEmpty {
+            return .filtered(logins: logins, labels: labels, words: words, states: states, statuses: statuses)
         }
         return words.isEmpty ? .empty : .text(words)
     }
@@ -74,9 +83,12 @@ public enum SearchQuery: Equatable, Sendable {
         joinedList(logins.map { "@\($0)" })
     }
 
-    /// The `@` tokens, then the `~` tokens, then the `is:` tokens, listed as `mentionList` lists names.
-    public static func tokenList(logins: [String], labels: [String], states: [StateFilter] = []) -> String {
-        joinedList(logins.map { "@\($0)" } + labels.map(labelToken) + states.map(\.token))
+    /// The `@` tokens, then the `~` tokens, then the `is:` tokens, then the `status:` tokens, listed as
+    /// `mentionList` lists names.
+    public static func tokenList(
+        logins: [String], labels: [String], states: [StateFilter] = [], statuses: [BoardStatusFilter] = []
+    ) -> String {
+        joinedList(logins.map { "@\($0)" } + labels.map(labelToken) + states.map(\.token) + statuses.map(\.token))
     }
 
     /// `~bug`, or `~"good first issue"` for a name with whitespace.
@@ -91,27 +103,36 @@ public enum SearchQuery: Equatable, Sendable {
     }
 
     public var logins: [String] {
-        if case .filtered(let logins, _, _, _) = self { return logins }
+        if case .filtered(let logins, _, _, _, _) = self { return logins }
         return []
     }
 
     public var labels: [String] {
-        if case .filtered(_, let labels, _, _) = self { return labels }
+        if case .filtered(_, let labels, _, _, _) = self { return labels }
         return []
     }
 
     public var states: [StateFilter] {
-        if case .filtered(_, _, _, let states) = self { return states }
+        if case .filtered(_, _, _, let states, _) = self { return states }
+        return []
+    }
+
+    public var statuses: [BoardStatusFilter] {
+        if case .filtered(_, _, _, _, let statuses) = self { return statuses }
         return []
     }
 
     public var words: [String] {
         switch self {
         case .text(let words): return words
-        case .filtered(_, _, let words, _): return words
+        case .filtered(_, _, let words, _, _): return words
         case .number, .item, .empty: return []
         }
     }
+
+    /// Nothing to ask GitHub: empty, or a `status:` search. GitHub knows no board Status, and the snapshot
+    /// holds the whole board, so a `status:` match is always local.
+    var isLocalOnly: Bool { self == .empty || !statuses.isEmpty }
 
     /// The repo focus a search for this query keeps to: none for `.item`, which names its own repository.
     public func keeping(_ focus: RepoFocus?) -> RepoFocus? {
@@ -133,12 +154,12 @@ public enum SearchQuery: Equatable, Sendable {
 
 extension SearchQuery {
     /// A `.filtered` query matches when every login has a role on the item, every label is one of its
-    /// labels (by name, ignoring case), it is in every state and every word is in its title; `.number`
-    /// and `.text` match as before.
+    /// labels (by name, ignoring case), it is in every state, its board Status matches every status and
+    /// every word is in its title; `.number` and `.text` match as before. A pull request has no Status.
     func matches(_ pr: PullRequest, viewer: String) -> Bool {
         switch self {
-        case .filtered(let logins, let labels, _, let states):
-            return matchesTitle(pr.title) && Self.hasLabels(labels, pr.labels) && states.allSatisfy { $0.matches(pr) }
+        case .filtered(let logins, let labels, _, let states, let statuses):
+            return statuses.isEmpty && matchesTitle(pr.title) && Self.hasLabels(labels, pr.labels) && states.allSatisfy { $0.matches(pr) }
                 && logins.allSatisfy { !PersonMatch.roles(of: pr, login: $0, viewer: viewer).isEmpty }
         case .item:
             return names(pr.key)
@@ -149,9 +170,9 @@ extension SearchQuery {
 
     func matches(_ issue: BoardIssue, viewer: String) -> Bool {
         switch self {
-        case .filtered(let logins, let labels, _, let states):
+        case .filtered(let logins, let labels, _, let states, let statuses):
             return matchesTitle(issue.title) && Self.hasLabels(labels, issue.labels)
-                && states.allSatisfy { $0.matches(issue) }
+                && states.allSatisfy { $0.matches(issue) } && statuses.allSatisfy { $0.matches(issue.status?.name) }
                 && logins.allSatisfy { !PersonMatch.roles(of: issue, login: $0, viewer: viewer).isEmpty }
         case .item:
             return names(issue.key)
@@ -280,8 +301,8 @@ public struct SearchResults: Equatable, Sendable {
             guard let scope, !scope.reaches(repo) else { return "No \(one) #\(n) in \(repo)" }
             return "PullBull searches \(scope.org ?? "your repos") only, not \(repo)"
         case .text(let words): return "No \(kind) match “\(words.joined(separator: " "))”"
-        case .filtered(let logins, let labels, let words, let states):
-            let names = SearchQuery.tokenList(logins: logins, labels: labels, states: states)
+        case .filtered(let logins, let labels, let words, let states, let statuses):
+            let names = SearchQuery.tokenList(logins: logins, labels: labels, states: states, statuses: statuses)
             return words.isEmpty
                 ? "No \(kind) with \(names)"
                 : "No \(kind) with \(names) match “\(words.joined(separator: " "))”"
@@ -355,7 +376,7 @@ public struct SearchEngine: Sendable {
     public func results(_ q: SearchQuery, snap: Snapshot, focus: RepoFocus? = nil) -> AsyncStream<SearchResults> {
         let focus = q.keeping(focus)
         let localResults = local(q, in: snap, focus: focus)
-        if q == .empty {
+        if q.isLocalOnly {
             var done = localResults
             done.phase = .done
             return Self.finished(with: [done])
@@ -367,14 +388,14 @@ public struct SearchEngine: Sendable {
     /// A search through `cache`: `first` shows at once, `updates` follow. A fresh answer is final and
     /// fetches nothing. A stale one shows while GitHub is asked again `debounce` later, and stays if
     /// that fails. Without one, the snapshot's matches show until GitHub answers, as `results` does.
-    /// A focused search has its own cache entries.
+    /// A focused search has its own cache entries. A `status:` search is the snapshot's alone and final.
     public func results(
         _ q: SearchQuery, snap: Snapshot, account: AccountRef, cache: SearchCache, focus: RepoFocus? = nil,
         debounce: Duration = .zero
     ) -> (first: SearchResults, updates: AsyncStream<SearchResults>) {
         let focus = q.keeping(focus)
         let localResults = local(q, in: snap, focus: focus)
-        guard q != .empty else {
+        guard !q.isLocalOnly else {
             var done = localResults
             done.phase = .done
             return (done, Self.finished(with: []))
@@ -498,6 +519,13 @@ public struct SearchEngine: Sendable {
         return order.compactMap { newest[$0] }.map { $0.withBoardItem(of: boardCopies[$0.key], in: snap) }
     }
 
+    /// `issues` (a tab's copies) with the board item and shown Status of their board copy, as search
+    /// results carry them.
+    static func onBoard(_ issues: [BoardIssue], in snap: Snapshot) -> [BoardIssue] {
+        let boardCopies = boardCopies(snap)
+        return issues.map { $0.withBoardItem(of: boardCopies[$0.key], in: snap) }
+    }
+
     /// The cached copy of one issue, picked as search picks it: the copy among board, Assigned and
     /// Created updated most recently, with the Status of the board copy. Nil when no list has it.
     public static func cachedIssue(_ key: PRKey, in snap: Snapshot) -> BoardIssue? {
@@ -555,7 +583,7 @@ public struct SearchEngine: Sendable {
         case .text(let words):
             return try await searchTitles(
                 q, logins: [], labels: [], states: [], words: words, snap: snap, focus: focus, api: api)
-        case .filtered(let logins, let labels, let words, let states):
+        case .filtered(let logins, let labels, let words, let states, _):
             return try await searchTitles(
                 q, logins: logins, labels: labels, states: states, words: words, snap: snap, focus: focus, api: api)
         case .empty:

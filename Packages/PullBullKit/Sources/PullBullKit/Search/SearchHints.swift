@@ -2,7 +2,7 @@ import Foundation
 
 /// A clickable hint under the empty search field: it types its sigil into the field.
 public enum SearchHint: Equatable, Sendable {
-    case number, person, label, state
+    case number, person, label, state, status
 
     public var sigil: String {
         switch self {
@@ -10,6 +10,7 @@ public enum SearchHint: Equatable, Sendable {
         case .person: "@"
         case .label: "~"
         case .state: "is:"
+        case .status: "status:"
         }
     }
 
@@ -20,14 +21,19 @@ public enum SearchHint: Equatable, Sendable {
         case .person: "person"
         case .label: "label"
         case .state: "state"
+        case .status: "column"
         }
     }
+
+    /// Whether the token line draws `word` after the sigil. `status:` names itself, and five tokens with
+    /// words don't fit the line; VoiceOver still reads the word.
+    public var showsWord: Bool { self != .status }
 
     /// Typing the sigil opens a completion list.
     public var opensList: Bool { self != .number }
 
     /// The token line, in order.
-    public static let all: [SearchHint] = [.number, .person, .label, .state]
+    public static let all: [SearchHint] = [.number, .person, .label, .state, .status]
 
     public var accessibilityLabel: String { "\(sigil) \(word)" }
     public var accessibilityHint: String { "Types \(sigil) in the search field" }
@@ -44,6 +50,7 @@ public enum SearchHint: Equatable, Sendable {
         case .person: "@name filters by author, assignee or reviewer"
         case .label: "~label filters by label"
         case .state: "is:open, closed, merged or draft filters by state"
+        case .status: "status:name filters issues by board Status"
         }
     }
 }

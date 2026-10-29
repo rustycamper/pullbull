@@ -15,8 +15,8 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
 
 @Suite struct SearchHintTests {
     @Test func theTokenLineInOrder() {
-        #expect(SearchHint.all == [.number, .person, .label, .state])
-        #expect(SearchHint.all.map(\.word) == ["number", "person", "label", "state"])
+        #expect(SearchHint.all == [.number, .person, .label, .state, .status])
+        #expect(SearchHint.all.map(\.word) == ["number", "person", "label", "state", "column"])
     }
 
     @Test func sigils() {
@@ -56,7 +56,7 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
 }
 
 @Suite struct HintPanelItemTests {
-    private static let tokens: [HintPanelItem] = [.hint(.number), .hint(.person), .hint(.label), .hint(.state)]
+    private static let tokens: [HintPanelItem] = [.hint(.number), .hint(.person), .hint(.label), .hint(.state), .hint(.status)]
 
     @Test func chipsComeBeforeTheTokens() {
         let saved = savedSearches(2)
@@ -68,11 +68,11 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
     @Test func plusNAndShowLessAreOneItem() {
         let saved = savedSearches(8)
         let folded = HintPanelItem.items(cloud: cloud(saved))
-        #expect(folded.count == 5 + 1 + 4)
+        #expect(folded.count == 5 + 1 + 5)
         #expect(folded[5] == .more)
         #expect(folded[6] == .hint(.number))
         let expanded = HintPanelItem.items(cloud: cloud(saved, expanded: true))
-        #expect(expanded.count == 8 + 1 + 4)
+        #expect(expanded.count == 8 + 1 + 5)
         #expect(expanded[8] == .more)
     }
 
@@ -84,7 +84,7 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
         #expect(HintPanelItem.move(nil, .down, in: items) == .select(.saved(ids[0])))
         #expect(HintPanelItem.move(.saved(ids[0]), .down, in: items) == .select(.saved(ids[1])))
         #expect(HintPanelItem.move(.saved(ids[1]), .down, in: items) == .select(.hint(.number)))
-        #expect(HintPanelItem.move(.hint(.state), .down, in: items) == .select(.hint(.state)))
+        #expect(HintPanelItem.move(.hint(.status), .down, in: items) == .select(.hint(.status)))
     }
 
     /// ↑ goes back, and from the first item returns to the field; in the field it stays there.
@@ -108,7 +108,7 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
         #expect(HintPanelItem.move(.saved(ids[1]), .right, in: items) == .select(.hint(.number)))
         #expect(HintPanelItem.move(.hint(.number), .left, in: items) == .select(.saved(ids[1])))
         #expect(HintPanelItem.move(.saved(ids[0]), .left, in: items) == .select(.saved(ids[0])))
-        #expect(HintPanelItem.move(.hint(.state), .right, in: items) == .select(.hint(.state)))
+        #expect(HintPanelItem.move(.hint(.status), .right, in: items) == .select(.hint(.status)))
         #expect(HintPanelItem.move(nil, .left, in: items) == .pass)
         #expect(HintPanelItem.move(nil, .right, in: items) == .pass)
     }

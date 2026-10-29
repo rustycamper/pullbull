@@ -17,6 +17,8 @@ struct PopoverView: View {
     @State private var caretToEnd = false
     @State private var keyMonitor = SearchKeyMonitor()
     @State private var caretObserver = FieldCaretObserver()
+    /// The qualifier ghost is on screen; Tab writes only one the user can see.
+    @State private var qualifierGhostDrawn = false
     /// The caret after a completed name, set once the field editor shows the completed text.
     @State private var pendingCaret: PendingCaret?
     /// The saved chip or token the arrows highlighted under the empty field; Return picks it.
@@ -243,7 +245,7 @@ struct PopoverView: View {
         VStack(spacing: 0) {
             HeaderView(
                 model: model, searching: searchShown, searchOpen: searchOpen, fieldFocused: $fieldFocused,
-                window: { [keyMonitor] in keyMonitor.window },
+                ghostDrawn: $qualifierGhostDrawn, window: { [keyMonitor] in keyMonitor.window },
                 onCancelSearch: cancelSearch, onSwitchMode: switchMode(to:), onSaveSearch: openSaveRow)
             if searchOpen, saveName != nil {
                 Hairline()
@@ -358,6 +360,8 @@ struct PopoverView: View {
             }
             guard text == model.searchText else { return }
             model.searchCaretMoved(to: caret)
+        } selected: {
+            model.searchTextSelected()
         }
         // The kept query comes back in a focused field, selected so typing replaces it.
         if searching {
@@ -577,7 +581,7 @@ struct PopoverView: View {
                 return false
             }
         }
-        // The open "@user", "~label" or "is:" list takes the arrows, Return, Tab and Esc; every other key
+        // The open "@user", "~label", "is:" or "status:" list takes the arrows, Return, Tab and Esc; every other key
         // reaches the field.
         // ⇧ or ⌥ with an arrow or Tab is the field's (extend the selection, move focus back).
         if completionShown {
@@ -600,6 +604,14 @@ struct PopoverView: View {
             default:
                 break
             }
+        }
+        // A grey qualifier after the caret (`sta` → `tus:`): plain Tab writes it; every other key is the field's.
+        if !completionShown, fieldFocused, event.keyCode == SearchKeyMonitor.tab,
+           flags.subtracting([.capsLock, .numericPad, .function]).isEmpty,
+           qualifierGhostDrawn, let caret = model.acceptQualifierGhost()
+        {
+            placeCaretAfterUpdate(caret, in: window)
+            return true
         }
         // The panel under the empty field: the arrows move one cursor over the saved chips and tokens
         // (← / → only once it is in the panel, ↑ from the first item back to the field), Return picks,
@@ -852,6 +864,7 @@ struct PopoverView: View {
         case .people(let people): people.selectedCandidate.map(CompletionSpeech.completed)
         case .labels(let labels): labels.selectedCandidate.map(CompletionSpeech.completed)
         case .states(let states): states.selectedCandidate.map(CompletionSpeech.completed)
+        case .statuses(let statuses): statuses.selectedCandidate.map(CompletionSpeech.completed)
         case nil: nil
         }
         guard let caret = model.acceptCompletion() else { return }
@@ -883,7 +896,7 @@ struct PopoverView: View {
         }
     }
 
-    /// A token: types its sigil into the empty field, which opens the `@`, `~` or `is:` list.
+    /// A token: types its sigil into the empty field, which opens the `@`, `~`, `is:` or `status:` list.
     private func pickHint(_ hint: SearchHint, in window: NSWindow?) {
         hintSelection = nil
         model.startToken(hint.sigil)

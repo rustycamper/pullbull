@@ -121,7 +121,9 @@ final class AppModel {
     private(set) var people: PeopleIndex = .empty
     /// Every label the current snapshot holds; "~label" candidates come from here.
     private(set) var labels: LabelIndex = .empty
-    /// The open "@user", "~label" or "is:" completion; nil when no token ends at the caret or the user closed it.
+    /// The selected board's Status columns; "status:" candidates come from here.
+    private(set) var statuses: StatusIndex = .empty
+    /// The open "@user", "~label", "is:" or "status:" completion; nil when no token ends at the caret or the user closed it.
     var completion: SearchCompletion? { searchField.searchCompletion }
     /// Bumped to ask the search field to take focus.
     private(set) var searchFieldFocusRequest = 0
@@ -641,7 +643,7 @@ final class AppModel {
         if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { searchStartedOnTab = nil }
         // A cleared field leaves the narrowed tab selected, and the next query searches everything.
         searchScope = searchScope.edited(to: text)
-        if let query = searchField.edit(text, caret: caret, people: people, labels: labels) {
+        if let query = searchField.edit(text, caret: caret, people: people, labels: labels, statuses: statuses) {
             runSearch(query, debounced: debounced)
         }
     }
@@ -649,7 +651,7 @@ final class AppModel {
     /// The caret moved without a text change: the list may close (the token then counts as typed), never open.
     func searchCaretMoved(to caret: Int) {
         guard route == .list || route == .search, caret <= searchText.utf16.count else { return }
-        if let query = searchField.caretMoved(to: caret, people: people, labels: labels) { runSearch(query) }
+        if let query = searchField.caretMoved(to: caret, people: people, labels: labels, statuses: statuses) { runSearch(query) }
     }
 
     func moveCompletion(by offset: Int) {
@@ -664,6 +666,26 @@ final class AppModel {
         }
         // No more typing follows a completed token, so GitHub is asked at once.
         updateSearch(accepted.text, caret: accepted.caret, debounced: false)
+        return accepted.caret
+    }
+
+    /// The rest of the qualifier the word at the caret starts, drawn after it in the field; nil while a
+    /// list is open or off the list and search routes.
+    var qualifierGhost: QualifierGhost? {
+        guard route == .list || route == .search else { return nil }
+        return searchField.ghost(statuses: statuses)
+    }
+
+    /// Text is selected in the field: no caret, so no ghost until it moves again.
+    func searchTextSelected() {
+        searchField.forgetCaret()
+    }
+
+    /// Tab on a ghost: writes the qualifier, which opens its list, and returns the caret for the view to
+    /// apply; nil without a ghost.
+    func acceptQualifierGhost() -> Int? {
+        guard let accepted = qualifierGhost?.accepted(in: searchText) else { return nil }
+        updateSearch(accepted.text, caret: accepted.caret)
         return accepted.caret
     }
 
@@ -705,7 +727,7 @@ final class AppModel {
     /// the end, and it searches as if typed. The view puts the caret there.
     func applySavedSearch(_ saved: SavedSearch) {
         searchStartedOnTab = nil
-        if let query = searchField.apply(saved, people: people, labels: labels) { runSearch(query, debounced: false) }
+        if let query = searchField.apply(saved, people: people, labels: labels, statuses: statuses) { runSearch(query, debounced: false) }
     }
 
     /// The field's query, trimmed, is one of the saved searches: the bookmark shows filled.
@@ -733,7 +755,7 @@ final class AppModel {
         guard fieldStale || searchResults == nil || searchKey(for: searchQuery) != searchedFor
             || shownSearchScope.isNarrowed
         else { return }
-        let query = fieldStale ? searchField.edit(searchText, caret: nil, people: people, labels: labels) : searchQuery
+        let query = fieldStale ? searchField.edit(searchText, caret: nil, people: people, labels: labels, statuses: statuses) : searchQuery
         if let query { runSearch(query, debounced: false, keeping: searchSelection) }
     }
 
@@ -760,7 +782,7 @@ final class AppModel {
         }
         if let narrowed = SearchNarrowing.results(
             query, scope: shownSearchScope, tabs: tabs, issueTabs: issueTabs, focus: repoFocus,
-            viewer: snapshot.org.viewer)
+            viewer: snapshot.org.viewer, snap: snapshot)
         {
             // The tab's lists are already fetched: nothing to ask GitHub.
             setSearchResults(narrowed)
@@ -814,7 +836,7 @@ final class AppModel {
     private func refreshSearchMatchCounts(for query: SearchQuery) {
         searchMatchCounts = SearchNarrowing.counts(
             query, prTabs: prTabs, tabs: tabs, issueTabs: issueTabs, focus: repoFocus,
-            viewer: snapshot?.org.viewer ?? "")
+            viewer: snapshot?.org.viewer ?? "", snap: snapshot)
     }
 
     /// Esc / Cancel: clears the query and returns to the tabs.
@@ -1516,7 +1538,8 @@ final class AppModel {
         snapshot = nil
         people = .empty
         labels = .empty
-        searchField.refresh(people: people, labels: labels)
+        statuses = .empty
+        searchField.refresh(people: people, labels: labels, statuses: statuses)
         tabs = nil
         issueTabs = nil
         hiddenApprovedCount = 0
@@ -1559,16 +1582,19 @@ final class AppModel {
             assignedCleared.reset()
             people = .empty
             labels = .empty
-            searchField.refresh(people: people, labels: labels)
+            statuses = .empty
+            searchField.refresh(people: people, labels: labels, statuses: statuses)
             searchMatchCounts = [:]
             return
         }
         let index = PeopleIndex.build(snapshot)
         let labelIndex = LabelIndex.build(snapshot)
-        if index != people || labelIndex != labels {
+        let statusIndex = StatusIndex.build(snapshot)
+        if index != people || labelIndex != labels || statusIndex != statuses {
             people = index
             labels = labelIndex
-            searchField.refresh(people: people, labels: labels)
+            statuses = statusIndex
+            searchField.refresh(people: people, labels: labels, statuses: statuses)
         }
         let now = Date()
         let built = TabBuilder.build(snapshot, settings: settings, now: now)

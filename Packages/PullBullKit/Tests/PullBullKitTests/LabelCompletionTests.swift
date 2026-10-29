@@ -59,8 +59,8 @@ private func open(_ text: String, _ index: LabelIndex = l) -> LabelCompletion? {
         #expect(PendingToken.at(caret: 2, in: "~bug") == nil)
     }
 
-    @Test func aliasOpensNoList() {
-        #expect(PendingToken.at(caret: 8, in: "label:bu") == nil)
+    @Test func aliasOpensTheList() {
+        #expect(PendingToken.at(caret: 8, in: "label:bu") == PendingToken(start: 0, end: 8, prefix: "bu", kind: .label))
     }
 
     @Test func startsToken() {

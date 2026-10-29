@@ -1,40 +1,45 @@
 import Foundation
 
-/// The line above `@`, `~` and `is:` search results, and what VoiceOver says for it.
+/// The line above `@`, `~`, `is:` and `status:` search results, and what VoiceOver says for it.
 public enum SearchContext {
     /// `<tokens> in all of <org>`, with words `<tokens> · “<words>” in all of <org>`,
     /// prefixed `Started typing on <tab> · ` after type-anywhere. `<tokens>` lists the
-    /// `@` names, then the `~` labels, then the `is:` states. With a focused `repo`, `in <repo>` instead.
+    /// `@` names, then the `~` labels, then the `is:` states, then the `status:` columns. With a focused `repo`, `in <repo>` instead.
     public static func text(
-        logins: [String], labels: [String] = [], states: [StateFilter] = [], words: [String], org: String,
-        repo: String? = nil, startedOnTab: String?
+        logins: [String], labels: [String] = [], states: [StateFilter] = [], statuses: [BoardStatusFilter] = [],
+        words: [String], org: String, repo: String? = nil, startedOnTab: String?
     ) -> String {
-        var line = SearchQuery.tokenList(logins: logins, labels: labels, states: states)
+        var line = SearchQuery.tokenList(logins: logins, labels: labels, states: states, statuses: statuses)
         if !words.isEmpty { line += " · “\(words.joined(separator: " "))”" }
         line += " " + place(org: org, repo: repo)
         if let tab = startedOnTab { line = "Started typing on \(tab) · " + line }
         return line
     }
 
-    /// `Filtered by <logins>, labels <labels>, states <states>, titles matching <words>, in all of <org>`
-    /// (`in <repo>` when focused); each part only when it applies.
+    /// `Filtered by <logins>, labels <labels>, states <states>, <statuses>, titles matching <words>, in all
+    /// of <org>` (`in <repo>` when focused); each part only when it applies.
     public static func accessibilityLabel(
-        logins: [String], labels: [String] = [], states: [StateFilter] = [], words: [String], org: String,
-        repo: String? = nil
+        logins: [String], labels: [String] = [], states: [StateFilter] = [], statuses: [BoardStatusFilter] = [],
+        words: [String], org: String, repo: String? = nil
     ) -> String {
-        filterDescription(logins: logins, labels: labels, states: states, words: words) + ", "
+        filterDescription(logins: logins, labels: labels, states: states, statuses: statuses, words: words) + ", "
             + place(org: org, repo: repo)
     }
 
-    /// `Filtered by <logins>, labels <labels>, states <states>, titles matching <words>`.
+    /// `Filtered by <logins>, labels <labels>, states <states>, <statuses>, titles matching <words>`, where
+    /// a status reads `Status In progress`, or `Status containing prog` for part of a name.
     static func filterDescription(
-        logins: [String], labels: [String], states: [StateFilter], words: [String]
+        logins: [String], labels: [String], states: [StateFilter], statuses: [BoardStatusFilter] = [],
+        words: [String]
     ) -> String {
         var filters: [String] = []
         if !logins.isEmpty { filters.append(SearchQuery.mentionList(logins)) }
         if !labels.isEmpty { filters.append((labels.count == 1 ? "label " : "labels ") + SearchQuery.joinedList(labels)) }
         if !states.isEmpty {
             filters.append((states.count == 1 ? "state " : "states ") + SearchQuery.joinedList(states.map(\.rawValue)))
+        }
+        if !statuses.isEmpty {
+            filters.append(SearchQuery.joinedList(statuses.map { "Status \($0.exact ? "" : "containing ")\($0.name)" }))
         }
         var label = "Filtered by \(filters.joined(separator: ", "))"
         if !words.isEmpty { label += ", titles matching \(words.joined(separator: " "))" }

@@ -101,17 +101,22 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 | Token | Matches |
 |---|---|
 | `@alice` `@me` | Author or reviewer. On issues: author or assignee |
-| `~bug` `~"good first issue"` | Label |
+| `~bug` `~"good first issue"` `label:bug` | Label |
 | `is:open` `is:closed` `is:merged` `is:draft` | State |
+| `status:prog` `status:"In progress"` | Status column on the board. Issues only |
 | `#123` | That number, every repo |
 | `owner/repo#123` or a link | Exactly that item |
 | words | Title |
 
-- `@`, `~`, `is:` and words combine; everything must match
+- `@`, `~`, `is:`, `status:` and words combine; everything must match
+- `status:` uses the board shown in the Board tab. Unquoted matches part of a Status name, quoted the whole name; case is ignored. Names with spaces need quotes to match exactly
+- With `status:`, PRs and issues not on the board don't match
 - `#123` and links work only on their own
 - Results span all tabs; click a tab to narrow
 - Matches in the other mode show a hint: <kbd>⌘</kbd><kbd>1</kbd> / <kbd>⌘</kbd><kbd>2</kbd>
 - Empty field shows saved searches and token hints. <kbd>↓</kbd> to walk them
+- Typing `@`, `~`, `label:`, `is:` or `status:` opens a completion list. `status:` lists the board's Status columns
+- Typing the start of `status:` or `label:` (`st`, `la`) at the end of the field shows the rest in grey. Not `is:`, a common word; `status:` only when the board has Status columns
 - **Save:** bookmark icon in the field. Manage in Settings → Search
 
 | Completion list | |
@@ -119,6 +124,11 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 | <kbd>↑</kbd> <kbd>↓</kbd> | Choose |
 | <kbd>Return</kbd> · <kbd>Tab</kbd> | Complete |
 | <kbd>Esc</kbd> | Close |
+
+| Grey suggestion (`st` → `status:`) | |
+|---|---|
+| <kbd>Tab</kbd> | Write it and open its list |
+| <kbd>Return</kbd>, typing | Ignore it |
 
 ## Ask AI
 
@@ -131,20 +141,20 @@ Settings → Ask AI.
 | Control | Default |
 |---|---|
 | Ask AI on/off | Off |
-| Anthropic API key | Empty. Stored in the Keychain only |
+| Anthropic API key | Empty. Stored in the Keychain only. **Remove** deletes it |
 | Model | The newest Sonnet your key can use. The newest Haiku is cheaper and less accurate. The list updates when you save the key; if Anthropic retires the chosen model, the next one takes over. Keys saved before this version keep the built-in list until saved again |
 | Exclude from Ask AI | Empty. Pick from the repos of the current org or scope; excluded repos are never stored or sent |
 | Index | Shown while Ask AI is on: items indexed, backfill progress ("N of ~M") or last sync, **Rebuild** |
 
 - The key can be saved only while Ask AI is on. It is checked when you save it (`GET /v1/models`, free). A bad key never reaches a question. [Get a key](https://platform.claude.com/settings/keys)
-- Without a key, <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> says "Add an Anthropic API key in Settings → Ask AI" and sends nothing
+- Without a key, <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> says "Add an Anthropic API key in Settings → Ask AI" and sends nothing. Before the index opens, it says "Ask AI index isn't ready yet."
 
 ### What is sent
 
 | When | To Anthropic |
 |---|---|
 | You save the key | The key, for the check |
-| You press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Your question and up to 40 matching PR and issue descriptions (first 1,500 characters each, plus title, author, state, labels, dates) |
+| You press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Your question, the org or account name, today's date, and up to 40 matching PR and issue descriptions (first 1,500 characters each, plus title, author, state, labels, dates, and the base branch of merged PRs) |
 | Anything else | Nothing |
 
 - Matching runs on this Mac. Only the best matches are sent
@@ -157,13 +167,14 @@ Settings → Ask AI.
 |---|---|
 | Ask | Type the description, press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd>. Normal results stay on screen; an "Asking…" row shows at the top |
 | Cancel | <kbd>Esc</kbd>, or edit the field |
-| Answer | Answer on top, then PRs and issues in one list, each with a line on why it matched |
+| Answer | Answer on top, then PRs and issues in one list, each with a line on why it matched. Under the answer: model, time, candidates sent |
 | Open | <kbd>Return</kbd> opens the item in its own mode. <kbd>Esc</kbd> or <kbd>←</kbd> in the detail returns to Ask AI |
 | GitHub · copy | <kbd>⌘</kbd><kbd>Return</kbd> opens on GitHub. Copy keys work as in the list |
 | Edit and re-ask | <kbd>Esc</kbd> or <kbd>←</kbd> on Ask AI returns to the field with the question kept |
 | Empty or edit the field | Back to normal search |
 
 - Each question stands alone; there are no follow-up questions
+- With [one repo](#one-repo) shown, Ask AI searches only that repo
 - Questions about deployment ("is it on production?") are answered only from what descriptions and labels say. The answer says so when it can't confirm
 - "Nothing matched" is a valid answer; try other words
 - Errors show as one line in place of the answer: no network, key rejected, rate limited, no answer in 20 s, declined, answer cut off, no answer, model retired, HTTP error
@@ -175,7 +186,7 @@ Settings → Ask AI.
 |---|---|
 | Contents | PRs and issues updated in the last 90 days in the account's scope, with full descriptions. No comments |
 | Where | This Mac, in the cache folder ([Data](#data)). Never sent as a whole |
-| Built | Turning Ask AI on starts a paced backfill; regular refresh goes first. Then it updates on each refresh |
+| Built | Turning Ask AI on starts a paced backfill; regular refresh goes first. Then it updates on each refresh, with a full re-sync once a week |
 | Deleted | Ask AI off (every index file), sign-out, or a renamed login. **Rebuild** empties the index and refetches; the file stays |
 | Excluded repos | Never stored. Rows are deleted when you add a repo to the list; removing it backfills the repo |
 
