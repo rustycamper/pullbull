@@ -78,7 +78,7 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 > Ready to merge = approved, no changes requested, checks green or none, no conflicts, not a draft. It doesn't see branch protection (required review count).
 
 - **Detail:** labels, reviewers, checks, description, conversation, files. Markdown incl. `<details>`
-- **Labels:** up to two chips per row, each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail lists them all
+- **Labels:** up to two chips per row (none in compact cards), each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail lists them all
 - **Right-click a row:** copy branch, link or Markdown link · open on GitHub · show only this repo · search author
 - **Footer:** account · refresh · open on GitHub · settings. Turns amber with **Retry** when a refresh fails
 

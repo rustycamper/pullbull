@@ -58,7 +58,7 @@ Keyboard-first · Native SwiftUI · Read-only
 | | | Board | All open issues on the board, by Status. Folded *Done*: last 14 days |
 
 - **Fold a lane:** click a Status header on Board or Assigned. Folds are kept per tab and board
-- **Labels:** chips with the label's colour dot on every row, all of them in the detail
+- **Labels:** chips with the label's colour dot on each row (not in compact cards), all of them in the detail
 - **One repo:** right-click a repo header or row → **Show Only *repo***, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd>
 - **Right-click a row:** copy branch (PRs), link or Markdown link · open on GitHub · search the author
 - **Switch board:** <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> on the Board tab
