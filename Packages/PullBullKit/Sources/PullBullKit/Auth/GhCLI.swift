@@ -19,9 +19,9 @@ public extension ProcessRunning {
 public struct SystemProcessRunner: ProcessRunning {
     private let timeout: Duration
 
-    /// Runs the blocking work (pipe reads, the exit wait) and the timeout. A queue of its own gets a
-    /// thread whenever one is needed; the global queue holds about one thread per core, so blocked reads
-    /// could keep the timeout from firing on time.
+    /// Runs the blocking work (pipe reads, the exit wait) and the timeout. A queue of its own targets the
+    /// overcommit root queue, which adds a thread when its threads block; the global queue doesn't overcommit
+    /// and holds about one thread per core, so blocked reads could keep the timeout from firing on time.
     private static let queue = DispatchQueue(label: "PullBull.process", attributes: .concurrent)
 
     /// A process still running after `timeout` (e.g. `gh` waiting on an unanswered Keychain prompt)
