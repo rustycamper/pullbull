@@ -254,6 +254,53 @@ private func notice(_ source: AccountSource, org: String?, access: OrgAccess?) -
         #expect(sections.gh.isEmpty)
     }
 
+    // MARK: Footer menu
+
+    private let devon = AccountRef(login: "devon", source: .gitHubApp)
+    private let frank = AccountRef(login: "frank", source: .gh)
+    private let alt = AccountRef(login: "alt", source: .gh)
+
+    @Test func menuListsAppAccountsThenGhThenActions() {
+        let entries = AccountPicker.menu(
+            appAccounts: [AccountSummary(userID: 1, login: "devon")], ghLogins: ["frank", "alt"],
+            current: frank, currentOrg: "initech", orgByAccount: ["devon": "acme"], signedOut: [], canSignIn: true)
+        #expect(entries == [
+            .account(devon, detail: "acme", isCurrent: false),
+            .separator,
+            .header("GitHub CLI"),
+            .account(frank, detail: "initech", isCurrent: true),
+            .account(alt, detail: nil, isCurrent: false),
+            .separator,
+            .addAccount,
+            .settings,
+        ])
+    }
+
+    @Test func menuShowsPersonalAndSignedOut() {
+        let entries = AccountPicker.menu(
+            appAccounts: [AccountSummary(userID: 1, login: "devon")], ghLogins: ["frank"],
+            current: frank, currentOrg: nil, orgByAccount: ["devon": "acme"], signedOut: [devon], canSignIn: false)
+        #expect(entries.first == .account(devon, detail: "Signed out", isCurrent: false))
+        #expect(entries.contains(.account(frank, detail: "personal", isCurrent: true)))
+        // Without sign-in, no Add Account….
+        #expect(!entries.contains(.addAccount))
+        #expect(entries.last == .settings)
+    }
+
+    @Test func menuWithOnlyGhAccountsStartsWithItsHeader() {
+        let entries = AccountPicker.menu(
+            appAccounts: [], ghLogins: ["frank"], current: frank, currentOrg: "initech", orgByAccount: [:],
+            signedOut: [], canSignIn: true)
+        #expect(entries.first == .header("GitHub CLI"))
+    }
+
+    @Test func menuWithNoAccountsOffersOnlyActions() {
+        let entries = AccountPicker.menu(
+            appAccounts: [], ghLogins: [], current: nil, currentOrg: nil, orgByAccount: [:], signedOut: [],
+            canSignIn: true)
+        #expect(entries == [.addAccount, .settings])
+    }
+
     @Test func ghOfferOnlyForAGhAccountWhenSignInWorks() {
         #expect(AccountPicker.offersSignIn(current: AccountRef(login: "p", source: .gh), canSignIn: true))
         #expect(!AccountPicker.offersSignIn(current: AccountRef(login: "p", source: .gh), canSignIn: false))

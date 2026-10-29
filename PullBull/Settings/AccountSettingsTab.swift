@@ -28,12 +28,12 @@ struct AccountSettingsTab: View {
                             signOutPhase = .confirming
                             signOutTarget = account
                         }
-                        .disabled(loader.isSwitchingAccount)
+                        .disabled(model.isSwitchingAccount)
                     }
                 }
             } label: {
-                RowLabel("GitHub account", note: loader.accountError ?? accountSourceNote,
-                         isWarning: loader.accountError != nil)
+                RowLabel("GitHub account", note: model.accountSwitchError ?? accountSourceNote,
+                         isWarning: model.accountSwitchError != nil)
             }
             if AccountPicker.offersSignIn(current: model.settings.accountRef, canSignIn: model.canSignInWithGitHub) {
                 MutedLine("Sign in with GitHub to stop depending on gh.")
@@ -51,7 +51,7 @@ struct AccountSettingsTab: View {
             } label: {
                 RowLabel("Organization", note: loader.orgsError ?? orgNote, isWarning: loader.orgsError != nil)
             }
-            .disabled(loader.isSwitchingAccount || model.settings.account == nil)
+            .disabled(model.isSwitchingAccount || model.settings.account == nil)
             if case .personalInstall = model.orgAccessNotice, let target = model.personalInstallTarget {
                 PersonalInstallView(model: model, target: target)
             } else if let notice = model.orgAccessNotice {
@@ -85,7 +85,7 @@ struct AccountSettingsTab: View {
         }
         .labelsHidden()
         .fixedSize()
-        .disabled(loader.isSwitchingAccount)
+        .disabled(model.isSwitchingAccount)
     }
 
     @ViewBuilder private var boardRow: some View {
@@ -123,13 +123,13 @@ struct AccountSettingsTab: View {
             Button("Use \(ghLogin) from GitHub CLI") {
                 Task { await loader.selectAccount(AccountRef(login: ghLogin, source: .gh), model: model, personal: true) }
             }
-            .disabled(loader.isSwitchingAccount)
+            .disabled(model.isSwitchingAccount)
         case .addScope, .logIn:
             Button("Set Up…") {
                 guard let login = model.settings.account else { return }
                 GhSetupWindowController.shared.show(app: model, purpose: .board(login: login))
             }
-            .disabled(loader.isSwitchingAccount)
+            .disabled(model.isSwitchingAccount)
         case .ready, nil:
             Label("Disabled", systemImage: "exclamationmark.triangle")
                 .foregroundStyle(.secondary)

@@ -42,6 +42,7 @@ struct PopoverView: View {
     @State private var repoMenuAnchor = MenuAnchor()
     /// The filter row's board name, for ⌘⇧B.
     @State private var boardMenuAnchor = MenuAnchor()
+    @State private var accountMenuAnchor = MenuAnchor()
     /// The pane the last pass showed; rows arriving for it fade in, a newly switched-to one cuts.
     @State private var fadePane: ListPane?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -225,7 +226,7 @@ struct PopoverView: View {
                 VStack(spacing: 0) {
                     FirstRunView(model: model)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    FooterView(model: model, now: .now)
+                    FooterView(model: model, now: .now, accountAnchor: accountMenuAnchor)
                 }
                 // While it fades out under the list, it takes no clicks.
                 .allowsHitTesting(model.showsFirstRun)
@@ -291,7 +292,7 @@ struct PopoverView: View {
                                     }
                                     .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: fieldOpen)
                                 }
-                            footer { FooterView(model: model, now: context.date) }
+                            footer { FooterView(model: model, now: context.date, accountAnchor: accountMenuAnchor) }
                         }
                     }
                 }
@@ -520,7 +521,7 @@ struct PopoverView: View {
             // Keypad Enter carries .numericPad and fn-Return .function; neither is a modifier here.
             guard flags.subtracting([.command, .shift, .capsLock, .numericPad, .function]).isEmpty else { return false }
             let key = Self.commandKey(event)
-            // ⌘⇧C, ⌘⇧F and ⌘⇧B are the only shifted commands.
+            // ⌘⇧C, ⌘⇧F, ⌘⇧B and ⌘⇧A are the only shifted commands.
             if flags.contains(.shift) {
                 switch key {
                 case "c":
@@ -535,6 +536,10 @@ struct PopoverView: View {
                 case "b":
                     guard listKeys != nil, boardPartShown, let view = boardMenuAnchor.view else { return false }
                     BoardMenu.show(model: model, in: view, at: .zero)
+                case "a":
+                    // In the list, with the footer's account button on screen (not first run or an error).
+                    guard listKeys != nil, let view = accountMenuAnchor.view, view.window != nil else { return false }
+                    AccountMenu.show(model: model, in: view, at: .zero)
                 default:
                     return false
                 }

@@ -89,6 +89,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var projectOwner: BoardOwner?
     /// The org last chosen for each account, restored when switching back to it.
     public var orgByAccount: [String: String] = [:]
+    /// The board last chosen for each owner (`BoardOwner.key`), restored when its scope comes back.
+    public var boardByOwner: [String: Int] = [:]
     public var grouping: Grouping = .repository
     public var compact = false
     public var hideOlderThanTwoMonths = true
@@ -130,7 +132,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var askExcludedRepos: [String] = []
 
     private enum CodingKeys: String, CodingKey {
-        case account, org, projectNumber, projectOwner, projectOrg, orgByAccount, grouping, compact,
+        case account, org, projectNumber, projectOwner, projectOrg, orgByAccount, boardByOwner, grouping, compact,
             hideOlderThanTwoMonths, hideApprovedByMe, hideDrafts, badge, notify, refreshMinutes, lastTab, toggleHotkey, mode, lastIssueTab,
             countAssignedIssues, solidBackground, accountSource, appAccounts, signedOutByUser, laneFolds,
             askEnabled, askModel, askModelChoices, askExcludedRepos
@@ -159,6 +161,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
             d.projectOwner = .org(org)
         }
         d.orgByAccount = c.readableValues(String.self, forKey: .orgByAccount) ?? d.orgByAccount
+        d.boardByOwner = c.readableValues(Int.self, forKey: .boardByOwner) ?? d.boardByOwner
         d.grouping = c.readable(Grouping.self, forKey: .grouping) ?? d.grouping
         d.compact = c.readable(Bool.self, forKey: .compact) ?? d.compact
         d.hideOlderThanTwoMonths =
@@ -200,6 +203,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         try c.encode(projectNumber, forKey: .projectNumber)
         try c.encodeIfPresent(projectOwner, forKey: .projectOwner)
         try c.encode(orgByAccount, forKey: .orgByAccount)
+        try c.encode(boardByOwner, forKey: .boardByOwner)
         try c.encode(grouping, forKey: .grouping)
         try c.encode(compact, forKey: .compact)
         try c.encode(hideOlderThanTwoMonths, forKey: .hideOlderThanTwoMonths)
@@ -301,16 +305,23 @@ public struct AppSettings: Codable, Equatable, Sendable {
     }
 
     /// Ties the board to the current scope's owner. The first org adopts an owner-less board as is;
-    /// moving to another org, to no-org mode or to another account there clears it (the caller then
-    /// picks the new owner's first board). Returns true when it was cleared, or when no-org mode
-    /// found the board owner-less: a number saved without an owner is never a personal board.
+    /// moving to another org, to no-org mode or to another account there takes the board last chosen
+    /// for the new owner, else clears it (the caller then picks the new owner's first board). Returns
+    /// true when it was cleared, or when no-org mode found the board owner-less: a number saved
+    /// without an owner is never a personal board.
     public mutating func reconcileBoard() -> Bool {
         guard let owner = boardOwner else { return false }
         if let projectOwner, projectOwner.matches(owner) { return false }
         defer { projectOwner = owner }
         if projectOwner == nil, !owner.isUser { return false }
-        projectNumber = nil
-        return true
+        projectNumber = boardByOwner[owner.key]
+        return projectNumber == nil
+    }
+
+    /// Records the current board as the one chosen for its owner.
+    public mutating func rememberBoard() {
+        guard let board else { return }
+        boardByOwner[board.owner.key] = board.number
     }
 
     /// Records the current org as the one chosen for the current account.

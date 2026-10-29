@@ -238,6 +238,38 @@ public enum AccountPicker {
         return (app, gh)
     }
 
+    /// The footer's account menu: app accounts, then the `gh` logins under "GitHub CLI", then Add
+    /// Account… (when sign-in works) and Account Settings…. Each account shows the org it would open
+    /// in: the current one's scope, another's remembered org, or nothing when none is remembered.
+    public static func menu(
+        appAccounts: [AccountSummary], ghLogins: [String], current: AccountRef?, currentOrg: String?,
+        orgByAccount: [String: String], signedOut: Set<AccountRef>, canSignIn: Bool
+    ) -> [AccountMenuEntry] {
+        let (app, gh) = sections(appAccounts: appAccounts, ghLogins: ghLogins, current: current)
+        func entry(_ account: AccountRef) -> AccountMenuEntry {
+            let isCurrent = account == current
+            let detail: String?
+            if signedOut.contains(account) {
+                detail = "Signed out"
+            } else if isCurrent {
+                detail = currentOrg ?? "personal"
+            } else {
+                detail = orgByAccount[account.login]
+            }
+            return .account(account, detail: detail, isCurrent: isCurrent)
+        }
+        var entries = app.map(entry)
+        if !gh.isEmpty {
+            if !entries.isEmpty { entries.append(.separator) }
+            entries.append(.header("GitHub CLI"))
+            entries += gh.map(entry)
+        }
+        if !entries.isEmpty { entries.append(.separator) }
+        if canSignIn { entries.append(.addAccount) }
+        entries.append(.settings)
+        return entries
+    }
+
     /// "Sign in with GitHub to stop depending on gh." shows for a current `gh` account when sign-in works.
     public static func offersSignIn(current: AccountRef?, canSignIn: Bool) -> Bool {
         canSignIn && current?.source == .gh
@@ -314,4 +346,14 @@ public enum CachedAvatars {
     public static func profileImageURL(_ login: String) -> URL? {
         URL(string: "https://github.com/\(login).png")
     }
+}
+
+/// One line of the footer's account menu (`AccountPicker.menu`).
+public enum AccountMenuEntry: Equatable, Sendable {
+    /// An account to switch to, checked when current; `detail` is its org, "personal", or "Signed out".
+    case account(AccountRef, detail: String?, isCurrent: Bool)
+    case header(String)
+    case separator
+    case addAccount
+    case settings
 }
