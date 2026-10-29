@@ -56,7 +56,8 @@ struct IssueListView: View {
                     // Under a focus the kit merges repo groups into one untitled group.
                     if group.title.isEmpty {
                         Color.clear.frame(height: 6)
-                        rows(group.issues, inRepoGroup: group.isRepo)
+                        // No header pins above it, so there is none to clear.
+                        rows(group.issues, inRepoGroup: group.isRepo, clearance: 0)
                     } else {
                         Section {
                             if !folded.contains(group.kind) {
@@ -91,12 +92,14 @@ struct IssueListView: View {
         return folded.contains(group.kind) ? .folded : .open
     }
 
-    private func rows(_ issues: [BoardIssue], inRepoGroup: Bool = false) -> some View {
+    private func rows(
+        _ issues: [BoardIssue], inRepoGroup: Bool = false, clearance: CGFloat = PinnedHeader.clearance
+    ) -> some View {
         let wantedLabels = model.searchQuery.labels
         return ForEach(issues) { issue in
             IssueRow(model: model, issue: issue, tab: tab, now: now, selected: model.listSelection == issue.key,
                      inRepoGroup: inRepoGroup || focus != nil, wantedLabels: wantedLabels)
-                .scrollTarget(issue.key, clearance: PinnedHeader.clearance)
+                .scrollTarget(issue.key, clearance: clearance)
         }
     }
 
