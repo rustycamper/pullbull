@@ -119,7 +119,7 @@ struct AskView: View {
         HStack {
             Text("↩ open · ⌘↩ GitHub · ⌘C copy")
             Spacer()
-            Text("⌥⌘↩ ask again")
+            Text("Esc edit question")
         }
         .font(.system(size: 11.5))
         .foregroundStyle(.secondary)

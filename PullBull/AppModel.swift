@@ -2003,7 +2003,7 @@ extension AppModel {
         if let key = askSelection { openAskResult(key) }
     }
 
-    /// Esc or ‹ on the Ask screen: the search field, with the question kept to edit and ask again. An
+    /// Esc or ✕ on the Ask screen: the search field, with the question kept to edit and ask again. An
     /// Ask running again from here stops.
     func closeAsk() {
         guard route == .ask else { return }
@@ -2043,12 +2043,6 @@ extension AppModel {
     func ask() {
         guard route == .search else { return }
         startAsk(searchText.trimmingCharacters(in: .whitespacesAndNewlines))
-    }
-
-    /// ⌥⌘↩ on the Ask screen: asks the same question again.
-    func askAgain() {
-        guard route == .ask else { return }
-        startAsk(askQuestion)
     }
 
     /// Esc while asking, or a detail opening: the reply in flight is dropped.

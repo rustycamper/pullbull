@@ -746,15 +746,11 @@ struct PopoverView: View {
     }
 
     /// The Ask screen: ↑/↓ move the highlight, ↩ opens it in its mode, ⌘↩ opens it on GitHub, ⌘C copies
-    /// its link, ⌘⇧C its reference, ⌥⌘C its Markdown link, ⌥⌘↩ asks the question again, Esc goes back to
-    /// the field with the question. Every other key passes through.
+    /// its link, ⌘⇧C its reference, ⌥⌘C its Markdown link, Esc goes back to the field with the question to
+    /// edit. Every other key passes through.
     private func handleAskKey(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
         let plain = flags.subtracting([.capsLock, .numericPad, .function])
         if flags.contains(.command) {
-            if Self.isOptionCommandReturn(event, flags: flags) {
-                model.askAgain()
-                return true
-            }
             if Self.isOptionCommandC(event, flags: flags) { return model.copyAskSelectionMarkdownLink() }
             guard plain.subtracting([.command, .shift]).isEmpty else { return false }
             if event.keyCode == SearchKeyMonitor.return || event.keyCode == SearchKeyMonitor.enter {
