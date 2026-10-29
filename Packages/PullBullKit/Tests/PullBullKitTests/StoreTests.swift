@@ -846,6 +846,19 @@ private func sample() -> Snapshot {
         #expect(s.reconcileBoard() == true)
     }
 
+    /// Settings saved before boards were remembered: remembering the board at load (as launch does)
+    /// keeps it for its owner through the first switch away and back.
+    @Test func boardInUseBeforeUpgradeComesBack() throws {
+        let saved = #"{"account":"me","org":"initech","projectNumber":7,"projectOwner":{"kind":"org","login":"initech"}}"#
+        var s = try JSONDecoder().decode(AppSettings.self, from: Data(saved.utf8))
+        s.rememberBoard()
+        s.org = "acme"
+        #expect(s.reconcileBoard() == true)
+        s.org = "initech"
+        #expect(s.reconcileBoard() == false)
+        #expect(s.board == .org("initech", 7))
+    }
+
     @Test func rememberedBoardsRoundTrip() throws {
         let store = SettingsStore(defaults: defaults())
         var s = AppSettings()

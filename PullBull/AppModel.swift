@@ -343,6 +343,9 @@ final class AppModel {
             gh: gh)
         var loaded = settingsStore.load()
         loaded.reconcileTab()
+        // Settings saved before boards were remembered: the board in use is remembered for its owner
+        // before the first switch moves away from it.
+        loaded.rememberBoard()
         // Settings saved in no-org mode before personal boards have a board number with no owner.
         _ = loaded.reconcileBoard()
         self.settings = loaded
@@ -2317,18 +2320,29 @@ extension AppModel {
     /// An account without an org is switched to with no org: no-org mode.
     /// A signed-out app account is switched to with its remembered org.
     /// `personal` keeps no-org mode, for the personal board's "Use X from GitHub CLI".
-    /// Settings and the footer's account menu both switch here, one switch at a time. Returns the orgs
-    /// loaded on the way, for Settings' org picker; nil when nothing was switched.
+    /// Settings and the footer's account menu both switch here, one switch at a time. A switch chosen
+    /// while launch is still finding the account waits for it, so launch can't undo the choice; one that
+    /// a sign-in, a sign-out or another account change overtakes while the orgs load is dropped.
+    /// Returns the orgs loaded on the way, for Settings' org picker; nil when nothing was switched.
     @discardableResult
     func selectAccount(_ account: AccountRef, personal: Bool = false) async -> AccountOrgs? {
         guard account != settings.accountRef, !isSwitchingAccount else { return nil }
         isSwitchingAccount = true
         defer { isSwitchingAccount = false }
         accountSwitchError = nil
+        await bootstrapTask?.value
+        let from = settings.accountRef
+        guard account != from, !signingIn, !signingOut else { return nil }
+        /// Nothing changed the account meanwhile, and an app account wasn't signed out of.
+        func stillWanted() -> Bool {
+            settings.accountRef == from && !signingIn && !signingOut
+                && (account.source == .gh || settings.appAccounts.contains { $0.ref == account })
+        }
         do {
             let orgs = try await organizations(for: account)
             let members = account.source == .gitHubApp
                 ? ((try? await memberOrganizations(for: account)) ?? []) : []
+            guard stillWanted() else { return nil }
             let candidates = account.source == .gitHubApp
                 ? OrgPicker.candidates(installed: orgs, memberOrgs: members) : orgs
             let org = personal ? nil : settings.preferredOrg(for: account.login, among: candidates)
@@ -2339,6 +2353,7 @@ extension AppModel {
         } catch AuthError.signedOut(let signedOut) where signedOut == account {
             // A signed-out app account is still reachable: with its remembered org, the popover offers
             // Sign In and Settings offers Sign Out….
+            guard stillWanted() else { return nil }
             switchAccount(to: account, org: settings.orgByAccount[account.login])
             return AccountOrgs(installed: [], members: [])
         } catch {
