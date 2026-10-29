@@ -34,6 +34,7 @@ Keyboard-first · Native SwiftUI · Read-only
 | <img src="docs/media/icons/link.png" width="22" height="22" alt=""> | Finding the PR that closes an issue takes clicks | Issue detail lists its linked PRs. Open one, <kbd>Esc</kbd> returns |
 | <img src="docs/media/icons/bolt.png" width="22" height="22" alt=""> | "Where is #123?" means opening a browser | <kbd>⌃</kbd><kbd>⌥</kbd><kbd>P</kbd>, type `#123` or paste the link, <kbd>Return</kbd> |
 | <img src="docs/media/icons/text-magnifyingglass.png" width="22" height="22" alt=""> | A chat mentions a PR or issue loosely: no link, no number | **Ask**: describe it in your own words (<kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd>), answered by Anthropic with your own API key. Off by default |
+| <img src="docs/media/icons/person-2.png" width="22" height="22" alt=""> | Work and personal GitHub accounts mean signing out and back in | Switch accounts on the fly from the footer (<kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>). Each comes back with its own org and board |
 | <img src="docs/media/icons/slider-horizontal-3.png" width="22" height="22" alt=""> | Notifications are all or nothing | Toggle each event separately |
 | <img src="docs/media/icons/keyboard.png" width="22" height="22" alt=""> | Web UIs make you reach for the mouse | Keyboard-first. Every action has a key; start typing anywhere to search |
 | <img src="docs/media/icons/macwindow.png" width="22" height="22" alt=""> | Most dev tools are web apps in a window | Native SwiftUI and AppKit, no web views. System materials, light and dark, VoiceOver, Reduce Motion |
