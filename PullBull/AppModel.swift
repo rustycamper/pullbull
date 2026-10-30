@@ -791,9 +791,11 @@ final class AppModel {
     }
 
     /// ⌃1–⌃9: saved search `number`, in Settings order, applied as if picked; false when there is none.
-    /// The view opens the field and puts the caret at the end.
+    /// It replaces whatever the field holds, so, as with typing, an Ask on the old text goes. The view
+    /// opens the field and puts the caret at the end.
     func applySavedSearch(number: Int) -> Bool {
         guard let saved = settings.savedSearches.search(forDigit: number) else { return false }
+        if saved.fieldText != searchText { clearAsk() }
         applySavedSearch(saved)
         return true
     }
