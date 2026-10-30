@@ -332,7 +332,7 @@ struct CIGlyph: View {
 }
 
 /// A row's `repo #num` in the meta style, or `#num` where a repo header already names the repo. A long
-/// repo name truncates; the number never does, and stands out in the primary colour.
+/// repo name truncates; the number never does, and stands out in medium weight.
 struct RepoNumber: View {
     let key: PRKey
     var showsRepo = true
@@ -348,8 +348,8 @@ struct RepoNumber: View {
                     .layoutPriority(-1)
             }
             Text("#\(String(key.number))")
+                .fontWeight(.medium)
                 .fixedSize()
-                .foregroundStyle(.primary)
         }
     }
 }
