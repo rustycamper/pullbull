@@ -47,6 +47,12 @@ public enum SearchHint: Equatable, Sendable {
     /// Typing the sigil opens a completion list.
     public var opensList: Bool { self != .number && self != .negate }
 
+    /// What picking the token leaves in the field, which holds `field`: its sigil, or after the lone `-` the
+    /// `-` token left, a sigil that `-` negates joins it.
+    public func text(after field: String) -> String {
+        field == SearchHint.negate.sigil && opensList ? field + sigil : sigil
+    }
+
     /// Every token, in reading order.
     public static let all: [SearchHint] = lines.flatMap { $0 }
 

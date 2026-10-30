@@ -983,10 +983,10 @@ struct PopoverView: View {
         }
     }
 
-    /// A token: types its sigil into the empty field, which opens its list; `-` opens none.
+    /// A token: types its sigil into the empty field, which opens its list; `-` opens none, and the next token joins it.
     private func pickHint(_ hint: SearchHint, in window: NSWindow?) {
         hintSelection = nil
-        model.startToken(hint.sigil)
+        model.startToken(hint.text(after: model.searchText))
         caretAtEndOfField(in: window)
     }
 

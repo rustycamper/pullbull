@@ -98,6 +98,16 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
         #expect(field.ghost(statuses: .empty) == nil)
         #expect(SearchQuery.parse(sigil) == .empty)
     }
+
+    /// After the `-` token, one it negates joins it; `#` and `-` start over, as every token does after other text.
+    @Test func tokenAfterNegate() {
+        #expect(SearchHint.person.text(after: "-") == "-@")
+        #expect(SearchHint.size.text(after: "-") == "-size:")
+        #expect(SearchHint.number.text(after: "-") == "#")
+        #expect(SearchHint.negate.text(after: "-") == "-")
+        #expect(SearchHint.person.text(after: "") == "@")
+        #expect(SearchHint.person.text(after: "fix") == "@")
+    }
 }
 
 @Suite struct HintPanelItemTests {
