@@ -43,7 +43,7 @@ struct PRRow: View {
         .onHover { hovering = $0 }
         .accessibilityAddTraits(selected ? [.isSelected] : [])
         .prContextMenu(
-            pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
+            pr, focus: FocusMenuItem(model: model, repo: pr.key.repo), time: TimeFocusMenu(model: model),
             person: .person(model: model, login: pr.author))
     }
 

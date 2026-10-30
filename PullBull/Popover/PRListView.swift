@@ -23,6 +23,7 @@ struct PRListView: View {
             ScrollView {
                 list
             }
+            .focusContextMenu(time: TimeFocusMenu(model: model))
             .scrollIndicators(.automatic)
             .onChange(of: model.listSelection) { _, key in
                 guard let key else { return }
@@ -110,7 +111,7 @@ struct PRListView: View {
         ListSectionHeader(
             glyph: "book.closed", title: repo.split(separator: "/").last.map(String.init) ?? repo,
             count: count > 0 ? count : nil, compact: model.settings.compact)
-            .focusContextMenu(FocusMenuItem(model: model, repo: repo))
+            .focusContextMenu(FocusMenuItem(model: model, repo: repo), time: TimeFocusMenu(model: model))
     }
 }
 
