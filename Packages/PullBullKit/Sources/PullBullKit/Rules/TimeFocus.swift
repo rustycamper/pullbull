@@ -40,6 +40,16 @@ public enum TimeStep: String, CaseIterable, Sendable {
         }
     }
 
+    /// The strip's label: "Today", "Last 3 days".
+    public var stripTitle: String {
+        switch self {
+        case .today: return "Today"
+        case .threeDays: return "Last 3 days"
+        case .week: return "Last week"
+        case .month: return "Last month"
+        }
+    }
+
     public var menuTitle: String {
         switch self {
         case .today: return "Today"
@@ -85,7 +95,7 @@ public struct TimeFocus: Equatable, Sendable {
         return date >= start
     }
 
-    /// The strip's line: "Updated in the last week · since Oct 24".
+    /// The strip's tooltip and spoken line: "Updated in the last week · since Oct 24".
     public func stripText(now: Date, calendar: Calendar = .current, locale: Locale = .current) -> String {
         let base = Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone)
         let since: String

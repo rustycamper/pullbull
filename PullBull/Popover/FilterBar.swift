@@ -2,7 +2,7 @@ import SwiftUI
 import PullBullKit
 
 /// The slim row at the top of every list: "▦ Roadmap ▾ · ▤ All repos ▾" on the Board tab, "▤ All repos ▾"
-/// elsewhere, "▤ widgets ▾ ✕" with a repo focus, plus "◷ Updated today" with a time focus. The board name opens
+/// elsewhere, "▤ widgets ▾ ✕" with a repo focus, plus "◷ Last 3 days" with a time focus. The board name opens
 /// the board menu (⌘⇧B), the repo name the repository menu (⌘⇧F); ✕ clears both focuses.
 struct FilterBar: View {
     let model: AppModel
@@ -21,8 +21,8 @@ struct FilterBar: View {
             }
             // When tight, the board name truncates first.
             repoPart.layoutPriority(1)
-            if let time = row.timeTitle {
-                timePart(time).layoutPriority(-1)
+            if let time = row.timeTitle, let step = model.timeFocus?.step {
+                timePart(step.stripTitle, help: time).layoutPriority(-1)
             }
             if row.isFocused {
                 Button { clear() } label: {
@@ -71,7 +71,8 @@ struct FilterBar: View {
     }
 
     /// "◷ Updated today": a plain label, cut off with an ellipsis before the repo and board parts give way.
-    private func timePart(_ title: String) -> some View {
+    /// The step's short name; `help` is its full line with the start date.
+    private func timePart(_ title: String, help: String) -> some View {
         HStack(spacing: 6) {
             Text("·")
                 .foregroundStyle(Palette.tertiary)
@@ -83,6 +84,7 @@ struct FilterBar: View {
                 .truncationMode(.tail)
                 .foregroundStyle(.primary)
         }
+        .help(help)
         .accessibilityHidden(true)
     }
 

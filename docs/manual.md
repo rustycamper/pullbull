@@ -252,7 +252,7 @@ Reopen within a minute and the detail is still there.
 ## Recent activity
 
 - Right-click a row, a repo header or the list → **Show Only Updated** → Today, In the Last 3 Days, In the Last Week or In the Last Month
-- A strip above the list names the start: *Updated today*, *Updated in the last week · since Oct 24*
+- A strip above the list names the step: *Today*, *Last 3 days*, *Last week*, *Last month*. Hover it for the start date.
 - Back to all: ✕ in the strip, **Show All**, or <kbd>Esc</kbd>. <kbd>Esc</kbd> clears this and Show Only *repo* together
 - Also cleared when the popover closes, or the tab or mode changes
 - Judged by last activity: when an open item last changed, or when a closed one ended

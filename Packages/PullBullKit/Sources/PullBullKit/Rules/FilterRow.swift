@@ -2,7 +2,7 @@ import Foundation
 
 /// The row at the top of every list: "▦ Roadmap ▾ · ▤ All repos ▾" on the Board tab, "▤ All repos ▾"
 /// elsewhere, "▤ widgets ▾ ✕" with a repo focus. Each part opens its menu; a time focus adds a plain label
-/// ("◷ Updated today") after the repo part.
+/// ("◷ Last 3 days") after the repo part.
 public struct FilterRow: Equatable, Sendable {
     /// The repo part's label: "All repos", or the focused repository's display name.
     public let repoTitle: String
@@ -10,7 +10,8 @@ public struct FilterRow: Equatable, Sendable {
     public let isFocused: Bool
     /// A repo focus is active: the repo label is tinted.
     public let isRepoFocused: Bool
-    /// The time focus's strip text ("Updated today"), nil without one and in search.
+    /// The time focus's full line ("Updated today"), for the tooltip and VoiceOver; nil without one and in
+    /// search.
     public let timeTitle: String?
     /// The board part's name, only on the Board tab while it offers the board menu, and never in search.
     public let boardTitle: String?
@@ -28,7 +29,7 @@ public struct FilterRow: Equatable, Sendable {
     /// The row for the list or search results on screen; nil while there is nothing to filter yet (the
     /// loading or error state fills the popover) unless a focus is active, so ✕ stays in reach. Search
     /// shows the repo part only, as it isn't board-scoped and ignores the tab's time focus. `focusName` is
-    /// the focused repository's display name; `timeTitle` the time focus's strip text; `boardTitle` is given
+    /// the focused repository's display name; `timeTitle` the time focus's full line; `boardTitle` is given
     /// only on the Board tab while it offers the board menu.
     public static func make(
         searching: Bool, listsBuilt: Bool, focusName: String?, timeTitle: String?, boardTitle: String?

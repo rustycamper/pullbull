@@ -96,6 +96,10 @@ import Testing
         #expect(text(.month, now: Self.date(2027, 1, 10, 15)) == "Updated in the last month · since Dec 12, 2026")
     }
 
+    @Test func stripTitles() {
+        #expect(TimeStep.allCases.map(\.stripTitle) == ["Today", "Last 3 days", "Last week", "Last month"])
+    }
+
     @Test func titles() {
         #expect(TimeStep.allCases.map(\.title) == ["today", "in the last 3 days", "in the last week", "in the last month"])
         #expect(TimeStep.allCases.map(\.menuTitle) == ["Today", "In the Last 3 Days", "In the Last Week", "In the Last Month"])
