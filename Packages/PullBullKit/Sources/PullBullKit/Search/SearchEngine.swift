@@ -5,18 +5,25 @@ public enum SearchQuery: Equatable, Sendable {
     /// One PR or issue by its repository (`owner/name`) and number, from a pasted link or `o/r#12`.
     case item(repo: String, number: Int)
     case text([String])
-    /// `@login`, `~label`, `is:` and `status:` terms ANDed with title words. Logins and labels keep the case
-    /// typed, deduplicated case-insensitively; `me` is always lowercase. Words are lowercased. States are
-    /// deduplicated; two that contradict match nothing. Statuses keep the case typed, deduplicated
-    /// case-insensitively; any status keeps the search to board issues. An `updated:` term limits the
+    /// `@login`, `~label`, `is:`, `status:` and `updated:` terms ANDed with title words, each included or,
+    /// after a `-`, excluded. Two states that contradict match nothing, and so does a term both included and
+    /// excluded. Any included status keeps the search to board issues. An included `updated:` term limits the
     /// search to recent activity (the last one typed counts).
-    case filtered(
-        logins: [String], labels: [String], words: [String], states: [StateFilter] = [],
-        statuses: [BoardStatusFilter] = [], updated: UpdatedFilter? = nil)
+    case filtered(SearchFilter)
     case empty
 
+    /// A `.filtered` query of included terms only.
+    public static func filtered(
+        logins: [String], labels: [String], words: [String], states: [StateFilter] = [],
+        statuses: [BoardStatusFilter] = [], updated: UpdatedFilter? = nil
+    ) -> SearchQuery {
+        .filtered(.included(
+            logins: logins, labels: labels, states: states, statuses: statuses, updated: updated, words: words))
+    }
+
     /// `pending` is a range of `raw` (an `@`, `~`, `is:`, `status:` or `updated:` token still being completed) that is left out of
-    /// the query. An `is:` with a value that isn't a state is a word.
+    /// the query; a `-` left before it is dropped. An `is:` with a value that isn't a state is a word, and so
+    /// is a `-` before anything but a sigil.
     public static func parse(_ raw: String, excluding pending: Range<String.Index>? = nil) -> SearchQuery {
         var source = raw
         if let pending { source.replaceSubrange(pending, with: " ") }
@@ -29,53 +36,49 @@ public enum SearchQuery: Equatable, Sendable {
         if digits.allSatisfy({ $0.isASCII && $0.isNumber }), let number = Int(digits) {
             return .number(number)
         }
-        var logins: [String] = []
-        var labels: [String] = []
-        var words: [String] = []
-        var states: [StateFilter] = []
-        var statuses: [BoardStatusFilter] = []
-        var updated: UpdatedFilter?
+        var filter = SearchFilter()
         for term in QueryScanner.terms(in: trimmed) {
+            let side: WritableKeyPath<SearchFilter, SearchTerms> = term.negated ? \.exclude : \.include
             switch term.kind {
             case .person:
                 let rest = term.value
                 if rest.isEmpty { continue }
                 if isLogin(rest) {
-                    let login = rest.lowercased() == "me" ? "me" : String(rest)
-                    if !logins.contains(where: { $0.lowercased() == login.lowercased() }) {
-                        logins.append(login)
-                    }
+                    filter[keyPath: side].add(login: rest.lowercased() == "me" ? "me" : String(rest))
                     continue
                 }
-                words.append(trimmed[term.range].lowercased())
+                filter.words.append(trimmed[term.range].lowercased())
             case .label, .labelAlias:
                 let label = term.value.trimmingCharacters(in: .whitespaces)
                 if label.isEmpty { continue }
-                if !labels.contains(where: { $0.lowercased() == label.lowercased() }) { labels.append(label) }
+                filter[keyPath: side].add(label: label)
             case .state:
                 if term.value.isEmpty { continue }
                 if let state = StateFilter(rawValue: term.value.lowercased()) {
-                    if !states.contains(state) { states.append(state) }
+                    filter[keyPath: side].add(state: state)
                     continue
                 }
-                words.append(trimmed[term.range].lowercased())
+                filter.words.append(trimmed[term.range].lowercased())
             case .status:
                 let name = term.value.trimmingCharacters(in: .whitespaces)
                 if name.isEmpty { continue }
-                let status = BoardStatusFilter(name: name, exact: term.quoted)
-                if !statuses.contains(where: { $0.isSame(as: status) }) { statuses.append(status) }
+                filter[keyPath: side].add(status: BoardStatusFilter(name: name, exact: term.quoted))
             case .updated:
                 if term.value.isEmpty { continue }
-                updated = UpdatedFilter.parse(String(term.value))
+                let updated = UpdatedFilter.parse(String(term.value))
+                if !term.negated {
+                    filter.include.updated = [updated]
+                } else if !filter.exclude.updated.contains(updated) {
+                    filter.exclude.updated.append(updated)
+                }
             case .word:
-                words.append(trimmed[term.range].lowercased())
+                // What a pending token leaves of `-@an`.
+                if term.value == "-" { continue }
+                filter.words.append(trimmed[term.range].lowercased())
             }
         }
-        if !logins.isEmpty || !labels.isEmpty || !states.isEmpty || !statuses.isEmpty || updated != nil {
-            return .filtered(
-                logins: logins, labels: labels, words: words, states: states, statuses: statuses, updated: updated)
-        }
-        return words.isEmpty ? .empty : .text(words)
+        if !filter.include.isEmpty || !filter.exclude.isEmpty { return .filtered(filter) }
+        return filter.words.isEmpty ? .empty : .text(filter.words)
     }
 
     /// A GitHub login: 1 to 39 of `A-Z a-z 0-9 -`, not starting with `-`.
@@ -96,8 +99,9 @@ public enum SearchQuery: Equatable, Sendable {
         updated: UpdatedFilter? = nil
     ) -> String {
         joinedList(
-            logins.map { "@\($0)" } + labels.map(labelToken) + states.map(\.token) + statuses.map(\.token)
-                + [updated?.token].compactMap { $0 })
+            SearchFilter.included(
+                logins: logins, labels: labels, states: states, statuses: statuses, updated: updated, words: []
+            ).tokens)
     }
 
     /// `~bug`, or `~"good first issue"` for a name with whitespace.
@@ -111,41 +115,37 @@ public enum SearchQuery: Equatable, Sendable {
         return items.dropLast().joined(separator: ", ") + " and " + items[items.count - 1]
     }
 
-    public var logins: [String] {
-        if case .filtered(let logins, _, _, _, _, _) = self { return logins }
-        return []
-    }
-
-    public var labels: [String] {
-        if case .filtered(_, let labels, _, _, _, _) = self { return labels }
-        return []
-    }
-
-    public var states: [StateFilter] {
-        if case .filtered(_, _, _, let states, _, _) = self { return states }
-        return []
-    }
-
-    public var statuses: [BoardStatusFilter] {
-        if case .filtered(_, _, _, _, let statuses, _) = self { return statuses }
-        return []
-    }
-
-    public var updated: UpdatedFilter? {
-        if case .filtered(_, _, _, _, _, let updated) = self { return updated }
+    public var filter: SearchFilter? {
+        if case .filtered(let filter) = self { return filter }
         return nil
     }
+
+    /// The included logins; `filter` has the excluded ones.
+    public var logins: [String] { filter?.include.logins ?? [] }
+
+    /// The included labels.
+    public var labels: [String] { filter?.include.labels ?? [] }
+
+    /// The included states.
+    public var states: [StateFilter] { filter?.include.states ?? [] }
+
+    /// The included statuses.
+    public var statuses: [BoardStatusFilter] { filter?.include.statuses ?? [] }
+
+    /// The included `updated:` term.
+    public var updated: UpdatedFilter? { filter?.include.updated.last }
 
     public var words: [String] {
         switch self {
         case .text(let words): return words
-        case .filtered(_, _, let words, _, _, _): return words
+        case .filtered(let filter): return filter.words
         case .number, .item, .empty: return []
         }
     }
 
-    /// Nothing to ask GitHub: empty, or a `status:` search. GitHub knows no board Status, and the snapshot
-    /// holds the whole board, so a `status:` match is always local.
+    /// Nothing to ask GitHub: empty, or a search for an included `status:`. GitHub knows no board Status, and
+    /// the snapshot holds the whole board, so such a match is always local. An excluded `status:` keeps pull
+    /// requests and issues off the board, so GitHub is still asked.
     var isLocalOnly: Bool { self == .empty || !statuses.isEmpty }
 
     /// The repo focus a search for this query keeps to: none for `.item`, which names its own repository.
@@ -167,21 +167,24 @@ public enum SearchQuery: Equatable, Sendable {
 }
 
 extension SearchQuery {
-    /// A `.filtered` query matches when every login has a role on the item, every label is one of its
-    /// labels (by name, ignoring case), it is in every state, its board Status matches every status and
-    /// every word is in its title, and its activity date is within the `updated:` step or date form (a raw `updated:` value
-    /// matches nothing); `.number` and `.text` match as before. A pull request has no Status.
+    /// A `.filtered` query matches when every included login has a role on the item, every included label
+    /// is one of its labels (by name, ignoring case), it is in every included state, its board Status matches
+    /// every included status, every word is in its title and its activity date is within the included
+    /// `updated:` step or date form (a raw `updated:` value matches nothing), and every excluded term fails
+    /// by the same rule (an excluded raw `updated:` value matches nothing too); `.number` and `.text` match
+    /// as before. A pull request has no Status.
     func matches(_ pr: PullRequest, viewer: String, now: Date = Date(), calendar: Calendar = .current) -> Bool {
-        matches(pr, viewer: viewer, window: updated?.resolved(now: now, calendar: calendar))
+        let windows = updatedWindows(now: now, calendar: calendar)
+        return matches(pr, viewer: viewer, window: windows.window, excludedWindows: windows.excluded)
     }
 
-    /// As above, with the `updated:` window already worked out, for a loop over many rows.
-    func matches(_ pr: PullRequest, viewer: String, window: UpdatedFilter.Window?) -> Bool {
+    /// As above, with the `updated:` windows already worked out, for a loop over many rows.
+    func matches(
+        _ pr: PullRequest, viewer: String, window: UpdatedFilter.Window?, excludedWindows: [UpdatedFilter.Window]
+    ) -> Bool {
         switch self {
-        case .filtered(let logins, let labels, _, let states, let statuses, _):
-            return statuses.isEmpty && window?.matches(pr) != false
-                && matchesTitle(pr.title) && Self.hasLabels(labels, pr.labels) && states.allSatisfy { $0.matches(pr) }
-                && logins.allSatisfy { !PersonMatch.roles(of: pr, login: $0, viewer: viewer).isEmpty }
+        case .filtered(let filter):
+            return filter.matches(pr, viewer: viewer, window: window, excludedWindows: excludedWindows)
         case .item:
             return names(pr.key)
         default:
@@ -190,16 +193,16 @@ extension SearchQuery {
     }
 
     func matches(_ issue: BoardIssue, viewer: String, now: Date = Date(), calendar: Calendar = .current) -> Bool {
-        matches(issue, viewer: viewer, window: updated?.resolved(now: now, calendar: calendar))
+        let windows = updatedWindows(now: now, calendar: calendar)
+        return matches(issue, viewer: viewer, window: windows.window, excludedWindows: windows.excluded)
     }
 
-    func matches(_ issue: BoardIssue, viewer: String, window: UpdatedFilter.Window?) -> Bool {
+    func matches(
+        _ issue: BoardIssue, viewer: String, window: UpdatedFilter.Window?, excludedWindows: [UpdatedFilter.Window]
+    ) -> Bool {
         switch self {
-        case .filtered(let logins, let labels, _, let states, let statuses, _):
-            return window?.matches(issue) != false
-                && matchesTitle(issue.title) && Self.hasLabels(labels, issue.labels)
-                && states.allSatisfy { $0.matches(issue) } && statuses.allSatisfy { $0.matches(issue.status?.name) }
-                && logins.allSatisfy { !PersonMatch.roles(of: issue, login: $0, viewer: viewer).isEmpty }
+        case .filtered(let filter):
+            return filter.matches(issue, viewer: viewer, window: window, excludedWindows: excludedWindows)
         case .item:
             return names(issue.key)
         default:
@@ -207,19 +210,17 @@ extension SearchQuery {
         }
     }
 
+    /// The filter's `updated:` windows as of `now`; none for any other query.
+    func updatedWindows(
+        now: Date, calendar: Calendar
+    ) -> (window: UpdatedFilter.Window?, excluded: [UpdatedFilter.Window]) {
+        filter?.windows(now: now, calendar: calendar) ?? (nil, [])
+    }
+
     /// An `.item` for `key`, the repository read without case.
     func names(_ key: PRKey) -> Bool {
         guard case .item(let repo, let number) = self else { return false }
         return key.number == number && key.repo.caseInsensitiveCompare(repo) == .orderedSame
-    }
-
-    private func matchesTitle(_ title: String) -> Bool {
-        let lowered = title.lowercased()
-        return words.allSatisfy { lowered.contains($0) }
-    }
-
-    private static func hasLabels(_ wanted: [String], _ labels: [String]) -> Bool {
-        wanted.allSatisfy { label in labels.contains { $0.caseInsensitiveCompare(label) == .orderedSame } }
     }
 }
 
@@ -327,12 +328,11 @@ public struct SearchResults: Equatable, Sendable {
             guard let scope, !scope.reaches(repo) else { return "No \(one) #\(n) in \(repo)" }
             return "PullBull searches \(scope.org ?? "your repos") only, not \(repo)"
         case .text(let words): return "No \(kind) match “\(words.joined(separator: " "))”"
-        case .filtered(let logins, let labels, let words, let states, let statuses, let updated):
-            let names = SearchQuery.tokenList(
-                logins: logins, labels: labels, states: states, statuses: statuses, updated: updated)
-            return words.isEmpty
+        case .filtered(let filter):
+            let names = SearchQuery.joinedList(filter.tokens)
+            return filter.words.isEmpty
                 ? "No \(kind) with \(names)"
-                : "No \(kind) with \(names) match “\(words.joined(separator: " "))”"
+                : "No \(kind) with \(names) match “\(filter.words.joined(separator: " "))”"
         case .empty: return nil
         }
     }
@@ -392,10 +392,12 @@ public struct SearchEngine: Sendable {
             return SearchResults(openPRs: [], closedPRs: [], issues: [], phase: .searching)
         }
         let prs = snap.reviewCandidates + snap.mine + snap.team + snap.recentlyClosed
-        let window = q.updated?.resolved(now: Date(), calendar: .current)
-        let matching = prs.filter { q.matches($0, viewer: snap.org.viewer, window: window) && Self.inFocus($0.key, focus) }
+        let (window, excluded) = q.updatedWindows(now: Date(), calendar: .current)
+        let matching = prs.filter {
+            q.matches($0, viewer: snap.org.viewer, window: window, excludedWindows: excluded) && Self.inFocus($0.key, focus)
+        }
         let issues = Self.cachedIssues(snap).filter {
-            q.matches($0, viewer: snap.org.viewer, window: window) && Self.inFocus($0.key, focus)
+            q.matches($0, viewer: snap.org.viewer, window: window, excludedWindows: excluded) && Self.inFocus($0.key, focus)
         }
         return Self.assemble(prs: matching, issues: issues, phase: .searching)
     }
@@ -609,17 +611,18 @@ public struct SearchEngine: Sendable {
             let found = try await api.lookup(number: n, org: owner, repos: repos)
             return Remote(prs: found.prs.filter { q.names($0.key) }, issues: found.issues.filter { q.names($0.key) })
         case .text(let words):
-            return try await searchTitles(
-                q, logins: [], labels: [], states: [], updated: nil, words: words, snap: snap, focus: focus, api: api)
-        case .filtered(let logins, let labels, let words, let states, _, let updated):
-            // A raw `updated:` value is GitHub's to judge, so the rows it returns aren't checked against it here.
-            var checked = q
-            if case .raw = updated {
-                checked = .filtered(logins: logins, labels: labels, words: words, states: states)
+            return try await searchTitles(q, sent: SearchFilter(words: words), snap: snap, focus: focus, api: api)
+        case .filtered(let filter):
+            // A raw `updated:` value, included or excluded, is GitHub's to judge, so the rows it returns aren't
+            // checked against it here.
+            func isRaw(_ updated: UpdatedFilter) -> Bool {
+                if case .raw = updated { return true }
+                return false
             }
-            return try await searchTitles(
-                checked, logins: logins, labels: labels, states: states, updated: updated, words: words, snap: snap,
-                focus: focus, api: api)
+            var checked = filter
+            checked.include.updated.removeAll(where: isRaw)
+            checked.exclude.updated.removeAll(where: isRaw)
+            return try await searchTitles(.filtered(checked), sent: filter, snap: snap, focus: focus, api: api)
         case .empty:
             return Remote()
         }
@@ -635,63 +638,60 @@ public struct SearchEngine: Sendable {
         focus?.matches(key) ?? true
     }
 
-    /// The PR and issue search strings within `scope` (`org:` or `user:`), or `repo:` for `focus`: every
-    /// state as GitHub names it, `involves:` for the first login only (`me` is `@me`), a `label:` for every
-    /// label (GitHub ANDs them), then the words quoted as title terms. `updated` follows the states, as
-    /// `serverQualifier` writes it for `now`.
+    /// The PR and issue search strings within `scope` (`org:` or `user:`), or `repo:` for `focus`: the
+    /// filter's `serverQualifiers` for `now`, newest first.
+    static func remoteQuery(
+        kind: String, scope: FetchScope, focus: RepoFocus? = nil, filter: SearchFilter, now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> String {
+        let qualifier = focus.map { "repo:\($0.repo)" } ?? scope.searchQualifier
+        let parts = [qualifier, "is:\(kind)"] + filter.serverQualifiers(now: now, calendar: calendar)
+        return (parts + ["sort:updated-desc"]).joined(separator: " ")
+    }
+
+    /// As above, for included terms only.
     static func remoteQuery(
         kind: String, scope: FetchScope, focus: RepoFocus? = nil, logins: [String], labels: [String],
         states: [StateFilter] = [], updated: UpdatedFilter? = nil, words: [String], now: Date = Date(),
         calendar: Calendar = .current
     ) -> String {
-        let qualifier = focus.map { "repo:\($0.repo)" } ?? scope.searchQualifier
-        var parts = [qualifier, "is:\(kind)"] + states.map(\.token)
-        if let updated { parts.append(updated.serverQualifier(now: now, calendar: calendar)) }
-        if let login = logins.first { parts.append("involves:\(login == "me" ? "@me" : login)") }
-        parts += quoted(labels).map { "label:\($0)" }
-        let quotedWords = quoted(words)
-        if !quotedWords.isEmpty { parts.append("in:title \(quotedWords.joined(separator: " "))") }
-        parts.append("sort:updated-desc")
-        return parts.joined(separator: " ")
+        remoteQuery(
+            kind: kind, scope: scope, focus: focus,
+            filter: .included(logins: logins, labels: labels, states: states, updated: updated, words: words), now: now,
+            calendar: calendar)
     }
 
     /// Each term in double quotes, without the quotes and backslashes it held; empty terms are dropped.
-    private static func quoted(_ terms: [String]) -> [String] {
+    static func quoted(_ terms: [String]) -> [String] {
         terms.compactMap { term -> String? in
             let bare = term.filter { $0 != "\"" && $0 != "\\" }
             return bare.isEmpty ? nil : "\"\(bare)\""
         }
     }
 
+    /// GitHub's rows for `sent`, each checked against `q`.
     private static func searchTitles(
-        _ q: SearchQuery, logins: [String], labels: [String], states: [StateFilter], updated: UpdatedFilter?,
-        words: [String],
-        snap: Snapshot, focus: RepoFocus?, api: GitHubAPI
+        _ q: SearchQuery, sent: SearchFilter, snap: Snapshot, focus: RepoFocus?, api: GitHubAPI
     ) async throws -> Remote {
-        guard !logins.isEmpty || !quoted(labels).isEmpty || !states.isEmpty || updated != nil
-            || !quoted(words).isEmpty
-        else {
-            return Remote()
-        }
+        let now = Date()
+        guard !sent.serverQualifiers(now: now, calendar: .current).isEmpty else { return Remote() }
         // A personal scope limited to an installation's repos drops matches elsewhere.
         let scope = snap.scope
-        let prQuery = remoteQuery(
-            kind: "pr", scope: scope, focus: focus, logins: logins, labels: labels, states: states, updated: updated, words: words)
-        // `is:merged` and `is:draft` match no issue, so the issue search is skipped.
-        let searchesIssues = states.allSatisfy(\.appliesToIssues)
+        let prQuery = remoteQuery(kind: "pr", scope: scope, focus: focus, filter: sent, now: now)
+        // An included `is:merged` or `is:draft` matches no issue, so the issue search is skipped.
+        let searchesIssues = !sent.prOnly && sent.include.states.allSatisfy(\.appliesToIssues)
         let issueQuery = searchesIssues
-            ? remoteQuery(
-                kind: "issue", scope: scope, focus: focus, logins: logins, labels: labels, states: states,
-                updated: updated, words: words)
+            ? remoteQuery(kind: "issue", scope: scope, focus: focus, filter: sent, now: now)
             : nil
         async let prSearch = api.searchPRs(prQuery, maxPages: remoteTextPages, pageSize: remotePageSize)
         async let issueSearch = searchIssues(issueQuery, api: api)
         var remote = Remote()
-        let window = q.updated?.resolved(now: Date(), calendar: .current)
+        let (window, excluded) = q.updatedWindows(now: now, calendar: .current)
         do {
             let prs = try await prSearch
             remote.prs = prs.prs.filter {
-                q.matches($0, viewer: snap.org.viewer, window: window) && scope.covers($0.key.repo) && inFocus($0.key, focus)
+                q.matches($0, viewer: snap.org.viewer, window: window, excludedWindows: excluded)
+                    && scope.covers($0.key.repo) && inFocus($0.key, focus)
             }
             remote.truncated = prs.hasMore
         } catch is CancellationError {
@@ -703,8 +703,13 @@ public struct SearchEngine: Sendable {
         }
         do {
             guard let issues = try await issueSearch else { return remote }
+            // Checked with its board copy's Status, which an excluded `status:` reads.
+            let boardCopies = Self.boardCopies(snap)
             remote.issues = issues.issues.filter {
-                q.matches($0, viewer: snap.org.viewer, window: window) && scope.covers($0.key.repo) && inFocus($0.key, focus)
+                q.matches(
+                    $0.withBoardItem(of: boardCopies[$0.key], in: snap), viewer: snap.org.viewer, window: window,
+                    excludedWindows: excluded)
+                    && scope.covers($0.key.repo) && inFocus($0.key, focus)
             }
             remote.truncated = remote.truncated || issues.hasMore
         } catch is CancellationError {

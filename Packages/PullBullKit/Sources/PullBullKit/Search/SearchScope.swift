@@ -107,8 +107,11 @@ public enum SearchNarrowing {
     private static func matching(
         _ q: SearchQuery, _ prs: [PullRequest], focus: RepoFocus?, viewer: String
     ) -> [PullRequest] {
-        let window = q.updated?.resolved(now: Date(), calendar: .current)
-        return prs.filter { q.matches($0, viewer: viewer, window: window) && SearchEngine.inFocus($0.key, q.keeping(focus)) }
+        let (window, excluded) = q.updatedWindows(now: Date(), calendar: .current)
+        return prs.filter {
+            q.matches($0, viewer: viewer, window: window, excludedWindows: excluded)
+                && SearchEngine.inFocus($0.key, q.keeping(focus))
+        }
     }
 
     /// The tab's items, with their board copy's Status when `snap` is given.
@@ -120,8 +123,11 @@ public enum SearchNarrowing {
     private static func matching(
         _ q: SearchQuery, _ issues: [BoardIssue], focus: RepoFocus?, viewer: String
     ) -> [BoardIssue] {
-        let window = q.updated?.resolved(now: Date(), calendar: .current)
-        return issues.filter { q.matches($0, viewer: viewer, window: window) && SearchEngine.inFocus($0.key, q.keeping(focus)) }
+        let (window, excluded) = q.updatedWindows(now: Date(), calendar: .current)
+        return issues.filter {
+            q.matches($0, viewer: viewer, window: window, excludedWindows: excluded)
+                && SearchEngine.inFocus($0.key, q.keeping(focus))
+        }
     }
 
     /// As many as the results list: an item listed twice shows once.
@@ -137,10 +143,9 @@ extension SearchContext {
         case .number(let n): what = "#\(n)"
         case .item(let repo, let n): what = "\(repo) #\(n)"
         case .text(let words): what = "“\(words.joined(separator: " "))”"
-        case .filtered(let logins, let labels, let words, let states, let statuses, let updated):
-            var tokens = SearchQuery.tokenList(
-                logins: logins, labels: labels, states: states, statuses: statuses, updated: updated)
-            if !words.isEmpty { tokens += " · “\(words.joined(separator: " "))”" }
+        case .filtered(let filter):
+            var tokens = SearchQuery.joinedList(filter.tokens)
+            if !filter.words.isEmpty { tokens += " · “\(filter.words.joined(separator: " "))”" }
             what = tokens
         case .empty: what = ""
         }
@@ -158,9 +163,8 @@ extension SearchContext {
         case .number(let n): label = "#\(n) in \(tab)"
         case .item(let repo, let n): label = "\(repo) #\(n) in \(tab)"
         case .text(let words): label = "Titles matching \(words.joined(separator: " ")) in \(tab)"
-        case .filtered(let logins, let labels, let words, let states, let statuses, let updated):
-            label = filterDescription(
-                logins: logins, labels: labels, states: states, statuses: statuses, updated: updated, words: words) + ", in \(tab)"
+        case .filtered(let filter):
+            label = filterDescription(filter) + ", in \(tab)"
         case .empty: label = "In \(tab)"
         }
         // An item names its own repository.

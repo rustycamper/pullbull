@@ -29,6 +29,16 @@ private func ghost(_ text: String, statuses: Bool = true) -> QualifierGhost? {
         #expect(ghost("up", statuses: false)?.remainder == "dated:")
     }
 
+    @Test func ghostAfterDash() throws {
+        #expect(ghost("-st")?.remainder == "atus:")
+        #expect(ghost("fix -la")?.remainder == "bel:")
+        #expect(ghost("-s") == nil)
+        #expect(ghost("--st") == nil)
+        let accepted = try #require(ghost("-st")?.accepted(in: "-st"))
+        #expect(accepted.text == "-status:")
+        #expect(accepted.caret == 8)
+    }
+
     @Test func noGhost() {
         #expect(ghost("s") == nil)
         #expect(ghost("l") == nil)

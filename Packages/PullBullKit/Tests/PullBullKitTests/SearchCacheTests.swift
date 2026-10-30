@@ -61,6 +61,12 @@ private extension SearchCache.Lookup {
         #expect(key("@alice") != key("alice"))
     }
 
+    @Test func negationChangesKey() {
+        #expect(key("@ann") != key("-@ann"))
+        #expect(key("-@Ann -~x") == key("-~X -@ann"))
+        #expect(key("-status:done fix") != key("fix"))
+    }
+
     @Test func updatedKeyChangesAtMidnight() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "America/New_York")!

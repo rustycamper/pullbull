@@ -30,7 +30,8 @@ public struct PendingToken: Equatable, Sendable {
     }
 
     /// The `@`, `~`, `label:`, `is:`, `status:` or `updated:` token that ends at the caret, if any. A label or
-    /// status may be quoted; a closed quote ends it. An `is:` value is letters only.
+    /// status may be quoted; a closed quote ends it. An `is:` value is letters only. After a `-`, the token
+    /// starts at its sigil, so the `-` stays when a candidate is picked.
     public static func at(caret: Int, in text: String) -> PendingToken? {
         let scalars = text.unicodeScalars
         guard caret >= 0, caret <= text.utf16.count else { return nil }
@@ -39,7 +40,8 @@ public struct PendingToken: Equatable, Sendable {
         if caretIndex < scalars.endIndex, !scalars[caretIndex].properties.isWhitespace { return nil }
         let head = String(text[..<caretIndex])
         guard let term = QueryScanner.terms(in: head).last, term.range.upperBound == head.endIndex else { return nil }
-        let start = term.range.lowerBound.utf16Offset(in: head)
+        let sigil = term.negated ? head.index(after: term.range.lowerBound) : term.range.lowerBound
+        let start = sigil.utf16Offset(in: head)
         let prefix = String(term.value)
         switch term.kind {
         case .person:
@@ -59,8 +61,8 @@ public struct PendingToken: Equatable, Sendable {
         }
     }
 
-    /// Whether a sigil at UTF-16 `offset` begins a word: at the start of `text` or after whitespace. With
-    /// a `kind`, only that kind's sigils count.
+    /// Whether a sigil at UTF-16 `offset` begins a word: at the start of `text` or after whitespace, or after
+    /// a `-` that is. With a `kind`, only that kind's sigils count.
     public static func startsToken(at offset: Int, in text: String, kind: Kind? = nil) -> Bool {
         guard offset >= 0, offset < text.utf16.count else { return false }
         let scalars = text.unicodeScalars
@@ -68,7 +70,12 @@ public struct PendingToken: Equatable, Sendable {
         guard index.samePosition(in: scalars) != nil, sigilEnd(in: text, at: index, of: kind) != nil else {
             return false
         }
-        return index == scalars.startIndex || scalars[scalars.index(before: index)].properties.isWhitespace
+        func startsWord(_ i: String.Index) -> Bool {
+            i == scalars.startIndex || scalars[scalars.index(before: i)].properties.isWhitespace
+        }
+        if startsWord(index) { return true }
+        let before = scalars.index(before: index)
+        return scalars[before] == "-" && startsWord(before)
     }
 
     public func range(in text: String) -> Range<String.Index>? {

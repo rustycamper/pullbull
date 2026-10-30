@@ -119,10 +119,12 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 | `owner/repo#123` or a link | Exactly that item |
 | `updated:today` `3d` `1w` `1m` | Items active since 00:00 today, or 2, 6 or 29 days before. GitHub's date forms (`updated:>2026-10-01`, `updated:2026-10-01..2026-10-07`) go to GitHub as written and also filter locally; any other value goes to GitHub as written |
 | words | Title |
+| `-@bot` `-~wontfix` `-is:draft` `-status:done` `-updated:1w` | Not that. Works on every qualifier; a bare `-word` is a word |
 
-- `@`, `~`, `is:`, `status:`, `updated:` and words combine; everything must match
+- `@`, `~`, `is:`, `status:`, `updated:` and words combine; everything must match; a leading `-` excludes
 - `status:` uses the board shown in the Board tab. Unquoted matches part of a Status name, quoted the whole name; case is ignored. Names with spaces need quotes to match exactly
 - With `status:`, PRs and issues not on the board don't match
+- `-status:` keeps PRs and issues not on the board
 - `#123` and links work only on their own
 - Results span all tabs; click a tab to narrow
 - **Right-click a result:** copy branch (PRs), link or Markdown link · open on GitHub · show only this repo · search author. Search author replaces the query; show only this repo keeps it and searches that repo
@@ -130,8 +132,8 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - Compact cards (Settings → General) apply to results too: one line each, with checks on open PRs and the Status on issues
 - Matches in the other mode show a hint: <kbd>⌘</kbd><kbd>1</kbd> / <kbd>⌘</kbd><kbd>2</kbd>
 - Empty field shows saved searches and token hints. <kbd>↓</kbd> to walk them
-- Typing `@`, `~`, `label:`, `is:`, `status:` or `updated:` opens a completion list. `status:` lists the board's Status columns with their open counts; picking one writes the full name in quotes. `updated:` lists the four steps
-- Typing the start of `status:`, `label:` or `updated:` (`st`, `la`, `up`) at the end of the field shows the rest in grey. Not `is:`, a common word; `status:` only when the board has Status columns; `updated:` only up to `upda`, so a title word like "update" is left alone
+- Typing `@`, `~`, `label:`, `is:`, `status:` or `updated:` opens a completion list. `status:` lists the board's Status columns with their open counts; picking one writes the full name in quotes. `updated:` lists the four steps. Also after `-`
+- Typing the start of `status:`, `label:` or `updated:` (`st`, `la`, `up`) at the end of the field shows the rest in grey. Not `is:`, a common word; `status:` only when the board has Status columns; `updated:` only up to `upda`, so a title word like "update" is left alone. Also after `-`
 - **Save:** bookmark icon in the field. Manage in Settings → Search
 
 | Completion list | |
