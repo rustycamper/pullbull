@@ -219,6 +219,21 @@ private func node(_ name: String) throws -> [String: Any] {
         #expect(old.ci == .skipped)
     }
 
+    @Test func diffTotals() throws {
+        var n = try node("pr_ghost_author")
+        n["additions"] = 120
+        n["deletions"] = 30
+        let pr = try Decoding.pullRequest(from: n)
+        #expect(pr.additions == 120 && pr.deletions == 30)
+        let data = try JSONEncoder().encode(pr)
+        var object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object["additions"] = nil
+        object["deletions"] = nil
+        let old = try JSONDecoder().decode(PullRequest.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(old.additions == nil && old.deletions == nil)
+        #expect(Queries.prFields.contains("additions deletions"))
+    }
+
     @Test func malformedNodeThrows() throws {
         var n = try node("pr_ghost_author")
         n["createdAt"] = "not a date"

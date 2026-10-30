@@ -96,6 +96,9 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
     public let mergedBy: String?
     /// Nil when GitHub sent none or a value this build doesn't know, and in snapshots cached before it was stored.
     public let mergeable: Mergeable?
+    /// Lines added and removed; nil when GitHub sent none, and in snapshots cached before they were stored.
+    public let additions: Int?
+    public let deletions: Int?
 
     public var glyph: PRGlyph { PRGlyph(state: state, isDraft: isDraft) }
     /// The colour of the label at `index`, nil when GitHub gave none or the cache predates it.
@@ -112,7 +115,7 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         commentCount: Int, lastCommentAuthor: String?,
         latestReviews: [Review], reviewRequests: [Reviewer], headCommitOid: String? = nil, labels: [String] = [],
         labelColors: [String?] = [], mergedBy: String? = nil, mergeable: Mergeable? = nil,
-        lastCommentByBot: Bool? = nil
+        lastCommentByBot: Bool? = nil, additions: Int? = nil, deletions: Int? = nil
     ) {
         self.key = key
         self.title = title
@@ -138,6 +141,8 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         self.labelColors = labelColors
         self.mergedBy = mergedBy
         self.mergeable = mergeable
+        self.additions = additions
+        self.deletions = deletions
     }
 
     /// Pull requests cached before labels were stored have none.
@@ -167,6 +172,8 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         labelColors = try c.decodeIfPresent([String?].self, forKey: .labelColors) ?? []
         mergedBy = try c.decodeIfPresent(String.self, forKey: .mergedBy)
         mergeable = try c.decodeIfPresent(String.self, forKey: .mergeable).flatMap(Mergeable.init(rawValue:))
+        additions = try c.decodeIfPresent(Int.self, forKey: .additions)
+        deletions = try c.decodeIfPresent(Int.self, forKey: .deletions)
     }
 }
 

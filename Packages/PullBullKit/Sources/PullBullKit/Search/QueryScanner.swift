@@ -19,6 +19,8 @@ struct QueryTerm {
         case review
         /// Starts with "repo:", any case.
         case repo
+        /// Starts with "size:", any case.
+        case size
         case word
     }
 
@@ -44,6 +46,7 @@ enum QueryScanner {
     static let updatedQualifier = "updated:"
     static let reviewQualifier = "review:"
     static let repoQualifier = "repo:"
+    static let sizeQualifier = "size:"
 
     /// The terms of `text` in order. A label's or status's value may be quoted (`~"good first issue"`,
     /// `label:"good first issue"`, `status:"In progress"`); a quote left open runs to the end of the text,
@@ -85,6 +88,9 @@ enum QueryScanner {
             } else if startsRepo(text[sigil...]) {
                 kind = .repo
                 valueStart = nil
+            } else if startsSize(text[sigil...]) {
+                kind = .size
+                valueStart = nil
             } else {
                 kind = personSigils.contains(text[sigil]) ? .person : .word
                 valueStart = nil
@@ -115,6 +121,7 @@ enum QueryScanner {
             case .updated: value = text[text.index(sigil, offsetBy: updatedQualifier.count)..<end]
             case .review: value = text[text.index(sigil, offsetBy: reviewQualifier.count)..<end]
             case .repo: value = text[text.index(sigil, offsetBy: repoQualifier.count)..<end]
+            case .size: value = text[text.index(sigil, offsetBy: sizeQualifier.count)..<end]
             }
             terms.append(QueryTerm(
                 kind: kind, range: start..<end, value: value, quoted: false, closed: false, negated: negated))
@@ -148,7 +155,7 @@ enum QueryScanner {
         guard let first = rest.first else { return false }
         return personSigils.contains(first) || labelSigils.contains(first) || startsLabelAlias(rest)
             || startsState(rest) || startsStatus(rest) || startsUpdated(rest) || startsReview(rest)
-            || startsRepo(rest)
+            || startsRepo(rest) || startsSize(rest)
     }
 
     /// `rest` starts with "is:", any case.
@@ -174,6 +181,11 @@ enum QueryScanner {
     /// `rest` starts with "repo:", any case.
     static func startsRepo(_ rest: Substring) -> Bool {
         rest.prefix(repoQualifier.count).lowercased() == repoQualifier
+    }
+
+    /// `rest` starts with "size:", any case.
+    static func startsSize(_ rest: Substring) -> Bool {
+        rest.prefix(sizeQualifier.count).lowercased() == sizeQualifier
     }
 
     /// `rest` starts with "label:", any case.

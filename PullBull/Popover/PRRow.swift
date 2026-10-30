@@ -217,6 +217,13 @@ struct PRRow: View {
                 ActionCapsule(action: action)
                     .padding(.leading, 4)
             }
+            if tab == .review, let size = DiffSize.text(additions: pr.additions, deletions: pr.deletions) {
+                Text(size)
+                    .fixedSize()
+                    .padding(.leading, 4)
+                    .accessibilityLabel(
+                        DiffSize.spoken(additions: pr.additions, deletions: pr.deletions) ?? size)
+            }
             LabelChips(set: labels, fit: fitting)
         }
     }

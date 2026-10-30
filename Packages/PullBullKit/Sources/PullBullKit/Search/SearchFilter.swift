@@ -1,6 +1,6 @@
 import Foundation
 
-/// One side of a filtered search: the `@`, `~`, `is:`, `status:`, `updated:` and `review:` terms it includes,
+/// One side of a filtered search: the `@`, `~`, `is:`, `status:`, `updated:` and `review:`, `repo:` and `size:` terms it includes,
 /// or the ones it excludes. Logins and labels keep the case typed, deduplicated case-insensitively; `me` is always
 /// lowercase. States are deduplicated, statuses deduplicated case-insensitively.
 public struct SearchTerms: Equatable, Sendable {
@@ -15,11 +15,13 @@ public struct SearchTerms: Equatable, Sendable {
     public var reviews: [ReviewFilter]
     /// Included: any of them. Excluded: none of them.
     public var repos: [RepoToken]
+    /// Pull requests only, matched locally. Included: any of them. Excluded: none of them.
+    public var sizes: [SizeFilter]
 
     public init(
         logins: [String] = [], labels: [String] = [], states: [StateFilter] = [], statuses: [BoardStatusFilter] = [],
         updated: [UpdatedFilter] = [], conditions: [ItemCondition] = [], reviews: [ReviewFilter] = [],
-        repos: [RepoToken] = []
+        repos: [RepoToken] = [], sizes: [SizeFilter] = []
     ) {
         self.logins = logins
         self.labels = labels
@@ -29,11 +31,13 @@ public struct SearchTerms: Equatable, Sendable {
         self.conditions = conditions
         self.reviews = reviews
         self.repos = repos
+        self.sizes = sizes
     }
 
     public var isEmpty: Bool {
         logins.isEmpty && labels.isEmpty && states.isEmpty && statuses.isEmpty && updated.isEmpty
             && conditions.isEmpty && reviews.isEmpty && repos.isEmpty
+            && sizes.isEmpty
     }
 
     /// The `@` tokens, then the `~` tokens, then the `is:` tokens (states, then conditions), then the
@@ -41,7 +45,7 @@ public struct SearchTerms: Equatable, Sendable {
     var tokens: [String] {
         logins.map { "@\($0)" } + labels.map(SearchQuery.labelToken) + states.map(\.token) + conditions.map(\.token)
             + statuses.map(\.token) + updated.map(\.token) + reviews.map(\.token)
-            + repos.map(\.token)
+            + repos.map(\.token) + sizes.map(\.token)
     }
 
     mutating func add(login: String) {
@@ -68,6 +72,10 @@ public struct SearchTerms: Equatable, Sendable {
         if !repos.contains(where: { $0.text.lowercased() == repo.text.lowercased() }) { repos.append(repo) }
     }
 
+    mutating func add(size: SizeFilter) {
+        if !sizes.contains(size) { sizes.append(size) }
+    }
+
     mutating func add(status: BoardStatusFilter) {
         if !statuses.contains(where: { $0.isSame(as: status) }) { statuses.append(status) }
     }
@@ -82,6 +90,7 @@ public struct SearchTerms: Equatable, Sendable {
             && reviews.allSatisfy { $0.matches(pr) == holds }
             && statuses.allSatisfy { $0.matches(nil) == holds }
             && inRepos(pr.key.repo, holds: holds)
+            && inSizes(pr, holds: holds)
     }
 
     func every(holds: Bool, _ issue: BoardIssue, viewer: String) -> Bool {
@@ -96,6 +105,14 @@ public struct SearchTerms: Equatable, Sendable {
     /// With no `repo:` term, true. Otherwise any of them matches `repo` (`holds` true) or none does.
     private func inRepos(_ repo: String, holds: Bool) -> Bool {
         repos.isEmpty || repos.contains { $0.matches(repo: repo) } == holds
+    }
+
+    /// With no `size:` term, true. A pull request of unknown size passes neither side. Otherwise any of
+    /// them is its size (`holds` true) or none is.
+    private func inSizes(_ pr: PullRequest, holds: Bool) -> Bool {
+        guard !sizes.isEmpty else { return true }
+        guard let size = SizeFilter.of(additions: pr.additions, deletions: pr.deletions) else { return false }
+        return sizes.contains(size) == holds
     }
 
     private static func has(_ label: String, _ labels: [String]) -> Bool {
@@ -133,10 +150,11 @@ public struct SearchFilter: Equatable, Sendable {
     }
 
     /// The search keeps to pull requests: the issue search is skipped and no issue matches. Any condition but
-    /// `is:unanswered` or any review does that, included or excluded.
+    /// `is:unanswered`, any review or any size does that, included or excluded.
     public var prOnly: Bool {
         (include.conditions + exclude.conditions).contains(where: \.prOnly)
             || !include.reviews.isEmpty || !exclude.reviews.isEmpty
+            || !include.sizes.isEmpty || !exclude.sizes.isEmpty
     }
 
     /// Nothing to ask GitHub: a condition about the viewer's own comments, which GitHub can't search, so the

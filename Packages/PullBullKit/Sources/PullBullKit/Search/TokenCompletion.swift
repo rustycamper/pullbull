@@ -66,7 +66,7 @@ public struct PendingToken: Equatable, Sendable {
         case .repo:
             guard prefix.allSatisfy({ $0.isLetter || $0.isNumber || "-_./".contains($0) }) else { return nil }
             return PendingToken(start: start, end: caret, prefix: prefix, kind: .repo)
-        case .word:
+        case .size, .word:
             return nil
         }
     }

@@ -73,6 +73,13 @@ public enum SearchQuery: Equatable, Sendable {
             case .repo:
                 if term.value.isEmpty { continue }
                 filter[keyPath: side].add(repo: RepoToken(text: String(term.value)))
+            case .size:
+                if term.value.isEmpty { continue }
+                if let size = SizeFilter(rawValue: term.value.lowercased()) {
+                    filter[keyPath: side].add(size: size)
+                    continue
+                }
+                filter.words.append(trimmed[term.range].lowercased())
             case .status:
                 let name = term.value.trimmingCharacters(in: .whitespaces)
                 if name.isEmpty { continue }

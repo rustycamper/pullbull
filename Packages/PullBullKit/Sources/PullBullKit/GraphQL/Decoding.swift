@@ -66,7 +66,8 @@ public enum Decoding {
             labels: labels.map(\.name), labelColors: labels.map(\.color),
             mergedBy: (node["mergedBy"] as? [String: Any])?["login"] as? String,
             mergeable: (node["mergeable"] as? String).flatMap(Mergeable.init(rawValue:)),
-            lastCommentByBot: lastCommenter.map { $0["__typename"] as? String == "Bot" }
+            lastCommentByBot: lastCommenter.map { $0["__typename"] as? String == "Bot" },
+            additions: node["additions"] as? Int, deletions: node["deletions"] as? Int
         )
     }
 

@@ -70,7 +70,7 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 
 | Tab | Shows |
 |---|---|
-| Review | PRs waiting on you or your team. Icon says why: requested, team, re-requested, new commits |
+| Review | PRs waiting on you or your team. Icon says why: requested, team, re-requested, new commits. Lines added and removed (`+120 −30`), not in compact cards |
 | Mine | Your PRs, review pills, checks, **Ready to merge**. Folded "Recently closed": yours closed or merged in the last 7 days |
 | Team | Other open PRs in the org |
 
@@ -116,6 +116,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 | `is:open` `is:closed` `is:merged` `is:draft` | State |
 | `is:ready` `is:conflict` `is:failing` `is:approved` | Ready to merge · merge conflicts · checks failed · has an approval. PRs only |
 | `review:changes` `review:none` | Changes requested · no reviews yet. PRs only |
+| `size:s` `size:m` `size:l` | Lines changed: up to 50, up to 300, more. PRs only |
 | `repo:widgets` `repo:acme/widgets` | That repo. The name alone matches every owner's; several `repo:` match any of them. Saved searches keep it |
 | `is:unanswered` | Your open PRs and your Assigned or Created issues whose last comment is someone else's, not a bot's. Searches your lists only |
 | `status:prog` `status:"In progress"` | Status column on the board. Issues only |
@@ -123,9 +124,9 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 | `owner/repo#123` or a link | Exactly that item |
 | `updated:today` `3d` `1w` `1m` | Items active since 00:00 today, or 2, 6 or 29 days before. GitHub's date forms (`updated:>2026-10-01`, `updated:2026-10-01..2026-10-07`) go to GitHub as written and also filter locally; any other value goes to GitHub as written |
 | words | Title |
-| `-@bot` `-~wontfix` `-is:draft` `-status:done` `-updated:1w` | Not that. Works on every qualifier; a bare `-word` is a word. These filter locally only, never on GitHub: `-status:`, `-updated:`, every negated `is:` condition and `review:`, `is:ready`, `is:conflict`, `is:approved`, `review:changes` and `is:unanswered`, and a `repo:` that matches no known repo |
+| `-@bot` `-~wontfix` `-is:draft` `-status:done` `-updated:1w` | Not that. Works on every qualifier; a bare `-word` is a word. `-is:draft` and the other states still go to GitHub. These filter locally only and send nothing to GitHub: `-status:`, `-updated:`, `-is:ready`, `-is:conflict`, `-is:failing`, `-is:approved`, `-is:unanswered`, `-review:`, `size:` and `-size:`, and positive `is:ready`, `is:conflict`, `is:approved`, `review:changes` and a `repo:` that matches no known repo. The rest of the search still goes to GitHub, except with `is:unanswered`, which keeps the whole search in your lists |
 
-- `@`, `~`, `is:`, `status:`, `updated:`, `review:`, `repo:` and words combine; everything must match; a leading `-` excludes
+- `@`, `~`, `is:`, `status:`, `updated:`, `review:`, `repo:`, `size:` and words combine; everything must match; a leading `-` excludes
 - `status:` uses the board shown in the Board tab. Unquoted matches part of a Status name, quoted the whole name; case is ignored. Names with spaces need quotes to match exactly
 - With `status:`, PRs and issues not on the board don't match
 - `-status:` keeps PRs and issues not on the board

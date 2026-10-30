@@ -7,7 +7,7 @@ enum Queries {
 
     static let prFields = """
     fragment prFields on PullRequest {
-      number title url isDraft state mergeable createdAt updatedAt closedAt headRefName baseRefName
+      number title url isDraft state mergeable additions deletions createdAt updatedAt closedAt headRefName baseRefName
       repository{nameWithOwner}
       author{login avatarUrl}
       comments(last:1){totalCount nodes{author{__typename login}}}
