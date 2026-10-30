@@ -1,6 +1,6 @@
-// Demo data for search: Pull Requests mode, "test" typed with the caret at the end. The results are laid out
-// like the Team tab. Tab counts are each tab's matches; no tab is selected (search spans all tabs). The footer
-// is SearchFooter: the coverage and match count, then Open and Clear. Ask AI is left out: with it the line is wider than the popover, so SearchFooter drops it.
+// Demo data for search: Pull Requests mode, opened with / on Team and "test" typed, caret at the end. The
+// results are laid out like Team. Tab counts are each tab's matches; no tab is selected (search spans all tabs).
+// SearchFooter: coverage and match count, then Open and Clear. No Ask AI: with it the line outgrows the popover.
 window.SCENES = window.SCENES || {};
 window.SCENES.search = {
   view: "search",

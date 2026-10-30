@@ -16,12 +16,12 @@
   }
 
   const keycap = (k) => `<span class="keycap">${esc(k)}</span>`;
-  const keyHint = (keys, label) => `<span class="hstack" style="gap:4px">${keys.map(keycap).join("")}<span>${esc(label)}</span></span>`;
+  const keyHint = (keys, label) => `<span class="hstack nowrap" style="gap:4px;flex:none">${keys.map(keycap).join("")}<span>${esc(label)}</span></span>`;
 
-  /** SearchFooter: SearchSummary (SearchContext.footerText: coverage, then "· N matches"), "⌥⌘↩ Ask AI" when Ask is offered and the line fits (`s.ask`), then ↩ Open and esc Clear. */
+  /** SearchFooter: SearchSummary (SearchContext.footerText: coverage, then "· N matches"), "⌥⌘↩ Ask AI" when Ask is offered and the line fits (`s.ask`), then ↩ Open and esc "Back to <tab>" (`s.startedOn`), or Clear. */
   function searchFooter(s) {
-    return `<div class="hstack footer f11" style="padding:0 14px;gap:10px"><span class="nowrap" style="font-variant-numeric:tabular-nums">${esc(s.coverage)} · ${s.count === 1 ? "1 match" : `${s.count} matches`}</span><span class="spacer"></span>` +
-      `${s.ask ? '<span class="nowrap">⌥⌘↩ Ask AI</span>' : ""}${keyHint(["↩"], "Open")}${keyHint(["esc"], "Clear")}</div>`;
+    return `<div class="hstack footer f11" style="padding:0 14px;gap:10px"><span class="ellipsis" style="font-variant-numeric:tabular-nums">${esc(s.coverage)} · ${s.count === 1 ? "1 match" : `${s.count} matches`}</span><span class="spacer"></span>` +
+      `${s.ask ? '<span class="nowrap">⌥⌘↩ Ask AI</span>' : ""}${keyHint(["↩"], "Open")}${keyHint(["esc"], s.startedOn ? `Back to ${s.startedOn}` : "Clear")}</div>`;
   }
 
   /** SearchResultsView: the open results as the Team tab lays them out (repo groups, Team rows), then the ended ones under "Closed and merged". */
