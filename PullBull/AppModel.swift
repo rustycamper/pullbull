@@ -790,6 +790,14 @@ final class AppModel {
         if let query = searchField.apply(saved, people: people, labels: labels, statuses: statuses, repos: repos) { runSearch(query, debounced: false) }
     }
 
+    /// ⌃1–⌃9: saved search `number`, in Settings order, applied as if picked; false when there is none.
+    /// The view opens the field and puts the caret at the end.
+    func applySavedSearch(number: Int) -> Bool {
+        guard let saved = settings.savedSearches.search(forDigit: number) else { return false }
+        applySavedSearch(saved)
+        return true
+    }
+
     /// The field's query, trimmed, is one of the saved searches: the bookmark shows filled.
     var searchIsSaved: Bool { settings.savedSearches.contains(query: searchText) }
 
@@ -1973,22 +1981,34 @@ extension AppModel {
         navigationKeys(for: shownTab, closedExpanded: closedExpanded, doneExpanded: doneExpanded)
     }
 
-    /// The time focus narrows only the shown tab, so another tab's rows are scoped by the repository alone.
     private func navigationKeys(for tab: ShownTab, closedExpanded: Bool, doneExpanded: Bool) -> [PRKey] {
+        navigationGroups(for: tab, closedExpanded: closedExpanded, doneExpanded: doneExpanded).groups.flatMap { $0 }
+    }
+
+    /// The shown groups of `tab`'s rows, in display order, and whether it shows group headers. The time
+    /// focus narrows only the shown tab, so another tab's rows are scoped by the repository alone.
+    private func navigationGroups(
+        for tab: ShownTab, closedExpanded: Bool, doneExpanded: Bool
+    ) -> (groups: [[PRKey]], grouped: Bool) {
         let focus = ListFocus(repo: repoFocus, time: tab == shownTab ? timeFocus : nil)
         switch tab {
         case .pullRequests(let prTab):
-            guard let contents = contents(of: prTab) else { return [] }
+            guard let contents = contents(of: prTab) else { return ([], false) }
             let scoped = focus.isActive ? focus.scope(contents) : ScopedTab(unscoped: contents)
             let closed = tabs?.recentlyClosed ?? []
-            return ListNavigation.prKeys(
-                tab: prTab, contents: scoped.contents, grouping: prGrouping(for: prTab),
+            let grouping = prGrouping(for: prTab)
+            let groups = ListNavigation.prGroups(
+                tab: prTab, contents: scoped.contents, grouping: grouping,
                 recentlyClosed: focus.isActive ? focus.scope(closed) : closed, closedExpanded: closedExpanded)
+            return (groups, ListNavigation.isGrouped(prGrouping: grouping))
         case .issues(let issueTab):
-            guard let issueTabs, issueTabs.isLoaded(issueTab), let contents = contents(of: issueTab) else { return [] }
+            guard let issueTabs, issueTabs.isLoaded(issueTab), let contents = contents(of: issueTab) else {
+                return ([], false)
+            }
             let scoped = focus.isActive ? focus.scope(contents) : ScopedIssueTab(unscoped: contents)
-            return ListNavigation.issueKeys(
+            let groups = ListNavigation.issueGroups(
                 scoped.contents, doneExpanded: doneExpanded, folded: foldedLanes(scoped.contents.groups, on: issueTab))
+            return (groups, ListNavigation.isGrouped(scoped.contents))
         }
     }
 
@@ -2010,6 +2030,20 @@ extension AppModel {
 
     func moveListSelection(by offset: Int, in keys: [PRKey]) {
         listSelection = ListNavigation.move(listSelection, by: offset, in: keys)
+    }
+
+    /// ⌥↓ / ⌥↑: the first row of the next or previous group (or of this one, going up from inside it).
+    /// Nothing in a list without groups, or past either end.
+    func jumpListGroup(by offset: Int, closedExpanded: Bool, doneExpanded: Bool) {
+        let shown = navigationGroups(for: shownTab, closedExpanded: closedExpanded, doneExpanded: doneExpanded)
+        guard shown.grouped, let key = ListNavigation.jump(listSelection, by: offset, in: shown.groups) else { return }
+        listSelection = key
+    }
+
+    /// ⌘↑ / ⌘↓: the first or last row; nothing when there are none.
+    func moveListSelectionToEdge(last: Bool, in keys: [PRKey]) {
+        guard let key = ListNavigation.edge(last: last, in: keys) else { return }
+        listSelection = key
     }
 
     /// ←/→: the neighboring sub-tab of the current mode.

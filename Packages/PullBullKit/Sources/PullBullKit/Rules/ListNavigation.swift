@@ -66,9 +66,45 @@ public enum ListNavigation {
     public static func issueKeys(
         _ contents: IssueTabContents, doneExpanded: Bool, folded: Set<IssueGroupKind> = []
     ) -> [PRKey] {
-        let listed = contents.groups.filter { $0.kind != .done && !folded.contains($0.kind) }.flatMap(\.issues)
-        let done = doneExpanded ? contents.groups.filter { $0.kind == .done }.flatMap(\.issues) : []
-        return (listed + done).map(\.key)
+        issueGroups(contents, doneExpanded: doneExpanded, folded: folded).flatMap { $0 }
+    }
+
+    /// An Issues list's shown groups of rows, in display order: every group but Done and the `folded`
+    /// lanes, then Done when expanded. Empty groups are left out.
+    public static func issueGroups(
+        _ contents: IssueTabContents, doneExpanded: Bool, folded: Set<IssueGroupKind>
+    ) -> [[PRKey]] {
+        let listed = contents.groups.filter { $0.kind != .done && !folded.contains($0.kind) }
+        let done = doneExpanded ? contents.groups.filter { $0.kind == .done } : []
+        return (listed + done).map { $0.issues.map(\.key) }.filter { !$0.isEmpty }
+    }
+
+    /// Whether a PR list grouped this way shows group headers to jump between.
+    public static func isGrouped(prGrouping: PRGrouping) -> Bool { prGrouping != .none }
+
+    /// Whether an Issues list shows group headers to jump between: not when it lists only the ungrouped
+    /// (`.all`) or the focus's merged, untitled group.
+    public static func isGrouped(_ contents: IssueTabContents) -> Bool {
+        contents.groups.contains { $0.kind != .done && !$0.title.isEmpty }
+    }
+
+    /// ⌥↓ / ⌥↑: the first row of the next group, or for ⌥↑ the first row of the selection's own group
+    /// when it isn't already there, else of the previous one. With no selection shown, ⌥↓ lands on the
+    /// first group and ⌥↑ on the last. Nil, to do nothing, past either end.
+    public static func jump(_ selection: PRKey?, by offset: Int, in groups: [[PRKey]]) -> PRKey? {
+        let groups = groups.filter { !$0.isEmpty }
+        guard !groups.isEmpty, offset != 0 else { return nil }
+        guard let selection, let current = groups.firstIndex(where: { $0.contains(selection) }) else {
+            return offset > 0 ? groups.first?.first : groups.last?.first
+        }
+        if offset < 0, groups[current].first != selection { return groups[current].first }
+        let target = current + offset
+        return groups.indices.contains(target) ? groups[target].first : nil
+    }
+
+    /// ⌘↑ / ⌘↓: the first or last row; nil when there are none.
+    public static func edge(last: Bool, in keys: [PRKey]) -> PRKey? {
+        last ? keys.last : keys.first
     }
 
     /// The row `offset` steps from `selection`, stopping at the ends. With no selection, or one that is

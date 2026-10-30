@@ -23,19 +23,32 @@ struct SearchHints: View {
     /// scrolls is laid out again beside the scroller when scroll bars always show.
     static func cloud(saved: SavedSearches, expanded: Bool) -> SavedChipCloud {
         let width = PopoverView.size.width - 2 * inset
-        let cloud = SavedChipCloud(saved: saved, expanded: expanded, width: width, measure: chipWidth)
+        let measure = { (chip: SavedChipCloud.Chip) in chipWidth(chip, in: saved) }
+        let cloud = SavedChipCloud(saved: saved, expanded: expanded, width: width, measure: measure)
         guard cloud.scrolls, NSScroller.preferredScrollerStyle == .legacy else { return cloud }
         let scroller = NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy)
-        return SavedChipCloud(saved: saved, expanded: expanded, width: width - scroller, measure: chipWidth)
+        return SavedChipCloud(saved: saved, expanded: expanded, width: width - scroller, measure: measure)
     }
 
-    private static func chipWidth(_ chip: SavedChipCloud.Chip) -> CGFloat {
+    /// The ⌃N key a saved chip shows after its name: the first nine have one.
+    private static func keyLabel(_ search: SavedSearch, in saved: SavedSearches) -> String? {
+        saved.items.firstIndex(of: search).flatMap(SavedSearches.keyLabel(at:))
+    }
+
+    private static let keyFont = NSFont.systemFont(ofSize: 11)
+
+    private static func chipWidth(_ chip: SavedChipCloud.Chip, in saved: SavedSearches) -> CGFloat {
         let text: String
         let font: NSFont
         switch chip {
         case .saved(let search):
             text = search.name
             font = search.nameIsQuery ? .monospacedSystemFont(ofSize: 12, weight: .regular) : .systemFont(ofSize: 12)
+            if let key = keyLabel(search, in: saved) {
+                return SavedChipCloud.chipWidth(
+                    textWidth: (text as NSString).size(withAttributes: [.font: font]).width,
+                    keyWidth: (key as NSString).size(withAttributes: [.font: keyFont]).width)
+            }
         case .more(let more):
             text = more.title
             font = .systemFont(ofSize: 12)
@@ -91,17 +104,28 @@ struct SearchHints: View {
     }
 
     @ViewBuilder private func chip(_ chip: SavedChipCloud.Chip) -> some View {
-        let width = Self.chipWidth(chip)
+        let saved = model.settings.savedSearches
+        let width = Self.chipWidth(chip, in: saved)
         switch chip {
         case .saved(let search):
             PanelButton(look: .filled, radius: 6, selected: selection == chip.item, action: { pick(chip.item) }) {
-                Text(search.name)
-                    .font(search.nameIsQuery ? .system(size: 12, design: .monospaced) : .system(size: 12))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .padding(.horizontal, SavedChipCloud.chipPadding)
-                    .frame(width: width, height: SavedChipCloud.chipHeight)
+                HStack(spacing: SavedChipCloud.keyGap) {
+                    Text(search.name)
+                        .font(search.nameIsQuery ? .system(size: 12, design: .monospaced) : .system(size: 12))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    if let key = Self.keyLabel(search, in: saved) {
+                        Text(key)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .fixedSize()
+                            .accessibilityHidden(true)
+                    }
+                }
+                .padding(.horizontal, SavedChipCloud.chipPadding)
+                .frame(width: width, height: SavedChipCloud.chipHeight)
             }
             .id(chip.item)
             .help(search.name)

@@ -138,7 +138,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - PR results show changes requested, conflicts and comments, and **Ready to merge** on yours
 - Compact cards (Settings → General) apply to results too: one line each, with checks on open PRs and the Status on issues
 - Matches in the other mode show a hint: <kbd>⌘</kbd><kbd>1</kbd> / <kbd>⌘</kbd><kbd>2</kbd>
-- Empty field shows saved searches and token hints. <kbd>↓</kbd> to walk them
+- Empty field shows saved searches and token hints; the first nine show their ⌃ key. <kbd>↓</kbd> to walk them
 - Typing `@`, `~`, `label:`, `is:`, `status:`, `updated:`, `review:` or `repo:` opens a completion list. `status:` lists the board's Status columns with their open counts; picking one writes the full name in quotes. `updated:` lists the four steps; `review:` lists `changes` and `none`; `repo:` lists the repos in your lists. Also after `-`
 - Typing the start of `status:`, `label:` or `updated:` (`st`, `la`, `up`) at the end of the field shows the rest in grey. Not `is:`, a common word; `status:` only when the board has Status columns; `updated:` only up to `upda`, so a title word like "update" is left alone. Also after `-`
 - **Save:** bookmark icon in the field. Manage in Settings → Search
@@ -224,6 +224,8 @@ Settings → Ask AI.
 | List | |
 |---|---|
 | <kbd>↑</kbd> <kbd>↓</kbd> | Select |
+| <kbd>⌥</kbd><kbd>↑</kbd> <kbd>⌥</kbd><kbd>↓</kbd> | Previous / next group (repo, author, lane). Folded lanes are skipped; nothing without groups |
+| <kbd>⌘</kbd><kbd>↑</kbd> <kbd>⌘</kbd><kbd>↓</kbd> | First / last row |
 | <kbd>←</kbd> <kbd>→</kbd> | Previous / next tab |
 | <kbd>Return</kbd> | Detail |
 | <kbd>⌘</kbd><kbd>Return</kbd> | Open on GitHub |
@@ -234,6 +236,7 @@ Settings → Ask AI.
 | <kbd>⌃</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy `gh pr checkout 412 -R owner/repo` |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | [Ask AI](#ask-ai), from the search field |
 | <kbd>⌘</kbd><kbd>1</kbd> · <kbd>⌘</kbd><kbd>2</kbd> | Pull Requests · Issues |
+| <kbd>⌃</kbd><kbd>1</kbd>…<kbd>⌃</kbd><kbd>9</kbd> | Saved search 1–9, in Settings order. Off while macOS uses ⌃1… to switch desktops (System Settings → Keyboard → Shortcuts → Mission Control) |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> | Repo menu ([one repo](#one-repo)) |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> | Board menu, on the Board tab |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd> | Account menu |
@@ -284,7 +287,7 @@ Reopen within a minute and the detail is still there.
 | General | Grouping, Team by author, oldest review first, compact cards, background, filters (Review and Team), menu bar count, refresh interval, shortcut, launch at login, updates |
 | Account | Account, org, board, access notices |
 | Notifications | One toggle per event, grouped: my pull requests · pull requests I review · issues assigned to me · issues I created |
-| Search | Saved searches: rename, edit the query, drag to reorder, **+** and **−**. Apply one from the empty search field |
+| Search | Saved searches: rename, edit the query, drag to reorder, **+** and **−**. Apply one from the empty search field; the first nine have ⌃1–⌃9 |
 | Ask AI | [Ask AI](#ask-ai): on/off, key, model, exclude list, index |
 
 | Group | Notification | Default |

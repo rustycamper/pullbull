@@ -21,6 +21,7 @@ struct SearchSettingsTab: View {
     }
 
     private static let nameWidth: CGFloat = 150
+    private static let keyWidth: CGFloat = 24
 
     private var rows: [SavedSearchEditor.Row] { editor.rows(in: model.settings.savedSearches) }
 
@@ -46,7 +47,7 @@ struct SearchSettingsTab: View {
             } header: {
                 Text("Saved searches")
             } footer: {
-                Text("Apply one from the empty search field: click it, or select it with ↓ and press Return.")
+                Text("Apply one from the empty search field: click it, or select it with ↓ and press Return. The first nine also apply with ⌃1–⌃9.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -68,6 +69,7 @@ struct SearchSettingsTab: View {
     private var columnHeader: some View {
         HStack(spacing: 8) {
             Color.clear.frame(width: 14, height: 1)
+            Text("Key").frame(width: Self.keyWidth, alignment: .leading)
             Text("Name").frame(width: Self.nameWidth, alignment: .leading)
             Text("Query")
             Spacer()
@@ -88,6 +90,12 @@ struct SearchSettingsTab: View {
                         .foregroundStyle(.tertiary)
                         .frame(width: 14)
                         .accessibilityHidden(true)
+                    // ⌃1–⌃9 apply the first nine saved; a new row has no key until it is saved.
+                    Text(index < model.settings.savedSearches.items.count
+                         ? SavedSearches.keyLabel(at: index) ?? "" : "")
+                        .font(.system(size: 11).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: Self.keyWidth, alignment: .leading)
                     field(
                         "Name", label: "Name, saved search \(index + 1)", text: binding(row, \.name),
                         valid: row.nameIsValid, focus: .name(row.id))

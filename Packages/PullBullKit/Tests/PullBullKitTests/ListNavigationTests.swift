@@ -184,3 +184,78 @@ private func issue(_ n: Int) -> BoardIssue {
         #expect(PRGrouping.forTab(.review, settings: s, repoFocused: false) == .none)
     }
 }
+
+// MARK: Group jumps and edges
+
+private let a = key(1), b = key(2), c = key(3), d = key(4), e = key(5)
+private let groups: [[PRKey]] = [[a, b], [c], [d, e]]
+
+extension ListNavigationTests {
+    @Test func jumpDown() {
+        #expect(ListNavigation.jump(b, by: 1, in: groups) == c)
+        #expect(ListNavigation.jump(c, by: 1, in: groups) == d)
+        #expect(ListNavigation.jump(e, by: 1, in: groups) == nil)
+        #expect(ListNavigation.jump(nil, by: 1, in: groups) == a)
+    }
+
+    /// ⌥↑ on a row that isn't first in its group goes to its group's first row (Ruling 14).
+    @Test func jumpUp() {
+        #expect(ListNavigation.jump(e, by: -1, in: groups) == d)
+        #expect(ListNavigation.jump(d, by: -1, in: groups) == c)
+        #expect(ListNavigation.jump(a, by: -1, in: groups) == nil)
+        #expect(ListNavigation.jump(nil, by: -1, in: groups) == d)
+    }
+
+    @Test func jumpSkipsEmptyGroupsAndUnshownSelection() {
+        #expect(ListNavigation.jump(b, by: 1, in: [[a, b], [], [c]]) == c)
+        #expect(ListNavigation.jump(key(99), by: 1, in: groups) == a)
+        #expect(ListNavigation.jump(nil, by: 1, in: []) == nil)
+    }
+
+    @Test func jumpSkipsFolded() {
+        let lane = { (id: String) in IssueGroupKind.status(StatusOption(id: id, name: id)) }
+        let contents = IssueTabContents(groups: [
+            IssueGroup(kind: lane("1"), issues: [issue(1), issue(2)], counted: true),
+            IssueGroup(kind: lane("2"), issues: [issue(3)], counted: true),
+            IssueGroup(kind: lane("3"), issues: [issue(4), issue(5)], counted: true),
+        ])
+        let groups = ListNavigation.issueGroups(contents, doneExpanded: false, folded: [lane("2")])
+        #expect(groups.map { $0.map(\.number) } == [[1, 2], [4, 5]])
+        #expect(ListNavigation.jump(key(1), by: 1, in: groups) == key(4))
+    }
+
+    @Test func doneCountsWhenExpanded() {
+        let option = StatusOption(id: "s", name: "Todo")
+        let contents = IssueTabContents(groups: [
+            IssueGroup(kind: .status(option), issues: [issue(1)], counted: true),
+            IssueGroup(kind: .done, issues: [issue(3)], counted: false),
+            IssueGroup(kind: .notOnBoard, issues: [issue(4)], counted: true),
+        ])
+        #expect(ListNavigation.issueGroups(contents, doneExpanded: false, folded: []).map { $0.map(\.number) }
+            == [[1], [4]])
+        #expect(ListNavigation.issueGroups(contents, doneExpanded: true, folded: []).map { $0.map(\.number) }
+            == [[1], [4], [3]])
+    }
+
+    @Test func ungroupedIsNotGrouped() {
+        let created = IssueTabContents(groups: [IssueGroup(kind: .all, issues: [issue(1)], counted: true)])
+        #expect(!ListNavigation.isGrouped(created))
+        let repos = IssueTabContents(groups: [
+            IssueGroup(kind: .repo("o/a"), issues: [issue(1)], counted: true),
+            IssueGroup(kind: .repo("o/b"), issues: [issue(2)], counted: true),
+        ])
+        #expect(ListNavigation.isGrouped(repos))
+        let focused = RepoFocus(repo: "o/a").scope(repos)
+        #expect(!ListNavigation.isGrouped(focused.contents))
+        #expect(!ListNavigation.isGrouped(prGrouping: .none))
+        #expect(ListNavigation.isGrouped(prGrouping: .repository))
+        #expect(ListNavigation.isGrouped(prGrouping: .author))
+    }
+
+    @Test func edge() {
+        #expect(ListNavigation.edge(last: false, in: [a, b, c]) == a)
+        #expect(ListNavigation.edge(last: true, in: [a, b, c]) == c)
+        #expect(ListNavigation.edge(last: true, in: []) == nil)
+        #expect(ListNavigation.edge(last: false, in: []) == nil)
+    }
+}

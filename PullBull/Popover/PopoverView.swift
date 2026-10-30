@@ -542,6 +542,12 @@ struct PopoverView: View {
             // Keypad Enter carries .numericPad and fn-Return .function; neither is a modifier here.
             guard flags.subtracting([.command, .shift, .capsLock, .numericPad, .function]).isEmpty else { return false }
             let key = Self.commandKey(event)
+            // ⌘↑ / ⌘↓: the first or last row, in the list only; in the search field they move the caret.
+            if !flags.contains(.shift), let listKeys,
+               event.keyCode == SearchKeyMonitor.upArrow || event.keyCode == SearchKeyMonitor.downArrow {
+                model.moveListSelectionToEdge(last: event.keyCode == SearchKeyMonitor.downArrow, in: listKeys)
+                return true
+            }
             // ⌘⇧C, ⌘⇧F, ⌘⇧B and ⌘⇧A are the only shifted commands.
             if flags.contains(.shift) {
                 switch key {
@@ -591,6 +597,17 @@ struct PopoverView: View {
                 PRActions.copy(link.url.absoluteString)
             default: return false
             }
+            return true
+        }
+        // ⌃1–⌃9: saved search N, by key position, in the list and in search but not the save row. It
+        // opens the field as picking the chip does.
+        if flags.subtracting([.capsLock, .numericPad, .function]) == .control, saveName == nil,
+           let digit = SearchKeyMonitor.digit(event) {
+            guard model.applySavedSearch(number: digit) else { return false }
+            hintSelection = nil
+            savedExpanded = false
+            fieldOpen = true
+            caretAtEndOfField(in: window)
             return true
         }
         if flags.contains(.control) { return false }
@@ -691,7 +708,11 @@ struct PopoverView: View {
         case SearchKeyMonitor.upArrow, SearchKeyMonitor.downArrow:
             let offset = event.keyCode == SearchKeyMonitor.downArrow ? 1 : -1
             if searching {
+                // ⌥↑ / ⌥↓ too: results move one row.
                 model.moveSearchSelection(by: offset)
+            } else if listKeys != nil, flags.subtracting([.capsLock, .numericPad, .function]) == .option {
+                // ⌥↑ / ⌥↓: the next or previous group; nothing in a list without groups.
+                model.jumpListGroup(by: offset, closedExpanded: closedExpanded, doneExpanded: doneExpanded)
             } else if let listKeys {
                 model.moveListSelection(by: offset, in: listKeys)
             } else {

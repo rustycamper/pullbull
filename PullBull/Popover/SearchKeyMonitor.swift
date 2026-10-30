@@ -50,6 +50,13 @@ final class SearchKeyMonitor {
     /// kVK_ANSI_1 and kVK_ANSI_2: the keys in the 1 and 2 position, whatever they type.
     static let digit1: UInt16 = 18
     static let digit2: UInt16 = 19
+    /// kVK_ANSI_1 to kVK_ANSI_9 in digit order: the number row by position, for ⌃1–⌃9.
+    static let digitKeys: [UInt16] = [digit1, digit2, 20, 21, 23, 22, 26, 28, 25]
+
+    /// 1 to 9 for a key in the number row's 1 to 9 position, else nil.
+    static func digit(_ event: NSEvent) -> Int? {
+        digitKeys.firstIndex(of: event.keyCode).map { $0 + 1 }
+    }
     /// kVK_ANSI_F, kVK_ANSI_R, kVK_ANSI_C and kVK_ANSI_LeftBracket: used for ⌘F, ⌘R, ⌘C and ⌘[ only when
     /// the layout types no Latin character there (e.g. Russian).
     static let letterF: UInt16 = 3

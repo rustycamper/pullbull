@@ -120,4 +120,22 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false, chip width: C
         #expect(c.lines.count == 2)
         #expect(c.chips == [.saved(saved.items[0]), .more(.hidden(2))])
     }
+
+    /// The ⌃N key is measured into the chip, so a keyed chip is wider and the cloud wraps by it.
+    @Test func measureIncludesKey() {
+        let keyed = SavedChipCloud.chipWidth(textWidth: 40, keyWidth: 14)
+        #expect(keyed > SavedChipCloud.chipWidth(textWidth: 40))
+        #expect(keyed == 59 + SavedChipCloud.keyGap + 14)
+        #expect(SavedChipCloud.chipWidth(textWidth: 500, keyWidth: 14) == SavedChipCloud.maxChipWidth)
+        // Three 100pt chips fit a 312pt line; with a 14pt key each, only two do.
+        let saved = searches(3)
+        let plain = SavedChipCloud(saved: saved, expanded: false, width: 312) { _ in
+            SavedChipCloud.chipWidth(textWidth: 100 - 19)
+        }
+        let withKeys = SavedChipCloud(saved: saved, expanded: false, width: 312) { _ in
+            SavedChipCloud.chipWidth(textWidth: 100 - 19, keyWidth: 14)
+        }
+        #expect(plain.lines.map(\.count) == [3])
+        #expect(withKeys.lines.map(\.count) == [2, 1])
+    }
 }

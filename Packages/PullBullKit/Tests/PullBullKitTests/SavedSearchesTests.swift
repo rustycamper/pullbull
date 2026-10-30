@@ -270,3 +270,18 @@ private func searches(_ count: Int) -> SavedSearches {
         #expect(query != .empty)
     }
 }
+
+extension SavedSearchesTests {
+    @Test func keyLabels() {
+        #expect(SavedSearches.keyLabel(at: 0) == "⌃1")
+        #expect(SavedSearches.keyLabel(at: 8) == "⌃9")
+        #expect(SavedSearches.keyLabel(at: 9) == nil)
+        #expect(SavedSearches.keyLabel(at: -1) == nil)
+        let saved = searches(3)
+        #expect(saved.search(forDigit: 3) == saved.items[2])
+        #expect(saved.search(forDigit: 1) == saved.items[0])
+        #expect(saved.search(forDigit: 4) == nil)
+        #expect(saved.search(forDigit: 0) == nil)
+        #expect(searches(12).search(forDigit: 10) == nil)
+    }
+}
