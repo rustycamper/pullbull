@@ -21,12 +21,48 @@ struct ListStateView<Footer: View>: View {
         let perform: () -> Void
     }
 
+    /// A phrase inside the detail that acts when clicked, drawn in the accent colour.
+    struct DetailLink {
+        let phrase: String
+        var help: String?
+        let perform: () -> Void
+    }
+
     let symbol: String
     var tone = Tone.neutral
     let title: String
     var detail: String?
+    var detailLink: DetailLink?
     var action: Action?
     @ViewBuilder let footer: () -> Footer
+
+    private static func accented(_ detail: String, _ phrase: String) -> AttributedString {
+        var attributed = AttributedString(detail)
+        if let range = attributed.range(of: phrase) {
+            attributed[range].foregroundColor = .accentColor
+        }
+        return attributed
+    }
+
+    @ViewBuilder private func detailText(_ detail: String) -> some View {
+        if let link = detailLink {
+            Button(action: link.perform) {
+                Text(Self.accented(detail, link.phrase))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(link.help ?? "")
+            .accessibilityLabel(detail)
+        } else {
+            Text(detail)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -45,10 +81,7 @@ struct ListStateView<Footer: View>: View {
                 // At least two lines held, so the one-line "You cleared…" copy doesn't move the view.
                 ZStack {
                     Text(verbatim: " \n ").hidden()
-                    Text(detail)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
+                    detailText(detail)
                 }
                 .font(.system(size: 12))
             }
@@ -78,8 +111,13 @@ struct ListStateView<Footer: View>: View {
 }
 
 extension ListStateView where Footer == EmptyView {
-    init(symbol: String, tone: Tone = .neutral, title: String, detail: String? = nil, action: Action? = nil) {
-        self.init(symbol: symbol, tone: tone, title: title, detail: detail, action: action) { EmptyView() }
+    init(
+        symbol: String, tone: Tone = .neutral, title: String, detail: String? = nil, detailLink: DetailLink? = nil,
+        action: Action? = nil
+    ) {
+        self.init(
+            symbol: symbol, tone: tone, title: title, detail: detail, detailLink: detailLink, action: action
+        ) { EmptyView() }
     }
 }
 

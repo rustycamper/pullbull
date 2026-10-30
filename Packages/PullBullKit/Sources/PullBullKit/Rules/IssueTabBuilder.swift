@@ -182,33 +182,21 @@ public enum IssueTabBuilder {
         let options = boardAvailable ? snap.boardStatusOptions ?? [] : []
         let statusKnown = !options.isEmpty
         let boardItems = unique(snap.boardIssues)
+        let onBoard = byKey(boardItems)
 
         let assignedIssues = unique(snap.assignedIssues ?? []).filter(\.isOpen)
-        let assigned: [IssueGroup]
-        if statusKnown {
-            let onBoard = Dictionary(boardItems.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
-            // Still open but done on the board: housekeeping, not work, so folded and not counted, as on Board.
-            let doneOnBoard = { (issue: BoardIssue) in onBoard[issue.key].map(isDone) ?? false }
-            let active = assignedIssues.filter { !doneOnBoard($0) }
-            assigned = statusGroups(options: options, skippingDone: true, issues: active) { issue -> BoardStatusValue?? in
-                guard let item = onBoard[issue.key] else { return nil }
-                return .some(item.status)
-            } + group(.notOnBoard, active.filter { onBoard[$0.key] == nil }, counted: true)
-                + group(.done, assignedIssues.filter(doneOnBoard), counted: false)
-        } else {
-            assigned = repoGroups(assignedIssues)
-        }
+        let assigned = groups(
+            of: assignedIssues, on: .assigned, onBoard: onBoard, options: options, grouping: settings.grouping)
 
         let createdIssues = unique(snap.createdIssues ?? []).filter(\.isOpen)
-        let created = settings.grouping == .repository
-            ? repoGroups(createdIssues) : group(.all, createdIssues, counted: true)
+        let created = groups(
+            of: createdIssues, on: .created, onBoard: onBoard, options: options, grouping: settings.grouping)
 
         var board: IssueTabContents?
         if boardAvailable {
+            // Every board item is its own board copy, so it takes the lane of its own Status.
             let active = boardItems.filter { !isDone($0) }
-            let open = statusKnown
-                ? statusGroups(options: options, skippingDone: true, issues: active) { issue -> BoardStatusValue?? in .some(issue.status) }
-                : repoGroups(active)
+            let open = groups(of: active, on: .board, onBoard: onBoard, options: options, grouping: settings.grouping)
             let cutoff = now.addingTimeInterval(-doneWindow)
             let done = boardItems
                 .filter { isDone($0) && (doneDate($0) ?? .distantPast) >= cutoff }
@@ -226,6 +214,39 @@ public enum IssueTabBuilder {
             assignedLoaded: snap.assignedIssues != nil, createdLoaded: snap.createdIssues != nil,
             assignedError: snap.assignedIssuesError, createdError: snap.createdIssuesError,
             assignedFetchedAt: snap.assignedIssuesFetchedAt, createdFetchedAt: snap.createdIssuesFetchedAt)
+    }
+
+    /// Open `issues` grouped as `tab` groups its open items, each lane read from the issue's board copy
+    /// in `snap`: on Assigned and Board, the Status lanes, then "Not on board", then the uncounted Done
+    /// group of those in the board's Done column, or repo groups when the board has no Status options;
+    /// on Created, by `settings.grouping`. Board's 14-day Done is not applied.
+    public static func groups(
+        of issues: [BoardIssue], on tab: IssueTab, in snap: Snapshot, settings: AppSettings
+    ) -> [IssueGroup] {
+        let options = snap.boardStatus == .available ? snap.boardStatusOptions ?? [] : []
+        return groups(
+            of: unique(issues), on: tab, onBoard: byKey(unique(snap.boardIssues)), options: options,
+            grouping: settings.grouping)
+    }
+
+    /// `groups(of:on:in:settings:)` with the board copies by key and the Status options (empty when the
+    /// board is unavailable or has none) already read.
+    static func groups(
+        of issues: [BoardIssue], on tab: IssueTab, onBoard: [PRKey: BoardIssue], options: [StatusOption],
+        grouping: Grouping
+    ) -> [IssueGroup] {
+        if tab == .created {
+            return grouping == .repository ? repoGroups(issues) : group(.all, issues, counted: true)
+        }
+        guard !options.isEmpty else { return repoGroups(issues) }
+        // Still open but done on the board: housekeeping, not work, so folded and not counted, as on Board.
+        let doneOnBoard = { (issue: BoardIssue) in onBoard[issue.key].map(isDone) ?? false }
+        let active = issues.filter { !doneOnBoard($0) }
+        return statusGroups(options: options, skippingDone: true, issues: active) { issue -> BoardStatusValue?? in
+            guard let item = onBoard[issue.key] else { return nil }
+            return .some(item.status)
+        } + group(.notOnBoard, active.filter { onBoard[$0.key] == nil }, counted: true)
+            + group(.done, issues.filter(doneOnBoard), counted: false)
     }
 
     /// The Status the lists group a board item under: its value while the board is available and the
@@ -302,6 +323,11 @@ public enum IssueTabBuilder {
     private static func tieBreak(_ a: BoardIssue, _ b: BoardIssue) -> Bool {
         if a.key.repo != b.key.repo { return a.key.repo < b.key.repo }
         return a.key.number < b.key.number
+    }
+
+    /// Board items by key, the first of a key kept.
+    private static func byKey(_ items: [BoardIssue]) -> [PRKey: BoardIssue] {
+        Dictionary(items.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     private static func unique(_ issues: [BoardIssue]) -> [BoardIssue] {

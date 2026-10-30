@@ -79,6 +79,19 @@ private let issueTabs = BuiltIssueTabs(
         #expect(SearchScope.issues(.created).isNarrowed)
     }
 
+    /// The scope tab, else the tab typing started on when it is in the shown mode, else the shown tab.
+    @Test func reference() {
+        #expect(SearchScope.reference(
+            scope: .pullRequests(.mine), startedOn: .pullRequests(.review), shown: .pullRequests(.review))
+            == .pullRequests(.mine))
+        #expect(SearchScope.reference(
+            scope: .everything, startedOn: .pullRequests(.review), shown: .pullRequests(.mine))
+            == .pullRequests(.review))
+        #expect(SearchScope.reference(scope: .everything, startedOn: .issues(.board), shown: .pullRequests(.team))
+            == .pullRequests(.team))
+        #expect(SearchScope.reference(scope: .everything, startedOn: nil, shown: .issues(.created)) == .issues(.created))
+    }
+
     // MARK: Items and results
 
     @Test func aPRTabListsEveryRowAndMineItsRecentlyClosed() {
@@ -209,5 +222,16 @@ private let issueTabs = BuiltIssueTabs(
         #expect(SearchContext.spokenMatches(.current(1)) == "1 match")
         #expect(SearchContext.spokenMatches(.stale(4, error: "x", since: nil)) == "4 matches, didn't update")
         #expect(SearchContext.spokenMatches(.unavailable) == "unavailable")
+    }
+}
+
+@Suite struct SearchScopeMovedTests {
+    private let all: [SearchScope] = [.pullRequests(.review), .pullRequests(.mine), .pullRequests(.team)]
+
+    @Test func movedAlongTabs() {
+        #expect(SearchScope.pullRequests(.review).moved(by: 1, among: all) == .pullRequests(.mine))
+        #expect(SearchScope.pullRequests(.team).moved(by: 1, among: all) == nil)
+        #expect(SearchScope.pullRequests(.review).moved(by: -1, among: all) == nil)
+        #expect(SearchScope.pullRequests(.mine).moved(by: 1, among: Array(all.prefix(2))) == nil)
     }
 }

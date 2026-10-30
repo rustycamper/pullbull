@@ -2,7 +2,8 @@ import SwiftUI
 import PullBullKit
 
 /// One issue in an Issues list: the state glyph, the title and a meta line (repo #num · age · comments ·
-/// label chips), with assignee avatars on the right. Compact rows fit on one line.
+/// label chips), with assignee avatars on the right. Compact rows fit on one line. A search result draws
+/// as a row of the tab it is laid out for, with its marks.
 struct IssueRow: View {
     let model: AppModel
     let issue: BoardIssue
@@ -14,19 +15,20 @@ struct IssueRow: View {
     var inRepoGroup = false
     /// The labels a `~label` search asks for, passed in so a row doesn't follow every keystroke.
     var wantedLabels: [String] = []
+    /// A search result's words and role; nil on a tab.
+    var search: SearchMarks?
     @State private var hovering = false
 
     private var compact: Bool { model.settings.compact }
     private var glyph: (symbol: String, color: Color, label: String) { Palette.issueGlyph(issue.glyph) }
-    /// A Board item in the folded Done group.
-    private var past: Bool { tab == .board && IssueTabBuilder.isDone(issue) }
+    /// A Board item in the folded Done group, or a closed search result.
+    private var past: Bool { tab == .board && IssueTabBuilder.isDone(issue) || search != nil && !issue.isOpen }
     private var me: String { model.snapshot?.org.viewer ?? model.settings.account ?? "" }
     private var avatars: [Assignee] { IssueRowRules.avatars(issue, tab: tab, me: me) }
 
     var body: some View {
         Button {
-            model.listSelection = issue.key
-            if PRActions.commandClicked { PRActions.openOnGitHub(issue) } else { model.openRowIssueDetail(issue.key) }
+            open()
         } label: {
             Group {
                 if compact { compactBody } else { fullBody }
@@ -40,8 +42,25 @@ struct IssueRow: View {
         .onHover { hovering = $0 }
         .accessibilityAddTraits(selected ? [.isSelected] : [])
         .issueContextMenu(
-            issue, focus: FocusMenuItem(model: model, repo: issue.key.repo), time: TimeFocusMenu(model: model),
+            issue, focus: FocusMenuItem(model: model, repo: issue.key.repo),
+            time: search == nil ? TimeFocusMenu(model: model) : nil,
             person: .person(model: model, login: issue.author))
+    }
+
+    /// A search result moves `searchSelection`, a tab row `listSelection`.
+    private func open() {
+        if search != nil {
+            if PRActions.commandClicked { model.openSearchResultOnGitHub(issue) } else { model.openSearchResult(issue) }
+        } else {
+            model.listSelection = issue.key
+            if PRActions.commandClicked { PRActions.openOnGitHub(issue) } else { model.openRowIssueDetail(issue.key) }
+        }
+    }
+
+    /// The title, a search's words in bold.
+    private var title: AttributedString {
+        guard let search else { return AttributedString(issue.title) }
+        return Highlight.title(issue.title, words: search.words)
     }
 
     // MARK: Full
@@ -54,7 +73,7 @@ struct IssueRow: View {
                 .frame(width: 20, height: 20)
                 .accessibilityLabel(glyph.label)
             VStack(alignment: .leading, spacing: 0) {
-                Text(issue.title)
+                Text(title)
                     .font(.system(size: 13))
                     .lineSpacing(1)
                     .lineLimit(2)
@@ -63,7 +82,8 @@ struct IssueRow: View {
                     .fixedSize(horizontal: false, vertical: true)
                     // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
                     .help(issue.title)
-                IssueMetaLine(issue: issue, now: now, showsRepo: !inRepoGroup, wantedLabels: wantedLabels)
+                IssueMetaLine(
+                    issue: issue, now: now, showsRepo: !inRepoGroup, role: search?.role, wantedLabels: wantedLabels)
                     .padding(.top, 3)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -88,7 +108,7 @@ struct IssueRow: View {
                 .frame(width: 16)
                 .accessibilityLabel(glyph.label)
         } title: {
-            Text(issue.title)
+            Text(title)
                 .foregroundStyle(past ? .secondary : .primary)
                 // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
                 .help(issue.title)

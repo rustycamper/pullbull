@@ -240,15 +240,15 @@ public enum TabBuilder {
         var hiddenApproved = Set<PRKey>()
         let review: [Row] = snap.reviewCandidates.filter { filters.keeps($0, now: now) }.compactMap { pr in
             switch ReviewRules.status(of: pr, me: me, myTeams: myTeams) {
-            case .needsReview(let reason): return Row(pr: pr, dimmed: false, counted: true, reviewReason: reason)
+            case .needsReview: break
             case .approvedByMe:
                 if settings.hideApprovedByMe {
                     hiddenApproved.insert(pr.key)
                     return nil
                 }
-                return Row(pr: pr, dimmed: true, counted: false)
             case .reviewedByMe, .notRequested: return nil
             }
+            return row(for: pr, on: .review, me: me, myTeams: myTeams)
         }
         let mine = snap.mine.filter { $0.state == .open }.map { Row(pr: $0, dimmed: false, counted: true) }
         let team = snap.team
@@ -268,8 +268,19 @@ public enum TabBuilder {
         )
     }
 
+    /// `pr` as `tab` shows it. On Review: counted, with its reason, while it needs my review; dimmed and
+    /// not counted once I approved it; neither when I reviewed it or wasn't asked. On Mine and Team: counted.
+    public static func row(for pr: PullRequest, on tab: PRTab, me: String, myTeams: Set<String>) -> Row {
+        guard tab == .review else { return Row(pr: pr, dimmed: false, counted: true) }
+        switch ReviewRules.status(of: pr, me: me, myTeams: myTeams) {
+        case .needsReview(let reason): return Row(pr: pr, dimmed: false, counted: true, reviewReason: reason)
+        case .approvedByMe: return Row(pr: pr, dimmed: true, counted: false)
+        case .reviewedByMe, .notRequested: return Row(pr: pr, dimmed: false, counted: false)
+        }
+    }
+
     /// Rows by latest activity, or with `oldestFirst` by when the PR was opened, the oldest first.
-    private static func contents(_ rows: [Row], oldestFirst: Bool = false) -> TabContents {
+    static func contents(_ rows: [Row], oldestFirst: Bool = false) -> TabContents {
         var seen = Set<PRKey>()
         let sorted = rows.sorted {
             if oldestFirst {

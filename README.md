@@ -45,7 +45,7 @@ Keyboard-first · Native SwiftUI · Read-only
 |:-:|:-:|
 | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/pr-detail-dark.png"><img src="docs/media/pr-detail-light.png" width="360" alt="Pull request detail, Ready to merge"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/issue-detail-dark.png"><img src="docs/media/issue-detail-light.png" width="360" alt="Issue detail with board card and linked PRs"></picture> |
 | **Board** | **Search** |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/board-dark.png"><img src="docs/media/board-light.png" width="360" alt="Board tab grouped by Status"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/search-dark.png"><img src="docs/media/search-light.png" width="360" alt="Search with people completion"></picture> |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/board-dark.png"><img src="docs/media/board-light.png" width="360" alt="Board tab grouped by Status"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/search-dark.png"><img src="docs/media/search-light.png" width="360" alt="Search results laid out like the Team tab"></picture> |
 
 ## Tabs
 
@@ -84,6 +84,8 @@ More in the [manual](docs/manual.md#issues).
 | a GitHub link | Exactly that PR or issue |
 | `updated:today` `updated:3d` `updated:1w` `updated:1m` | Items active since 00:00 today, or 2, 6 or 29 days before; GitHub's date forms (`updated:>2026-10-01`) also filter locally |
 | `-@dependabot` `-~wontfix` | Leave those out: a `-` before any qualifier |
+
+Results are laid out like the tab you search from, with the same groups and rows; merged and closed ones follow under Closed and merged.
 
 Combine `@`, `~`, `is:`, `status:`, `updated:`, `review:`, `repo:`, `size:` and words. Type `st`, `la` or `up` and press <kbd>Tab</kbd> for `status:`, `label:` or `updated:`, with suggestions. Save the searches you repeat with the bookmark icon, apply one with ⌃1–⌃9; manage them in Settings → Search.
 

@@ -19,6 +19,15 @@ enum ShownTab: Hashable {
         case .issues(let tab): tab.title
         }
     }
+
+    /// The tab a search is narrowed to; nil for everything.
+    init?(_ scope: SearchScope) {
+        switch scope {
+        case .everything: return nil
+        case .pullRequests(let tab): self = .pullRequests(tab)
+        case .issues(let tab): self = .issues(tab)
+        }
+    }
 }
 
 extension SearchScope {
@@ -182,6 +191,9 @@ final class AppModel {
     private(set) var searchMatchCounts: [SearchScope: IssueTabCount] = [:]
     /// The highlighted result (Return opens it).
     var searchSelection: PRKey?
+    /// Whether the results' Closed section and Done group are expanded; both start so, and stay as set
+    /// through query edits, scope and mode changes and a detail, until the field empties.
+    private(set) var searchExpansion = ListExpansion(closed: true, done: true)
     /// The highlighted row of each list tab (↑/↓; Return opens it), kept while switching tabs.
     private(set) var listSelections: [ShownTab: PRKey] = [:]
     /// The list or search row chosen to open, highlighted for a moment before its detail opens.
@@ -862,6 +874,7 @@ final class AppModel {
         guard query != .empty else {
             searchResults = nil
             searchSelection = nil
+            searchExpansion = ListExpansion(closed: true, done: true)
             if route == .search { route = .list }
             return
         }
@@ -940,9 +953,65 @@ final class AppModel {
         searchField.forgetCompletion()
     }
 
-    /// The current mode's results in display order: pull requests in PR mode, issues in Issues mode.
+    /// The tab whose layout the results take (`SearchScope.reference`): the narrowed tab, else the tab
+    /// typing started on while it is in this mode, else the tab on screen.
+    var searchReferenceTab: ShownTab {
+        let reference = SearchScope.reference(
+            scope: shownSearchScope, startedOn: searchStartedOnTab.map(SearchScope.init), shown: SearchScope(shownTab))
+        return ShownTab(reference) ?? shownTab
+    }
+
+    /// The PR results in the reference tab's layout; nil in Issues mode and without results.
+    var searchPRLayout: SearchPRLayout? {
+        guard mode == .pullRequests, let results = searchResults, let snapshot,
+              case .pullRequests(let tab) = searchReferenceTab
+        else { return nil }
+        return SearchLayout.pullRequests(
+            results, on: tab, grouping: prGrouping(for: tab), settings: settings, org: snapshot.org)
+    }
+
+    /// The issue results in the reference tab's layout; nil in PR mode and without results or a snapshot.
+    var searchIssueLayout: SearchIssueLayout? {
+        guard mode == .issues, let results = searchResults, let snapshot,
+              case .issues(let tab) = searchReferenceTab
+        else { return nil }
+        return SearchLayout.issues(results, on: tab, settings: settings, focus: repoFocus, snap: snapshot)
+    }
+
+    /// Folds or unfolds the results' Closed section; a selection it hides moves to the next row shown.
+    func toggleSearchClosed() {
+        let old = searchItemKeys
+        searchExpansion.closed.toggle()
+        keepSearchSelection(from: old)
+    }
+
+    /// Folds or unfolds the results' Done group, as `toggleSearchClosed`.
+    func toggleSearchDone() {
+        let old = searchItemKeys
+        searchExpansion.done.toggle()
+        keepSearchSelection(from: old)
+    }
+
+    private func keepSearchSelection(from old: [PRKey]) {
+        let kept = ListNavigation.selection(searchSelection, from: old, to: searchItemKeys)
+        guard kept != searchSelection else { return }
+        keptSearchSelection = nil
+        searchSelection = kept
+    }
+
+    /// Every result of the current mode, folded sections included.
+    var searchMatchCount: Int {
+        searchResults?.orderedKeys(mode: mode).count ?? 0
+    }
+
+    /// The current mode's results as shown, in display order: the reference tab's groups, then Done and
+    /// Closed while expanded.
     var searchItemKeys: [PRKey] {
-        searchResults?.orderedKeys(mode: mode) ?? []
+        switch mode {
+        case .pullRequests: searchPRLayout?.keys(closedExpanded: searchExpansion.closed) ?? []
+        case .issues:
+            searchIssueLayout?.keys(closedExpanded: searchExpansion.closed, doneExpanded: searchExpansion.done) ?? []
+        }
     }
 
     /// The line pointing to the other mode when only its kind matches; nil while searching, and in a
@@ -964,6 +1033,51 @@ final class AppModel {
         keptSearchSelection = nil
         let current = searchSelection.flatMap { keys.firstIndex(of: $0) } ?? (offset > 0 ? -1 : keys.count)
         searchSelection = keys[min(max(current + offset, 0), keys.count - 1)]
+    }
+
+    /// ⌥↓ / ⌥↑: the first row of the next or previous group of the results (or of this one, going up from
+    /// inside it). Nothing when the reference tab's layout has no groups, or past either end.
+    func jumpSearchGroup(by offset: Int) {
+        let shown: (groups: [[PRKey]], grouped: Bool)
+        switch mode {
+        case .pullRequests:
+            guard let layout = searchPRLayout else { return }
+            shown = (layout.groups(closedExpanded: searchExpansion.closed), layout.isGrouped)
+        case .issues:
+            guard let layout = searchIssueLayout else { return }
+            shown = (
+                layout.groups(closedExpanded: searchExpansion.closed, doneExpanded: searchExpansion.done),
+                layout.isGrouped)
+        }
+        guard shown.grouped, let key = ListNavigation.jump(searchSelection, by: offset, in: shown.groups)
+        else { return }
+        keptSearchSelection = nil
+        searchSelection = key
+    }
+
+    /// ⌘↑ / ⌘↓: the first or last result shown; nothing when there are none.
+    func moveSearchSelectionToEdge(last: Bool) {
+        guard let key = ListNavigation.edge(last: last, in: searchItemKeys) else { return }
+        keptSearchSelection = nil
+        searchSelection = key
+    }
+
+    /// ← / → in the search field: narrows the search to the reference tab's neighbour, which becomes the
+    /// selected tab, and runs it. Unlike a tab click it never toggles back to everything. Nil at either end.
+    func moveSearchScope(by offset: Int) -> ShownTab? {
+        let tabs: [SearchScope] = switch mode {
+        case .pullRequests: prTabs.map { .pullRequests($0) }
+        case .issues: IssueTab.allCases.map { .issues($0) }
+        }
+        guard let next = SearchScope(searchReferenceTab).moved(by: offset, among: tabs),
+              let tab = ShownTab(next) else { return nil }
+        searchScope = next
+        switch tab {
+        case .pullRequests(let tab): selectedTab = tab
+        case .issues(let tab): selectedIssueTab = tab
+        }
+        runSearch(searchQuery, debounced: false)
+        return tab
     }
 
     /// Return: the selected result's detail view; with no result, the fallback line's mode.

@@ -24,6 +24,12 @@ public enum SearchContext {
             org: org, repo: repo, startedOnTab: startedOnTab)
     }
 
+    /// The footer's summary: `context`, then ` · N matches` once the count is known.
+    public static func footerText(_ context: String, matches: Int?) -> String {
+        guard let matches else { return context }
+        return context + " · " + matchCount(matches)
+    }
+
     /// `Filtered by <logins>, labels <labels>, states <states>, <statuses>, excluding <…>, titles matching
     /// <words>, in all of <org>` (`in <repo>` when focused); each part only when it applies.
     public static func accessibilityLabel(filter: SearchFilter, org: String, repo: String? = nil) -> String {

@@ -1,9 +1,10 @@
 import SwiftUI
 import PullBullKit
 
-/// The current mode's search results in two groups (open and closed-or-merged PRs, or open and closed
-/// issues), with an explicit state: "Searching…", the line pointing to the other mode when only its kind
-/// matches, the no-match message, or the remote failure. Narrowed to a tab, the context line names it and
+/// The current mode's search results laid out as the reference tab lays out its list (its repo, author
+/// or Status groups and headers, and Done), then the merged and closed ones under a folding Closed
+/// section, with an explicit state: "Searching…", the line pointing to the other mode when only its kind
+/// matches, the no-match message, or the remote failure. Narrowed to a tab, the footer's summary names it and
 /// the no-match state offers everything instead.
 struct SearchResultsView: View {
     let model: AppModel
@@ -12,15 +13,14 @@ struct SearchResultsView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                // Only the groups' headers pin; the context line, Ask line and banners scroll away.
+                // Only the groups' headers pin; the Ask line and banners scroll away.
                 LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
-                    contextLine
                     askLine
                     if let results = model.searchResults, !results.isEmpty(in: model.mode) {
                         if let message = results.failure(in: model.mode) {
                             FailureBanner(message: message)
                         }
-                        groups(results)
+                        groups
                         if let note = results.truncationNote {
                             Text(note)
                                 .font(.system(size: 11))
@@ -35,7 +35,7 @@ struct SearchResultsView: View {
                         }
                         stateMessage
                             .frame(maxWidth: .infinity)
-                            .frame(height: 300)
+                            .frame(height: EmptyListFrame.height(sectionBelow: false))
                     }
                 }
                 .padding(.horizontal, Metrics.rowInset)
@@ -78,44 +78,6 @@ struct SearchResultsView: View {
 
     // MARK: State
 
-    private var contextLine: some View {
-        HStack(spacing: 6) {
-            if model.searchStartedOnTab != nil, scopeTitle == nil {
-                Image(systemName: "keyboard")
-                    .font(.system(size: 10))
-                    .accessibilityHidden(true)
-            }
-            if let login = logins.first {
-                AvatarView(login: model.people.display(login), url: model.people.avatarURL(login), size: 14)
-                    .accessibilityHidden(true)
-            } else if !labels.isEmpty {
-                Image(systemName: "tag")
-                    .font(.system(size: 10))
-                    .accessibilityHidden(true)
-            }
-            Text(contextText)
-                .lineLimit(1)
-                .accessibilityLabel(contextLabel)
-            Spacer(minLength: 0)
-            if let results = model.searchResults, results.phase == .searching, !results.isEmpty(in: model.mode) {
-                ProgressView()
-                    .controlSize(.mini)
-                    .accessibilityLabel("Searching GitHub")
-            }
-            // Ask is offered only once a key is saved; ⌥⌘↩ is the one way to send anything to Anthropic.
-            if model.offersAsk {
-                Text("⌥⌘↩ Ask AI")
-                    .fixedSize()
-                    .accessibilityLabel("Option Command Return to Ask AI")
-            }
-        }
-        .font(.system(size: 11))
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 8)
-        .padding(.top, 10)
-        .frame(minHeight: 24)
-    }
-
     /// "Asking…" while an Ask runs, else its failure or the no-key notice; the normal results stay below.
     @ViewBuilder private var askLine: some View {
         if model.asking != nil {
@@ -144,44 +106,6 @@ struct SearchResultsView: View {
     /// The tab the results are narrowed to; nil for everything.
     private var scopeTitle: String? { model.searchScopeTitle }
 
-    private var matchCount: Int { model.searchItemKeys.count }
-
-    private var contextText: String {
-        // The filter row above names the focus.
-        if let scopeTitle {
-            return SearchContext.narrowedText(model.searchQuery, tab: scopeTitle, matches: matchCount)
-        }
-        // A pasted link names its own repository, whatever the focus.
-        if case .item(let repo, let n) = model.searchQuery { return "\(model.displayName(of: repo)) #\(n)" }
-        if let filter = model.searchQuery.filter {
-            return SearchContext.text(
-                filter: filter, org: org, repo: focusName, startedOnTab: model.searchStartedOnTab?.title)
-        }
-        // The filter row above names the focus too.
-        if let focusName {
-            if case .number(let n) = model.searchQuery { return "#\(n) in \(focusName)" }
-            if let tab = model.searchStartedOnTab { return "Started typing on \(tab.title) · searching \(focusName)" }
-            return "Titles in \(focusName)"
-        }
-        // Before the first launch has found an org there is no name to show; no-org mode searches the
-        // user's own repos.
-        let personal = model.snapshot.map { $0.scope.org == nil } ?? false
-        let repos = personal ? "your repos" : org.isEmpty ? "every repo" : "every \(org) repo"
-        let scope = personal ? "your repos" : org.isEmpty ? "the organization" : org
-        if case .number(let n) = model.searchQuery { return "#\(n) in \(repos)" }
-        if let tab = model.searchStartedOnTab { return "Started typing on \(tab.title) · searching all of \(scope)" }
-        return "Titles in all of \(scope)"
-    }
-
-    private var contextLabel: String {
-        if let scopeTitle {
-            return SearchContext.narrowedAccessibilityLabel(
-                model.searchQuery, tab: scopeTitle, matches: matchCount, repo: focusName)
-        }
-        guard let filter = model.searchQuery.filter else { return contextText }
-        return SearchContext.accessibilityLabel(filter: filter, org: org, repo: focusName)
-    }
-
     @ViewBuilder private var stateMessage: some View {
         let results = model.searchResults
         if results == nil, model.snapshot == nil, let error = model.status.error {
@@ -193,20 +117,20 @@ struct SearchResultsView: View {
         } else if let fallback = model.searchFallback {
             fallbackLine(fallback)
         } else if let message = results?.failure(in: model.mode) {
-            failure(message, symbol: "wifi.slash", retry: { model.retrySearch() })
+            // GitHub answering with an error, or answering part of the search, is no lost connection.
+            failure(
+                message, symbol: model.status.error == .offline ? "wifi.slash" : "exclamationmark.triangle",
+                retry: { model.retrySearch() })
         } else if let scopeTitle, let results, results.phase == .done, results.isEmpty(in: model.mode) {
             narrowedEmpty(scopeTitle)
         } else if let message = results?.emptyMessage(
             org: focusName ?? org, query: model.searchQuery, scope: model.snapshot?.scope, mode: model.mode) {
-            ListStateView(symbol: "magnifyingglass", title: message) {
-                if let unknown = unknownToken {
-                    footerLine("\(unknown) isn't on anything PullBull has loaded")
-                }
-                // With a key saved, Ask may find it from a looser description.
-                if model.offersAsk {
-                    footerLine("Try other words, or ⌥⌘↩ to Ask AI.")
-                }
-            }
+            // With a key saved, Ask may find it from a looser description.
+            // A name or label nothing has loaded says so in the detail, in place of the hint.
+            ListStateView(
+                symbol: "magnifyingglass", title: message,
+                detail: unknownToken.map { "\(Self.clipped($0)) isn't on anything PullBull has loaded." }
+                    ?? (model.offersAsk ? "Try other words, or ⌥⌘↩ to Ask AI." : "Try other words."))
         } else {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
@@ -217,15 +141,21 @@ struct SearchResultsView: View {
         }
     }
 
+    /// A typed name or label short enough that the detail keeps to its two lines.
+    private static func clipped(_ token: String) -> String {
+        token.count > 32 ? token.prefix(31) + "…" : token
+    }
+
     /// No match among the narrowed tab's items, with the way back to everything.
     private func narrowedEmpty(_ tab: String) -> some View {
-        ListStateView(symbol: "magnifyingglass", title: SearchContext.noMatches(inTab: tab)) {
-            Button("Search everything") { model.searchEverything() }
-                .buttonStyle(.link)
-                .font(.system(size: 11))
-                .help(model.mode == .issues
-                    ? "Search every issue for this query" : "Search every pull request for this query")
-        }
+        ListStateView(
+            symbol: "magnifyingglass", title: SearchContext.noMatches(inTab: tab),
+            detail: "Search everything to look in every tab.",
+            detailLink: .init(
+                phrase: "Search everything",
+                help: model.mode == .issues
+                    ? "Search every issue for this query" : "Search every pull request for this query",
+                perform: { model.searchEverything() }))
     }
 
     /// Only the other mode's kind matches: one quiet line in the empty message's place, which switches
@@ -258,106 +188,167 @@ struct SearchResultsView: View {
     ) -> some View {
         ListStateView(
             symbol: symbol, tone: .warning, title: message,
+            detail: symbol == "wifi.slash" ? "Check your connection and retry." : "Try again in a moment.",
             action: .init(title: "Retry", help: help, disabled: model.status.isRefreshing, perform: retry))
-    }
-
-    private func footerLine(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 11))
-            .foregroundStyle(.secondary)
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: Groups
 
-    @ViewBuilder private func groups(_ results: SearchResults) -> some View {
+    @ViewBuilder private var groups: some View {
         switch model.mode {
-        case .pullRequests: prGroups(results)
-        case .issues: issueGroups(results)
+        case .pullRequests:
+            if let layout = model.searchPRLayout { prGroups(layout) }
+        case .issues:
+            if let layout = model.searchIssueLayout { issueGroups(layout) }
         }
     }
 
-    @ViewBuilder private func prGroups(_ results: SearchResults) -> some View {
-        prGroup("Open pull requests", results.openPRs)
-        prGroup("Closed and merged pull requests", results.closedPRs)
-    }
-
-    @ViewBuilder private func issueGroups(_ results: SearchResults) -> some View {
-        issueGroup("Open issues", results.openIssues)
-        issueGroup("Closed issues", results.closedIssues)
-    }
-
-    @ViewBuilder private func prGroup(_ title: String, _ prs: [PullRequest]) -> some View {
-        if !prs.isEmpty {
-            Section {
-                ForEach(prs) { pr in
-                    PRRow(
-                        model: model, row: Row(pr: pr, dimmed: false, counted: false),
-                        context: .search(words: words, role: role(of: pr), viewer: viewer),
-                        compact: model.settings.compact, now: now,
-                        selected: model.searchSelection == pr.key, wantedLabels: labels)
-                    .scrollTarget(pr.key, clearance: PinnedHeader.clearance)
+    @ViewBuilder private func prGroups(_ layout: SearchPRLayout) -> some View {
+        let rows = layout.contents.rows
+        switch layout.grouping {
+        case .repository:
+            ForEach(ListNavigation.repoGroups(rows), id: \.repo) { group in
+                Section {
+                    prRows(group.rows, on: layout.tab)
+                } header: {
+                    RepoGroupHeader(model: model, repo: group.repo, rows: group.rows, menus: .search)
+                        .pinnedHeaderBackground()
                 }
-            } header: {
-                groupHeader(title, count: prs.count)
+            }
+        case .author:
+            ForEach(ListNavigation.authorGroups(rows), id: \.author) { group in
+                Section {
+                    prRows(group.rows, on: layout.tab)
+                } header: {
+                    AuthorGroupHeader(model: model, author: group.author, rows: group.rows, menus: .search)
+                        .pinnedHeaderBackground()
+                }
+            }
+        case .none:
+            // Ungrouped rows have no header to clear.
+            prRows(rows, on: layout.tab, clearance: 0)
+                .padding(.top, 6)
+        }
+        if !layout.ended.isEmpty {
+            closedSection(title: "Closed and merged", count: layout.ended.count) {
+                closedRows(layout.ended)
             }
         }
     }
 
-    @ViewBuilder private func issueGroup(_ title: String, _ issues: [BoardIssue]) -> some View {
-        if !issues.isEmpty {
+    @ViewBuilder private func issueGroups(_ layout: SearchIssueLayout) -> some View {
+        let groups = layout.contents.groups
+        ForEach(groups.filter { $0.kind != .done }) { group in
+            // Under a focus the kit merges repo groups into one untitled group.
+            if group.title.isEmpty {
+                Color.clear.frame(height: 6)
+                // No header pins above it, so there is none to clear.
+                issueRows(group.issues, on: layout.tab, clearance: 0)
+            } else {
+                Section {
+                    issueRows(group.issues, on: layout.tab, underRepoHeader: group.isRepo)
+                } header: {
+                    // Lanes never fold while searching, so their headers have no chevron.
+                    IssueGroupHeader(model: model, group: group, fold: nil, menus: .search)
+                        .pinnedHeaderBackground()
+                }
+            }
+        }
+        if let done = groups.first(where: { $0.kind == .done }) {
             Section {
-                ForEach(issues) { issue in
-                    SearchIssueRow(
-                        issue: issue, words: words, labels: labels, role: role(of: issue), now: now,
-                        compact: model.settings.compact,
-                        selected: model.searchSelection == issue.key, flashing: model.rowFlash.key == issue.key
-                    ) {
-                        if PRActions.commandClicked { model.openSearchResultOnGitHub(issue) } else { model.openSearchResult(issue) }
-                    }
-                    .issueContextMenu(
-                        issue, focus: FocusMenuItem(model: model, repo: issue.key.repo),
-                        person: .person(model: model, login: issue.author))
-                    .scrollTarget(issue.key, clearance: PinnedHeader.clearance)
+                if model.searchExpansion.done {
+                    issueRows(done.issues, on: layout.tab)
                 }
             } header: {
-                groupHeader(title, count: issues.count)
+                ListSectionHeader(
+                    glyph: "checkmark.circle", title: "Done", count: done.issues.count, note: "still open",
+                    fold: .init(isOpen: model.searchExpansion.done) { model.toggleSearchDone() },
+                    compact: model.settings.compact)
+                    .pinnedHeaderBackground()
+            }
+        }
+        if !layout.ended.isEmpty {
+            closedSection(title: "Closed", count: layout.ended.count) {
+                issueRows(layout.ended, on: layout.tab)
             }
         }
     }
 
-    /// An open or closed group's header; search groups never fold.
-    private func groupHeader(_ title: String, count: Int) -> some View {
-        ListSectionHeader(glyph: nil, title: title, count: count, compact: model.settings.compact)
-            .pinnedHeaderBackground()
+    /// The merged and closed results under a hairline, folded with the header's chevron.
+    @ViewBuilder private func closedSection<Rows: View>(
+        title: String, count: Int, @ViewBuilder rows: () -> Rows
+    ) -> some View {
+        Hairline()
+            .padding(.horizontal, 8)
+            .padding(.top, 6)
+        Section {
+            if model.searchExpansion.closed {
+                rows()
+            }
+        } header: {
+            ListSectionHeader(
+                glyph: nil, title: title, count: count,
+                fold: .init(isOpen: model.searchExpansion.closed) { model.toggleSearchClosed() },
+                compact: model.settings.compact)
+                .pinnedHeaderBackground()
+        }
+    }
+
+    /// The open results as rows of `tab`, which give their review state, dimming and avatars.
+    private func prRows(_ rows: [Row], on tab: PRTab, clearance: CGFloat = PinnedHeader.clearance) -> some View {
+        ForEach(rows) { row in
+            PRRow(
+                model: model, row: row, context: .search(tab, SearchMarks(words: words, role: role(of: row.pr))),
+                compact: model.settings.compact, now: now,
+                selected: model.searchSelection == row.pr.key, wantedLabels: labels)
+            .scrollTarget(row.pr.key, clearance: clearance)
+        }
+    }
+
+    /// The merged and closed results as Mine's Recently closed draws them.
+    private func closedRows(_ prs: [PullRequest]) -> some View {
+        ForEach(prs) { pr in
+            ClosedRow(
+                model: model, pr: pr, now: now, selected: model.searchSelection == pr.key,
+                search: SearchMarks(words: words, role: role(of: pr)))
+            .scrollTarget(pr.key, clearance: PinnedHeader.clearance)
+        }
+    }
+
+    private func issueRows(
+        _ issues: [BoardIssue], on tab: IssueTab, underRepoHeader: Bool = false,
+        clearance: CGFloat = PinnedHeader.clearance
+    ) -> some View {
+        ForEach(issues) { issue in
+            IssueRow(
+                model: model, issue: issue, tab: tab, now: now, selected: model.searchSelection == issue.key,
+                inRepoGroup: !SearchLayout.showsRepo(
+                    issue.key, underRepoHeader: underRepoHeader, focus: model.repoFocus),
+                wantedLabels: labels, search: SearchMarks(words: words, role: role(of: issue)))
+            .scrollTarget(issue.key, clearance: clearance)
+        }
     }
 }
 
-/// The result count (or the arrow-key hint after typing anywhere) and the Return / Esc hints, in place of
-/// the list footer while searching.
+/// What the search covers and how many match, then the Ask AI, Return and Esc hints, in place of the list
+/// footer while searching. The Ask hint shows only when the whole line fits.
 struct SearchFooter: View {
     let model: AppModel
 
     var body: some View {
         HStack(spacing: 10) {
-            // "Copied" takes the leading hint's or count's place for a moment.
+            // "Copied" takes the summary's place for a moment.
             if let copied = CopyConfirmation.shared.message {
                 CopiedNote(message: copied)
                 Spacer()
-                hint(["↩"], returnLabel)
-                hint(["esc"], model.searchStartedOnTab.map { "Back to \($0.title)" } ?? "Clear")
-            } else if let tab = model.searchStartedOnTab {
-                hint(["↑", "↓"], "Select")
-                Spacer()
-                hint(["↩"], returnLabel)
-                hint(["esc"], "Back to \(tab.title)")
+                hints
             } else {
-                Text(countText)
-                    .monospacedDigit()
-                Spacer()
-                hint(["↩"], returnLabel)
-                hint(["esc"], "Clear")
+                ViewThatFits(in: .horizontal) {
+                    // Fit is judged with the spinner and the match count's room held, so the hint doesn't
+                    // blink as they come and go.
+                    line(withAsk: model.offersAsk, reservesRoom: true)
+                    line(withAsk: false, reservesRoom: false)
+                }
             }
         }
         .font(.system(size: 11))
@@ -368,10 +359,23 @@ struct SearchFooter: View {
         .overlay(alignment: .top) { Hairline() }
     }
 
-    private var countText: String {
-        let count = model.searchItemKeys.count
-        guard let results = model.searchResults, count > 0 || results.phase != .searching else { return "" }
-        return count == 1 ? "1 result" : "\(count) results"
+    private func line(withAsk: Bool, reservesRoom: Bool) -> some View {
+        HStack(spacing: 10) {
+            SearchSummary(model: model, reservesRoom: reservesRoom)
+            Spacer()
+            if withAsk {
+                // Ask is offered only once a key is saved; ⌥⌘↩ is the one way to send anything to Anthropic.
+                Text("⌥⌘↩ Ask AI")
+                    .fixedSize()
+                    .accessibilityLabel("Option Command Return to Ask AI")
+            }
+            hints
+        }
+    }
+
+    @ViewBuilder private var hints: some View {
+        hint(["↩"], returnLabel)
+        hint(["esc"], model.searchStartedOnTab.map { "Back to \($0.title)" } ?? "Clear")
     }
 
     /// Return follows the fallback line when it is all there is.
@@ -381,6 +385,143 @@ struct SearchFooter: View {
     }
 
     private func hint(_ keys: [String], _ label: String) -> some View { KeyHint(keys: keys, label: label) }
+}
+
+/// The footer's leading text: what the search covers and, once known, how many match, led by the
+/// started-typing, person or label glyph, and trailed by a spinner while GitHub answers.
+struct SearchSummary: View {
+    let model: AppModel
+    /// Lays out for the longest the summary gets (a three-digit count, the spinner showing), so the line
+    /// around it doesn't change size as those come and go.
+    var reservesRoom = false
+
+    var body: some View {
+        // The reserve sits behind the line, so the spinner follows the text rather than the held room.
+        ZStack(alignment: .leading) {
+            if reservesRoom {
+                HStack(spacing: 6) {
+                    leading
+                    Text(widestContextText)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .layoutPriority(-1)
+                    ProgressView()
+                        .controlSize(.mini)
+                }
+                .hidden()
+                .accessibilityHidden(true)
+            }
+            HStack(spacing: 6) {
+                leading
+                Text(contextText)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .layoutPriority(-1)
+                    .accessibilityLabel(contextLabel)
+                if searchingGitHub {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .accessibilityLabel("Searching GitHub")
+                }
+            }
+        }
+    }
+
+    /// The started-typing glyph, then the person's avatar or the label tag.
+    @ViewBuilder private var leading: some View {
+        if model.searchStartedOnTab != nil, scopeTitle == nil {
+            Image(systemName: "keyboard")
+                .font(.system(size: 10))
+                .accessibilityHidden(true)
+        }
+        if let login = logins.first {
+            AvatarView(login: model.people.display(login), url: model.people.avatarURL(login), size: 14)
+                .accessibilityHidden(true)
+        } else if !labels.isEmpty {
+            Image(systemName: "tag")
+                .font(.system(size: 10))
+                .accessibilityHidden(true)
+        }
+    }
+
+    /// Where a number was looked up: the org, or "your repos" in no-org mode.
+    private var org: String {
+        guard let snapshot = model.snapshot else { return model.settings.org ?? "" }
+        return snapshot.scope.org ?? "your repos"
+    }
+
+    /// The focused repository's display name; nil unfocused.
+    private var focusName: String? { model.repoFocus.map { model.displayName(of: $0.repo) } }
+
+    private var logins: [String] { model.searchQuery.logins }
+
+    private var labels: [String] { model.searchQuery.labels }
+
+    /// The tab the results are narrowed to; nil for everything.
+    private var scopeTitle: String? { model.searchScopeTitle }
+
+    private var matchCount: Int { model.searchMatchCount }
+
+    /// The count of an unscoped search, once known; a narrowed text already ends with it.
+    private var matches: Int? {
+        guard let results = model.searchResults, matchCount > 0 || results.phase != .searching else { return nil }
+        return matchCount
+    }
+
+    private var searchingGitHub: Bool {
+        guard let results = model.searchResults else { return false }
+        return results.phase == .searching && !results.isEmpty(in: model.mode)
+    }
+
+    /// The summary with a count of the widest size it takes.
+    private var widestContextText: String {
+        if let scopeTitle {
+            return SearchContext.narrowedText(model.searchQuery, tab: scopeTitle, matches: 999)
+        }
+        return SearchContext.footerText(coverage, matches: 999)
+    }
+
+    private var contextText: String {
+        if let scopeTitle {
+            return SearchContext.narrowedText(model.searchQuery, tab: scopeTitle, matches: matchCount)
+        }
+        return SearchContext.footerText(coverage, matches: matches)
+    }
+
+    /// What an unscoped search covers.
+    private var coverage: String {
+        // A pasted link names its own repository, whatever the focus.
+        if case .item(let repo, let n) = model.searchQuery { return "\(model.displayName(of: repo)) #\(n)" }
+        if let filter = model.searchQuery.filter {
+            return SearchContext.text(
+                filter: filter, org: org, repo: focusName, startedOnTab: model.searchStartedOnTab?.title)
+        }
+        // The filter row above names the focus.
+        if let focusName {
+            if case .number(let n) = model.searchQuery { return "#\(n) in \(focusName)" }
+            if let tab = model.searchStartedOnTab { return "Started typing on \(tab.title) · searching \(focusName)" }
+            return "Titles in \(focusName)"
+        }
+        // Before the first launch has found an org there is no name to show; no-org mode searches the
+        // user's own repos.
+        let personal = model.snapshot.map { $0.scope.org == nil } ?? false
+        let repos = personal ? "your repos" : org.isEmpty ? "every repo" : "every \(org) repo"
+        let scope = personal ? "your repos" : org.isEmpty ? "the organization" : org
+        if case .number(let n) = model.searchQuery { return "#\(n) in \(repos)" }
+        if let tab = model.searchStartedOnTab { return "Started typing on \(tab.title) · searching all of \(scope)" }
+        return "Titles in all of \(scope)"
+    }
+
+    private var contextLabel: String {
+        if let scopeTitle {
+            return SearchContext.narrowedAccessibilityLabel(
+                model.searchQuery, tab: scopeTitle, matches: matchCount, repo: focusName)
+        }
+        let label = model.searchQuery.filter.map {
+            SearchContext.accessibilityLabel(filter: $0, org: org, repo: focusName)
+        } ?? coverage
+        return matches.map { label + ", " + SearchContext.matchCount($0) } ?? label
+    }
 }
 
 /// The completion list's keys, in place of the search or list footer while the list is open.
@@ -456,123 +597,16 @@ private struct FailureBanner: View {
     }
 }
 
-/// An issue result: the state glyph, the highlighted title, the Issues list's meta line and a muted
-/// board Status pill (search results are not grouped by Status).
-private struct SearchIssueRow: View {
-    let issue: BoardIssue
-    let words: [String]
-    /// The labels a `~label` search asks for, whose chips lead.
-    let labels: [String]
-    let role: String?
-    let now: Date
-    let compact: Bool
-    let selected: Bool
-    let flashing: Bool
-    let action: () -> Void
-
-    private var glyph: (symbol: String, color: Color, label: String) { Palette.issueGlyph(issue.glyph) }
-
-    var body: some View {
-        SearchRowButton(compact: compact, selected: selected, flashing: flashing, action: action) {
-            if compact { compactBody } else { fullBody }
-        }
-    }
-
-    private var fullBody: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(symbol: glyph.symbol)
-                .font(.system(size: 13))
-                .foregroundStyle(glyph.color)
-                .frame(width: 20, height: 20)
-                .accessibilityLabel(glyph.label)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(Highlight.title(issue.title, words: words))
-                    .font(.system(size: 13))
-                    .lineSpacing(1)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .foregroundStyle(titleStyle)
-                    .fixedSize(horizontal: false, vertical: true)
-                    // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
-                    .help(issue.title)
-                IssueMetaLine(issue: issue, now: now, role: role, wantedLabels: labels)
-                    .padding(.top, 3)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            statusPill
-        }
-    }
-
-    /// The tab rows' compact line, with the Status pill where a tab row has its assignees.
-    private var compactBody: some View {
-        CompactRowLayout(
-            repoNumber: RepoNumber(key: issue.key, compact: true),
-            age: IssueMetaLine.age(of: issue, now: now), ageWidth: issue.isOpen ? 24 : nil
-        ) {
-            Image(symbol: glyph.symbol)
-                .font(.system(size: 11))
-                .foregroundStyle(glyph.color)
-                .frame(width: 16)
-                .accessibilityLabel(glyph.label)
-        } title: {
-            Text(Highlight.title(issue.title, words: words))
-                .foregroundStyle(titleStyle)
-                .help(issue.title)
-        } badges: {
-            EmptyView()
-        } trailing: {
-            // Sized to fit, so the title truncates first.
-            statusPill
-                .fixedSize()
-        }
-    }
-
-    private var titleStyle: AnyShapeStyle {
-        issue.isOpen ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)
-    }
-
-    @ViewBuilder private var statusPill: some View {
-        if let status = issue.status?.name {
-            Pill(symbol: nil, text: status, foreground: Palette.secondaryText, fill: Palette.fill)
-                .accessibilityLabel("Status: \(status)")
-        }
-    }
-}
-
-private struct SearchRowButton<Label: View>: View {
-    /// A compact label brings its own height and padding (`CompactRowLayout`).
-    let compact: Bool
-    let selected: Bool
-    let flashing: Bool
-    let action: () -> Void
-    @ViewBuilder let label: () -> Label
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            label()
-                .padding(.horizontal, compact ? 0 : 8)
-                .padding(.top, compact ? 0 : 7)
-                .padding(.bottom, compact ? 0 : 8)
-                .contentShape(Rectangle())
-                .modifier(RowFill(
-                    cornerRadius: compact ? 6 : 7, selected: selected, hovering: hovering, flashing: flashing))
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .accessibilityAddTraits(selected ? [.isSelected] : [])
-    }
-}
-
 enum Highlight {
-    /// The title with every query word in bold.
+    /// The title with every query word on a soft highlight. Not bold: the title keeps the tab's width, so it
+    /// wraps where the tab's does.
     static func title(_ title: String, words: [String]) -> AttributedString {
         var attributed = AttributedString(title)
         for word in words where !word.isEmpty {
             var searchStart = title.startIndex
             while let range = title.range(of: word, options: .caseInsensitive, range: searchStart..<title.endIndex) {
                 if let attributedRange = Range(range, in: attributed) {
-                    attributed[attributedRange].inlinePresentationIntent = .stronglyEmphasized
+                    attributed[attributedRange].backgroundColor = Palette.match
                 }
                 searchStart = range.upperBound
             }
@@ -582,12 +616,12 @@ enum Highlight {
 }
 
 private extension View {
-    /// The Ask line's place under the context line: small, muted, and as wide as the rows.
+    /// The Ask line's place at the top of the results: small, muted, and as wide as the rows.
     func askLineStyle() -> some View {
         font(.system(size: 11))
             .foregroundStyle(.secondary)
             .padding(.horizontal, 8)
-            .padding(.top, 4)
+            .padding(.top, 6)
             .frame(maxWidth: .infinity, minHeight: 20, alignment: .leading)
     }
 }

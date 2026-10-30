@@ -135,45 +135,6 @@ import Testing
         #expect(chips.action == nil)
     }
 
-    // MARK: Search
-
-    static func search(
-        author: String = "me", state: PRState = .open, reviews: [(String, ReviewState)] = [],
-        mergeable: Mergeable? = nil, viewer: String = "me"
-    ) -> RowChips {
-        RowChips(
-            searchResult: row(author: author, state: state, reviews: reviews, mergeable: mergeable).pr, viewer: viewer)
-    }
-
-    @Test func searchShowsNoCountsOrNoReviews() {
-        #expect(Self.search() == RowChips(action: nil, info: []))
-        #expect(Self.search(reviews: [("a", .approved)], viewer: "other") == RowChips(action: nil, info: []))
-    }
-
-    @Test func searchReadyToMergeOnlyOnTheViewersOwn() {
-        #expect(Self.search(reviews: [("a", .approved)]) == RowChips(action: .readyToMerge, info: []))
-        #expect(Self.search(reviews: [("a", .approved)], viewer: "ME").action == .readyToMerge)
-        #expect(Self.search(author: "alice", reviews: [("a", .approved)]).action == nil)
-    }
-
-    @Test func searchChangesRequestedOnAnyOpenPR() {
-        let chips = Self.search(author: "alice", reviews: [("bob", .changesRequested), ("carol", .approved)])
-        #expect(chips == RowChips(action: .changesRequested(by: ["bob"]), info: []))
-    }
-
-    @Test func searchConflictsOnAnyOpenPR() {
-        #expect(Self.search(author: "alice", mergeable: .conflicting) == RowChips(action: nil, info: [.conflicts]))
-        let own = Self.search(reviews: [("a", .approved)], mergeable: .conflicting)
-        #expect(own == RowChips(action: nil, info: [.conflicts]))
-    }
-
-    @Test func searchEndedPRShowsNothing() {
-        for state: PRState in [.merged, .closed] {
-            let chips = Self.search(state: state, reviews: [("a", .changesRequested)], mergeable: .conflicting)
-            #expect(chips == RowChips(action: nil, info: []))
-        }
-    }
-
     // MARK: Wording
 
     @Test func infoWording() {

@@ -53,13 +53,13 @@ struct PRListView: View {
                         EmptyTabView(model: model, tab: tab, now: now)
                     }
                 }
-                .frame(height: tab == .mine && !recentlyClosed.isEmpty ? 260 : 400)
+                .frame(height: EmptyListFrame.height(sectionBelow: tab == .mine && !recentlyClosed.isEmpty))
             } else if grouping == .repository {
                 ForEach(groups, id: \.repo) { group in
                     Section {
                         rows(group.rows)
                     } header: {
-                        repoHeader(group.repo, rows: group.rows)
+                        RepoGroupHeader(model: model, repo: group.repo, rows: group.rows, menus: .list)
                             .pinnedHeaderBackground()
                     }
                 }
@@ -68,7 +68,7 @@ struct PRListView: View {
                     Section {
                         rows(group.rows)
                     } header: {
-                        AuthorHeader(model: model, author: group.author, rows: group.rows)
+                        AuthorGroupHeader(model: model, author: group.author, rows: group.rows, menus: .list)
                             .pinnedHeaderBackground()
                     }
                 }
@@ -124,35 +124,6 @@ struct PRListView: View {
         ListSectionHeader(
             glyph: nil, title: "Recently closed", count: recentlyClosed.count, trailing: closedWindow,
             fold: .init(isOpen: closedExpanded) { closedExpanded.toggle() }, compact: model.settings.compact)
-    }
-
-    /// A repo group's header, counting what the tab counts; it offers the repo focus.
-    private func repoHeader(_ repo: String, rows: [Row]) -> some View {
-        let count = rows.filter(\.counted).count
-        return ListSectionHeader(
-            glyph: "book.closed", title: repo.split(separator: "/").last.map(String.init) ?? repo,
-            count: count > 0 ? count : nil, compact: model.settings.compact)
-            .focusContextMenu(
-                FocusMenuItem(model: model, repo: repo), time: TimeFocusMenu(model: model),
-                openAll: BulkOpenItem(urls: rows.map(\.pr.url)))
-    }
-}
-
-/// An author group's header: their avatar and login, counting what the tab counts; it offers a search
-/// for them.
-private struct AuthorHeader: View {
-    @Bindable var model: AppModel
-    let author: String
-    let rows: [Row]
-
-    var body: some View {
-        let count = rows.filter(\.counted).count
-        ListSectionHeader(
-            glyph: nil, title: author, count: count > 0 ? count : nil,
-            avatar: .init(login: author, url: rows.first?.pr.authorAvatarURL), compact: model.settings.compact)
-        .focusContextMenu(
-            FocusMenuItem.person(model: model, login: author), time: TimeFocusMenu(model: model),
-            openAll: BulkOpenItem(urls: rows.map(\.pr.url)))
     }
 }
 
