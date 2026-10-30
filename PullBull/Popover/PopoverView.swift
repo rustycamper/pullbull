@@ -227,7 +227,8 @@ struct PopoverView: View {
         // Any other text (the user's next edit) ends a pending caret.
         .onChange(of: model.searchText) { _, text in
             if let pending = pendingCaret, pending.text != text { pendingCaret = nil }
-            hintSelection = nil
+            // The `-` token picked from the keyboard keeps the cursor it just typed.
+            if !(text == SearchHint.negate.sigil && hintSelection == .hint(.negate)) { hintSelection = nil }
             saveName = nil
         }
     }
