@@ -73,6 +73,7 @@ public enum SearchContext {
             filters.append(
                 (terms.states.count == 1 ? "state " : "states ") + SearchQuery.joinedList(terms.states.map(\.rawValue)))
         }
+        filters += terms.conditions.map(\.summary)
         if !terms.statuses.isEmpty {
             filters.append(
                 SearchQuery.joinedList(terms.statuses.map { "Status \($0.exact ? "" : "containing ")\($0.name)" }))
@@ -80,6 +81,7 @@ public enum SearchContext {
         for updated in terms.updated {
             if case .step(let step) = updated { filters.append("updated \(step.title)") } else { filters.append(updated.token) }
         }
+        filters += terms.reviews.map { "review: \($0.summary)" }
         return filters
     }
 

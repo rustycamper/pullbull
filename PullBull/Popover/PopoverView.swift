@@ -880,6 +880,7 @@ struct PopoverView: View {
         case .states(let states): states.selectedCandidate.map(CompletionSpeech.completed)
         case .statuses(let statuses): statuses.selectedCandidate.map(CompletionSpeech.completed)
         case .updated(let steps): steps.selectedCandidate.map(CompletionSpeech.completed)
+        case .reviews(let reviews): reviews.selectedCandidate.map(CompletionSpeech.completed)
         case nil: nil
         }
         guard let caret = model.acceptCompletion() else { return }

@@ -55,7 +55,7 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
         var field = SearchFieldState()
         let sigil = SearchHint.state.sigil
         field.edit(sigil, caret: sigil.utf16.count, people: .empty)
-        #expect(field.stateCompletion?.candidates.map(\.state) == [.open, .closed, .merged, .draft])
+        #expect(field.stateCompletion?.candidates.map(\.value) == IsValue.all)
     }
 }
 

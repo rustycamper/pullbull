@@ -72,6 +72,16 @@ struct CompletionList: View {
                             }
                         }
                     }
+                case .reviews(let reviews):
+                    if reviews.candidates.isEmpty {
+                        message("No review filter called “\(reviews.token.prefix)” · ↩ to search anyway")
+                    } else {
+                        ForEach(Array(reviews.candidates.enumerated()), id: \.element.id) { index, candidate in
+                            ReviewCompletionRow(candidate: candidate, selected: index == reviews.selection) {
+                                pick(index, in: completion)
+                            }
+                        }
+                    }
                 }
             }
             .padding(4)
@@ -200,10 +210,10 @@ private struct StateCompletionRow: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .frame(width: 18, height: 18)
-                Text(candidate.state.rawValue)
+                Text(candidate.value.name)
                     .font(.system(size: 13))
                 Spacer(minLength: 8)
-                Text(candidate.state.summary)
+                Text(candidate.value.summary)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -279,6 +289,42 @@ private struct TimeStepCompletionRow: View {
                     .font(.system(size: 13))
                 Spacer(minLength: 8)
                 Text(candidate.step.title)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .frame(height: 26)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(selected ? Palette.selection : hovering ? Palette.rowHover : .clear))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(CompletionSpeech.label(candidate))
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : [.isButton])
+    }
+}
+
+private struct ReviewCompletionRow: View {
+    let candidate: ReviewCandidate
+    let selected: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.bubble")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18, height: 18)
+                Text(candidate.insertText)
+                    .font(.system(size: 13))
+                Spacer(minLength: 8)
+                Text(candidate.review.summary)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }

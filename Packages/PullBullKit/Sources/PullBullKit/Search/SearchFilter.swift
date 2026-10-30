@@ -1,7 +1,7 @@
 import Foundation
 
-/// One side of a filtered search: the `@`, `~`, `is:`, `status:` and `updated:` terms it includes, or the
-/// ones it excludes. Logins and labels keep the case typed, deduplicated case-insensitively; `me` is always
+/// One side of a filtered search: the `@`, `~`, `is:`, `status:`, `updated:` and `review:` terms it includes,
+/// or the ones it excludes. Logins and labels keep the case typed, deduplicated case-insensitively; `me` is always
 /// lowercase. States are deduplicated, statuses deduplicated case-insensitively.
 public struct SearchTerms: Equatable, Sendable {
     public var logins: [String]
@@ -10,27 +10,33 @@ public struct SearchTerms: Equatable, Sendable {
     public var statuses: [BoardStatusFilter]
     /// Included: at most one, the last typed. Excluded: every one typed.
     public var updated: [UpdatedFilter]
+    /// The `is:` values that aren't states.
+    public var conditions: [ItemCondition]
+    public var reviews: [ReviewFilter]
 
     public init(
         logins: [String] = [], labels: [String] = [], states: [StateFilter] = [], statuses: [BoardStatusFilter] = [],
-        updated: [UpdatedFilter] = []
+        updated: [UpdatedFilter] = [], conditions: [ItemCondition] = [], reviews: [ReviewFilter] = []
     ) {
         self.logins = logins
         self.labels = labels
         self.states = states
         self.statuses = statuses
         self.updated = updated
+        self.conditions = conditions
+        self.reviews = reviews
     }
 
     public var isEmpty: Bool {
         logins.isEmpty && labels.isEmpty && states.isEmpty && statuses.isEmpty && updated.isEmpty
+            && conditions.isEmpty && reviews.isEmpty
     }
 
-    /// The `@` tokens, then the `~` tokens, then the `is:` tokens, then the `status:` tokens, then the
-    /// `updated:` tokens.
+    /// The `@` tokens, then the `~` tokens, then the `is:` tokens (states, then conditions), then the
+    /// `status:` tokens, then the `updated:` tokens, then the `review:` tokens.
     var tokens: [String] {
-        logins.map { "@\($0)" } + labels.map(SearchQuery.labelToken) + states.map(\.token) + statuses.map(\.token)
-            + updated.map(\.token)
+        logins.map { "@\($0)" } + labels.map(SearchQuery.labelToken) + states.map(\.token) + conditions.map(\.token)
+            + statuses.map(\.token) + updated.map(\.token) + reviews.map(\.token)
     }
 
     mutating func add(login: String) {
@@ -45,16 +51,26 @@ public struct SearchTerms: Equatable, Sendable {
         if !states.contains(state) { states.append(state) }
     }
 
+    mutating func add(condition: ItemCondition) {
+        if !conditions.contains(condition) { conditions.append(condition) }
+    }
+
+    mutating func add(review: ReviewFilter) {
+        if !reviews.contains(review) { reviews.append(review) }
+    }
+
     mutating func add(status: BoardStatusFilter) {
         if !statuses.contains(where: { $0.isSame(as: status) }) { statuses.append(status) }
     }
 
-    /// Whether each login, label, state and status term holds for `pr` (`holds` true) or fails for it (`holds`
-    /// false). A pull request has no Status.
+    /// Whether each login, label, state, condition, review and status term holds for `pr` (`holds` true) or
+    /// fails for it (`holds` false). A pull request has no Status.
     func every(holds: Bool, _ pr: PullRequest, viewer: String) -> Bool {
         logins.allSatisfy { !PersonMatch.roles(of: pr, login: $0, viewer: viewer).isEmpty == holds }
             && labels.allSatisfy { Self.has($0, pr.labels) == holds }
             && states.allSatisfy { $0.matches(pr) == holds }
+            && conditions.allSatisfy { $0.matches(pr) == holds }
+            && reviews.allSatisfy { $0.matches(pr) == holds }
             && statuses.allSatisfy { $0.matches(nil) == holds }
     }
 
@@ -99,8 +115,12 @@ public struct SearchFilter: Equatable, Sendable {
         include.tokens + exclude.tokens.map { "-" + $0 }
     }
 
-    /// The search keeps to pull requests: the issue search is skipped and no issue matches.
-    public var prOnly: Bool { false }
+    /// The search keeps to pull requests: the issue search is skipped and no issue matches. Any condition but
+    /// `is:unanswered` or any review does that, included or excluded.
+    public var prOnly: Bool {
+        (include.conditions + exclude.conditions).contains(where: \.prOnly)
+            || !include.reviews.isEmpty || !exclude.reviews.isEmpty
+    }
 
     /// The included `updated:` window and the excluded ones as of `now`, worked out once for a query's rows.
     func windows(now: Date, calendar: Calendar) -> (window: UpdatedFilter.Window?, excluded: [UpdatedFilter.Window]) {
@@ -137,12 +157,17 @@ public struct SearchFilter: Equatable, Sendable {
     /// on GitHub, so it never drops a row the local filter keeps), `-label:` and `-is:`. An excluded `status:`
     /// is the board's, which GitHub doesn't know, and an excluded `updated:` is never sent either: GitHub
     /// judges it on `updatedAt`, while the local filter reads a closed item's close date, so GitHub would drop
-    /// rows the local filter keeps.
+    /// rows the local filter keeps. The same goes for an excluded condition or review: GitHub's `status:failure`
+    /// and `review:none` aren't known to match exactly what the local filter does, so their `-` forms could drop
+    /// rows it keeps. An included condition or review sends its form only when GitHub's match holds every row
+    /// the local one does (`is:failing`, `review:none`).
     public func serverQualifiers(now: Date, calendar: Calendar) -> [String] {
         var parts = include.states.map(\.token)
         if let updated = include.updated.last { parts.append(updated.serverQualifier(now: now, calendar: calendar)) }
         if let login = include.logins.first { parts.append("involves:\(Self.serverLogin(login))") }
         parts += SearchEngine.quoted(include.labels).map { "label:\($0)" }
+        parts += include.conditions.compactMap(\.serverQualifier)
+        parts += include.reviews.compactMap(\.serverQualifier)
         let quotedWords = SearchEngine.quoted(words)
         if !quotedWords.isEmpty { parts.append("in:title \(quotedWords.joined(separator: " "))") }
         parts += exclude.logins.map { "-author:\(Self.serverLogin($0))" }

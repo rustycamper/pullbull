@@ -114,6 +114,8 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 | `@alice` `@me` | Author or reviewer. On issues: author or assignee |
 | `~bug` `~"good first issue"` `label:bug` | Label |
 | `is:open` `is:closed` `is:merged` `is:draft` | State |
+| `is:ready` `is:conflict` `is:failing` `is:approved` | Ready to merge · merge conflicts · checks failed · has an approval. PRs only |
+| `review:changes` `review:none` | Changes requested · no reviews yet. PRs only |
 | `status:prog` `status:"In progress"` | Status column on the board. Issues only |
 | `#123` | That number, every repo |
 | `owner/repo#123` or a link | Exactly that item |
@@ -121,7 +123,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 | words | Title |
 | `-@bot` `-~wontfix` `-is:draft` `-status:done` `-updated:1w` | Not that. Works on every qualifier; a bare `-word` is a word. `-status:` and `-updated:` filter locally only |
 
-- `@`, `~`, `is:`, `status:`, `updated:` and words combine; everything must match; a leading `-` excludes
+- `@`, `~`, `is:`, `status:`, `updated:`, `review:` and words combine; everything must match; a leading `-` excludes
 - `status:` uses the board shown in the Board tab. Unquoted matches part of a Status name, quoted the whole name; case is ignored. Names with spaces need quotes to match exactly
 - With `status:`, PRs and issues not on the board don't match
 - `-status:` keeps PRs and issues not on the board
@@ -132,7 +134,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - Compact cards (Settings → General) apply to results too: one line each, with checks on open PRs and the Status on issues
 - Matches in the other mode show a hint: <kbd>⌘</kbd><kbd>1</kbd> / <kbd>⌘</kbd><kbd>2</kbd>
 - Empty field shows saved searches and token hints. <kbd>↓</kbd> to walk them
-- Typing `@`, `~`, `label:`, `is:`, `status:` or `updated:` opens a completion list. `status:` lists the board's Status columns with their open counts; picking one writes the full name in quotes. `updated:` lists the four steps. Also after `-`
+- Typing `@`, `~`, `label:`, `is:`, `status:`, `updated:` or `review:` opens a completion list. `status:` lists the board's Status columns with their open counts; picking one writes the full name in quotes. `updated:` lists the four steps; `review:` lists `changes` and `none`. Also after `-`
 - Typing the start of `status:`, `label:` or `updated:` (`st`, `la`, `up`) at the end of the field shows the rest in grey. Not `is:`, a common word; `status:` only when the board has Status columns; `updated:` only up to `upda`, so a title word like "update" is left alone. Also after `-`
 - **Save:** bookmark icon in the field. Manage in Settings → Search
 

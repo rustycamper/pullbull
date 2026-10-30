@@ -35,12 +35,12 @@ private func open(_ text: String) -> StateCompletion? {
 
 @Suite struct StateCompletionTests {
     @Test func bareQualifierListsEveryState() throws {
-        #expect(try #require(open("is:")).candidates.map(\.state) == [.open, .closed, .merged, .draft])
+        #expect(try #require(open("is:")).candidates.map(\.value) == StateFilter.allCases.map(IsValue.state) + ItemCondition.allCases.map(IsValue.condition))
     }
 
     @Test func candidatesFollowThePrefix() throws {
-        #expect(try #require(open("is:M")).candidates.map(\.state) == [.merged])
-        #expect(try #require(open("is:open")).candidates.map(\.state) == [.open])
+        #expect(try #require(open("is:M")).candidates.map(\.value) == [.state(.merged)])
+        #expect(try #require(open("is:open")).candidates.map(\.value) == [.state(.open)])
         #expect(try #require(open("is:x")).candidates.isEmpty)
     }
 
@@ -58,19 +58,19 @@ private func open(_ text: String) -> StateCompletion? {
     }
 
     @Test func candidateText() {
-        #expect(StateCandidate(state: .draft).insertText == "is:draft")
-        #expect(StateCandidate(state: .draft).id == "draft")
+        #expect(StateCandidate(value: .state(.draft)).insertText == "is:draft")
+        #expect(StateCandidate(value: .state(.draft)).id == "draft")
         #expect(StateFilter.closed.token == "is:closed")
     }
 
     @Test func speech() throws {
         let all = try #require(open("is:"))
-        #expect(CompletionSpeech.opened(all) == "4 states. Up and down arrows to choose, Return to complete.")
+        #expect(CompletionSpeech.opened(all) == "9 states. Up and down arrows to choose, Return to complete.")
         #expect(CompletionSpeech.opened(try #require(open("is:x"))) == "No matching states. Return to search anyway.")
-        #expect(CompletionSpeech.selected(all.moved(by: 2)) == "merged, merged PRs, 3 of 4")
-        #expect(CompletionSpeech.completed(StateCandidate(state: .open)) == "Showing open items")
+        #expect(CompletionSpeech.selected(all.moved(by: 2)) == "merged, merged PRs, 3 of 9")
+        #expect(CompletionSpeech.completed(StateCandidate(value: .state(.open))) == "Showing open items")
         #expect(CompletionSpeech.change(from: nil, to: .states(all), loaded: false)
-            == "4 states. Up and down arrows to choose, Return to complete.")
+            == "9 states. Up and down arrows to choose, Return to complete.")
     }
 }
 
@@ -78,7 +78,7 @@ private func open(_ text: String) -> StateCompletion? {
     @Test func typingTheQualifierOpensTheStateList() {
         var state = SearchFieldState()
         #expect(type("is:", into: &state) == nil)
-        #expect(state.stateCompletion?.candidates.count == 4)
+        #expect(state.stateCompletion?.candidates.count == 9)
         #expect(state.searchCompletion?.token.kind == .state)
         #expect(state.completion == nil && state.labelCompletion == nil)
     }
@@ -108,6 +108,6 @@ private func open(_ text: String) -> StateCompletion? {
         type("is:o", into: &state)
         state.dismiss()
         type("is:", into: &state)
-        #expect(state.stateCompletion?.candidates.count == 4)
+        #expect(state.stateCompletion?.candidates.count == 9)
     }
 }

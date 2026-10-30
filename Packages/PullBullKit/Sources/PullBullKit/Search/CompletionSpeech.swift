@@ -1,6 +1,6 @@
 import Foundation
 
-/// What VoiceOver says for the "@user", "~label", "is:", "status:" and "updated:" completion lists, which never take focus from the
+/// What VoiceOver says for the "@user", "~label", "is:", "status:", "updated:" and "review:" completion lists, which never take focus from the
 /// search field.
 public enum CompletionSpeech {
     /// The list opened on a new token. `loaded` is false before the first snapshot.
@@ -40,6 +40,15 @@ public enum CompletionSpeech {
         }
     }
 
+    /// The review filters never wait for a snapshot.
+    public static func opened(_ completion: ReviewCompletion) -> String {
+        switch completion.candidates.count {
+        case 0: return "No matching review filters. Return to search anyway."
+        case 1: return "1 review filter. Up and down arrows to choose, Return to complete."
+        case let count: return "\(count) review filters. Up and down arrows to choose, Return to complete."
+        }
+    }
+
     public static func opened(_ completion: StatusCompletion, loaded: Bool) -> String {
         guard loaded else { return "Status columns appear once PullBull has loaded" }
         switch completion.candidates.count {
@@ -69,7 +78,12 @@ public enum CompletionSpeech {
 
     /// One row: `<state>, <summary>`.
     public static func label(_ candidate: StateCandidate) -> String {
-        "\(candidate.state.rawValue), \(candidate.state.summary)"
+        "\(candidate.value.name), \(candidate.value.summary)"
+    }
+
+    /// One row: `<filter>, <summary>`.
+    public static func label(_ candidate: ReviewCandidate) -> String {
+        "\(candidate.review.rawValue), \(candidate.review.summary)"
     }
 
     /// One row: `<token>, <title>`.
@@ -98,6 +112,10 @@ public enum CompletionSpeech {
         completion.selectedCandidate.map { position(label($0), in: completion) }
     }
 
+    public static func selected(_ completion: ReviewCompletion) -> String? {
+        completion.selectedCandidate.map { position(label($0), in: completion) }
+    }
+
     /// What to say when the list changes from `old` to `new`: open on a new token, or when the candidates
     /// go from none to some or some to none on the same token; the selection after ↑ / ↓; else nothing.
     public static func change(from old: PersonCompletion?, to new: PersonCompletion?, loaded: Bool) -> String? {
@@ -120,6 +138,10 @@ public enum CompletionSpeech {
         change(from: old, to: new, opened: opened, selected: selected)
     }
 
+    public static func change(from old: ReviewCompletion?, to new: ReviewCompletion?) -> String? {
+        change(from: old, to: new, opened: opened, selected: selected)
+    }
+
     /// As for one kind; a list of another kind counts as a new token.
     public static func change(from old: SearchCompletion?, to new: SearchCompletion?, loaded: Bool) -> String? {
         switch (old, new) {
@@ -129,11 +151,13 @@ public enum CompletionSpeech {
         case (.states(let o), .states(let n)): return change(from: o, to: n)
         case (.statuses(let o), .statuses(let n)): return change(from: o, to: n, loaded: loaded)
         case (.updated(let o), .updated(let n)): return change(from: o, to: n)
+        case (.reviews(let o), .reviews(let n)): return change(from: o, to: n)
         case (_, .people(let n)): return opened(n, loaded: loaded)
         case (_, .labels(let n)): return opened(n, loaded: loaded)
         case (_, .states(let n)): return opened(n)
         case (_, .statuses(let n)): return opened(n, loaded: loaded)
         case (_, .updated(let n)): return opened(n)
+        case (_, .reviews(let n)): return opened(n)
         }
     }
 
@@ -146,10 +170,15 @@ public enum CompletionSpeech {
     }
 
     public static func completed(_ candidate: StateCandidate) -> String {
-        switch candidate.state {
-        case .open, .closed: "Showing \(candidate.state.rawValue) items"
-        case .merged, .draft: "Showing \(candidate.state.rawValue) pull requests"
+        switch candidate.value {
+        case .state(.open), .state(.closed): "Showing \(candidate.value.name) items"
+        case .state(.merged), .state(.draft): "Showing \(candidate.value.name) pull requests"
+        case .condition(let condition): "Showing pull requests: \(condition.summary)"
         }
+    }
+
+    public static func completed(_ candidate: ReviewCandidate) -> String {
+        "Showing pull requests: \(candidate.review.summary)"
     }
 
     public static func completed(_ candidate: TimeStepCandidate) -> String {

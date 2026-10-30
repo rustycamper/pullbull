@@ -21,8 +21,8 @@ public enum SearchQuery: Equatable, Sendable {
             logins: logins, labels: labels, states: states, statuses: statuses, updated: updated, words: words))
     }
 
-    /// `pending` is a range of `raw` (an `@`, `~`, `is:`, `status:` or `updated:` token still being completed) that is left out of
-    /// the query; a `-` left before it is dropped. An `is:` with a value that isn't a state is a word, and so
+    /// `pending` is a range of `raw` (an `@`, `~`, `is:`, `status:`, `updated:` or `review:` token still being completed) that is left out of
+    /// the query; a `-` left before it is dropped. An `is:` with a value that isn't a state or condition is a word, and so is a `review:` with another value, and so
     /// is a `-` before anything but a sigil.
     public static func parse(_ raw: String, excluding pending: Range<String.Index>? = nil) -> SearchQuery {
         var source = raw
@@ -56,6 +56,17 @@ public enum SearchQuery: Equatable, Sendable {
                 if term.value.isEmpty { continue }
                 if let state = StateFilter(rawValue: term.value.lowercased()) {
                     filter[keyPath: side].add(state: state)
+                    continue
+                }
+                if let condition = ItemCondition(rawValue: term.value.lowercased()) {
+                    filter[keyPath: side].add(condition: condition)
+                    continue
+                }
+                filter.words.append(trimmed[term.range].lowercased())
+            case .review:
+                if term.value.isEmpty { continue }
+                if let review = ReviewFilter(rawValue: term.value.lowercased()) {
+                    filter[keyPath: side].add(review: review)
                     continue
                 }
                 filter.words.append(trimmed[term.range].lowercased())
@@ -676,7 +687,7 @@ public struct SearchEngine: Sendable {
         // A personal scope limited to an installation's repos drops matches elsewhere.
         let scope = snap.scope
         let prQuery = remoteQuery(kind: "pr", scope: scope, focus: focus, filter: sent, now: now)
-        // An included `is:merged` or `is:draft` matches no issue, so the issue search is skipped.
+        // An included `is:merged` or `is:draft`, a PR-only condition or a review matches no issue, so the issue search is skipped.
         let searchesIssues = !sent.prOnly && sent.include.states.allSatisfy(\.appliesToIssues)
         let issueQuery = searchesIssues
             ? remoteQuery(kind: "issue", scope: scope, focus: focus, filter: sent, now: now)
