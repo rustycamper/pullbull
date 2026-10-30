@@ -247,3 +247,54 @@ extension NotificationGateTests {
         #expect(feed.fetch(from: merged, to: mergeSnap(370, mergedAt: 200)).isEmpty)
     }
 }
+
+// MARK: - Fast CI follow
+
+private func ciSnap(_ offset: TimeInterval, ci: CIState) -> Snapshot {
+    var s = snap(offset, comments: 0)
+    let p = s.mine[0]
+    s.mine = [PullRequest(
+        key: p.key, title: p.title, url: p.url, author: p.author, authorAvatarURL: nil, state: .open, isDraft: false,
+        createdAt: p.createdAt, updatedAt: p.updatedAt, closedAt: nil, headRef: "h", baseRef: "main", ci: ci,
+        headCommitDate: nil, commentCount: 0, lastCommentAuthor: nil,
+        latestReviews: [Review(author: "bob", state: .approved, submittedAt: launch)], reviewRequests: [],
+        mergeable: .mergeable)]
+    return s
+}
+
+private let followed = RefreshStatus(lastSuccess: nil, error: nil, isRefreshing: false, isCIFollow: true)
+
+extension NotificationGateTests {
+    /// A follow merged into the baseline posts its changes, and the next full refresh, which sees the
+    /// same state, posts them again never.
+    @Test func followPostsOnceAcrossTheNextFullRefresh() {
+        var feed = Feed()
+        feed.toggles.readyToMerge = true
+        let base = ciSnap(10, ci: .pending)
+        #expect(feed.fetch(from: nil, to: base).isEmpty)
+        let follow = base.merging(followed: ciSnap(10, ci: .failure).mine)
+        #expect(feed.gate.events(snapshot: follow, status: followed, toggles: feed.toggles).map(\.kind) == [.ciFailed])
+        #expect(feed.fetch(from: follow, to: ciSnap(130, ci: .failure)).isEmpty)
+        // Ready to merge the same way.
+        let pending = ciSnap(250, ci: .pending)
+        #expect(feed.fetch(from: ciSnap(130, ci: .failure), to: pending).isEmpty)
+        let green = pending.merging(followed: ciSnap(250, ci: .success).mine)
+        #expect(feed.gate.events(snapshot: green, status: followed, toggles: feed.toggles).map(\.kind) == [.readyToMerge])
+        #expect(feed.fetch(from: green, to: ciSnap(370, ci: .success)).isEmpty)
+    }
+
+    /// A follow update is diffed only on top of the full refresh it was merged into.
+    @Test func followNeedsItsBaseline() {
+        var feed = Feed()
+        // No baseline yet.
+        #expect(feed.gate.events(snapshot: ciSnap(10, ci: .failure), status: followed, toggles: feed.toggles).isEmpty)
+        #expect(feed.fetch(from: nil, to: ciSnap(20, ci: .pending)).isEmpty)
+        // Merged into another snapshot than the baseline: ignored, and the baseline stays.
+        #expect(feed.gate.events(snapshot: ciSnap(15, ci: .failure), status: followed, toggles: feed.toggles).isEmpty)
+        #expect(feed.fetch(from: ciSnap(20, ci: .pending), to: ciSnap(140, ci: .failure)) == [.ciFailed])
+        // A follow that carries an error never counts.
+        var failed = followed
+        failed.error = .offline
+        #expect(feed.gate.events(snapshot: ciSnap(140, ci: .pending), status: failed, toggles: feed.toggles).isEmpty)
+    }
+}

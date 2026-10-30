@@ -246,7 +246,7 @@ final class PopoverController: NSObject {
             let window = note.object as? NSWindow
             MainActor.assumeIsolated {
                 guard let self, self.isShown, let window, window !== self.panel,
-                      window.styleMask.contains(.titled) else { return }
+                      window.sheetParent !== self.panel, window.styleMask.contains(.titled) else { return }
                 NSApp.activate()
                 self.close()
             }

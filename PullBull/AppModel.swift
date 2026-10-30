@@ -31,6 +31,13 @@ extension SearchScope {
     }
 }
 
+/// Whether the shown tab's Recently closed (PRs) and Done (issues) groups are expanded; the popover keeps
+/// it in step with what it shows.
+struct ListExpansion: Equatable {
+    var closed = false
+    var done = false
+}
+
 @Observable @MainActor
 final class AppModel {
     var settings: AppSettings {
@@ -74,7 +81,10 @@ final class AppModel {
     var selectedTab: PRTab {
         didSet {
             if settings.lastTab != selectedTab { settings.lastTab = selectedTab }
-            if selectedTab != oldValue { timeFocus = nil }
+            if selectedTab != oldValue {
+                timeFocus = nil
+                detailWalk = nil
+            }
         }
     }
     /// Pull Requests or Issues; remembered across launches, as is the tab of each mode.
@@ -83,6 +93,7 @@ final class AppModel {
             if settings.mode != mode { settings.mode = mode }
             guard mode != oldValue else { return }
             timeFocus = nil
+            detailWalk = nil
             modeNews.show(mode)
             // The other mode's tabs don't narrow this mode's search.
             let wasNarrowed = searchScope.isNarrowed
@@ -98,7 +109,10 @@ final class AppModel {
     var selectedIssueTab: IssueTab {
         didSet {
             if settings.lastIssueTab != selectedIssueTab { settings.lastIssueTab = selectedIssueTab }
-            if selectedIssueTab != oldValue { timeFocus = nil }
+            if selectedIssueTab != oldValue {
+                timeFocus = nil
+                detailWalk = nil
+            }
         }
     }
     /// The tab showing in the current mode.
@@ -148,6 +162,8 @@ final class AppModel {
     private(set) var people: PeopleIndex = .empty
     /// Every label the current snapshot holds; "~label" candidates come from here.
     private(set) var labels: LabelIndex = .empty
+    /// The focus menu's repositories; "repo:" candidates come from here.
+    private(set) var repos: RepoIndex = .empty
     /// The selected board's Status columns; "status:" candidates come from here.
     private(set) var statuses: StatusIndex = .empty
     /// The open "@user", "~label", "is:" or "status:" completion; nil when no token ends at the caret or the user closed it.
@@ -304,6 +320,11 @@ final class AppModel {
     private(set) var detailFetch: DetailFetch?
     /// Where Back returns to from the detail view.
     private(set) var detailReturnRoute: Route = .list
+    /// ⌥↓ / ⌥↑ through the list or search results the detail on screen was opened from; nil for a
+    /// detail opened from a notification, Ask or a link. An issue walk lasts through a linked PR's detail.
+    private(set) var detailWalk: DetailWalk?
+    /// Recently closed and Done as the popover shows them, so a walk's order is the one on screen.
+    @ObservationIgnored var listExpansion = ListExpansion()
     /// A notification opened a detail while the popover was closed; the next open shows it as it is.
     @ObservationIgnored var detailOpenedWhileClosed = false
     @ObservationIgnored private var detailTask: Task<Void, Never>?
@@ -331,6 +352,7 @@ final class AppModel {
         let board: BoardRef?
         let refreshMinutes: Int
         let canReadProjects: Bool
+        let followsPendingCI: Bool
 
         var ref: AccountRef { AccountRef(login: account, source: source) }
     }
@@ -565,11 +587,14 @@ final class AppModel {
         return listFocus.isActive ? listFocus.scope(closed) : closed
     }
 
-    /// PR tabs show repo group headers: Group by Repository is on and no focus merges them into one list.
-    var listGroupedByRepo: Bool { settings.grouping == .repository && repoFocus == nil }
+    /// How `tab` groups its rows: by repository when Group by Repository is on and no focus merges them,
+    /// and for Team by author when that is on.
+    func prGrouping(for tab: PRTab) -> PRGrouping {
+        PRGrouping.forTab(tab, settings: settings, repoFocused: repoFocus != nil)
+    }
 
     /// Rows name their repository (`repo #num`) unless a repo header or the focus already does.
-    var rowsShowRepo: Bool { settings.grouping != .repository && repoFocus == nil }
+    func rowsShowRepo(on tab: PRTab) -> Bool { prGrouping(for: tab) != .repository && repoFocus == nil }
 
     /// The focus menu's repositories; empty before the first snapshot. Kept current as the tabs and the
     /// focus change, as every row's context menu names its repository from them.
@@ -577,6 +602,10 @@ final class AppModel {
 
     private func refreshRepoChoices() {
         repoChoices = tabs.map { RepoFocus.choices(prs: $0, issues: issueTabs, current: repoFocus) } ?? []
+        let index = RepoIndex(choices: repoChoices)
+        guard index != repos else { return }
+        repos = index
+        searchField.refresh(people: people, labels: labels, statuses: statuses, repos: repos)
     }
 
     /// How the focus UI names `repo` (`owner/name`): the bare name unless another listed repository shares
@@ -694,7 +723,7 @@ final class AppModel {
         if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { searchStartedOnTab = nil }
         // A cleared field leaves the narrowed tab selected, and the next query searches everything.
         searchScope = searchScope.edited(to: text)
-        if let query = searchField.edit(text, caret: caret, people: people, labels: labels, statuses: statuses) {
+        if let query = searchField.edit(text, caret: caret, people: people, labels: labels, statuses: statuses, repos: repos) {
             runSearch(query, debounced: debounced)
         }
     }
@@ -702,7 +731,7 @@ final class AppModel {
     /// The caret moved without a text change: the list may close (the token then counts as typed), never open.
     func searchCaretMoved(to caret: Int) {
         guard route == .list || route == .search, caret <= searchText.utf16.count else { return }
-        if let query = searchField.caretMoved(to: caret, people: people, labels: labels, statuses: statuses) { runSearch(query) }
+        if let query = searchField.caretMoved(to: caret, people: people, labels: labels, statuses: statuses, repos: repos) { runSearch(query) }
     }
 
     func moveCompletion(by offset: Int) {
@@ -756,12 +785,12 @@ final class AppModel {
         searchField.close()
     }
 
-    /// A search hint was picked: the field holds `sigil` alone with the caret after it, so an `@`, `~` or
-    /// `is:` opens its list at once. The view puts the caret there.
-    func startToken(_ sigil: String) {
+    /// A search hint was picked: the field holds `text` alone (a sigil, or `-` and a sigil) with the caret
+    /// after it, so an `@`, `~` or `is:` opens its list at once. The view puts the caret there.
+    func startToken(_ text: String) {
         searchField.forgetCompletion()
         searchStartedOnTab = nil
-        updateSearch(sigil, caret: sigil.utf16.count)
+        updateSearch(text, caret: text.utf16.count)
     }
 
     /// Searches for everything involving `login` and puts the caret after it.
@@ -778,7 +807,17 @@ final class AppModel {
     /// the end, and it searches as if typed. The view puts the caret there.
     func applySavedSearch(_ saved: SavedSearch) {
         searchStartedOnTab = nil
-        if let query = searchField.apply(saved, people: people, labels: labels, statuses: statuses) { runSearch(query, debounced: false) }
+        if let query = searchField.apply(saved, people: people, labels: labels, statuses: statuses, repos: repos) { runSearch(query, debounced: false) }
+    }
+
+    /// ⌃1–⌃9: saved search `number`, in Settings order, applied as if picked; false when there is none.
+    /// It replaces whatever the field holds, so, as with typing, an Ask on the old text goes. The view
+    /// opens the field and puts the caret at the end.
+    func applySavedSearch(number: Int) -> Bool {
+        guard let saved = settings.savedSearches.search(forDigit: number) else { return false }
+        if saved.fieldText != searchText { clearAsk() }
+        applySavedSearch(saved)
+        return true
     }
 
     /// The field's query, trimmed, is one of the saved searches: the bookmark shows filled.
@@ -806,7 +845,7 @@ final class AppModel {
         guard fieldStale || searchResults == nil || searchKey(for: searchQuery) != searchedFor
             || shownSearchScope.isNarrowed
         else { return }
-        let query = fieldStale ? searchField.edit(searchText, caret: nil, people: people, labels: labels, statuses: statuses) : searchQuery
+        let query = fieldStale ? searchField.edit(searchText, caret: nil, people: people, labels: labels, statuses: statuses, repos: repos) : searchQuery
         if let query { runSearch(query, debounced: false, keeping: searchSelection) }
     }
 
@@ -1453,7 +1492,8 @@ final class AppModel {
         pickPersonalBoardIfNeeded()
         let config = RunConfig(
             account: account.login, source: account.source, scope: scope, board: settings.board,
-            refreshMinutes: max(1, settings.refreshMinutes), canReadProjects: canReadProjects)
+            refreshMinutes: max(1, settings.refreshMinutes), canReadProjects: canReadProjects,
+            followsPendingCI: settings.followPendingCI)
         guard config != running else { return }
         let interval = Duration.seconds(config.refreshMinutes * 60)
         if let coordinator, running?.ref == account, running?.scope == scope {
@@ -1461,7 +1501,8 @@ final class AppModel {
             running = config
             command {
                 await coordinator.update(
-                    board: config.board, canReadProjects: config.canReadProjects, interval: interval)
+                    board: config.board, canReadProjects: config.canReadProjects, interval: interval,
+                    followsPendingCI: config.followsPendingCI)
             }
             return
         }
@@ -1502,7 +1543,8 @@ final class AppModel {
         command {
             await coordinator.start(
                 account: account.login, scope: scope, board: config.board,
-                canReadProjects: config.canReadProjects, interval: interval, activity: activity)
+                canReadProjects: config.canReadProjects, interval: interval, activity: activity,
+                followsPendingCI: config.followsPendingCI)
             // The last path seen: on its own it refreshes nothing (nothing has failed yet).
             if let satisfied = self.networkSatisfied { await coordinator.networkPathChanged(satisfied: satisfied) }
         }
@@ -1595,7 +1637,7 @@ final class AppModel {
         people = .empty
         labels = .empty
         statuses = .empty
-        searchField.refresh(people: people, labels: labels, statuses: statuses)
+        searchField.refresh(people: people, labels: labels, statuses: statuses, repos: repos)
         tabs = nil
         issueTabs = nil
         hiddenApprovedCount = 0
@@ -1642,7 +1684,7 @@ final class AppModel {
             people = .empty
             labels = .empty
             statuses = .empty
-            searchField.refresh(people: people, labels: labels, statuses: statuses)
+            searchField.refresh(people: people, labels: labels, statuses: statuses, repos: repos)
             searchMatchCounts = [:]
             return
         }
@@ -1653,7 +1695,7 @@ final class AppModel {
             people = index
             labels = labelIndex
             statuses = statusIndex
-            searchField.refresh(people: people, labels: labels, statuses: statuses)
+            searchField.refresh(people: people, labels: labels, statuses: statuses, repos: repos)
         }
         let now = Date()
         let built = TabBuilder.build(snapshot, settings: settings, now: now)
@@ -1733,14 +1775,71 @@ extension AppModel {
         return openedPR?.key == key ? openedPR : nil
     }
 
-    /// A PR row chosen in a list or search: the row flashes, then its detail opens.
+    /// A PR row chosen in a list or search: the row flashes, then its detail opens, with ⌥↓ / ⌥↑ walking
+    /// the rows in the order on screen now.
     func openRowDetail(_ key: PRKey) {
-        flashRow(key) { $0.openDetail(key) }
+        let walk = DetailWalk(keys: walkKeys, opening: key, kind: .pullRequest)
+        flashRow(key) { model in
+            model.openDetail(key)
+            model.detailWalk = walk
+        }
     }
 
-    /// An issue row chosen in a list or search: the row flashes, then its detail opens.
+    /// An issue row chosen in a list or search: the row flashes, then its detail opens, with ⌥↓ / ⌥↑
+    /// walking the rows in the order on screen now.
     func openRowIssueDetail(_ key: PRKey) {
-        flashRow(key) { $0.openIssueDetail(key) }
+        let walk = DetailWalk(keys: walkKeys, opening: key, kind: .issue)
+        flashRow(key) { model in
+            model.openIssueDetail(key)
+            model.detailWalk = walk
+        }
+    }
+
+    /// The rows a walk steps through: the search results while searching, else the tab's list as shown.
+    private var walkKeys: [PRKey] {
+        route == .search
+            ? searchItemKeys : listKeys(closedExpanded: listExpansion.closed, doneExpanded: listExpansion.done)
+    }
+
+    /// "2 of 6" for the detail on screen; nil when it has no walk.
+    var detailPosition: String? {
+        switch route {
+        case .detail(let key): detailWalk?.position(showing: key, kind: .pullRequest)
+        case .issueDetail(let key): detailWalk?.position(showing: key, kind: .issue)
+        case .list, .search, .ask: nil
+        }
+    }
+
+    /// ⌥↓ / ⌥↑ in a detail: the next or previous item of its walk, with the list or search selection
+    /// following, so Back lands on it. An item that has left the data, with no detail cached, is skipped.
+    /// False when the detail has no walk (the key passes on); true at either end, where nothing happens.
+    func stepDetail(by offset: Int) -> Bool {
+        guard detailPosition != nil, let walk = detailWalk else { return false }
+        let next = walk.stepped(by: offset) { key in
+            switch walk.kind {
+            case .pullRequest: pullRequest(for: key) == nil && details[key] == nil
+            case .issue: issue(for: key) == nil && issueDetails[key] == nil
+            }
+        }
+        guard let next else { return true }
+        detailWalk = next
+        let key = next.current
+        let fromSearch = switch walk.kind {
+        case .pullRequest: detailReturnRoute == .search
+        case .issue: issueDetailReturnRoute == .search
+        }
+        if fromSearch {
+            keptSearchSelection = nil
+            searchSelection = key
+        } else {
+            listSelection = key
+        }
+        // The route is already this kind of detail, so where Back returns to stays.
+        switch walk.kind {
+        case .pullRequest: openDetail(key)
+        case .issue: openIssueDetail(key)
+        }
+        return true
     }
 
     /// Highlights the row for `RowFlash.duration`, then runs `open`. A choice during the flash is
@@ -1762,6 +1861,11 @@ extension AppModel {
 
     /// Shows the detail view for `key` with the cached detail at once, then refreshes it in place.
     func openDetail(_ key: PRKey) {
+        // A step keeps the walk; so does a linked PR, whose issue walk resumes on Back. Any other open
+        // (a notification, Ask) has none; a row's walk is set once the detail is open.
+        if case .issueDetail = route {} else if detailWalk?.position(showing: key, kind: .pullRequest) == nil {
+            detailWalk = nil
+        }
         switch route {
         case .ask: askReturn.open(from: .ask)
         case .issueDetail: if !askReturn.isEmpty { askReturn.open(from: .issueDetail) }
@@ -1785,12 +1889,15 @@ extension AppModel {
         if !askReturn.isEmpty, askReturn.close() == .ask {
             route = .ask
         } else if case .issueDetail(let issue) = detailReturnRoute {
+            // The issue's walk, if any, goes on from there.
             route = detailReturnRoute
             loadIssueDetail(issue)
+            return
         } else {
             route = detailReturnRoute == .search && !searchText.isEmpty ? .search : .list
             searchAgainIfStale()
         }
+        detailWalk = nil
     }
 
     /// Whether Back from the detail on screen (through an issue detail, for a linked PR) ends in the
@@ -1934,6 +2041,7 @@ extension AppModel {
         openedPR = nil
         refreshSeenSincePrefetch = false
         detailReturnRoute = .list
+        detailWalk = nil
         issueDetailTask?.cancel()
         issueDetailTask = nil
         issueDetails = [:]
@@ -1964,22 +2072,34 @@ extension AppModel {
         navigationKeys(for: shownTab, closedExpanded: closedExpanded, doneExpanded: doneExpanded)
     }
 
-    /// The time focus narrows only the shown tab, so another tab's rows are scoped by the repository alone.
     private func navigationKeys(for tab: ShownTab, closedExpanded: Bool, doneExpanded: Bool) -> [PRKey] {
+        navigationGroups(for: tab, closedExpanded: closedExpanded, doneExpanded: doneExpanded).groups.flatMap { $0 }
+    }
+
+    /// The shown groups of `tab`'s rows, in display order, and whether it shows group headers. The time
+    /// focus narrows only the shown tab, so another tab's rows are scoped by the repository alone.
+    private func navigationGroups(
+        for tab: ShownTab, closedExpanded: Bool, doneExpanded: Bool
+    ) -> (groups: [[PRKey]], grouped: Bool) {
         let focus = ListFocus(repo: repoFocus, time: tab == shownTab ? timeFocus : nil)
         switch tab {
         case .pullRequests(let prTab):
-            guard let contents = contents(of: prTab) else { return [] }
+            guard let contents = contents(of: prTab) else { return ([], false) }
             let scoped = focus.isActive ? focus.scope(contents) : ScopedTab(unscoped: contents)
             let closed = tabs?.recentlyClosed ?? []
-            return ListNavigation.prKeys(
-                tab: prTab, contents: scoped.contents, groupedByRepo: listGroupedByRepo,
+            let grouping = prGrouping(for: prTab)
+            let groups = ListNavigation.prGroups(
+                tab: prTab, contents: scoped.contents, grouping: grouping,
                 recentlyClosed: focus.isActive ? focus.scope(closed) : closed, closedExpanded: closedExpanded)
+            return (groups, ListNavigation.isGrouped(prGrouping: grouping))
         case .issues(let issueTab):
-            guard let issueTabs, issueTabs.isLoaded(issueTab), let contents = contents(of: issueTab) else { return [] }
+            guard let issueTabs, issueTabs.isLoaded(issueTab), let contents = contents(of: issueTab) else {
+                return ([], false)
+            }
             let scoped = focus.isActive ? focus.scope(contents) : ScopedIssueTab(unscoped: contents)
-            return ListNavigation.issueKeys(
+            let groups = ListNavigation.issueGroups(
                 scoped.contents, doneExpanded: doneExpanded, folded: foldedLanes(scoped.contents.groups, on: issueTab))
+            return (groups, ListNavigation.isGrouped(scoped.contents))
         }
     }
 
@@ -2001,6 +2121,20 @@ extension AppModel {
 
     func moveListSelection(by offset: Int, in keys: [PRKey]) {
         listSelection = ListNavigation.move(listSelection, by: offset, in: keys)
+    }
+
+    /// ⌥↓ / ⌥↑: the first row of the next or previous group (or of this one, going up from inside it).
+    /// Nothing in a list without groups, or past either end.
+    func jumpListGroup(by offset: Int, closedExpanded: Bool, doneExpanded: Bool) {
+        let shown = navigationGroups(for: shownTab, closedExpanded: closedExpanded, doneExpanded: doneExpanded)
+        guard shown.grouped, let key = ListNavigation.jump(listSelection, by: offset, in: shown.groups) else { return }
+        listSelection = key
+    }
+
+    /// ⌘↑ / ⌘↓: the first or last row; nothing when there are none.
+    func moveListSelectionToEdge(last: Bool, in keys: [PRKey]) {
+        guard let key = ListNavigation.edge(last: last, in: keys) else { return }
+        listSelection = key
     }
 
     /// ←/→: the neighboring sub-tab of the current mode.
@@ -2028,6 +2162,47 @@ extension AppModel {
         case .pullRequests: return (key, pullRequest(for: key)?.url ?? GitHubLinks.pullRequest(key))
         case .issues: return (key, issue(for: key)?.url ?? GitHubLinks.issue(key))
         }
+    }
+
+    /// The PR that ⇧⌘↩ and ⌃⌘C act on: the selected result while searching, else the highlighted row;
+    /// nil when neither is a PR, and in Issues mode.
+    func selectedPRKey(in listKeys: [PRKey]?) -> PRKey? {
+        if route == .search {
+            guard let key = searchSelection, let results = searchResults,
+                  (results.openPRs + results.closedPRs).contains(where: { $0.key == key })
+            else { return nil }
+            return key
+        }
+        guard mode == .pullRequests, let listKeys else { return nil }
+        return ListNavigation.shown(listSelection, in: listKeys)
+    }
+
+    /// ⇧⌘↩ and the row menu: Files changed, or the changes since my review.
+    func filesLink(for pr: PullRequest) -> FilesLink {
+        FilesLink.target(for: pr, me: snapshot?.org.viewer ?? "", myTeams: snapshot?.org.myTeams ?? [])
+    }
+
+    /// The plain Files changed page while the PR's list data isn't at hand.
+    func filesLink(for key: PRKey) -> FilesLink {
+        pullRequest(for: key).map(filesLink(for:)) ?? .plain(key)
+    }
+
+    /// Open Failing Check: the first failed check's page, from the detail when it still matches the row,
+    /// else from a fresh detail fetch; the PR's Checks tab when that fails or finds no failed check.
+    func openFailingCheck(_ key: PRKey) {
+        if let detail = details[key], let pr = pullRequest(for: key), detail.isCurrent(for: pr) {
+            NSWorkspace.shared.open(FailingCheck.url(in: detail.checks, key: key))
+            return
+        }
+        Task { [weak self] in
+            let checks = await self?.checksForNotification(key)
+            NSWorkspace.shared.open(FailingCheck.url(in: checks ?? [], key: key))
+        }
+    }
+
+    /// ⌃⌘C and the row menu: `gh pr checkout N -R owner/repo`, then the quiet "Copied" note.
+    func copyCheckoutCommand(_ key: PRKey) {
+        PRActions.copyCheckoutCommand(key)
     }
 
     /// The detail on screen and its GitHub page, as its Copy Link and Open on GitHub use it.
@@ -2072,6 +2247,7 @@ extension AppModel {
         issueDetailFetch = nil
         detailReturnRoute = .list
         issueDetailReturnRoute = .list
+        detailWalk = nil
     }
 
     /// ⌘R in a detail: fetches it again unless a fetch is already running.
@@ -2284,6 +2460,9 @@ extension AppModel {
 
     /// Shows the issue detail for `key` with the cached detail at once, then refreshes it in place.
     func openIssueDetail(_ key: PRKey) {
+        // A step keeps the walk; any other open (a notification, Ask) has none, and a row's walk is set
+        // once the detail is open.
+        if detailWalk?.position(showing: key, kind: .issue) == nil { detailWalk = nil }
         switch route {
         case .list, .search:
             leaveAsk()
@@ -2313,6 +2492,7 @@ extension AppModel {
         issueDetailTask?.cancel()
         issueDetailTask = nil
         issueDetailFetch = nil
+        detailWalk = nil
         if !askReturn.isEmpty, askReturn.close() == .ask {
             route = .ask
             return

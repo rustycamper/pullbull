@@ -2,7 +2,7 @@ import Foundation
 
 /// A clickable hint under the empty search field: it types its sigil into the field.
 public enum SearchHint: Equatable, Sendable {
-    case number, person, label, state, status, updated
+    case number, person, label, state, status, updated, review, repo, size, negate
 
     public var sigil: String {
         switch self {
@@ -12,6 +12,10 @@ public enum SearchHint: Equatable, Sendable {
         case .state: "is:"
         case .status: "status:"
         case .updated: "updated:"
+        case .review: "review:"
+        case .repo: "repo:"
+        case .size: "size:"
+        case .negate: "-"
         }
     }
 
@@ -24,18 +28,39 @@ public enum SearchHint: Equatable, Sendable {
         case .state: "state"
         case .status: "column"
         case .updated: "time"
+        case .review: "review"
+        case .repo: "repo"
+        case .size: "size"
+        case .negate: "not"
         }
     }
 
-    /// Whether the token line draws `word` after the sigil. `status:` and `updated:` name themselves, and six
-    /// tokens with words don't fit the line; VoiceOver still reads the word.
-    public var showsWord: Bool { self != .status && self != .updated }
+    /// Whether the token line draws `word` after the sigil. `status:`, `updated:`, `review:`, `repo:` and
+    /// `size:` name themselves, which keeps each line short enough; VoiceOver still reads the word.
+    public var showsWord: Bool {
+        switch self {
+        case .status, .updated, .review, .repo, .size: false
+        case .number, .person, .label, .state, .negate: true
+        }
+    }
 
     /// Typing the sigil opens a completion list.
-    public var opensList: Bool { self != .number }
+    public var opensList: Bool { self != .number && self != .negate }
 
-    /// The token line, in order.
-    public static let all: [SearchHint] = [.number, .person, .label, .state, .status, .updated]
+    /// What picking the token leaves in the field, which holds `field`: its sigil; after the lone `-` the
+    /// `-` token left, a sigil `-` can negate joins it instead.
+    public func text(after field: String) -> String {
+        field == SearchHint.negate.sigil && opensList ? field + sigil : sigil
+    }
+
+    /// Every token, in reading order.
+    public static let all: [SearchHint] = lines.flatMap { $0 }
+
+    /// The panel's two token lines, always both drawn so its height never changes.
+    public static let lines: [[SearchHint]] = [
+        [.number, .person, .label, .state, .status],
+        [.updated, .review, .repo, .size, .negate],
+    ]
 
     public var accessibilityLabel: String { "\(sigil) \(word)" }
     public var accessibilityHint: String { "Types \(sigil) in the search field" }
@@ -54,6 +79,10 @@ public enum SearchHint: Equatable, Sendable {
         case .state: "is:open, closed, merged or draft filters by state"
         case .status: "status:name filters issues by board Status"
         case .updated: "updated:today, 3d, 1w or 1m filters by last activity"
+        case .review: "review:changes or none filters by review"
+        case .repo: "repo:name filters by repository"
+        case .size: "size:s, m or l filters pull requests by lines changed"
+        case .negate: "- before @, ~, is:, status:, updated:, review:, repo: or size: excludes it"
         }
     }
 }
@@ -65,7 +94,7 @@ public enum HintPanelItem: Hashable, Sendable {
     case more
     case hint(SearchHint)
 
-    /// The cloud's chips, then the token line.
+    /// The cloud's chips, then the token lines.
     public static func items(cloud: SavedChipCloud) -> [HintPanelItem] {
         cloud.chips.map(\.item) + SearchHint.all.map(HintPanelItem.hint)
     }
@@ -105,7 +134,7 @@ public enum HintPanelMove: Equatable, Sendable {
     case pass
 }
 
-/// The fixed line under the token line: what the selected item does, or a default.
+/// The fixed line under the token lines: what the selected item does, or a default.
 public struct HintCaption: Hashable, Sendable {
     public let text: String
     /// A saved search's query, drawn as code.

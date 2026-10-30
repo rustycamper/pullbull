@@ -20,6 +20,9 @@ public struct NotificationChanges: Equatable, Sendable {
 /// and belongs to the same account and org as the marker's. Cached snapshots never count. The first
 /// live fetch after launch, and the first after an account or org switch, is the baseline and posts
 /// nothing; later live fetches for the same account and org are diffed against the previous one.
+/// A fast CI follow (`isCIFollow`) counts as a live fetch merged into the baseline: it is diffed
+/// against the baseline when it carries the baseline's `fetchedAt`, and then becomes the baseline,
+/// so the next full refresh never posts its changes again.
 public struct NotificationGate: Sendable {
     private let launchedAt: Date
     private var baseline: Snapshot?
@@ -51,6 +54,13 @@ public struct NotificationGate: Sendable {
             marker = .some(snapshot)
             return NotificationChanges()
         }
+        if status.isCIFollow {
+            guard status.error == nil, let fresh = snapshot, let old = baseline, Self.sameContext(old, fresh),
+                  fresh.fetchedAt == old.fetchedAt
+            else { return NotificationChanges() }
+            baseline = fresh
+            return diff(old, fresh, toggles: toggles, filters: filters, now: now)
+        }
         guard let started = marker else { return NotificationChanges() }
         marker = nil
         guard status.error == nil, let fresh = snapshot, fresh.fetchedAt >= launchedAt else {
@@ -66,7 +76,13 @@ public struct NotificationGate: Sendable {
         guard let old = baseline, Self.sameContext(old, fresh), fresh.fetchedAt > old.fetchedAt else {
             return NotificationChanges()
         }
-        return NotificationChanges(
+        return diff(old, fresh, toggles: toggles, filters: filters, now: now)
+    }
+
+    private func diff(
+        _ old: Snapshot, _ fresh: Snapshot, toggles: NotificationToggles, filters: ReviewFilters, now: Date
+    ) -> NotificationChanges {
+        NotificationChanges(
             prs: ChangeDetector.events(
                 old: old, new: fresh, me: fresh.org.viewer, myTeams: fresh.org.myTeams, toggles: toggles,
                 filters: filters, now: now),

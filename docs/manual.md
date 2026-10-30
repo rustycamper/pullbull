@@ -70,18 +70,20 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 
 | Tab | Shows |
 |---|---|
-| Review | PRs waiting on you or your team. Icon says why: requested, team, re-requested, new commits |
+| Review | PRs waiting on you or your team. Icon says why: requested, team, re-requested, new commits. Lines added and removed (`+120 −30`), not in compact cards. Oldest first: Settings → General (by when the PR was opened) |
 | Mine | Your PRs, review pills, checks, **Ready to merge**. Folded "Recently closed": yours closed or merged in the last 7 days |
-| Team | Other open PRs in the org |
+| Team | Other open PRs in the org. Group by author: Settings → General |
 
 A PR with merge conflicts shows a **Conflicts** note on every tab.
 
 > [!NOTE]
 > Ready to merge = approved, no changes requested, checks green or none, no conflicts, not a draft. It doesn't see branch protection (required review count).
 
-- **Detail:** labels, reviewers, checks, description, conversation, files. Markdown incl. `<details>`
+- **Pending CI:** while checks run on your PRs, PullBull checks up to 5 of them (newest commits first) every 30 s, for up to 20 minutes each, so *CI failed* and *Ready to merge* arrive sooner. Not while offline or rate-limited. Settings → General → Check my pending CI more often
+- **Detail:** labels, reviewers, checks, description, conversation, files. Markdown incl. `<details>`. **Open Failing Check** beside failed checks
 - **Labels:** up to two chips per row (none in compact cards), each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail lists them all
-- **Right-click a row:** copy branch, link or Markdown link · open on GitHub · show only this repo · show only updated · search author
+- **Right-click a row:** copy branch, link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · show only updated · search author
+- **Right-click a group header** (repo, author): **Open All *N* on GitHub**, from two PRs up; above 8 it asks first. An author header's menu also offers **Search @*login*** and **Show Only Updated**
 - **Footer:** account · refresh · open on GitHub · settings. Turns amber with **Retry** when a refresh fails
 - **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Lists your signed-in accounts, then GitHub CLI logins, each with the org it opens in; then Add Account… and Account Settings…. Each account comes back with its last org, and each org with its last board
 
@@ -103,6 +105,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - **Labels:** chips as on [pull requests](#pull-requests). The board card lists them all
 - **Switch board:** on the Board tab, click its name in the filter row, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd>
 - **Right-click a row:** copy link or Markdown link · open on GitHub · show only this repo · show only updated · search author
+- **Right-click a group header** (a Status lane, No status, Not on board or a repo): **Open All *N* on GitHub**, from two issues up; above 8 it asks first. Done has none
 - **Detail:** board card (incl. labels) · linked PRs (<kbd>Esc</kbd> returns) · description · last two comments
 
 ## Search
@@ -114,24 +117,31 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 | `@alice` `@me` | Author or reviewer. On issues: author or assignee |
 | `~bug` `~"good first issue"` `label:bug` | Label |
 | `is:open` `is:closed` `is:merged` `is:draft` | State |
+| `is:ready` `is:conflict` `is:failing` `is:approved` | Ready to merge · merge conflicts · checks failed · has an approval. PRs only |
+| `review:changes` `review:none` | Changes requested · no reviews yet. PRs only |
+| `size:s` `size:m` `size:l` | Lines changed: up to 50, up to 300, more. PRs only |
+| `repo:widgets` `repo:acme/widgets` | That repo. The name alone matches every owner's; several `repo:` match any of them. An exact `owner/name` goes to GitHub even for a repo PullBull hasn't seen; a name alone goes as the one known repo it names, and filters your lists only when no known repo or several have it. Saved searches keep it |
+| `is:unanswered` | Your open PRs and your Assigned or Created issues whose last comment is someone else's, not a bot's. Searches your lists only |
 | `status:prog` `status:"In progress"` | Status column on the board. Issues only |
 | `#123` | That number, every repo |
 | `owner/repo#123` or a link | Exactly that item |
 | `updated:today` `3d` `1w` `1m` | Items active since 00:00 today, or 2, 6 or 29 days before. GitHub's date forms (`updated:>2026-10-01`, `updated:2026-10-01..2026-10-07`) go to GitHub as written and also filter locally; any other value goes to GitHub as written |
 | words | Title |
+| `-@bot` `-~wontfix` `-is:draft` `-status:done` `-updated:1w` | Not that. Works on every qualifier; a bare `-word` is a word. `-is:draft` and the other states still go to GitHub. These filter locally only and send nothing to GitHub: `-status:`, `-updated:`, `-is:ready`, `-is:conflict`, `-is:failing`, `-is:approved`, `-is:unanswered`, `-review:`, `size:` and `-size:`, and positive `is:ready`, `is:conflict`, `is:approved` and `review:changes`. A `repo:` or `-repo:` name alone that matches no known repo, or several, filters locally only too; an exact `-repo:owner/name` is sent. The rest of the search still goes to GitHub, except with `is:unanswered` or `-is:unanswered`, which keep the whole search in your lists |
 
-- `@`, `~`, `is:`, `status:`, `updated:` and words combine; everything must match
+- `@`, `~`, `is:`, `status:`, `updated:`, `review:`, `repo:`, `size:` and words combine; everything must match; a leading `-` excludes
 - `status:` uses the board shown in the Board tab. Unquoted matches part of a Status name, quoted the whole name; case is ignored. Names with spaces need quotes to match exactly
 - With `status:`, PRs and issues not on the board don't match
+- `-status:` keeps PRs and issues not on the board
 - `#123` and links work only on their own
 - Results span all tabs; click a tab to narrow
-- **Right-click a result:** copy branch (PRs), link or Markdown link · open on GitHub · show only this repo · search author. Search author replaces the query; show only this repo keeps it and searches that repo
+- **Right-click a result:** copy branch (PRs), link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · search author. The checkout, files and failing check items are on PRs. Search author replaces the query; show only this repo keeps it and searches that repo
 - PR results show changes requested, conflicts and comments, and **Ready to merge** on yours
 - Compact cards (Settings → General) apply to results too: one line each, with checks on open PRs and the Status on issues
 - Matches in the other mode show a hint: <kbd>⌘</kbd><kbd>1</kbd> / <kbd>⌘</kbd><kbd>2</kbd>
-- Empty field shows saved searches and token hints. <kbd>↓</kbd> to walk them
-- Typing `@`, `~`, `label:`, `is:`, `status:` or `updated:` opens a completion list. `status:` lists the board's Status columns with their open counts; picking one writes the full name in quotes. `updated:` lists the four steps
-- Typing the start of `status:`, `label:` or `updated:` (`st`, `la`, `up`) at the end of the field shows the rest in grey. Not `is:`, a common word; `status:` only when the board has Status columns; `updated:` only up to `upda`, so a title word like "update" is left alone
+- Empty field shows saved searches, the first nine with their ⌃ key, and two lines of token hints: `#` `@` `~` `is:` `status:`, then `updated:` `review:` `repo:` `size:` `-`. <kbd>↓</kbd> to walk them; picking a token types it, and all but `#` and `-` open their list. After `-`, the next token joins it (`-@`, `-size:`), with the mouse or the keyboard
+- Typing `@`, `~`, `label:`, `is:`, `status:`, `updated:`, `review:`, `repo:` or `size:` opens a completion list. `status:` lists the board's Status columns with their open counts; picking one writes the full name in quotes. `updated:` lists the four steps; `review:` lists `changes` and `none`; `size:` lists `s`, `m` and `l` with their line limits; `repo:` lists the repos in your lists. Also after `-`
+- Typing the start of `status:`, `label:` or `updated:` (`st`, `la`, `up`) at the end of the field shows the rest in grey. Not `is:`, a common word; `status:` only when the board has Status columns; `updated:` only up to `upda`, so a title word like "update" is left alone. Also after `-`
 - **Save:** bookmark icon in the field. Manage in Settings → Search
 
 | Completion list | |
@@ -215,14 +225,19 @@ Settings → Ask AI.
 | List | |
 |---|---|
 | <kbd>↑</kbd> <kbd>↓</kbd> | Select |
+| <kbd>⌥</kbd><kbd>↑</kbd> <kbd>⌥</kbd><kbd>↓</kbd> | Previous / next group (repo, author, lane). Folded lanes are skipped; nothing without groups. In search results, one row, as <kbd>↑</kbd> <kbd>↓</kbd> |
+| <kbd>⌘</kbd><kbd>↑</kbd> <kbd>⌘</kbd><kbd>↓</kbd> | First / last row |
 | <kbd>←</kbd> <kbd>→</kbd> | Previous / next tab |
 | <kbd>Return</kbd> | Detail |
 | <kbd>⌘</kbd><kbd>Return</kbd> | Open on GitHub |
 | <kbd>⌘</kbd><kbd>C</kbd> | Copy link |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd> | Copy `owner/repo#123` |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy Markdown link |
+| <kbd>⇧</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Files changed; on a PR with new commits since your review, just those changes |
+| <kbd>⌃</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy Checkout Command: `gh pr checkout 412 -R owner/repo` |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | [Ask AI](#ask-ai), from the search field |
 | <kbd>⌘</kbd><kbd>1</kbd> · <kbd>⌘</kbd><kbd>2</kbd> | Pull Requests · Issues |
+| <kbd>⌃</kbd><kbd>1</kbd>…<kbd>⌃</kbd><kbd>9</kbd> | Saved search 1–9, in Settings order. Off while macOS uses ⌃1… to switch desktops (System Settings → Keyboard → Shortcuts → Mission Control) |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> | Repo menu ([one repo](#one-repo)) |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> | Board menu, on the Board tab |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd> | Account menu |
@@ -234,9 +249,14 @@ Settings → Ask AI.
 | Detail | |
 |---|---|
 | <kbd>Esc</kbd> · <kbd>←</kbd> · <kbd>⌘</kbd><kbd>[</kbd> | Back |
+| <kbd>⌥</kbd><kbd>↓</kbd> <kbd>⌥</kbd><kbd>↑</kbd> | Next / previous item of the list or search you came from. The back button shows where you are (2 of 6). Stops at the ends. Not for a detail opened from a notification or a linked PR |
 | <kbd>⌘</kbd><kbd>Return</kbd> | Open on GitHub |
 | <kbd>⌘</kbd><kbd>C</kbd> · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>C</kbd> | Same copies as the list |
+| <kbd>⇧</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Files changed; on a PR with new commits since your review, just those changes |
+| <kbd>⌃</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy Checkout Command: `gh pr checkout 412 -R owner/repo` |
 | <kbd>⌘</kbd><kbd>R</kbd> | Refresh |
+
+The order is the one on screen when you opened the first item; a refresh doesn't reshuffle it. An item that has left the lists since is skipped, unless its detail was already loaded.
 
 Reopen within a minute and the detail is still there.
 
@@ -246,12 +266,13 @@ Reopen within a minute and the detail is still there.
 - Or the repo menu: <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd>, or the repo name in the filter row. Each repo shows its counts
 - Back to all: ✕ in the filter row, **Show all**, **Show All Repositories**, or <kbd>Esc</kbd>
 - Applies to every tab; search stays inside it
+- To keep a repo in a saved search, use `repo:` instead
 - Counts and notifications still cover all repos
 - Cleared on relaunch
 
 ## Recent activity
 
-- Right-click a row, a repo header or the list → **Show Only Updated** → Today, In the Last 3 Days, In the Last Week or In the Last Month
+- Right-click a row, a repo header, an author header or the list → **Show Only Updated** → Today, In the Last 3 Days, In the Last Week or In the Last Month
 - A strip above the list names the step: *Today*, *Last 3 days*, *Last week*, *Last month*; hover for the full line and start date
 - On Mine, the Recently closed header names the step too; under the month it stays *Last 7 days*
 - Back to all: ✕ in the strip, **Show All**, or <kbd>Esc</kbd>. <kbd>Esc</kbd> clears this and Show Only *repo* together
@@ -267,10 +288,10 @@ Reopen within a minute and the detail is still there.
 
 | Tab | |
 |---|---|
-| General | Grouping, compact cards, background, filters (Review and Team), menu bar count, refresh interval, shortcut, launch at login, updates |
+| General | Grouping, Team by author, oldest review first, compact cards, background, filters (Review and Team), menu bar count, refresh interval, pending CI checks, shortcut, launch at login, updates |
 | Account | Account, org, board, access notices |
 | Notifications | One toggle per event, grouped: my pull requests · pull requests I review · issues assigned to me · issues I created |
-| Search | Saved searches: rename, edit the query, drag to reorder, **+** and **−**. Apply one from the empty search field |
+| Search | Saved searches: rename, edit the query, drag to reorder, **+** and **−**. Apply one from the empty search field; the first nine have ⌃1–⌃9 |
 | Ask AI | [Ask AI](#ask-ai): on/off, key, model, exclude list, index |
 
 | Group | Notification | Default |
@@ -291,7 +312,7 @@ Reopen within a minute and the detail is still there.
 | | Status changed on the board | off |
 | | Closed or reopened | on |
 
-Your own comments, moves and closes never notify. Several comments on one issue between refreshes make one notification ("3 new comments"). Status changes count on the board the Board tab shows, as "In Progress → In Review"; moves the board's automation makes after a close or a merge don't notify, the close does.
+With Settings → General → Check my pending CI more often, CI failed and Ready to merge arrive within about 30 s while your checks run: for up to 5 of your PRs, for 20 minutes each, and not at a 1-minute refresh interval. Your own comments, moves and closes never notify. Several comments on one issue between refreshes make one notification ("3 new comments"). Status changes count on the board the Board tab shows, as "In Progress → In Review"; moves the board's automation makes after a close or a merge don't notify, the close does.
 
 Click a notification to open the detail.
 

@@ -27,6 +27,7 @@ public enum Decoding {
         let author = node["author"] as? [String: Any]
         let comments = node["comments"] as? [String: Any]
         let commentNodes = comments?["nodes"] as? [[String: Any]] ?? []
+        let lastCommenter = commentNodes.last?["author"] as? [String: Any]
         let commit = ((node["commits"] as? [String: Any])?["nodes"] as? [[String: Any]])?.last?["commit"]
             as? [String: Any]
         let reviewNodes = (node["latestReviews"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
@@ -58,13 +59,15 @@ public enum Decoding {
             ci: ciState(rollup: commit?["statusCheckRollup"]),
             headCommitDate: try optionalDate(commit?["committedDate"]),
             commentCount: comments?["totalCount"] as? Int ?? 0,
-            lastCommentAuthor: (commentNodes.last?["author"] as? [String: Any])?["login"] as? String,
+            lastCommentAuthor: lastCommenter?["login"] as? String,
             latestReviews: try reviewNodes.map(review),
             reviewRequests: requestNodes.compactMap(reviewer),
             headCommitOid: commit?["oid"] as? String,
             labels: labels.map(\.name), labelColors: labels.map(\.color),
             mergedBy: (node["mergedBy"] as? [String: Any])?["login"] as? String,
-            mergeable: (node["mergeable"] as? String).flatMap(Mergeable.init(rawValue:))
+            mergeable: (node["mergeable"] as? String).flatMap(Mergeable.init(rawValue:)),
+            lastCommentByBot: lastCommenter.map { $0["__typename"] as? String == "Bot" },
+            additions: node["additions"] as? Int, deletions: node["deletions"] as? Int
         )
     }
 
@@ -82,6 +85,8 @@ public enum Decoding {
         else { return nil }
         let labelNodes = (node["labels"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
         let labels = labels(labelNodes)
+        let lastComment = (((node["lastComment"] as? [String: Any])?["nodes"] as? [[String: Any]])?.last?["author"]
+            as? [String: Any])
         let assigneeNodes = (node["assignees"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
         return BoardIssue(
             key: PRKey(repo: repo, number: number), title: title, url: url,
@@ -92,8 +97,8 @@ public enum Decoding {
             updatedAt: lenientDate(node["updatedAt"]),
             closedAt: lenientDate(node["closedAt"]),
             commentCount: (node["comments"] as? [String: Any])?["totalCount"] as? Int ?? 0,
-            lastCommentAuthor: (((node["lastComment"] as? [String: Any])?["nodes"] as? [[String: Any]])?.last?["author"]
-                as? [String: Any])?["login"] as? String,
+            lastCommentAuthor: lastComment?["login"] as? String,
+            lastCommentByBot: lastComment.map { $0["__typename"] as? String == "Bot" },
             labels: labels.map(\.name), labelColors: labels.map(\.color),
             assignees: assigneeNodes.compactMap { node in
                 guard let login = node["login"] as? String else { return nil }

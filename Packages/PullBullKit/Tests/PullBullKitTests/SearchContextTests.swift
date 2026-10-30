@@ -56,4 +56,16 @@ import Testing
         #expect(SearchContext.accessibilityLabel(logins: ["a"], labels: ["bug", "ui"], words: ["x"], org: "acme")
             == "Filtered by @a, labels bug and ui, titles matching x, in all of acme")
     }
+
+    @Test func negatedContext() throws {
+        let filter = try #require(SearchQuery.parse("@ann -@bot fix").filter)
+        #expect(SearchContext.text(filter: filter, org: "acme", repo: nil, startedOnTab: nil)
+            == "@ann and -@bot · “fix” in all of acme")
+        let label = SearchContext.accessibilityLabel(filter: filter, org: "acme", repo: nil)
+        #expect(label.contains("Filtered by @ann, excluding @bot"))
+        #expect(label == "Filtered by @ann, excluding @bot, titles matching fix, in all of acme")
+        let excludedOnly = try #require(SearchQuery.parse("-@bot -~wontfix").filter)
+        #expect(SearchContext.accessibilityLabel(filter: excludedOnly, org: "acme", repo: nil)
+            == "Filtered, excluding @bot and label wontfix, in all of acme")
+    }
 }

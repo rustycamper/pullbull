@@ -33,7 +33,10 @@ public final class SearchCache: @unchecked Sendable {
     enum Query: Hashable, Sendable {
         case number(Int)
         case item(repo: String, number: Int)
-        case terms(logins: [String], labels: [String], words: [String], states: [StateFilter], updated: String?)
+        /// `extra` holds the filter's other cache tokens: its exclusions and included statuses.
+        case terms(
+            logins: [String], labels: [String], words: [String], states: [StateFilter], updated: String?,
+            extra: [String])
         case empty
 
         init(_ query: SearchQuery, now: Date, calendar: Calendar) {
@@ -46,8 +49,19 @@ public final class SearchCache: @unchecked Sendable {
                     logins: Self.folded(query.logins), labels: Self.folded(query.labels),
                     words: Self.folded(query.words),
                     states: Set(query.states).sorted { $0.rawValue < $1.rawValue },
-                    updated: query.updated?.serverQualifier(now: now, calendar: calendar))
+                    updated: query.updated?.serverQualifier(now: now, calendar: calendar),
+                    extra: Self.extra(query.filter, now: now, calendar: calendar))
             }
+        }
+
+        /// `filter`'s cache tokens less the included logins, labels, states and `updated:` the other parts hold.
+        private static func extra(_ filter: SearchFilter?, now: Date, calendar: Calendar) -> [String] {
+            guard let filter else { return [] }
+            let include = filter.include
+            let held = SearchFilter(include: SearchTerms(
+                logins: include.logins, labels: include.labels, states: include.states, updated: include.updated))
+            let heldTokens = Set(held.cacheTokens(now: now, calendar: calendar))
+            return filter.cacheTokens(now: now, calendar: calendar).filter { !heldTokens.contains($0) }
         }
 
         private static func folded(_ terms: [String]) -> [String] {

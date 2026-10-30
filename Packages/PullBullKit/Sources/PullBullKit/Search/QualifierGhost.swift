@@ -17,20 +17,22 @@ public struct QualifierGhost: Equatable, Sendable {
     static let maximumUpdatedWord = 4
 
     /// The ghost for the word ending at `caret`, which must be the end of `text`: a plain word of at least
-    /// two letters that starts a qualifier's name, ignoring case; `updated:` only for two to four letters.
+    /// two letters, after an optional `-`, that starts a qualifier's name, ignoring case; `updated:` only for
+    /// two to four letters. A `-` stays before the qualifier.
     /// `statuses` is false when the board has no Status columns, so `status:` would have nothing to list.
     public static func at(caret: Int, in text: String, statuses: Bool) -> QualifierGhost? {
         guard caret == text.utf16.count, let term = QueryScanner.terms(in: text).last,
-              term.kind == .word, term.range.upperBound == text.endIndex,
-              term.value.count >= minimumWord
+              term.kind == .word, term.range.upperBound == text.endIndex
         else { return nil }
-        let word = term.value.lowercased()
+        let negated = term.value.first == "-"
+        let word = (negated ? term.value.dropFirst() : term.value).lowercased()
+        guard word.count >= minimumWord else { return nil }
         let qualifiers = (statuses ? [QueryScanner.statusQualifier] : []) + [QueryScanner.labelQualifier]
             + (word.count <= maximumUpdatedWord ? [QueryScanner.updatedQualifier] : [])
         guard let qualifier = qualifiers.first(where: { $0.dropLast().hasPrefix(word) }) else { return nil }
         return QualifierGhost(
             qualifier: qualifier, remainder: String(qualifier.dropFirst(word.count)),
-            start: term.range.lowerBound.utf16Offset(in: text))
+            start: term.range.lowerBound.utf16Offset(in: text) + (negated ? 1 : 0))
     }
 
     /// `text` with the word replaced by the qualifier, and the caret after it so its list opens.

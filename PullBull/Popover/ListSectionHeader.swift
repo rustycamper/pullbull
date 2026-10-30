@@ -16,8 +16,15 @@ struct ListSectionHeader: View {
     var trailing: String? = nil
     /// Nil for headers that don't fold.
     var fold: Fold? = nil
+    /// A person's avatar in the glyph's place, as an author group's header shows.
+    var avatar: Avatar? = nil
     /// The rows' icon column: compact rows have a narrower one.
     var compact = false
+
+    struct Avatar {
+        let login: String
+        let url: URL?
+    }
 
     struct Fold {
         let isOpen: Bool
@@ -63,7 +70,10 @@ struct ListSectionHeader: View {
     /// At 11pt the SF circle matches the 13pt row glyph's diameter.
     private var label: some View {
         HStack(spacing: compact ? 8 : 10) {
-            if let glyph {
+            if let avatar {
+                AvatarView(login: avatar.login, url: avatar.url, size: compact ? 14 : 16)
+                    .frame(width: compact ? 16 : 20)
+            } else if let glyph {
                 Image(systemName: glyph)
                     .font(.system(size: compact ? 10 : 11))
                     .foregroundStyle(glyphColor)

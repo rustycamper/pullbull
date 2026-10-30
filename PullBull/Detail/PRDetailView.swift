@@ -55,7 +55,9 @@ struct PRDetailView: View {
 
     private var header: some View {
         HStack(spacing: 4) {
-            DetailBackButton(title: backTitle, action: model.closeDetail)
+            DetailBackButton(
+                title: backTitle, position: model.detailWalk?.position(showing: key, kind: .pullRequest),
+                action: model.closeDetail)
             Spacer(minLength: 0)
             // A checkmark for a moment after ⌥⌘C.
             DetailIconButton(
@@ -76,7 +78,8 @@ struct PRDetailView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .monospacedDigit()
                 .lineLimit(1)
-                .padding(.horizontal, 72)
+                // Clear of the back button's "2 of 6" too, so the title doesn't move when it shows.
+                .padding(.horizontal, 96)
         }
         .padding(.horizontal, 8)
         .frame(height: 44)
@@ -235,6 +238,10 @@ struct PRDetailView: View {
             }
             if detail.checksTruncated {
                 TruncationNote(shown: checks.count, total: detail.checkTotal, noun: "checks", url: webURL)
+            }
+        } accessory: {
+            if FailingCheck.hasFailure(checks) {
+                Link("Open Failing Check", destination: FailingCheck.url(in: checks, key: key))
             }
         }
     }

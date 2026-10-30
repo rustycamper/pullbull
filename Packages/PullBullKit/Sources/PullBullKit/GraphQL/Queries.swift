@@ -7,10 +7,10 @@ enum Queries {
 
     static let prFields = """
     fragment prFields on PullRequest {
-      number title url isDraft state mergeable createdAt updatedAt closedAt headRefName baseRefName
+      number title url isDraft state mergeable additions deletions createdAt updatedAt closedAt headRefName baseRefName
       repository{nameWithOwner}
       author{login avatarUrl}
-      comments(last:1){totalCount nodes{author{login}}}
+      comments(last:1){totalCount nodes{author{__typename login}}}
       commits(last:1){nodes{commit{oid committedDate statusCheckRollup{state contexts{\(rollupCounts)}}}}}
       latestReviews(first:20){nodes{author{login} state submittedAt commit{oid}}}
       reviewRequests(first:20){nodes{requestedReviewer{__typename ... on User{login} ... on Team{slug}}}}
@@ -135,7 +135,7 @@ enum Queries {
     """
 
     /// The newest comment's author, aliased: `issueRowFields` already selects `comments{totalCount}`.
-    static let lastCommentAuthor = "lastComment: comments(last:1){nodes{author{login}}}"
+    static let lastCommentAuthor = "lastComment: comments(last:1){nodes{author{__typename login}}}"
 
     /// The latest Status moves on any board (a few, as the last may be on another board) and the latest
     /// reopening, for issue notifications.
@@ -199,6 +199,17 @@ enum Queries {
             """
         }.joined(separator: "\n")
         return "query($org:String!,$n:Int!){\n\(aliases)\n}\n\(prFields)\n\(issueRowFields)"
+    }
+
+    /// `count` pull requests by owner, name and number (variables `o0, r0, n0`, …), aliased `p0...pN`.
+    /// A deleted or hidden one comes back null.
+    static func pullRequests(count: Int) -> String {
+        let indices = 0..<count
+        let variables = indices.map { "$o\($0):String!,$r\($0):String!,$n\($0):Int!" }.joined(separator: ",")
+        let aliases = indices.map {
+            "p\($0): repository(owner:$o\($0), name:$r\($0)){pullRequest(number:$n\($0)){...prFields}}"
+        }.joined(separator: "\n")
+        return "query(\(variables)){\n\(aliases)\n}\n\(prFields)"
     }
 
     /// One issue with its row fields, body, last two comments and the PRs that close it. The comments

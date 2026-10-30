@@ -10,6 +10,8 @@ public struct SavedChipCloud: Equatable, Sendable {
     public static let chipHeight: CGFloat = 24
     public static let chipPadding: CGFloat = 9
     public static let maxChipWidth: CGFloat = 168
+    /// Between a chip's name and its ⌃N key.
+    public static let keyGap: CGFloat = 6
     /// The expanded cloud's height once it scrolls: five lines and their gaps.
     public static let expandedHeight = CGFloat(expandedLines) * chipHeight + CGFloat(expandedLines - 1) * spacing
 
@@ -56,7 +58,8 @@ public struct SavedChipCloud: Equatable, Sendable {
     /// The first search "+N" hides, which takes the cursor when it expands from the keyboard.
     public let firstHidden: SavedSearch?
 
-    /// `measure` is a chip's width (`chipWidth(textWidth:)` of its text); `width` is the line's.
+    /// `measure` is a chip's width (`chipWidth(textWidth:)` of its text, with its key when it has one);
+    /// `width` is the line's.
     public init(saved: SavedSearches, expanded: Bool, width: CGFloat, measure: (Chip) -> CGFloat) {
         let all = saved.items.map(Chip.saved)
         let widths = all.map(measure)
@@ -89,6 +92,12 @@ public struct SavedChipCloud: Equatable, Sendable {
     /// truncates text it was measured to fit, plus padding, capped at `maxChipWidth`.
     public static func chipWidth(textWidth: CGFloat) -> CGFloat {
         min(textWidth.rounded(.up) + 1 + 2 * chipPadding, maxChipWidth)
+    }
+
+    /// The same for a chip whose ⌃N key, `keyWidth` wide, follows its name `keyGap` after it. The key is
+    /// measured in, so at the cap the name truncates and the key never does.
+    public static func chipWidth(textWidth: CGFloat, keyWidth: CGFloat) -> CGFloat {
+        min(textWidth.rounded(.up) + 1 + keyGap + keyWidth.rounded(.up) + 2 * chipPadding, maxChipWidth)
     }
 
     /// The indices of `widths` by line, greedily, `spacing` apart; a chip wider than the line has a

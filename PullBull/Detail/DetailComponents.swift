@@ -132,27 +132,42 @@ struct StatePill: View {
     }
 }
 
-/// The detail header's way back: a chevron in the same quiet 28pt button as the header's other icons.
-/// Where it leads is in the tooltip and VoiceOver label.
+/// The detail header's way back: a chevron in the same quiet 28pt button as the header's other icons,
+/// then the walk's "2 of 6" when ⌥↓ / ⌥↑ step through a list. Where it leads is in the tooltip and
+/// VoiceOver label.
 struct DetailBackButton: View {
     let title: String
+    /// "2 of 6"; nil when the detail has no walk.
+    var position: String?
     let action: () -> Void
     @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "chevron.left")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 28, height: 28)
-                .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? Palette.fill : .clear))
-                .contentShape(Rectangle())
+            HStack(spacing: 0) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(width: 28, height: 28)
+                if let position {
+                    Text(verbatim: position)
+                        .font(.system(size: 11))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .fixedSize()
+                        .padding(.trailing, 8)
+                }
+            }
+            .foregroundStyle(.secondary)
+            .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? Palette.fill : .clear))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help("Back to \(title) (esc)")
-        .accessibilityLabel("Back to \(title)")
+        .help("Back to \(destination) (esc)")
+        .accessibilityLabel("Back to \(position.map { "\(title), \($0)" } ?? title)")
     }
+
+    private var destination: String { position.map { "\(title) · \($0)" } ?? title }
 }
 
 struct DetailIconButton: View {

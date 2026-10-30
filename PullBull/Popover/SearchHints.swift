@@ -3,7 +3,7 @@ import SwiftUI
 import PullBullKit
 
 /// The panel under the empty search field, drawn over the top of the current list: the saved searches as a cloud of
-/// chips (`SavedChipCloud`), one line of syntax tokens, and a caption explaining the selected item. A
+/// chips (`SavedChipCloud`), two fixed lines of syntax tokens, and a caption explaining the selected item. A
 /// saved chip applies its search, "+N" expands the cloud and "Show less" folds it, and a token types its
 /// sigil into the field. Its height changes only when searches are saved or deleted or the cloud expands.
 struct SearchHints: View {
@@ -23,19 +23,32 @@ struct SearchHints: View {
     /// scrolls is laid out again beside the scroller when scroll bars always show.
     static func cloud(saved: SavedSearches, expanded: Bool) -> SavedChipCloud {
         let width = PopoverView.size.width - 2 * inset
-        let cloud = SavedChipCloud(saved: saved, expanded: expanded, width: width, measure: chipWidth)
+        let measure = { (chip: SavedChipCloud.Chip) in chipWidth(chip, in: saved) }
+        let cloud = SavedChipCloud(saved: saved, expanded: expanded, width: width, measure: measure)
         guard cloud.scrolls, NSScroller.preferredScrollerStyle == .legacy else { return cloud }
         let scroller = NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy)
-        return SavedChipCloud(saved: saved, expanded: expanded, width: width - scroller, measure: chipWidth)
+        return SavedChipCloud(saved: saved, expanded: expanded, width: width - scroller, measure: measure)
     }
 
-    private static func chipWidth(_ chip: SavedChipCloud.Chip) -> CGFloat {
+    /// The ⌃N key a saved chip shows after its name: the first nine have one.
+    private static func keyLabel(_ search: SavedSearch, in saved: SavedSearches) -> String? {
+        saved.items.firstIndex(of: search).flatMap(SavedSearches.keyLabel(at:))
+    }
+
+    private static let keyFont = NSFont.systemFont(ofSize: 11)
+
+    private static func chipWidth(_ chip: SavedChipCloud.Chip, in saved: SavedSearches) -> CGFloat {
         let text: String
         let font: NSFont
         switch chip {
         case .saved(let search):
             text = search.name
             font = search.nameIsQuery ? .monospacedSystemFont(ofSize: 12, weight: .regular) : .systemFont(ofSize: 12)
+            if let key = keyLabel(search, in: saved) {
+                return SavedChipCloud.chipWidth(
+                    textWidth: (text as NSString).size(withAttributes: [.font: font]).width,
+                    keyWidth: (key as NSString).size(withAttributes: [.font: keyFont]).width)
+            }
         case .more(let more):
             text = more.title
             font = .systemFont(ofSize: 12)
@@ -91,17 +104,28 @@ struct SearchHints: View {
     }
 
     @ViewBuilder private func chip(_ chip: SavedChipCloud.Chip) -> some View {
-        let width = Self.chipWidth(chip)
+        let saved = model.settings.savedSearches
+        let width = Self.chipWidth(chip, in: saved)
         switch chip {
         case .saved(let search):
             PanelButton(look: .filled, radius: 6, selected: selection == chip.item, action: { pick(chip.item) }) {
-                Text(search.name)
-                    .font(search.nameIsQuery ? .system(size: 12, design: .monospaced) : .system(size: 12))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .padding(.horizontal, SavedChipCloud.chipPadding)
-                    .frame(width: width, height: SavedChipCloud.chipHeight)
+                HStack(spacing: SavedChipCloud.keyGap) {
+                    Text(search.name)
+                        .font(search.nameIsQuery ? .system(size: 12, design: .monospaced) : .system(size: 12))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    if let key = Self.keyLabel(search, in: saved) {
+                        Text(key)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .fixedSize()
+                            .accessibilityHidden(true)
+                    }
+                }
+                .padding(.horizontal, SavedChipCloud.chipPadding)
+                .frame(width: width, height: SavedChipCloud.chipHeight)
             }
             .id(chip.item)
             .help(search.name)
@@ -121,30 +145,37 @@ struct SearchHints: View {
         }
     }
 
+    /// Both lines of `SearchHint.lines`, always drawn.
     private var tokens: some View {
-        HStack(spacing: 4) {
-            ForEach(SearchHint.all, id: \.self) { hint in
-                PanelButton(look: .outlined, radius: 5, selected: selection == .hint(hint), action: {
-                    pick(.hint(hint))
-                }) {
-                    HStack(spacing: 5) {
-                        Text(hint.sigil)
-                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(.primary)
-                        if hint.showsWord {
-                            Text(hint.word)
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .lineLimit(1)
-                    .padding(.horizontal, 5)
-                    .frame(height: 22)
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(SearchHint.lines.enumerated()), id: \.offset) { _, line in
+                HStack(spacing: 4) {
+                    ForEach(line, id: \.self) { token($0) }
                 }
-                .accessibilityLabel(hint.accessibilityLabel)
-                .accessibilityHint(hint.accessibilityHint)
             }
         }
+    }
+
+    private func token(_ hint: SearchHint) -> some View {
+        PanelButton(look: .outlined, radius: 5, selected: selection == .hint(hint), action: {
+            pick(.hint(hint))
+        }) {
+            HStack(spacing: 5) {
+                Text(hint.sigil)
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.primary)
+                if hint.showsWord {
+                    Text(hint.word)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .lineLimit(1)
+            .padding(.horizontal, 5)
+            .frame(height: 22)
+        }
+        .accessibilityLabel(hint.accessibilityLabel)
+        .accessibilityHint(hint.accessibilityHint)
     }
 
     /// One fixed line: the selected chip's query, the token's sentence, or a default. VoiceOver reads

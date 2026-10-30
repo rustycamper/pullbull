@@ -65,6 +65,37 @@ actor FakeFetcher: SnapshotFetching {
         held.removeAll()
         waiting.forEach { $0.resume() }
     }
+
+    // MARK: Fast CI follow
+
+    struct FollowStep {
+        let result: Result<[PullRequest], any Error>
+        let hold: Bool
+
+        static func ok(_ prs: [PullRequest], hold: Bool = false) -> Self { .init(result: .success(prs), hold: hold) }
+        static func fail(_ error: any Error) -> Self { .init(result: .failure(error), hold: false) }
+    }
+
+    private var followSteps: [FollowStep] = []
+    private var followHeld: [CheckedContinuation<Void, Never>] = []
+    /// The keys of each `pullRequests` call, in order.
+    private(set) var followCalls: [[PRKey]] = []
+
+    func setFollows(_ steps: [FollowStep]) { followSteps = steps }
+
+    func pullRequests(_ keys: [PRKey], account: String) async throws -> [PullRequest] {
+        followCalls.append(keys)
+        guard !followSteps.isEmpty else { throw APIError.server(500) }
+        let step = followSteps.removeFirst()
+        if step.hold { await withCheckedContinuation { followHeld.append($0) } }
+        return try step.result.get()
+    }
+
+    func releaseFollows() {
+        let waiting = followHeld
+        followHeld.removeAll()
+        waiting.forEach { $0.resume() }
+    }
 }
 
 private extension FakeFetcher.Step {
@@ -143,9 +174,13 @@ private struct Harness {
         coordinator = RefreshCoordinator(fetcher: fetcher, store: store, clock: clock, now: { now.get() })
     }
 
-    func start(_ account: String = "me", interval: Duration = .seconds(120), canReadProjects: Bool = true) async {
+    func start(
+        _ account: String = "me", interval: Duration = .seconds(120), canReadProjects: Bool = true,
+        followsPendingCI: Bool = false
+    ) async {
         await coordinator.start(
-            account: account, scope: .org("o"), board: .org("o", 3), canReadProjects: canReadProjects, interval: interval)
+            account: account, scope: .org("o"), board: .org("o", 3), canReadProjects: canReadProjects, interval: interval,
+            followsPendingCI: followsPendingCI)
     }
 }
 
@@ -1161,5 +1196,310 @@ private func withBoard(_ snap: Snapshot) -> Snapshot {
         calendar.timeZone = .current
         let reset = calendar.date(from: DateComponents(year: 2026, month: 10, day: 26, hour: 14, minute: 5))!
         #expect(RefreshError.rateLimited(reset).message == "Rate limited until 14:05")
+    }
+}
+
+// MARK: - Fast CI follow
+
+private let followKey = PRKey(repo: "o/r", number: 5)
+
+private func mine(_ ci: CIState, title: String = "mine", at date: Date = t0) -> PullRequest {
+    PullRequest(
+        key: followKey, title: title, url: URL(string: "https://x/5")!,
+        author: "me", authorAvatarURL: nil, state: .open, isDraft: false,
+        createdAt: date, updatedAt: date, closedAt: nil, headRef: "h", baseRef: "main", ci: ci,
+        headCommitDate: date, commentCount: 0, lastCommentAuthor: nil, latestReviews: [], reviewRequests: [],
+        headCommitOid: "abc", mergeable: .mergeable)
+}
+
+/// `snapshot(title)` with one of my PRs in Mine, its CI `ci`.
+private func withMine(_ ci: CIState, title: String = "full", at date: Date = t0) -> Snapshot {
+    var snap = snapshot(title, at: date)
+    snap.mine = [mine(ci, at: date)]
+    return snap
+}
+
+private func thirties(_ sleeps: [Duration]) -> Int { sleeps.filter { $0 == .seconds(30) }.count }
+
+extension RefreshCoordinatorTests {
+    @Test func followPollsPendingMinePRsEvery30s() async throws {
+        let full = withMine(.pending)
+        let h = Harness([.ok(full), .ok(withMine(.failure, at: t0.addingTimeInterval(120)), hold: true)])
+        await h.fetcher.setFollows([.ok([mine(.failure, title: "followed")])])
+        var updates = h.coordinator.updates.makeAsyncIterator()
+        await h.start(interval: .seconds(120), followsPendingCI: true)
+        _ = await nextSettled(&updates)
+        #expect(await nextSettled(&updates)?.0 == full)
+        await h.clock.waitForSleeps { $0.contains(.seconds(120)) && thirties($0) == 1 }
+        h.now.set(t0.addingTimeInterval(30))
+        h.clock.advance(by: .seconds(30))
+        let followed = try #require(await updates.next())
+        #expect(await h.fetcher.followCalls == [[followKey]])
+        #expect(followed.0?.mine == [mine(.failure, title: "followed")])
+        #expect(followed.0?.reviewCandidates == full.reviewCandidates)
+        #expect(followed.0?.fetchedAt == full.fetchedAt)
+        #expect(followed.1.lastSuccess == full.fetchedAt)
+        #expect(followed.1.error == nil)
+        #expect(!followed.1.isRefreshing)
+        #expect(followed.1.isCIFollow)
+        #expect(await h.coordinator.heldStatus.isCIFollow == false)
+        #expect(await h.store.load(account: "me", scope: .org("o"))?.mine.first?.ci == .failure)
+    }
+
+    @Test func followRepeatsWhilePendingUntilTheFullRefreshIsNear() async throws {
+        let h = Harness([.ok(withMine(.pending)), .ok(withMine(.pending, at: t0.addingTimeInterval(120)), hold: true)])
+        await h.fetcher.setFollows([.ok([mine(.pending)]), .ok([mine(.pending)])])
+        await h.start(interval: .seconds(120), followsPendingCI: true)
+        await h.clock.waitForSleeps { thirties($0) == 1 }
+        h.now.set(t0.addingTimeInterval(30))
+        h.clock.advance(by: .seconds(30))
+        await h.clock.waitForSleeps { thirties($0) == 2 }
+        h.now.set(t0.addingTimeInterval(60))
+        h.clock.advance(by: .seconds(30))
+        await h.clock.waitForSleeps { thirties($0) == 3 }
+        #expect(await h.fetcher.followCalls.count == 2)
+        // At 90 s the full refresh is due in 30 s: no follow, and none scheduled.
+        h.now.set(t0.addingTimeInterval(90))
+        h.clock.advance(by: .seconds(30))
+        #expect(await !eventually(within: .milliseconds(200)) { await h.fetcher.followCalls.count > 2 })
+        #expect(thirties(h.clock.requestedSleeps) == 3)
+    }
+
+    @Test func followStopsWhenNoPending() async throws {
+        let h = Harness([.ok(withMine(.pending)), .ok(snapshot("next"), hold: true)])
+        await h.fetcher.setFollows([.ok([mine(.success)])])
+        var updates = h.coordinator.updates.makeAsyncIterator()
+        await h.start(interval: .seconds(120), followsPendingCI: true)
+        _ = await nextSettled(&updates)
+        _ = await nextSettled(&updates)
+        await h.clock.waitForSleeps { thirties($0) == 1 }
+        h.now.set(t0.addingTimeInterval(30))
+        h.clock.advance(by: .seconds(30))
+        #expect(try #require(await updates.next()).0?.mine.first?.ci == .success)
+        #expect(await !eventually(within: .milliseconds(200)) { thirties(h.clock.requestedSleeps) > 1 })
+        #expect(h.clock.pendingSleepers == 1)
+        #expect(await h.fetcher.followCalls.count == 1)
+    }
+
+    @Test func followNeverRunsDuringFullRefresh() async throws {
+        let h = Harness([.ok(withMine(.pending)), .ok(withMine(.pending, title: "second"), hold: true)])
+        await h.fetcher.setFollows([.ok([mine(.failure)])])
+        await h.start(interval: .seconds(120), followsPendingCI: true)
+        await h.clock.waitForSleeps { thirties($0) == 1 }
+        let coordinator = h.coordinator
+        let refresh = Task { await coordinator.refreshNow() }
+        await h.fetcher.waitForCalls(2)
+        h.now.set(t0.addingTimeInterval(30))
+        h.clock.advance(by: .seconds(30))
+        #expect(await !eventually(within: .milliseconds(200)) { await h.fetcher.followCalls.count > 0 })
+        await h.fetcher.releaseHeld()
+        await refresh.value
+        // The full refresh still sees a pending PR, so following starts again from it.
+        await h.clock.waitForSleeps { thirties($0) == 2 }
+        #expect(await h.fetcher.followCalls.isEmpty)
+    }
+
+    @Test func followFailureIsSilent() async throws {
+        let h = Harness([
+            .ok(withMine(.pending)), .ok(withMine(.pending, at: t0.addingTimeInterval(120))),
+            .ok(snapshot("third"), hold: true),
+        ])
+        await h.fetcher.setFollows([.fail(APIError.server(502)), .ok([mine(.pending)])])
+        await h.start(interval: .seconds(120), followsPendingCI: true)
+        await h.clock.waitForSleeps { thirties($0) == 1 }
+        h.now.set(t0.addingTimeInterval(30))
+        h.clock.advance(by: .seconds(30))
+        #expect(await eventually { await h.fetcher.followCalls.count == 1 })
+        #expect(await !eventually(within: .milliseconds(200)) { thirties(h.clock.requestedSleeps) > 1 })
+        #expect(await h.coordinator.heldStatus.error == nil)
+        #expect(await h.coordinator.heldStatus.lastSuccess == t0)
+        // The next full refresh succeeds and following resumes.
+        h.now.set(t0.addingTimeInterval(120))
+        h.clock.advance(by: .seconds(90))
+        await h.fetcher.waitForCalls(2)
+        await h.clock.waitForSleeps { thirties($0) == 2 }
+        h.now.set(t0.addingTimeInterval(150))
+        h.clock.advance(by: .seconds(30))
+        #expect(await eventually { await h.fetcher.followCalls.count == 2 })
+    }
+
+    @Test func followOffWhenSettingOff() async throws {
+        let h = Harness([.ok(withMine(.pending)), .ok(snapshot("next"), hold: true)])
+        await h.fetcher.setFollows([.ok([mine(.failure)])])
+        await h.start(interval: .seconds(120), followsPendingCI: false)
+        #expect(await h.clock.waitForSleeps(1) == [.seconds(120)])
+        h.now.set(t0.addingTimeInterval(30))
+        h.clock.advance(by: .seconds(30))
+        #expect(await !eventually(within: .milliseconds(200)) { await h.fetcher.followCalls.count > 0 })
+        #expect(thirties(h.clock.requestedSleeps) == 0)
+    }
+
+    @Test func updateTurnsFollowOffAndOn() async throws {
+        let h = Harness([.ok(withMine(.pending)), .ok(snapshot("next"), hold: true)])
+        await h.fetcher.setFollows([.ok([mine(.pending)])])
+        await h.start(interval: .seconds(120), followsPendingCI: true)
+        await h.clock.waitForSleeps { thirties($0) == 1 }
+        await h.coordinator.update(
+            board: .org("o", 3), canReadProjects: true, interval: .seconds(120), followsPendingCI: false)
+        #expect(await eventually { h.clock.pendingSleepers == 1 })
+        h.now.set(t0.addingTimeInterval(30))
+        h.clock.advance(by: .seconds(30))
+        #expect(await !eventually(within: .milliseconds(200)) { await h.fetcher.followCalls.count > 0 })
+        await h.coordinator.update(
+            board: .org("o", 3), canReadProjects: true, interval: .seconds(120), followsPendingCI: true)
+        await h.clock.waitForSleeps { thirties($0) == 2 }
+        h.now.set(t0.addingTimeInterval(60))
+        h.clock.advance(by: .seconds(30))
+        #expect(await eventually { await h.fetcher.followCalls.count == 1 })
+    }
+
+    @Test func followSkipsWithOneMinuteInterval() async throws {
+        let h = Harness([.ok(withMine(.pending)), .ok(snapshot("next"), hold: true)])
+        await h.fetcher.setFollows([.ok([mine(.failure)])])
+        await h.start(interval: .seconds(60), followsPendingCI: true)
+        await h.clock.waitForSleeps { $0.contains(.seconds(60)) && thirties($0) == 1 }
+        h.now.set(t0.addingTimeInterval(30))
+        h.clock.advance(by: .seconds(30))
+        #expect(await !eventually(within: .milliseconds(200)) { await h.fetcher.followCalls.count > 0 })
+        #expect(thirties(h.clock.requestedSleeps) == 1)
+    }
+
+    @Test func followStopsWhenAFullRefreshFails() async throws {
+        let h = Harness([.ok(withMine(.pending)), .fail(APIError.network("offline")), .ok(snapshot("x"), hold: true)])
+        await h.fetcher.setFollows([.ok([mine(.failure)])])
+        await h.start(interval: .seconds(120), followsPendingCI: true)
+        await h.clock.waitForSleeps { thirties($0) == 1 }
+        await h.coordinator.refreshNow()
+        #expect(await h.coordinator.heldStatus.error == .offline)
+        h.now.set(t0.addingTimeInterval(30))
+        h.clock.advance(by: .seconds(30))
+        #expect(await !eventually(within: .milliseconds(200)) { await h.fetcher.followCalls.count > 0 })
+    }
+
+    @Test func followStopsWithTheLoop() async throws {
+        let h = Harness([.ok(withMine(.pending))])
+        await h.fetcher.setFollows([.ok([mine(.failure)])])
+        await h.start(interval: .seconds(120), followsPendingCI: true)
+        await h.clock.waitForSleeps { thirties($0) == 1 }
+        await h.coordinator.stop()
+        #expect(await eventually { h.clock.pendingSleepers == 0 })
+        h.clock.advance(by: .seconds(30))
+        #expect(await !eventually(within: .milliseconds(200)) { await h.fetcher.followCalls.count > 0 })
+    }
+
+    /// `stop()` waits for a follow in flight, which then writes nothing.
+    @Test func stopWaitsForAFollowInFlight() async throws {
+        let full = withMine(.pending)
+        let h = Harness([.ok(full)])
+        await h.fetcher.setFollows([.ok([mine(.failure)], hold: true)])
+        await h.start(interval: .seconds(120), followsPendingCI: true)
+        await h.clock.waitForSleeps { thirties($0) == 1 }
+        h.now.set(t0.addingTimeInterval(30))
+        h.clock.advance(by: .seconds(30))
+        #expect(await eventually { await h.fetcher.followCalls.count == 1 })
+        let stopped = StopFlag()
+        let coordinator = h.coordinator
+        let stopping = Task {
+            await coordinator.stop()
+            stopped.set()
+        }
+        #expect(await !eventually(within: .milliseconds(200)) { stopped.isSet })
+        await h.fetcher.releaseFollows()
+        await stopping.value
+        #expect(await h.coordinator.droppedFollows == 1)
+        #expect(await h.store.load(account: "me", scope: .org("o")) == full)
+    }
+
+    /// Turned off and on again while a follow runs: that follow is dropped without blocking the next.
+    @Test func followCancelledByTheToggleDoesNotBlock() async throws {
+        let h = Harness([.ok(withMine(.pending)), .ok(snapshot("next"), hold: true)])
+        await h.fetcher.setFollows([.ok([mine(.pending)], hold: true), .ok([mine(.failure)])])
+        await h.start(interval: .seconds(300), followsPendingCI: true)
+        await h.clock.waitForSleeps { thirties($0) == 1 }
+        h.now.set(t0.addingTimeInterval(30))
+        h.clock.advance(by: .seconds(30))
+        #expect(await eventually { await h.fetcher.followCalls.count == 1 })
+        await h.coordinator.update(
+            board: .org("o", 3), canReadProjects: true, interval: .seconds(300), followsPendingCI: false)
+        await h.coordinator.update(
+            board: .org("o", 3), canReadProjects: true, interval: .seconds(300), followsPendingCI: true)
+        await h.clock.waitForSleeps { thirties($0) == 2 }
+        await h.fetcher.releaseFollows()
+        #expect(await eventually { await h.coordinator.droppedFollows == 1 })
+        h.now.set(t0.addingTimeInterval(60))
+        h.clock.advance(by: .seconds(30))
+        #expect(await eventually { await h.fetcher.followCalls.count == 2 })
+        #expect(await eventually { await h.coordinator.heldSnapshot?.mine.first?.ci == .failure })
+    }
+
+    /// A follow that returns after a full refresh started never replaces that refresh's data.
+    @Test func followResultNeverOverwritesANewerFullRefresh() async throws {
+        let newer = withMine(.success, title: "newer", at: t0.addingTimeInterval(40))
+        let h = Harness([.ok(withMine(.pending)), .ok(newer), .ok(snapshot("x"), hold: true)])
+        await h.fetcher.setFollows([.ok([mine(.failure, title: "stale")], hold: true)])
+        await h.start(interval: .seconds(120), followsPendingCI: true)
+        await h.clock.waitForSleeps { thirties($0) == 1 }
+        h.now.set(t0.addingTimeInterval(30))
+        h.clock.advance(by: .seconds(30))
+        #expect(await eventually { await h.fetcher.followCalls.count == 1 })
+        h.now.set(t0.addingTimeInterval(40))
+        await h.coordinator.refreshNow()
+        #expect(await h.coordinator.heldSnapshot == newer)
+        await h.fetcher.releaseFollows()
+        #expect(await eventually { await h.coordinator.droppedFollows == 1 })
+        #expect(await h.coordinator.heldSnapshot == newer)
+        #expect(await h.store.load(account: "me", scope: .org("o")) == newer)
+    }
+
+    /// The same, when the full refresh is still running as the follow returns.
+    @Test func followResultIsDroppedWhileAFullRefreshRuns() async throws {
+        let h = Harness([.ok(withMine(.pending)), .ok(withMine(.success, title: "newer"), hold: true)])
+        await h.fetcher.setFollows([.ok([mine(.failure, title: "stale")], hold: true)])
+        await h.start(interval: .seconds(120), followsPendingCI: true)
+        await h.clock.waitForSleeps { thirties($0) == 1 }
+        h.now.set(t0.addingTimeInterval(30))
+        h.clock.advance(by: .seconds(30))
+        #expect(await eventually { await h.fetcher.followCalls.count == 1 })
+        let coordinator = h.coordinator
+        let refresh = Task { await coordinator.refreshNow() }
+        await h.fetcher.waitForCalls(2)
+        await h.fetcher.releaseFollows()
+        #expect(await eventually { await h.coordinator.droppedFollows == 1 })
+        #expect(await h.coordinator.heldSnapshot?.mine.first?.title == "mine")
+        await h.fetcher.releaseHeld()
+        await refresh.value
+        #expect(await h.coordinator.heldSnapshot?.mine.first?.ci == .success)
+    }
+
+    /// Fed through the notification gate as the app feeds it: CI failed fires once, from the follow,
+    /// and the next full refresh, which sees the same failure, fires nothing.
+    @Test func followNotifiesOnceAcrossTheNextFullRefresh() async throws {
+        let h = Harness([
+            .ok(withMine(.pending)), .ok(withMine(.failure, title: "second", at: t0.addingTimeInterval(120))),
+            .ok(snapshot("x"), hold: true),
+        ])
+        await h.fetcher.setFollows([.ok([mine(.failure)])])
+        var gate = NotificationGate(launchedAt: t0.addingTimeInterval(-1))
+        var kinds: [PREventKind] = []
+        var updates = h.coordinator.updates.makeAsyncIterator()
+        func drain(_ count: Int) async {
+            for _ in 0..<count {
+                guard let (snap, status) = await updates.next() else { return }
+                kinds += gate.events(snapshot: snap, status: status, toggles: NotificationToggles()).map(\.kind)
+            }
+        }
+        await h.start(interval: .seconds(120), followsPendingCI: true)
+        await drain(3)  // cache, marker, first full refresh (the baseline)
+        #expect(kinds.isEmpty)
+        await h.clock.waitForSleeps { thirties($0) == 1 }
+        h.now.set(t0.addingTimeInterval(30))
+        h.clock.advance(by: .seconds(30))
+        await drain(1)
+        #expect(kinds == [.ciFailed])
+        h.now.set(t0.addingTimeInterval(120))
+        h.clock.advance(by: .seconds(90))
+        await drain(2)  // marker, second full refresh
+        #expect(await h.coordinator.heldSnapshot?.fetchedAt == t0.addingTimeInterval(120))
+        #expect(kinds == [.ciFailed])
     }
 }

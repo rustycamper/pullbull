@@ -15,18 +15,26 @@ struct QueryTerm {
         case status
         /// Starts with "updated:", any case.
         case updated
+        /// Starts with "review:", any case.
+        case review
+        /// Starts with "repo:", any case.
+        case repo
+        /// Starts with "size:", any case.
+        case size
         case word
     }
 
     let kind: Kind
-    /// The whole term, sigil and quotes included.
+    /// The whole term, a leading `-`, sigil and quotes included.
     let range: Range<String.Index>
-    /// After the sigil, "label:", "is:", "status:" or "updated:", without quotes; the whole term for a word.
+    /// After the sigil, "label:", "is:", "status:", "updated:" or "review:", without quotes; the whole term for a word.
     let value: Substring
     /// The value opened with a quote.
     let quoted: Bool
     /// A quoted value found its closing quote.
     let closed: Bool
+    /// A `-` before the sigil excludes what the term names. A word never has one: `-flaky` is a word.
+    let negated: Bool
 }
 
 enum QueryScanner {
@@ -36,11 +44,15 @@ enum QueryScanner {
     static let stateQualifier = "is:"
     static let statusQualifier = "status:"
     static let updatedQualifier = "updated:"
+    static let reviewQualifier = "review:"
+    static let repoQualifier = "repo:"
+    static let sizeQualifier = "size:"
 
     /// The terms of `text` in order. A label's or status's value may be quoted (`~"good first issue"`,
     /// `label:"good first issue"`, `status:"In progress"`); a quote left open runs to the end of the text,
-    /// or to the whitespace before the next `@`, `~`, `#`, `label:`, `is:`, `status:` or `updated:` term, which then
-    /// parses as usual. An `is:` or `updated:` value is never quoted.
+    /// or to the whitespace before the next `@`, `~`, `#`, `label:`, `is:`, `status:`, `updated:`, `review:` or `repo:` term, which then
+    /// parses as usual. An `is:`, `updated:`, `review:` or `repo:` value is never quoted. A `-` right before any sigil but `#`
+    /// negates the term.
     static func terms(in text: String) -> [QueryTerm] {
         var terms: [QueryTerm] = []
         var i = text.startIndex
@@ -51,25 +63,36 @@ enum QueryScanner {
                 continue
             }
             let start = i
+            let negated = c == "-" && startsQualifier(text[text.index(after: i)...])
+            let sigil = negated ? text.index(after: i) : i
             let valueStart: String.Index?
             let kind: QueryTerm.Kind
-            if labelSigils.contains(c) {
+            if labelSigils.contains(text[sigil]) {
                 kind = .label
-                valueStart = text.index(after: i)
-            } else if text[i...].prefix(labelQualifier.count).lowercased() == labelQualifier {
+                valueStart = text.index(after: sigil)
+            } else if startsLabelAlias(text[sigil...]) {
                 kind = .labelAlias
-                valueStart = text.index(i, offsetBy: labelQualifier.count)
-            } else if startsState(text[i...]) {
+                valueStart = text.index(sigil, offsetBy: labelQualifier.count)
+            } else if startsState(text[sigil...]) {
                 kind = .state
                 valueStart = nil
-            } else if startsStatus(text[i...]) {
+            } else if startsStatus(text[sigil...]) {
                 kind = .status
-                valueStart = text.index(i, offsetBy: statusQualifier.count)
-            } else if startsUpdated(text[i...]) {
+                valueStart = text.index(sigil, offsetBy: statusQualifier.count)
+            } else if startsUpdated(text[sigil...]) {
                 kind = .updated
                 valueStart = nil
+            } else if startsReview(text[sigil...]) {
+                kind = .review
+                valueStart = nil
+            } else if startsRepo(text[sigil...]) {
+                kind = .repo
+                valueStart = nil
+            } else if startsSize(text[sigil...]) {
+                kind = .size
+                valueStart = nil
             } else {
-                kind = personSigils.contains(c) ? .person : .word
+                kind = personSigils.contains(text[sigil]) ? .person : .word
                 valueStart = nil
             }
             if let valueStart, valueStart < text.endIndex, text[valueStart] == "\"" {
@@ -77,11 +100,13 @@ enum QueryScanner {
                 if let close = text[open...].firstIndex(of: "\"") {
                     i = text.index(after: close)
                     terms.append(QueryTerm(
-                        kind: kind, range: start..<i, value: text[open..<close], quoted: true, closed: true))
+                        kind: kind, range: start..<i, value: text[open..<close], quoted: true, closed: true,
+                        negated: negated))
                 } else {
                     i = openQuoteEnd(in: text, from: open)
                     terms.append(QueryTerm(
-                        kind: kind, range: start..<i, value: text[open..<i], quoted: true, closed: false))
+                        kind: kind, range: start..<i, value: text[open..<i], quoted: true, closed: false,
+                        negated: negated))
                 }
                 continue
             }
@@ -90,12 +115,16 @@ enum QueryScanner {
             let value: Substring
             switch kind {
             case .word: value = text[start..<end]
-            case .person: value = text[text.index(after: start)..<end]
+            case .person: value = text[text.index(after: sigil)..<end]
             case .label, .labelAlias, .status: value = text[(valueStart ?? end)..<end]
-            case .state: value = text[text.index(start, offsetBy: stateQualifier.count)..<end]
-            case .updated: value = text[text.index(start, offsetBy: updatedQualifier.count)..<end]
+            case .state: value = text[text.index(sigil, offsetBy: stateQualifier.count)..<end]
+            case .updated: value = text[text.index(sigil, offsetBy: updatedQualifier.count)..<end]
+            case .review: value = text[text.index(sigil, offsetBy: reviewQualifier.count)..<end]
+            case .repo: value = text[text.index(sigil, offsetBy: repoQualifier.count)..<end]
+            case .size: value = text[text.index(sigil, offsetBy: sizeQualifier.count)..<end]
             }
-            terms.append(QueryTerm(kind: kind, range: start..<end, value: value, quoted: false, closed: false))
+            terms.append(QueryTerm(
+                kind: kind, range: start..<end, value: value, quoted: false, closed: false, negated: negated))
             i = end
         }
         return terms
@@ -115,11 +144,18 @@ enum QueryScanner {
         return text.endIndex
     }
 
+    /// `rest` starts a sigil term, or `-` and one that can be negated.
     private static func startsSigilTerm(_ rest: Substring) -> Bool {
         guard let first = rest.first else { return false }
-        return personSigils.contains(first) || labelSigils.contains(first) || first == "#"
-            || rest.prefix(labelQualifier.count).lowercased() == labelQualifier || startsState(rest) || startsStatus(rest)
-            || startsUpdated(rest)
+        return first == "#" || startsQualifier(rest) || (first == "-" && startsQualifier(rest.dropFirst()))
+    }
+
+    /// `rest` starts an `@`, `~`, `label:`, `is:`, `status:`, `updated:` `review:` or `repo:` term: one a `-` can negate.
+    static func startsQualifier(_ rest: Substring) -> Bool {
+        guard let first = rest.first else { return false }
+        return personSigils.contains(first) || labelSigils.contains(first) || startsLabelAlias(rest)
+            || startsState(rest) || startsStatus(rest) || startsUpdated(rest) || startsReview(rest)
+            || startsRepo(rest) || startsSize(rest)
     }
 
     /// `rest` starts with "is:", any case.
@@ -135,6 +171,21 @@ enum QueryScanner {
     /// `rest` starts with "updated:", any case.
     static func startsUpdated(_ rest: Substring) -> Bool {
         rest.prefix(updatedQualifier.count).lowercased() == updatedQualifier
+    }
+
+    /// `rest` starts with "review:", any case.
+    static func startsReview(_ rest: Substring) -> Bool {
+        rest.prefix(reviewQualifier.count).lowercased() == reviewQualifier
+    }
+
+    /// `rest` starts with "repo:", any case.
+    static func startsRepo(_ rest: Substring) -> Bool {
+        rest.prefix(repoQualifier.count).lowercased() == repoQualifier
+    }
+
+    /// `rest` starts with "size:", any case.
+    static func startsSize(_ rest: Substring) -> Bool {
+        rest.prefix(sizeQualifier.count).lowercased() == sizeQualifier
     }
 
     /// `rest` starts with "label:", any case.

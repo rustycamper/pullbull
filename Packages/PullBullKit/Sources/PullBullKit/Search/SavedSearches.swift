@@ -118,6 +118,16 @@ public struct SavedSearches: Codable, Equatable, Sendable {
         items = rest
     }
 
+    /// The key that applies the search at `index`: "⌃1" to "⌃9" for the first nine, else nil.
+    public static func keyLabel(at index: Int) -> String? {
+        (0..<9).contains(index) ? "⌃\(index + 1)" : nil
+    }
+
+    /// The search ⌃`digit` applies: the `digit`th in order, for 1 to 9; nil when there is none.
+    public func search(forDigit digit: Int) -> SavedSearch? {
+        (1...9).contains(digit) && digit <= items.count ? items[digit - 1] : nil
+    }
+
     /// Whether `query`, trimmed, is exactly (case included) a saved query.
     public func contains(query: String) -> Bool {
         guard let query = SavedSearch.validQuery(query) else { return false }
@@ -219,11 +229,13 @@ extension SearchFieldState {
     /// were typed, and returns the query to search for.
     @discardableResult
     public mutating func apply(
-        _ saved: SavedSearch, people: PeopleIndex, labels: LabelIndex, statuses: StatusIndex = .empty
+        _ saved: SavedSearch, people: PeopleIndex, labels: LabelIndex, statuses: StatusIndex = .empty,
+        repos: RepoIndex = .empty
     ) -> SearchQuery? {
         forgetCompletion()
         let text = saved.fieldText
-        let query = edit(text, caret: text.utf16.count, people: people, labels: labels, statuses: statuses)
+        let query = edit(
+            text, caret: text.utf16.count, people: people, labels: labels, statuses: statuses, repos: repos)
         forgetCompletion()
         return query
     }

@@ -9,6 +9,10 @@ import Testing
         #expect(!ListSkeleton.prLeadsWithHeader(grouping: .none, focused: false))
     }
 
+    @Test func authorGroupingLeadsWithHeaderEvenFocused() {
+        #expect(ListSkeleton.prLeadsWithHeader(grouping: .author, focused: true))
+    }
+
     @Test func createdFollowsGroupingAndFocus() {
         #expect(ListSkeleton.issueLeadsWithHeader(tab: .created, grouping: .repository, focused: false, statusKnown: true))
         #expect(!ListSkeleton.issueLeadsWithHeader(tab: .created, grouping: .none, focused: false, statusKnown: true))

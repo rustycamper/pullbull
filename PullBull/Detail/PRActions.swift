@@ -52,6 +52,12 @@ enum PRActions {
         CopyConfirmation.shared.show("Copied Markdown link")
     }
 
+    /// `gh pr checkout N -R owner/repo`, then the quiet "Copied" where the popover shows it.
+    @MainActor static func copyCheckoutCommand(_ key: PRKey) {
+        copy(CheckoutCommand.text(for: key))
+        CopyConfirmation.shared.show("Copied checkout command")
+    }
+
     static func copy(_ string: String) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
@@ -85,11 +91,49 @@ extension FocusMenuItem {
     }
 }
 
+/// "Open All N on GitHub" on a group header; nil unless the group holds two or more pages.
+struct BulkOpenItem {
+    let title: String
+    let action: () -> Void
+
+    @MainActor init?(urls: [URL]) {
+        let urls = BulkOpen.urls(urls)
+        guard BulkOpen.offers(count: urls.count) else { return nil }
+        title = BulkOpen.menuTitle(count: urls.count)
+        action = { BulkOpenItem.open(urls) }
+    }
+
+    /// Above the threshold, asks first: as a sheet on the popover's panel when it is key, so the panel
+    /// stays open (and keeps its state) behind the question; otherwise as an app-modal alert.
+    @MainActor private static func open(_ urls: [URL]) {
+        guard BulkOpen.needsConfirmation(count: urls.count) else {
+            urls.forEach { NSWorkspace.shared.open($0) }
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = BulkOpen.prompt(count: urls.count)
+        alert.addButton(withTitle: "Open")
+        alert.addButton(withTitle: "Cancel")
+        let confirmed = { urls.forEach { NSWorkspace.shared.open($0) } }
+        if let window = NSApp.keyWindow {
+            alert.beginSheetModal(for: window) { response in
+                if response == .alertFirstButtonReturn { confirmed() }
+            }
+        } else {
+            NSApp.activate()
+            if alert.runModal() == .alertFirstButtonReturn { confirmed() }
+        }
+    }
+}
+
 extension View {
-    /// Right-click: the repo focus and person search items (list and search rows), Copy Branch Name, Copy Link,
-    /// Copy as Markdown Link, Open on GitHub. VoiceOver gets Copy as Markdown Link as an action too.
+    /// Right-click: the repo focus and person search items (list and search rows), Copy Branch Name, Copy
+    /// Checkout Command, Copy Link, Copy as Markdown Link, Open on GitHub, the files item (`files.menuTitle`)
+    /// and, on a PR whose checks failed, Open Failing Check. VoiceOver gets Copy as Markdown Link as an
+    /// action too.
     func prContextMenu(
-        _ pr: PullRequest, focus: FocusMenuItem? = nil, time: TimeFocusMenu? = nil, person: FocusMenuItem? = nil
+        _ pr: PullRequest, focus: FocusMenuItem? = nil, time: TimeFocusMenu? = nil, person: FocusMenuItem? = nil,
+        files: FilesLink? = nil, failingCheck: (() -> Void)? = nil
     ) -> some View {
         contextMenu {
             if focus != nil || time != nil || person != nil {
@@ -99,10 +143,17 @@ extension View {
                 Divider()
             }
             Button("Copy Branch Name", systemImage: "arrow.triangle.branch") { PRActions.copyBranch(pr) }
+            Button("Copy Checkout Command", systemImage: "terminal") { PRActions.copyCheckoutCommand(pr.key) }
             Button("Copy Link", systemImage: "link") { PRActions.copyLink(pr) }
             Button("Copy as Markdown Link", systemImage: "link.badge.plus") { PRActions.copyMarkdownLink(pr) }
             Divider()
             Button("Open on GitHub", systemImage: "arrow.up.right.square") { PRActions.openOnGitHub(pr) }
+            if let files {
+                Button(files.menuTitle, systemImage: "doc.text.magnifyingglass") { NSWorkspace.shared.open(files.url) }
+            }
+            if pr.ci == .failure, let failingCheck {
+                Button("Open Failing Check", systemImage: "xmark.octagon", action: failingCheck)
+            }
         }
         .accessibilityAction(named: "Copy as Markdown Link") { PRActions.copyMarkdownLink(pr) }
     }
@@ -127,13 +178,19 @@ extension View {
         .accessibilityAction(named: "Copy as Markdown Link") { PRActions.copyMarkdownLink(issue) }
     }
 
-    /// Right-click on a repo group header or a list's background: the repo focus and Show Only Updated
-    /// items; no menu without either.
-    @ViewBuilder func focusContextMenu(_ focus: FocusMenuItem? = nil, time: TimeFocusMenu? = nil) -> some View {
-        if focus != nil || time != nil {
+    /// Right-click on a group header or a list's background: the repo focus, Show Only Updated and, on a
+    /// header, Open All; no menu without any.
+    @ViewBuilder func focusContextMenu(
+        _ focus: FocusMenuItem? = nil, time: TimeFocusMenu? = nil, openAll: BulkOpenItem? = nil
+    ) -> some View {
+        if focus != nil || time != nil || openAll != nil {
             contextMenu {
                 if let focus { FocusMenuButton(item: focus) }
                 if let time { time }
+                if let openAll {
+                    if focus != nil || time != nil { Divider() }
+                    Button(openAll.title, systemImage: "arrow.up.right.square", action: openAll.action)
+                }
             }
         } else {
             self

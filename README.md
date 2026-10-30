@@ -51,9 +51,9 @@ Keyboard-first · Native SwiftUI · Read-only
 
 | &emsp;&emsp;&emsp; | Mode | Tab | Shows |
 |:-:|---|---|---|
-| <kbd>⌘</kbd><kbd>1</kbd> | **Pull Requests** | Review | PRs requesting your or your team's review, re-requests, new commits since your review |
-| | | Mine | Your open PRs, review pills, checks, *Ready to merge*. Folded *Recently closed*: last 7 days |
-| | | Team | Other open PRs in the org |
+| <kbd>⌘</kbd><kbd>1</kbd> | **Pull Requests** | Review | PRs requesting your or your team's review, re-requests, new commits since your review, with lines changed |
+| | | Mine | Your open PRs, review pills, checks, *Ready to merge*, checked every 30 s while CI runs. Folded *Recently closed*: last 7 days |
+| | | Team | Other open PRs in the org, by repo or by author |
 | <kbd>⌘</kbd><kbd>2</kbd> | **Issues** | Assigned | Your issues, grouped by board Status (by repo without a board). Folded *Done*: done on the board, still open |
 | | | Created | Issues you opened |
 | | | Board | All open issues on the board, by Status. Folded *Done*: last 14 days |
@@ -62,7 +62,7 @@ Keyboard-first · Native SwiftUI · Read-only
 - **Labels:** chips with the label's colour dot on each row (not in compact cards), all of them in the detail
 - **One repo:** right-click a repo header or row → **Show Only *repo***, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd>
 - **Recent activity:** right-click a row, a repo header or the list → **Show Only Updated**: today, 3 days, a week or a month
-- **Right-click a row:** copy branch (PRs), link or Markdown link · open on GitHub · search the author
+- **Right-click a row:** copy branch (PRs), link or Markdown link · checkout command · open on GitHub · failing check · search the author
 - **Switch board:** <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> on the Board tab
 - **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Each account keeps its org and board
 
@@ -75,12 +75,17 @@ More in the [manual](docs/manual.md#issues).
 | `@alice` | PRs alice authored or reviews, issues they opened or are assigned |
 | `~bug` | Items with that label |
 | `is:open` `is:closed` `is:merged` `is:draft` | Items in that state |
+| `is:failing` `is:ready` `review:changes` | PRs by what they need |
+| `is:unanswered` | Your PRs and issues waiting on your reply |
+| `size:s` `size:m` `size:l` | PRs by lines changed: up to 50, up to 300, more |
+| `repo:widgets` `repo:acme/widgets` | Only that repo; `owner/name` also finds repos PullBull hasn't seen. Save it with the search |
 | `status:prog` `status:"In progress"` | Issues in that Status column on the board |
 | `#123` | That number, in every repo |
 | a GitHub link | Exactly that PR or issue |
 | `updated:today` `updated:3d` `updated:1w` `updated:1m` | Items active since 00:00 today, or 2, 6 or 29 days before; GitHub's date forms (`updated:>2026-10-01`) also filter locally |
+| `-@dependabot` `-~wontfix` | Leave those out: a `-` before any qualifier |
 
-Combine `@`, `~`, `is:`, `status:`, `updated:` and words. Type `st`, `la` or `up` and press <kbd>Tab</kbd> for `status:`, `label:` or `updated:`, with suggestions. Save the searches you repeat with the bookmark icon; manage them in Settings → Search.
+Combine `@`, `~`, `is:`, `status:`, `updated:`, `review:`, `repo:`, `size:` and words. Type `st`, `la` or `up` and press <kbd>Tab</kbd> for `status:`, `label:` or `updated:`, with suggestions. Save the searches you repeat with the bookmark icon, apply one with ⌃1–⌃9; manage them in Settings → Search.
 
 > [!TIP]
 > **Can't remember the words?** [Ask AI](docs/manual.md#ask-ai) finds the item from a description (<kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd>). Off by default; turn it on in Settings → Ask AI.
@@ -91,9 +96,13 @@ Combine `@`, `~`, `is:`, `status:`, `updated:` and words. Type `st`, `la` or `up
 |---|---|
 | <kbd>⌃</kbd><kbd>⌥</kbd><kbd>P</kbd> | Open or close, from any app |
 | <kbd>↑</kbd> <kbd>↓</kbd> | Select |
+| <kbd>⌥</kbd><kbd>↑</kbd> <kbd>⌥</kbd><kbd>↓</kbd> | Previous / next group |
+| <kbd>⌥</kbd><kbd>↓</kbd> <kbd>⌥</kbd><kbd>↑</kbd> in the detail | Next / previous item, without going back |
 | <kbd>Return</kbd> · <kbd>⌘</kbd><kbd>Return</kbd> | Open detail · open on GitHub |
+| <kbd>⇧</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Files changed, or only what changed since your review |
 | <kbd>⌘</kbd><kbd>1</kbd> · <kbd>⌘</kbd><kbd>2</kbd> | Pull Requests · Issues |
 | <kbd>/</kbd> or just type | Search |
+| <kbd>⌃</kbd><kbd>1</kbd>…<kbd>⌃</kbd><kbd>9</kbd> | Saved searches |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd> | Repo menu · board menu · account menu |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Ask (once turned on) |
 | <kbd>Esc</kbd> | Back, clear, close |
@@ -106,7 +115,7 @@ Full list in the [manual](docs/manual.md#keyboard).
 
 | Tab | |
 |---|---|
-| General | Grouping, compact cards, filters, menu bar count, refresh interval, shortcut, launch at login, updates |
+| General | Grouping, Team by author, compact cards, filters, menu bar count, refresh interval, shortcut, launch at login, updates |
 | Account | Account, org, board |
 | Notifications | A separate toggle for each event on your PRs, PRs you review, issues assigned to you and issues you created: reviews, CI, comments, ready to merge, merged, assigned, status changes, closed or reopened |
 | Search | Saved searches: rename, edit, reorder, delete |

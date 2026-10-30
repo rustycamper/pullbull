@@ -46,18 +46,18 @@ public enum StateFilter: String, CaseIterable, Equatable, Sendable {
 }
 
 public struct StateCandidate: CompletionCandidate {
-    public let state: StateFilter
+    public let value: IsValue
 
-    public var id: String { state.rawValue }
-    public var insertText: String { state.token }
+    public var id: String { value.name }
+    public var insertText: String { value.token }
 
-    public init(state: StateFilter) {
-        self.state = state
+    public init(value: IsValue) {
+        self.value = value
     }
 
-    /// The states whose name starts with `prefix`, ignoring case, in `StateFilter` order.
+    /// The `is:` values whose name starts with `prefix`, ignoring case: the states, then the conditions.
     static func candidates(prefix: String) -> [StateCandidate] {
         let p = prefix.lowercased()
-        return StateFilter.allCases.filter { $0.rawValue.hasPrefix(p) }.map(StateCandidate.init)
+        return IsValue.all.filter { $0.name.hasPrefix(p) }.map(StateCandidate.init)
     }
 }

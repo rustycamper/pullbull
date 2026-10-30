@@ -60,8 +60,12 @@ struct PopoverView: View {
     private var searchOpen: Bool { searchShown || fieldOpen }
     /// The "@user", "~label" or "is:" list is on screen (only with the search field open).
     private var completionShown: Bool { model.completion != nil && searchOpen }
-    /// The panel under the empty field takes the arrows, Return and Esc.
-    private var hintsActive: Bool { fieldOpen && !searching && model.searchText.isEmpty && !completionShown }
+    /// The panel under the empty field takes the arrows, Return and Esc; also after its `-` token, so the
+    /// keyboard can walk on to the token that joins it.
+    private var hintsActive: Bool {
+        fieldOpen && !searching && (model.searchText.isEmpty || model.searchText == SearchHint.negate.sigil)
+            && !completionShown
+    }
     /// The saved chips under the empty field.
     private var hintCloud: SavedChipCloud {
         SearchHints.cloud(saved: model.settings.savedSearches, expanded: savedExpanded)
@@ -98,6 +102,7 @@ struct PopoverView: View {
     }
     /// The Done group of the Issues tab on screen is unfolded.
     private var doneExpanded: Bool { doneExpandedTabs.contains(model.selectedIssueTab) }
+    private var listExpansion: ListExpansion { ListExpansion(closed: closedExpanded, done: doneExpanded) }
 
     private func doneExpanded(_ tab: IssueTab) -> Binding<Bool> {
         Binding {
@@ -195,6 +200,8 @@ struct PopoverView: View {
         // Folding a group drops a highlight on one of its rows, so it doesn't come back on the next unfold.
         .onChange(of: closedExpanded) { _, expanded in if !expanded { dropHiddenListSelection() } }
         .onChange(of: doneExpandedTabs) { old, new in if !old.isSubset(of: new) { dropHiddenListSelection() } }
+        // A detail's walk snapshots the rows as shown, Recently closed and Done included when expanded.
+        .onChange(of: listExpansion, initial: true) { _, new in model.listExpansion = new }
         .onChange(of: fieldFocused) { _, focused in
             // Back in the search field (a click, ⌘F): its hints show, and the save row gives way.
             if focused {
@@ -220,7 +227,8 @@ struct PopoverView: View {
         // Any other text (the user's next edit) ends a pending caret.
         .onChange(of: model.searchText) { _, text in
             if let pending = pendingCaret, pending.text != text { pendingCaret = nil }
-            hintSelection = nil
+            // The `-` token picked from the keyboard keeps the cursor it just typed.
+            if !(text == SearchHint.negate.sigil && hintSelection == .hint(.negate)) { hintSelection = nil }
             saveName = nil
         }
     }
@@ -521,6 +529,18 @@ struct PopoverView: View {
                 return searching ? model.copySearchSelectionMarkdownLink()
                     : listKeys.map(model.copyListSelectionMarkdownLink(in:)) ?? false
             }
+            // ⇧⌘↩ and ⌃⌘C: the selected result's or highlighted row's files and checkout command. Neither
+            // edits text, so they work with the search field focused too.
+            if Self.isShiftCommandReturn(event, flags: flags) {
+                guard let key = model.selectedPRKey(in: listKeys) else { return false }
+                NSWorkspace.shared.open(model.filesLink(for: key).url)
+                return true
+            }
+            if Self.isControlCommandC(event, flags: flags) {
+                guard let key = model.selectedPRKey(in: listKeys) else { return false }
+                model.copyCheckoutCommand(key)
+                return true
+            }
             // ⌥⌘↩: Ask, whatever row is selected. Only from the open search field, never the save row.
             if Self.isOptionCommandReturn(event, flags: flags) {
                 guard searchOpen, saveName == nil, model.settings.askEnabled else { return false }
@@ -530,6 +550,12 @@ struct PopoverView: View {
             // Keypad Enter carries .numericPad and fn-Return .function; neither is a modifier here.
             guard flags.subtracting([.command, .shift, .capsLock, .numericPad, .function]).isEmpty else { return false }
             let key = Self.commandKey(event)
+            // ⌘↑ / ⌘↓: the first or last row, in the list only; in the search field they move the caret.
+            if !flags.contains(.shift), let listKeys,
+               event.keyCode == SearchKeyMonitor.upArrow || event.keyCode == SearchKeyMonitor.downArrow {
+                model.moveListSelectionToEdge(last: event.keyCode == SearchKeyMonitor.downArrow, in: listKeys)
+                return true
+            }
             // ⌘⇧C, ⌘⇧F, ⌘⇧B and ⌘⇧A are the only shifted commands.
             if flags.contains(.shift) {
                 switch key {
@@ -579,6 +605,17 @@ struct PopoverView: View {
                 PRActions.copy(link.url.absoluteString)
             default: return false
             }
+            return true
+        }
+        // ⌃1–⌃9: saved search N, by key position, in the list and in search but not the save row. It
+        // opens the field as picking the chip does.
+        if flags.subtracting([.capsLock, .numericPad, .function]) == .control, saveName == nil,
+           let digit = SearchKeyMonitor.digit(event) {
+            guard model.applySavedSearch(number: digit) else { return false }
+            hintSelection = nil
+            savedExpanded = false
+            fieldOpen = true
+            caretAtEndOfField(in: window)
             return true
         }
         if flags.contains(.control) { return false }
@@ -679,7 +716,11 @@ struct PopoverView: View {
         case SearchKeyMonitor.upArrow, SearchKeyMonitor.downArrow:
             let offset = event.keyCode == SearchKeyMonitor.downArrow ? 1 : -1
             if searching {
+                // ⌥↑ / ⌥↓ too: results move one row.
                 model.moveSearchSelection(by: offset)
+            } else if listKeys != nil, flags.subtracting([.capsLock, .numericPad, .function]) == .option {
+                // ⌥↑ / ⌥↓: the next or previous group; nothing in a list without groups.
+                model.jumpListGroup(by: offset, closedExpanded: closedExpanded, doneExpanded: doneExpanded)
             } else if let listKeys {
                 model.moveListSelection(by: offset, in: listKeys)
             } else {
@@ -723,11 +764,22 @@ struct PopoverView: View {
         return true
     }
 
-    /// The detail views have no search: Esc, ← and ⌘[ go back, ⌘↩ opens the page on GitHub, ⌘C copies its
-    /// link (unless text is selected), ⌘⇧C its reference, ⌥⌘C its Markdown link, ⌘R fetches it again.
-    /// Every other key passes through.
+    /// The detail views have no search: Esc, ← and ⌘[ go back, ⌥↓ / ⌥↑ step through the list it came
+    /// from, ⌘↩ opens the page on GitHub, ⌘C copies its link (unless text is selected), ⌘⇧C its
+    /// reference, ⌥⌘C its Markdown link, ⌘R fetches it again. Every other key passes through.
     private func handleDetailKey(_ event: NSEvent, flags: NSEvent.ModifierFlags, in window: NSWindow) -> Bool {
         guard flags.contains(.command) else {
+            if event.keyCode == SearchKeyMonitor.upArrow || event.keyCode == SearchKeyMonitor.downArrow {
+                // ⌥ only (arrows carry .numericPad and .function); a repeat steps again. Without a walk the
+                // key passes on; at either end it's taken and nothing happens.
+                guard flags.subtracting([.capsLock, .numericPad, .function]) == .option else { return false }
+                let before = model.detailPosition
+                guard model.stepDetail(by: event.keyCode == SearchKeyMonitor.downArrow ? 1 : -1) else { return false }
+                if let position = model.detailPosition, position != before {
+                    AccessibilityNotification.Announcement(position).post()
+                }
+                return true
+            }
             if event.keyCode == SearchKeyMonitor.leftArrow {
                 // Arrows carry .numericPad and .function; ⌥ and ⇧ arrows are left alone. SwiftUI's selectable
                 // text doesn't report a selection, so ← goes back even with text selected.
@@ -744,6 +796,17 @@ struct PopoverView: View {
             return true
         }
         if Self.isOptionCommandC(event, flags: flags) { return model.copyShownDetailMarkdownLink() }
+        // ⇧⌘↩ and ⌃⌘C act on a PR detail only.
+        if Self.isShiftCommandReturn(event, flags: flags) {
+            guard case .detail(let key) = model.route else { return false }
+            NSWorkspace.shared.open(model.filesLink(for: key).url)
+            return true
+        }
+        if Self.isControlCommandC(event, flags: flags) {
+            guard case .detail(let key) = model.route else { return false }
+            model.copyCheckoutCommand(key)
+            return true
+        }
         guard flags.subtracting([.command, .shift, .capsLock, .numericPad, .function]).isEmpty,
               let link = model.shownDetailLink else { return false }
         let key = Self.commandKey(event)
@@ -831,6 +894,17 @@ struct PopoverView: View {
             && (event.keyCode == SearchKeyMonitor.return || event.keyCode == SearchKeyMonitor.enter)
     }
 
+    /// ⇧⌘↩ (or keypad Enter) exactly: no ⌥ or ⌃.
+    private static func isShiftCommandReturn(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
+        flags.subtracting([.capsLock, .numericPad, .function]) == [.command, .shift]
+            && (event.keyCode == SearchKeyMonitor.return || event.keyCode == SearchKeyMonitor.enter)
+    }
+
+    /// ⌃⌘C exactly: no ⇧ or ⌥.
+    private static func isControlCommandC(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
+        flags.subtracting([.capsLock, .numericPad, .function]) == [.control, .command] && commandKey(event) == "c"
+    }
+
     /// ⌥⌘C exactly: no ⇧ or ⌃.
     private static func isOptionCommandC(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
         flags.subtracting([.capsLock, .numericPad, .function]) == [.command, .option] && commandKey(event) == "c"
@@ -880,6 +954,9 @@ struct PopoverView: View {
         case .states(let states): states.selectedCandidate.map(CompletionSpeech.completed)
         case .statuses(let statuses): statuses.selectedCandidate.map(CompletionSpeech.completed)
         case .updated(let steps): steps.selectedCandidate.map(CompletionSpeech.completed)
+        case .reviews(let reviews): reviews.selectedCandidate.map(CompletionSpeech.completed)
+        case .repos(let repos): repos.selectedCandidate.map(CompletionSpeech.completed)
+        case .sizes(let sizes): sizes.selectedCandidate.map(CompletionSpeech.completed)
         case nil: nil
         }
         guard let caret = model.acceptCompletion() else { return }
@@ -908,13 +985,15 @@ struct PopoverView: View {
             }
         case .hint(let hint):
             pickHint(hint, in: window)
+            // From the keyboard the cursor stays on `-`, one ← or ↑ from the tokens that can follow it.
+            if fromKeyboard, hint == .negate { hintSelection = item }
         }
     }
 
-    /// A token: types its sigil into the empty field, which opens the `@`, `~`, `is:`, `status:` or `updated:` list.
+    /// A token: types its sigil into the field, which opens its list; `-` opens none, and the next token joins it.
     private func pickHint(_ hint: SearchHint, in window: NSWindow?) {
         hintSelection = nil
-        model.startToken(hint.sigil)
+        model.startToken(hint.text(after: model.searchText))
         caretAtEndOfField(in: window)
     }
 

@@ -63,7 +63,9 @@ struct IssueDetailView: View {
 
     private var header: some View {
         HStack(spacing: 4) {
-            DetailBackButton(title: backTitle, action: model.closeIssueDetail)
+            DetailBackButton(
+                title: backTitle, position: model.detailWalk?.position(showing: key, kind: .issue),
+                action: model.closeIssueDetail)
             Spacer(minLength: 0)
             // A checkmark for a moment after ⌥⌘C.
             DetailIconButton(
@@ -84,7 +86,8 @@ struct IssueDetailView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .monospacedDigit()
                 .lineLimit(1)
-                .padding(.horizontal, 72)
+                // Clear of the back button's "2 of 6" too, so the title doesn't move when it shows.
+                .padding(.horizontal, 96)
         }
         .padding(.horizontal, 8)
         .frame(height: 44)

@@ -115,6 +115,22 @@ public struct Snapshot: Codable, Sendable, Equatable {
         return snapshot
     }
 
+    /// This snapshot with each of `followed` that is still open replacing the pull request of the same key in
+    /// Mine, Review and Team. A merged or closed one keeps its old row until the next full refresh, since Mine
+    /// lists open PRs only and the row would vanish. Keys it doesn't hold are ignored; `fetchedAt` and every
+    /// other list are unchanged.
+    public func merging(followed: [PullRequest]) -> Snapshot {
+        let open = followed.filter { $0.state == .open }
+        guard !open.isEmpty else { return self }
+        let byKey = Dictionary(open.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
+        let replace = { (list: [PullRequest]) in list.map { byKey[$0.key] ?? $0 } }
+        var snapshot = self
+        snapshot.mine = replace(mine)
+        snapshot.reviewCandidates = replace(reviewCandidates)
+        snapshot.team = replace(team)
+        return snapshot
+    }
+
     /// The board `boardIssues` belong to. A snapshot cached before the owner was stored had an org's
     /// board; a personal one had none, so its number is never read as a personal board.
     public var board: BoardRef? {
@@ -247,15 +263,20 @@ public enum TabBuilder {
             .sorted { ($0.closedAt ?? .distantPast) > ($1.closedAt ?? .distantPast) }
 
         return BuiltTabs(
-            review: contents(review), mine: contents(mine), team: contents(team),
+            review: contents(review, oldestFirst: settings.reviewOldestFirst), mine: contents(mine), team: contents(team),
             recentlyClosed: closed, hiddenApprovedCount: hiddenApproved.count
         )
     }
 
-    private static func contents(_ rows: [Row]) -> TabContents {
+    /// Rows by latest activity, or with `oldestFirst` by when the PR was opened, the oldest first.
+    private static func contents(_ rows: [Row], oldestFirst: Bool = false) -> TabContents {
         var seen = Set<PRKey>()
         let sorted = rows.sorted {
-            if $0.pr.updatedAt != $1.pr.updatedAt { return $0.pr.updatedAt > $1.pr.updatedAt }
+            if oldestFirst {
+                if $0.pr.createdAt != $1.pr.createdAt { return $0.pr.createdAt < $1.pr.createdAt }
+            } else if $0.pr.updatedAt != $1.pr.updatedAt {
+                return $0.pr.updatedAt > $1.pr.updatedAt
+            }
             if $0.id.repo != $1.id.repo { return $0.id.repo < $1.id.repo }
             return $0.id.number < $1.id.number
         }

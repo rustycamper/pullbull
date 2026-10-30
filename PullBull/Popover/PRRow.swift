@@ -44,7 +44,8 @@ struct PRRow: View {
         .accessibilityAddTraits(selected ? [.isSelected] : [])
         .prContextMenu(
             pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
-            time: tab == nil ? nil : TimeFocusMenu(model: model), person: .person(model: model, login: pr.author))
+            time: tab == nil ? nil : TimeFocusMenu(model: model), person: .person(model: model, login: pr.author),
+            files: model.filesLink(for: pr), failingCheck: { model.openFailingCheck(pr.key) })
     }
 
     /// A search result moves `searchSelection`, a tab row `listSelection`.
@@ -157,7 +158,7 @@ struct PRRow: View {
     }
 
     /// `repo #num`, or `#num` under a repo header; search results have no repo headers, so they always show the repo.
-    private var showsRepo: Bool { tab == nil || model.rowsShowRepo }
+    private var showsRepo: Bool { tab == nil || tab.map { model.rowsShowRepo(on: $0) } ?? true }
 
     /// The relative age, or an ended PR's "merged Oct 12".
     private var age: String {
@@ -216,6 +217,13 @@ struct PRRow: View {
             if let action = chips.action {
                 ActionCapsule(action: action)
                     .padding(.leading, 4)
+            }
+            if tab == .review, let size = DiffSize.text(additions: pr.additions, deletions: pr.deletions) {
+                Text(size)
+                    .fixedSize()
+                    .padding(.leading, 4)
+                    .accessibilityLabel(
+                        DiffSize.spoken(additions: pr.additions, deletions: pr.deletions) ?? size)
             }
             LabelChips(set: labels, fit: fitting)
         }
@@ -307,7 +315,8 @@ struct ClosedRow: View {
         .help(pr.title)
         .prContextMenu(
             pr, focus: FocusMenuItem(model: model, repo: pr.key.repo), time: TimeFocusMenu(model: model),
-            person: .person(model: model, login: pr.author))
+            person: .person(model: model, login: pr.author), files: model.filesLink(for: pr),
+            failingCheck: { model.openFailingCheck(pr.key) })
     }
 
     private func ended(merged: Bool) -> String {

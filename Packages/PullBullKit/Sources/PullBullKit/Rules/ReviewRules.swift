@@ -26,10 +26,7 @@ public enum ReviewRules {
     public static func status(of pr: PullRequest, me: String, myTeams: Set<String>) -> ReviewStatus {
         if same(pr.author, me) { return .notRequested }
 
-        // Unsubmitted reviews (pending drafts, or no submission date) are not "my review".
-        let mine = pr.latestReviews.first {
-            same($0.author, me) && $0.state != .pending && $0.submittedAt != nil
-        }
+        let mine = myReview(pr, me: me)
 
         let directlyRequested = pr.reviewRequests.contains {
             if case .user(let login) = $0 { return same(login, me) }
@@ -66,6 +63,12 @@ public enum ReviewRules {
         guard [.success, .skipped, .none].contains(pr.ci) else { return false }
         let states = pr.latestReviews.map(\.state)
         return states.contains(.approved) && !states.contains(.changesRequested)
+    }
+
+    /// My latest submitted review of `pr`. Unsubmitted reviews (pending drafts, or no submission date)
+    /// are not "my review".
+    static func myReview(_ pr: PullRequest, me: String) -> Review? {
+        pr.latestReviews.first { same($0.author, me) && $0.state != .pending && $0.submittedAt != nil }
     }
 
     private static func same(_ a: String, _ b: String) -> Bool {

@@ -34,7 +34,9 @@ import Testing
         #expect(SearchQuery.parse("@a_b") == .text(["@a_b"]))
         let tooLong = "@" + String(repeating: "a", count: 40)
         #expect(SearchQuery.parse(tooLong) == .text([tooLong]))
-        #expect(SearchQuery.parse("-@alice") == .text(["-@alice"]))
+        // A leading `-` excludes the person.
+        #expect(SearchQuery.parse("-@alice").logins.isEmpty)
+        #expect(SearchQuery.parse("-@alice").filter?.exclude.logins == ["alice"])
     }
 
     @Test func numberStaysAlone() {
