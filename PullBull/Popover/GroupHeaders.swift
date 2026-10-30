@@ -2,9 +2,9 @@ import SwiftUI
 import PullBullKit
 
 /// Which context menus a group header offers: the list's (the repo focus or a search for the author,
-/// Show Only Updated and Open All), or none.
+/// Show Only Updated and Open All), search's (the same without Show Only Updated), or none.
 enum HeaderMenus {
-    case list, none
+    case list, search, none
 }
 
 /// A repo group's header, counting what the tab counts; in a list it offers the repo focus.
@@ -16,13 +16,14 @@ struct RepoGroupHeader: View {
 
     var body: some View {
         let count = rows.filter(\.counted).count
-        let list = menus == .list
+        let offered = menus != .none
         ListSectionHeader(
             glyph: "book.closed", title: repo.split(separator: "/").last.map(String.init) ?? repo,
             count: count > 0 ? count : nil, compact: model.settings.compact)
             .focusContextMenu(
-                list ? FocusMenuItem(model: model, repo: repo) : nil, time: list ? TimeFocusMenu(model: model) : nil,
-                openAll: list ? BulkOpenItem(urls: rows.map(\.pr.url)) : nil)
+                offered ? FocusMenuItem(model: model, repo: repo) : nil,
+                time: menus == .list ? TimeFocusMenu(model: model) : nil,
+                openAll: offered ? BulkOpenItem(urls: rows.map(\.pr.url)) : nil)
     }
 }
 
@@ -36,13 +37,14 @@ struct AuthorGroupHeader: View {
 
     var body: some View {
         let count = rows.filter(\.counted).count
-        let list = menus == .list
+        let offered = menus != .none
         ListSectionHeader(
             glyph: nil, title: author, count: count > 0 ? count : nil,
             avatar: .init(login: author, url: rows.first?.pr.authorAvatarURL), compact: model.settings.compact)
         .focusContextMenu(
-            list ? FocusMenuItem.person(model: model, login: author) : nil, time: list ? TimeFocusMenu(model: model) : nil,
-            openAll: list ? BulkOpenItem(urls: rows.map(\.pr.url)) : nil)
+            offered ? FocusMenuItem.person(model: model, login: author) : nil,
+            time: menus == .list ? TimeFocusMenu(model: model) : nil,
+            openAll: offered ? BulkOpenItem(urls: rows.map(\.pr.url)) : nil)
     }
 }
 
@@ -69,12 +71,13 @@ struct IssueGroupHeader: View {
     }
 
     var body: some View {
-        let list = menus == .list
+        let offered = menus != .none
         ListSectionHeader(
             glyph: symbol, glyphColor: symbolColor, title: group.title,
             count: group.counted ? group.issues.count : nil, fold: fold, compact: model.settings.compact)
             .focusContextMenu(
-                list ? focusItem : nil, time: list ? TimeFocusMenu(model: model) : nil, openAll: list ? openAll : nil)
+                offered ? focusItem : nil, time: menus == .list ? TimeFocusMenu(model: model) : nil,
+                openAll: offered ? openAll : nil)
     }
 
     /// Every lane and repo group offers it; the merged untitled group has no header.

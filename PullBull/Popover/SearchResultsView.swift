@@ -212,7 +212,7 @@ struct SearchResultsView: View {
                 Section {
                     prRows(group.rows, on: layout.tab)
                 } header: {
-                    RepoGroupHeader(model: model, repo: group.repo, rows: group.rows, menus: .none)
+                    RepoGroupHeader(model: model, repo: group.repo, rows: group.rows, menus: .search)
                         .pinnedHeaderBackground()
                 }
             }
@@ -221,7 +221,7 @@ struct SearchResultsView: View {
                 Section {
                     prRows(group.rows, on: layout.tab)
                 } header: {
-                    AuthorGroupHeader(model: model, author: group.author, rows: group.rows, menus: .none)
+                    AuthorGroupHeader(model: model, author: group.author, rows: group.rows, menus: .search)
                         .pinnedHeaderBackground()
                 }
             }
@@ -250,7 +250,7 @@ struct SearchResultsView: View {
                     issueRows(group.issues, on: layout.tab, underRepoHeader: group.isRepo)
                 } header: {
                     // Lanes never fold while searching, so their headers have no chevron.
-                    IssueGroupHeader(model: model, group: group, fold: nil, menus: .none)
+                    IssueGroupHeader(model: model, group: group, fold: nil, menus: .search)
                         .pinnedHeaderBackground()
                 }
             }
