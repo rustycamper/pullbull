@@ -122,13 +122,13 @@ struct SearchResultsView: View {
             narrowedEmpty(scopeTitle)
         } else if let message = results?.emptyMessage(
             org: focusName ?? org, query: model.searchQuery, scope: model.snapshot?.scope, mode: model.mode) {
-            ListStateView(symbol: "magnifyingglass", title: message) {
+            // With a key saved, Ask may find it from a looser description.
+            ListStateView(
+                symbol: "magnifyingglass", title: message,
+                detail: model.offersAsk ? "Try other words, or ⌥⌘↩ to Ask AI." : "Try other words."
+            ) {
                 if let unknown = unknownToken {
                     footerLine("\(unknown) isn't on anything PullBull has loaded")
-                }
-                // With a key saved, Ask may find it from a looser description.
-                if model.offersAsk {
-                    footerLine("Try other words, or ⌥⌘↩ to Ask AI.")
                 }
             }
         } else {
@@ -143,7 +143,10 @@ struct SearchResultsView: View {
 
     /// No match among the narrowed tab's items, with the way back to everything.
     private func narrowedEmpty(_ tab: String) -> some View {
-        ListStateView(symbol: "magnifyingglass", title: SearchContext.noMatches(inTab: tab)) {
+        ListStateView(
+            symbol: "magnifyingglass", title: SearchContext.noMatches(inTab: tab),
+            detail: "Search everything to look in every tab."
+        ) {
             Button("Search everything") { model.searchEverything() }
                 .buttonStyle(.link)
                 .font(.system(size: 11))
@@ -181,7 +184,7 @@ struct SearchResultsView: View {
         _ message: String, symbol: String, help: String? = nil, retry: @escaping () -> Void
     ) -> some View {
         ListStateView(
-            symbol: symbol, tone: .warning, title: message,
+            symbol: symbol, tone: .warning, title: message, detail: "Check your connection and retry.",
             action: .init(title: "Retry", help: help, disabled: model.status.isRefreshing, perform: retry))
     }
 
