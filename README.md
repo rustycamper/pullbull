@@ -75,7 +75,7 @@ More in the [manual](docs/manual.md#issues).
 | `@alice` | PRs alice authored or reviews, issues they opened or are assigned |
 | `~bug` | Items with that label |
 | `is:open` `is:closed` `is:merged` `is:draft` | Items in that state |
-| `is:failing` `is:ready` `review:changes` | Your PRs by what they need |
+| `is:failing` `is:ready` `is:unanswered` `review:changes` | Your PRs by what they need |
 | `repo:widgets` | Only that repo; save it with the search |
 | `status:prog` `status:"In progress"` | Issues in that Status column on the board |
 | `#123` | That number, in every repo |
@@ -83,7 +83,7 @@ More in the [manual](docs/manual.md#issues).
 | `updated:today` `updated:3d` `updated:1w` `updated:1m` | Items active since 00:00 today, or 2, 6 or 29 days before; GitHub's date forms (`updated:>2026-10-01`) also filter locally |
 | `-@dependabot` `-~wontfix` | Leave those out: a `-` before any qualifier |
 
-Combine `@`, `~`, `is:`, `status:`, `updated:` and words. Type `st`, `la` or `up` and press <kbd>Tab</kbd> for `status:`, `label:` or `updated:`, with suggestions. Save the searches you repeat with the bookmark icon; manage them in Settings → Search.
+Combine `@`, `~`, `is:`, `status:`, `updated:`, `review:`, `repo:` and words. Type `st`, `la` or `up` and press <kbd>Tab</kbd> for `status:`, `label:` or `updated:`, with suggestions. Save the searches you repeat with the bookmark icon; manage them in Settings → Search.
 
 > [!TIP]
 > **Can't remember the words?** [Ask AI](docs/manual.md#ask-ai) finds the item from a description (<kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd>). Off by default; turn it on in Settings → Ask AI.

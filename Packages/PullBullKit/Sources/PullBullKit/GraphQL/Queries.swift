@@ -10,7 +10,7 @@ enum Queries {
       number title url isDraft state mergeable createdAt updatedAt closedAt headRefName baseRefName
       repository{nameWithOwner}
       author{login avatarUrl}
-      comments(last:1){totalCount nodes{author{login}}}
+      comments(last:1){totalCount nodes{author{__typename login}}}
       commits(last:1){nodes{commit{oid committedDate statusCheckRollup{state contexts{\(rollupCounts)}}}}}
       latestReviews(first:20){nodes{author{login} state submittedAt commit{oid}}}
       reviewRequests(first:20){nodes{requestedReviewer{__typename ... on User{login} ... on Team{slug}}}}
@@ -135,7 +135,7 @@ enum Queries {
     """
 
     /// The newest comment's author, aliased: `issueRowFields` already selects `comments{totalCount}`.
-    static let lastCommentAuthor = "lastComment: comments(last:1){nodes{author{login}}}"
+    static let lastCommentAuthor = "lastComment: comments(last:1){nodes{author{__typename login}}}"
 
     /// The latest Status moves on any board (a few, as the last may be on another board) and the latest
     /// reopening, for issue notifications.

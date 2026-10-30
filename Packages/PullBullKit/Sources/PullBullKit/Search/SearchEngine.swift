@@ -159,8 +159,9 @@ public enum SearchQuery: Equatable, Sendable {
 
     /// Nothing to ask GitHub: empty, or a search for an included `status:`. GitHub knows no board Status, and
     /// the snapshot holds the whole board, so such a match is always local. An excluded `status:` keeps pull
-    /// requests and issues off the board, so GitHub is still asked.
-    var isLocalOnly: Bool { self == .empty || !statuses.isEmpty }
+    /// requests and issues off the board, so GitHub is still asked. `is:unanswered`, included or excluded, is
+    /// local too: GitHub can't tell who wrote the newest comment.
+    var isLocalOnly: Bool { self == .empty || !statuses.isEmpty || filter?.localOnly == true }
 
     /// The repo focus a search for this query keeps to: none for `.item`, which names its own repository.
     public func keeping(_ focus: RepoFocus?) -> RepoFocus? {
@@ -560,7 +561,14 @@ public struct SearchEngine: Sendable {
             if isNewer(issue, than: kept) { newest[issue.key] = issue }
         }
         let boardCopies = boardCopies(snap)
-        return order.compactMap { newest[$0] }.map { $0.withBoardItem(of: boardCopies[$0.key], in: snap) }
+        var commented: [PRKey: BoardIssue] = [:]
+        for issue in (snap.assignedIssues ?? []) + (snap.createdIssues ?? [])
+        where issue.lastCommentAuthor != nil && commented[issue.key] == nil {
+            commented[issue.key] = issue
+        }
+        return order.compactMap { newest[$0] }.map {
+            $0.withBoardItem(of: boardCopies[$0.key], in: snap, commentFrom: commented[$0.key])
+        }
     }
 
     /// `issues` (a tab's copies) with the board item and shown Status of their board copy, as search
@@ -579,7 +587,7 @@ public struct SearchEngine: Sendable {
             + (snap.createdIssues ?? []).filter { $0.key == key }
         guard var newest = copies.first else { return nil }
         for issue in copies.dropFirst() where isNewer(issue, than: newest) { newest = issue }
-        return newest.withBoardItem(of: board, in: snap)
+        return newest.withBoardItem(of: board, in: snap, commentFrom: copies.first { $0.lastCommentAuthor != nil })
     }
 
     /// Whether `issue` replaces the copy kept so far: only a strictly later `updatedAt` does.
@@ -773,11 +781,15 @@ public struct SearchEngine: Sendable {
 
 private extension BoardIssue {
     /// This copy with the board item of `board`, the same issue's board copy (nil when it is not on
-    /// the board), and its Status only where the lists show it.
-    func withBoardItem(of board: BoardIssue?, in snap: Snapshot) -> BoardIssue {
-        BoardIssue(
+    /// the board), and its Status only where the lists show it. `commentFrom` is the Assigned or Created copy,
+    /// whose newest comment this copy takes when it has none of its own (a board copy carries none).
+    func withBoardItem(of board: BoardIssue?, in snap: Snapshot, commentFrom: BoardIssue? = nil) -> BoardIssue {
+        let byOther = lastCommentAuthor == nil ? commentFrom : nil
+        return BoardIssue(
             key: key, title: title, url: url, isOpen: isOpen, author: author, stateReason: stateReason,
             createdAt: createdAt, updatedAt: updatedAt, closedAt: closedAt, commentCount: commentCount,
+            lastCommentAuthor: byOther?.lastCommentAuthor ?? lastCommentAuthor,
+            lastCommentByBot: byOther?.lastCommentByBot ?? lastCommentByBot,
             labels: labels, labelColors: labelColors, assignees: assignees, status: IssueTabBuilder.shownStatus(board?.status, in: snap),
             boardItemId: board?.boardItemId, myAssignment: myAssignment)
     }

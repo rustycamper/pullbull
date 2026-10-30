@@ -117,12 +117,13 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 | `is:ready` `is:conflict` `is:failing` `is:approved` | Ready to merge · merge conflicts · checks failed · has an approval. PRs only |
 | `review:changes` `review:none` | Changes requested · no reviews yet. PRs only |
 | `repo:widgets` `repo:acme/widgets` | That repo. The name alone matches every owner's; several `repo:` match any of them. Saved searches keep it |
+| `is:unanswered` | Your open PRs and your Assigned or Created issues whose last comment is someone else's, not a bot's. Searches your lists only |
 | `status:prog` `status:"In progress"` | Status column on the board. Issues only |
 | `#123` | That number, every repo |
 | `owner/repo#123` or a link | Exactly that item |
 | `updated:today` `3d` `1w` `1m` | Items active since 00:00 today, or 2, 6 or 29 days before. GitHub's date forms (`updated:>2026-10-01`, `updated:2026-10-01..2026-10-07`) go to GitHub as written and also filter locally; any other value goes to GitHub as written |
 | words | Title |
-| `-@bot` `-~wontfix` `-is:draft` `-status:done` `-updated:1w` | Not that. Works on every qualifier; a bare `-word` is a word. `-status:` and `-updated:` filter locally only |
+| `-@bot` `-~wontfix` `-is:draft` `-status:done` `-updated:1w` | Not that. Works on every qualifier; a bare `-word` is a word. These filter locally only, never on GitHub: `-status:`, `-updated:`, every negated `is:` condition and `review:`, `is:ready`, `is:conflict`, `is:approved`, `review:changes` and `is:unanswered`, and a `repo:` that matches no known repo |
 
 - `@`, `~`, `is:`, `status:`, `updated:`, `review:`, `repo:` and words combine; everything must match; a leading `-` excludes
 - `status:` uses the board shown in the Board tab. Unquoted matches part of a Status name, quoted the whole name; case is ignored. Names with spaces need quotes to match exactly

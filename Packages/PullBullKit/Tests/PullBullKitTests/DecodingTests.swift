@@ -107,6 +107,26 @@ private func node(_ name: String) throws -> [String: Any] {
         #expect(old.title == "t")
     }
 
+    @Test func lastCommentBot() throws {
+        var n = try node("pr_ghost_author")
+        n["comments"] = ["totalCount": 1, "nodes": [["author": ["__typename": "Bot", "login": "dependabot"]]]]
+        let pr = try Decoding.pullRequest(from: n)
+        #expect(pr.lastCommentAuthor == "dependabot")
+        #expect(pr.lastCommentByBot == true)
+        n["comments"] = ["totalCount": 1, "nodes": [["author": ["__typename": "User", "login": "frank"]]]]
+        #expect(try Decoding.pullRequest(from: n).lastCommentByBot == false)
+        #expect(Queries.prFields.contains("comments(last:1){totalCount nodes{author{__typename login}}}"))
+        #expect(Queries.lastCommentAuthor.contains("author{__typename login}"))
+    }
+
+    @Test func oldCacheDecodesWithoutNewFields() throws {
+        let pr = try Decoding.pullRequest(from: node("pr_ghost_author"))
+        var object = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(pr)) as? [String: Any])
+        object["lastCommentByBot"] = nil
+        let old = try JSONDecoder().decode(PullRequest.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(old.lastCommentByBot == nil)
+    }
+
     @Test func ghostAuthorDecodes() throws {
         let pr = try Decoding.pullRequest(from: node("pr_ghost_author"))
         #expect(pr.author == "ghost")

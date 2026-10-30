@@ -81,6 +81,8 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
     public let headCommitDate: Date?
     public let commentCount: Int
     public let lastCommentAuthor: String?
+    /// Whether the newest comment's author is a bot; nil with no comment and in snapshots cached before it was stored.
+    public let lastCommentByBot: Bool?
     public let latestReviews: [Review]
     public let reviewRequests: [Reviewer]
     /// The head commit's oid; nil in snapshots cached before it was stored.
@@ -109,7 +111,8 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         headRef: String, baseRef: String, ci: CIState, headCommitDate: Date?,
         commentCount: Int, lastCommentAuthor: String?,
         latestReviews: [Review], reviewRequests: [Reviewer], headCommitOid: String? = nil, labels: [String] = [],
-        labelColors: [String?] = [], mergedBy: String? = nil, mergeable: Mergeable? = nil
+        labelColors: [String?] = [], mergedBy: String? = nil, mergeable: Mergeable? = nil,
+        lastCommentByBot: Bool? = nil
     ) {
         self.key = key
         self.title = title
@@ -127,6 +130,7 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         self.headCommitDate = headCommitDate
         self.commentCount = commentCount
         self.lastCommentAuthor = lastCommentAuthor
+        self.lastCommentByBot = lastCommentByBot
         self.latestReviews = latestReviews
         self.reviewRequests = reviewRequests
         self.headCommitOid = headCommitOid
@@ -155,6 +159,7 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         headCommitDate = try c.decodeIfPresent(Date.self, forKey: .headCommitDate)
         commentCount = try c.decode(Int.self, forKey: .commentCount)
         lastCommentAuthor = try c.decodeIfPresent(String.self, forKey: .lastCommentAuthor)
+        lastCommentByBot = try c.decodeIfPresent(Bool.self, forKey: .lastCommentByBot)
         latestReviews = try c.decode([Review].self, forKey: .latestReviews)
         reviewRequests = try c.decode([Reviewer].self, forKey: .reviewRequests)
         headCommitOid = try c.decodeIfPresent(String.self, forKey: .headCommitOid)
@@ -295,6 +300,8 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
     /// The newest comment's author; set only on Assigned and Created search results, nil for a deleted
     /// (ghost) author and in issues cached before it was stored.
     public let lastCommentAuthor: String?
+    /// Whether the newest comment's author is a bot; set with `lastCommentAuthor`, nil otherwise.
+    public let lastCommentByBot: Bool?
     public let labels: [String]
     /// GitHub's 6-hex colour for each of `labels`, by position; nil where it's missing, and empty in
     /// issues cached before it was stored. Read it through `labelColor(at:)`.
@@ -331,7 +338,7 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
         key: PRKey, title: String, url: URL, isOpen: Bool,
         author: String? = nil, stateReason: IssueStateReason? = nil,
         createdAt: Date? = nil, updatedAt: Date? = nil, closedAt: Date? = nil,
-        commentCount: Int = 0, lastCommentAuthor: String? = nil, labels: [String] = [], labelColors: [String?] = [],
+        commentCount: Int = 0, lastCommentAuthor: String? = nil, lastCommentByBot: Bool? = nil, labels: [String] = [], labelColors: [String?] = [],
         assignees: [Assignee] = [], status: BoardStatusValue? = nil, boardItemId: Int? = nil,
         myAssignment: Assignment? = nil, statusMoves: [StatusMove] = [], lastReopen: IssueStateChange? = nil,
         lastClose: IssueStateChange? = nil
@@ -347,6 +354,7 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
         self.closedAt = closedAt
         self.commentCount = commentCount
         self.lastCommentAuthor = lastCommentAuthor
+        self.lastCommentByBot = lastCommentByBot
         self.labels = labels
         self.labelColors = labelColors
         self.assignees = assignees
@@ -372,6 +380,7 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
         closedAt = try c.decodeIfPresent(Date.self, forKey: .closedAt)
         commentCount = try c.decodeIfPresent(Int.self, forKey: .commentCount) ?? 0
         lastCommentAuthor = try c.decodeIfPresent(String.self, forKey: .lastCommentAuthor)
+        lastCommentByBot = try c.decodeIfPresent(Bool.self, forKey: .lastCommentByBot)
         labels = try c.decodeIfPresent([String].self, forKey: .labels) ?? []
         labelColors = try c.decodeIfPresent([String?].self, forKey: .labelColors) ?? []
         assignees = try c.decodeIfPresent([Assignee].self, forKey: .assignees) ?? []

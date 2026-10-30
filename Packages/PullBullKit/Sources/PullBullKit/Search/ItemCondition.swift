@@ -35,14 +35,27 @@ public enum ItemCondition: String, CaseIterable, Equatable, Sendable {
     /// Whether the condition is about pull requests only; a search with one skips issues.
     public var prOnly: Bool { self != .unanswered }
 
-    func matches(_ pr: PullRequest) -> Bool {
+    /// `unanswered` reads the viewer: an open pull request of theirs whose newest comment is someone else's,
+    /// and not a bot's.
+    func matches(_ pr: PullRequest, viewer: String) -> Bool {
         switch self {
         case .ready: ReviewRules.isReadyToMerge(pr)
         case .conflict: pr.hasConflicts
         case .failing: pr.ci == .failure
         case .approved: pr.latestReviews.contains { $0.state == .approved }
-        case .unanswered: false
+        case .unanswered:
+            pr.state == .open && pr.author.caseInsensitiveCompare(viewer) == .orderedSame
+                && LastComment.isOwed(author: pr.lastCommentAuthor, byBot: pr.lastCommentByBot, viewer: viewer)
         }
+    }
+
+    /// Only `unanswered` can match an issue: an open one assigned to or opened by the viewer, whose newest
+    /// comment is someone else's, and not a bot's.
+    func matches(_ issue: BoardIssue, viewer: String) -> Bool {
+        guard self == .unanswered, issue.isOpen else { return false }
+        func isViewer(_ login: String?) -> Bool { login?.caseInsensitiveCompare(viewer) == .orderedSame }
+        return (isViewer(issue.author) || issue.assignees.contains { isViewer($0.login) })
+            && LastComment.isOwed(author: issue.lastCommentAuthor, byBot: issue.lastCommentByBot, viewer: viewer)
     }
 }
 
@@ -118,5 +131,19 @@ public struct ReviewCandidate: CompletionCandidate {
     static func candidates(prefix: String) -> [ReviewCandidate] {
         let p = prefix.lowercased()
         return ReviewFilter.allCases.filter { $0.rawValue.hasPrefix(p) }.map(ReviewCandidate.init)
+    }
+}
+
+/// Who wrote the newest comment, for `is:unanswered`.
+public enum LastComment {
+    /// Whether the author is a bot: GitHub's `Bot` type when known, else the `[bot]` login suffix.
+    public static func isBot(login: String?, byBot: Bool?) -> Bool {
+        byBot ?? login?.lowercased().hasSuffix("[bot]") ?? false
+    }
+
+    /// The newest comment is someone else's: there is one, and neither the viewer nor a bot wrote it.
+    static func isOwed(author: String?, byBot: Bool?, viewer: String) -> Bool {
+        guard let author, author.caseInsensitiveCompare(viewer) != .orderedSame else { return false }
+        return !isBot(login: author, byBot: byBot)
     }
 }

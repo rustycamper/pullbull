@@ -78,7 +78,7 @@ public struct SearchTerms: Equatable, Sendable {
         logins.allSatisfy { !PersonMatch.roles(of: pr, login: $0, viewer: viewer).isEmpty == holds }
             && labels.allSatisfy { Self.has($0, pr.labels) == holds }
             && states.allSatisfy { $0.matches(pr) == holds }
-            && conditions.allSatisfy { $0.matches(pr) == holds }
+            && conditions.allSatisfy { $0.matches(pr, viewer: viewer) == holds }
             && reviews.allSatisfy { $0.matches(pr) == holds }
             && statuses.allSatisfy { $0.matches(nil) == holds }
             && inRepos(pr.key.repo, holds: holds)
@@ -88,6 +88,7 @@ public struct SearchTerms: Equatable, Sendable {
         logins.allSatisfy { !PersonMatch.roles(of: issue, login: $0, viewer: viewer).isEmpty == holds }
             && labels.allSatisfy { Self.has($0, issue.labels) == holds }
             && states.allSatisfy { $0.matches(issue) == holds }
+            && conditions.allSatisfy { $0.matches(issue, viewer: viewer) == holds }
             && statuses.allSatisfy { $0.matches(issue.status?.name) == holds }
             && inRepos(issue.key.repo, holds: holds)
     }
@@ -136,6 +137,12 @@ public struct SearchFilter: Equatable, Sendable {
     public var prOnly: Bool {
         (include.conditions + exclude.conditions).contains(where: \.prOnly)
             || !include.reviews.isEmpty || !exclude.reviews.isEmpty
+    }
+
+    /// Nothing to ask GitHub: a condition about the viewer's own comments, which GitHub can't search, so the
+    /// snapshot answers it, included or excluded.
+    var localOnly: Bool {
+        (include.conditions + exclude.conditions).contains(.unanswered)
     }
 
     /// The included `updated:` window and the excluded ones as of `now`, worked out once for a query's rows.
