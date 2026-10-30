@@ -48,6 +48,16 @@ import Testing
         #expect(Self.newYork.component(.hour, from: start) == 0)
     }
 
+    /// Santiago's 2026-09-06 starts at 01:00: midnight doesn't exist, so earlier days must not inherit that hour.
+    @Test func stepStartWhereMidnightIsSkipped() {
+        let santiago = Self.calendar("America/Santiago")
+        let now = Self.date(2026, 9, 6, 12, in: santiago)
+        let threeDays = TimeStep.threeDays.start(now: now, calendar: santiago)
+        #expect(threeDays == Self.date(2026, 9, 4, in: santiago))
+        #expect(santiago.component(.hour, from: threeDays) == 0)
+        #expect(TimeStep.today.start(now: now, calendar: santiago) == santiago.startOfDay(for: now))
+    }
+
     @Test func stepStartFollowsTimeZone() {
         let now = Date(timeIntervalSince1970: 1_798_632_000)
         let auckland = TimeStep.today.start(now: now, calendar: Self.calendar("Pacific/Auckland"))

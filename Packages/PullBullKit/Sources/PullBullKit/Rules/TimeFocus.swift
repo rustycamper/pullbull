@@ -59,9 +59,10 @@ public enum TimeStep: String, CaseIterable, Sendable {
         }
     }
 
-    /// Local midnight `daysBack` days before the day containing `now`.
+    /// When the day `daysBack` days before the one containing `now` starts: local midnight, or later where
+    /// a DST change skips it.
     public func start(now: Date, calendar: Calendar) -> Date {
-        calendar.date(byAdding: .day, value: -daysBack, to: calendar.startOfDay(for: now))!
+        calendar.startOfDay(for: calendar.date(byAdding: .day, value: -daysBack, to: now)!)
     }
 }
 
