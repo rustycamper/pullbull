@@ -134,8 +134,10 @@ public struct SearchFilter: Equatable, Sendable {
     /// GitHub names it, the included `updated:` as `serverQualifier` writes it for `now`, `involves:` for the
     /// first login only (`me` is `@me`), a `label:` for every label (GitHub ANDs them), the words quoted as
     /// title terms; then the exclusions: `-author:` for every login (a commenter or reviewer isn't excluded
-    /// on GitHub, so it never drops a row the local filter keeps), `-label:`, `-is:` and `-updated:`. A
-    /// `status:` is the board's, which GitHub doesn't know, so it is never sent.
+    /// on GitHub, so it never drops a row the local filter keeps), `-label:` and `-is:`. An excluded `status:`
+    /// is the board's, which GitHub doesn't know, and an excluded `updated:` is never sent either: GitHub
+    /// judges it on `updatedAt`, while the local filter reads a closed item's close date, so GitHub would drop
+    /// rows the local filter keeps.
     public func serverQualifiers(now: Date, calendar: Calendar) -> [String] {
         var parts = include.states.map(\.token)
         if let updated = include.updated.last { parts.append(updated.serverQualifier(now: now, calendar: calendar)) }
@@ -146,7 +148,6 @@ public struct SearchFilter: Equatable, Sendable {
         parts += exclude.logins.map { "-author:\(Self.serverLogin($0))" }
         parts += SearchEngine.quoted(exclude.labels).map { "-label:\($0)" }
         parts += exclude.states.map { "-" + $0.token }
-        parts += exclude.updated.map { "-" + $0.serverQualifier(now: now, calendar: calendar) }
         return parts
     }
 

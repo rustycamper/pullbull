@@ -19,13 +19,14 @@ private let repo = "initech/gadgets"
 
 private func pr(
     _ number: Int, author: String = "someone", state: PRState = .open, isDraft: Bool = false,
-    updatedAt: Date = now, labels: [String] = [], reviews: [Review] = [], lastCommentAuthor: String? = nil
+    updatedAt: Date = now, closedAt: Date? = nil, labels: [String] = [], reviews: [Review] = [],
+    lastCommentAuthor: String? = nil
 ) -> PullRequest {
     PullRequest(
         key: PRKey(repo: repo, number: number), title: "Fix",
         url: URL(string: "https://github.com/\(repo)/pull/\(number)")!, author: author,
         authorAvatarURL: nil, state: state, isDraft: isDraft, createdAt: updatedAt, updatedAt: updatedAt,
-        closedAt: state == .open ? nil : updatedAt, headRef: "a", baseRef: "main", ci: .none, headCommitDate: nil,
+        closedAt: state == .open ? nil : closedAt ?? updatedAt, headRef: "a", baseRef: "main", ci: .none, headCommitDate: nil,
         commentCount: lastCommentAuthor == nil ? 0 : 1, lastCommentAuthor: lastCommentAuthor, latestReviews: reviews,
         reviewRequests: [], labels: labels)
 }
@@ -176,8 +177,21 @@ private func snapshot() -> Snapshot {
         let q = try prQuery(#"-~"good first" -is:draft -updated:3d"#)
         #expect(q.contains(#"-label:"good first""#))
         #expect(q.contains("-is:draft"))
-        #expect(q.contains("-updated:>=2026-10-28T04:00:00Z"))
+        #expect(!q.contains("-updated"))
         #expect(q.hasSuffix(" sort:updated-desc"))
+    }
+
+    /// GitHub reads `updated:` as `updatedAt`, the local filter a closed item's close date, so an excluded
+    /// `updated:` stays local: GitHub would drop a merged PR commented on yesterday that the local filter keeps.
+    @Test func negatedUpdatedIsNotSent() throws {
+        #expect(try prQuery("-updated:today")
+            == "org:initech is:pr sort:updated-desc")
+        #expect(try prQuery("-updated:today fix")
+            == #"org:initech is:pr in:title "fix" sort:updated-desc"#)
+        #expect(try prQuery("updated:3d -updated:today")
+            == "org:initech is:pr updated:>=2026-10-28T04:00:00Z sort:updated-desc")
+        let mergedLongAgo = pr(1, state: .merged, updatedAt: at(2026, 10, 29), closedAt: at(2026, 10, 20))
+        #expect(matches("-updated:3d", mergedLongAgo))
     }
 
     @Test func negationsFollowThePositiveParts() throws {

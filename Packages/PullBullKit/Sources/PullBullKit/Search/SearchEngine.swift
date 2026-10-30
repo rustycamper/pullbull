@@ -613,15 +613,13 @@ public struct SearchEngine: Sendable {
         case .text(let words):
             return try await searchTitles(q, sent: SearchFilter(words: words), snap: snap, focus: focus, api: api)
         case .filtered(let filter):
-            // A raw `updated:` value, included or excluded, is GitHub's to judge, so the rows it returns aren't
-            // checked against it here.
-            func isRaw(_ updated: UpdatedFilter) -> Bool {
-                if case .raw = updated { return true }
+            // An included raw `updated:` value is GitHub's to judge, so the rows it returns aren't checked against
+            // it here. An excluded one isn't sent, so it stays and matches nothing, as it does locally.
+            var checked = filter
+            checked.include.updated.removeAll {
+                if case .raw = $0 { return true }
                 return false
             }
-            var checked = filter
-            checked.include.updated.removeAll(where: isRaw)
-            checked.exclude.updated.removeAll(where: isRaw)
             return try await searchTitles(.filtered(checked), sent: filter, snap: snap, focus: focus, api: api)
         case .empty:
             return Remote()
