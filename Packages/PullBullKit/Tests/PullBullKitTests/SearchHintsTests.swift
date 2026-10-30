@@ -20,11 +20,11 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
             == ["number", "person", "label", "state", "column", "time", "review", "repo", "size", "not"])
     }
 
-    /// Two fixed lines that read as `all`: the six original tokens, then the PR and negation ones.
+    /// Two fixed lines of five that read as `all`, each narrow enough that no token is cut off.
     @Test func twoLines() {
         #expect(SearchHint.lines == [
-            [.number, .person, .label, .state, .status, .updated],
-            [.review, .repo, .size, .negate],
+            [.number, .person, .label, .state, .status],
+            [.updated, .review, .repo, .size, .negate],
         ])
         #expect(SearchHint.lines.flatMap { $0 } == SearchHint.all)
     }

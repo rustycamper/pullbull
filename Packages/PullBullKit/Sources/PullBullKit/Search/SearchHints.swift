@@ -36,7 +36,7 @@ public enum SearchHint: Equatable, Sendable {
     }
 
     /// Whether the token line draws `word` after the sigil. `status:`, `updated:`, `review:`, `repo:` and
-    /// `size:` name themselves, and six tokens with words don't fit a line; VoiceOver still reads the word.
+    /// `size:` name themselves, which keeps each line short enough; VoiceOver still reads the word.
     public var showsWord: Bool {
         switch self {
         case .status, .updated, .review, .repo, .size: false
@@ -58,8 +58,8 @@ public enum SearchHint: Equatable, Sendable {
 
     /// The panel's two token lines, always both drawn so its height never changes.
     public static let lines: [[SearchHint]] = [
-        [.number, .person, .label, .state, .status, .updated],
-        [.review, .repo, .size, .negate],
+        [.number, .person, .label, .state, .status],
+        [.updated, .review, .repo, .size, .negate],
     ]
 
     public var accessibilityLabel: String { "\(sigil) \(word)" }
