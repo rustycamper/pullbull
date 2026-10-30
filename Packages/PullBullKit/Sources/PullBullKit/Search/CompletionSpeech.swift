@@ -1,6 +1,6 @@
 import Foundation
 
-/// What VoiceOver says for the "@user", "~label", "is:", "status:", "updated:" and "review:" completion lists, which never take focus from the
+/// What VoiceOver says for the "@user", "~label", "is:", "status:", "updated:", "review:" and "repo:" completion lists, which never take focus from the
 /// search field.
 public enum CompletionSpeech {
     /// The list opened on a new token. `loaded` is false before the first snapshot.
@@ -49,6 +49,15 @@ public enum CompletionSpeech {
         }
     }
 
+    public static func opened(_ completion: RepoCompletion, loaded: Bool) -> String {
+        guard loaded else { return "Repositories appear once PullBull has loaded" }
+        switch completion.candidates.count {
+        case 0: return "No matching repositories. Return to search anyway."
+        case 1: return "1 repository. Up and down arrows to choose, Return to complete."
+        case let count: return "\(count) repositories. Up and down arrows to choose, Return to complete."
+        }
+    }
+
     public static func opened(_ completion: StatusCompletion, loaded: Bool) -> String {
         guard loaded else { return "Status columns appear once PullBull has loaded" }
         switch completion.candidates.count {
@@ -86,6 +95,11 @@ public enum CompletionSpeech {
         "\(candidate.review.rawValue), \(candidate.review.summary)"
     }
 
+    /// One row: `<owner/name>, on <n> items`, the count part only when it applies.
+    public static func label(_ candidate: RepoCandidate) -> String {
+        [candidate.repo, items(candidate.openCount)].compactMap { $0 }.joined(separator: ", ")
+    }
+
     /// One row: `<token>, <title>`.
     public static func label(_ candidate: TimeStepCandidate) -> String {
         "\(candidate.insertText), \(candidate.step.title)"
@@ -116,6 +130,10 @@ public enum CompletionSpeech {
         completion.selectedCandidate.map { position(label($0), in: completion) }
     }
 
+    public static func selected(_ completion: RepoCompletion) -> String? {
+        completion.selectedCandidate.map { position(label($0), in: completion) }
+    }
+
     /// What to say when the list changes from `old` to `new`: open on a new token, or when the candidates
     /// go from none to some or some to none on the same token; the selection after ↑ / ↓; else nothing.
     public static func change(from old: PersonCompletion?, to new: PersonCompletion?, loaded: Bool) -> String? {
@@ -142,6 +160,10 @@ public enum CompletionSpeech {
         change(from: old, to: new, opened: opened, selected: selected)
     }
 
+    public static func change(from old: RepoCompletion?, to new: RepoCompletion?, loaded: Bool) -> String? {
+        change(from: old, to: new, opened: { opened($0, loaded: loaded) }, selected: selected)
+    }
+
     /// As for one kind; a list of another kind counts as a new token.
     public static func change(from old: SearchCompletion?, to new: SearchCompletion?, loaded: Bool) -> String? {
         switch (old, new) {
@@ -152,6 +174,8 @@ public enum CompletionSpeech {
         case (.statuses(let o), .statuses(let n)): return change(from: o, to: n, loaded: loaded)
         case (.updated(let o), .updated(let n)): return change(from: o, to: n)
         case (.reviews(let o), .reviews(let n)): return change(from: o, to: n)
+        case (.repos(let o), .repos(let n)): return change(from: o, to: n, loaded: loaded)
+        case (_, .repos(let n)): return opened(n, loaded: loaded)
         case (_, .people(let n)): return opened(n, loaded: loaded)
         case (_, .labels(let n)): return opened(n, loaded: loaded)
         case (_, .states(let n)): return opened(n)
@@ -183,6 +207,10 @@ public enum CompletionSpeech {
 
     public static func completed(_ candidate: TimeStepCandidate) -> String {
         "Showing items updated \(candidate.step.title)"
+    }
+
+    public static func completed(_ candidate: RepoCandidate) -> String {
+        "Showing items in \(candidate.repo)"
     }
 
     public static func completed(_ candidate: StatusCandidate) -> String {

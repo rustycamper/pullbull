@@ -14,9 +14,11 @@ public struct PendingToken: Equatable, Sendable {
         case updated
         /// `review:changes`
         case review
+        /// `repo:widgets` or `repo:acme/widgets`
+        case repo
     }
 
-    /// UTF-16 offset of the sigil ("@", "＠", "~", "～", "label:", "is:", "status:", "updated:" or "review:", any case).
+    /// UTF-16 offset of the sigil ("@", "＠", "~", "～", "label:", "is:", "status:", "updated:", "review:" or "repo:", any case).
     public let start: Int
     /// UTF-16 offset of the caret.
     public let end: Int
@@ -61,6 +63,9 @@ public struct PendingToken: Equatable, Sendable {
         case .review:
             guard prefix.allSatisfy(\.isLetter) else { return nil }
             return PendingToken(start: start, end: caret, prefix: prefix, kind: .review)
+        case .repo:
+            guard prefix.allSatisfy({ $0.isLetter || $0.isNumber || "-_./".contains($0) }) else { return nil }
+            return PendingToken(start: start, end: caret, prefix: prefix, kind: .repo)
         case .word:
             return nil
         }
@@ -99,7 +104,7 @@ public struct PendingToken: Equatable, Sendable {
     static func sigilEnd(in text: String, at index: String.Index, of kind: Kind?) -> String.Index? {
         let scalars = text.unicodeScalars
         let character = Character(scalars[index])
-        let kinds: [Kind] = kind.map { [$0] } ?? [.person, .label, .state, .status, .updated, .review]
+        let kinds: [Kind] = kind.map { [$0] } ?? [.person, .label, .state, .status, .updated, .review, .repo]
         for kind in kinds {
             switch kind {
             case .person where QueryScanner.personSigils.contains(character),
@@ -115,6 +120,8 @@ public struct PendingToken: Equatable, Sendable {
                 return text.index(index, offsetBy: QueryScanner.updatedQualifier.count)
             case .review where QueryScanner.startsReview(text[index...]):
                 return text.index(index, offsetBy: QueryScanner.reviewQualifier.count)
+            case .repo where QueryScanner.startsRepo(text[index...]):
+                return text.index(index, offsetBy: QueryScanner.repoQualifier.count)
             default:
                 continue
             }
@@ -178,6 +185,7 @@ public typealias StateCompletion = TokenCompletion<StateCandidate>
 public typealias StatusCompletion = TokenCompletion<StatusCandidate>
 public typealias UpdatedCompletion = TokenCompletion<TimeStepCandidate>
 public typealias ReviewCompletion = TokenCompletion<ReviewCandidate>
+public typealias RepoCompletion = TokenCompletion<RepoCandidate>
 
 extension TokenCompletion where Candidate == PersonCandidate {
     /// Nil when no `@` token ends at the caret or the token at `dismissedStart` is the one there.
@@ -239,9 +247,20 @@ extension TokenCompletion where Candidate == ReviewCandidate {
     }
 }
 
+extension TokenCompletion where Candidate == RepoCandidate {
+    /// Nil when no `repo:` token ends at the caret or the token at `dismissedStart` is the one there.
+    public static func open(
+        text: String, caret: Int, dismissedStart: Int?, repos: RepoIndex
+    ) -> RepoCompletion? {
+        token(.repo, text: text, caret: caret, dismissedStart: dismissedStart).map {
+            RepoCompletion(token: $0, candidates: repos.candidates(prefix: $0.prefix), selection: 0)
+        }
+    }
+}
+
 /// The one completion list the search field can show: people for an `@` token, labels for a `~` token,
 /// states and conditions for an `is:` token, board Status columns for a `status:` token, time steps for an
-/// `updated:` token, review filters for a `review:` token.
+/// `updated:` token, review filters for a `review:` token, repositories for a `repo:` token.
 public enum SearchCompletion: Equatable, Sendable {
     case people(PersonCompletion)
     case labels(LabelCompletion)
@@ -249,11 +268,12 @@ public enum SearchCompletion: Equatable, Sendable {
     case statuses(StatusCompletion)
     case updated(UpdatedCompletion)
     case reviews(ReviewCompletion)
+    case repos(RepoCompletion)
 
     /// The list for the token at the caret, of whichever kind it is.
     public static func open(
         text: String, caret: Int, dismissedStart: Int?, people: PeopleIndex, labels: LabelIndex,
-        statuses: StatusIndex = .empty
+        statuses: StatusIndex = .empty, repos: RepoIndex = .empty
     ) -> SearchCompletion? {
         if let completion = PersonCompletion.open(text: text, caret: caret, dismissedStart: dismissedStart, people: people) {
             return .people(completion)
@@ -271,6 +291,9 @@ public enum SearchCompletion: Equatable, Sendable {
         if let completion = ReviewCompletion.open(text: text, caret: caret, dismissedStart: dismissedStart) {
             return .reviews(completion)
         }
+        if let completion = RepoCompletion.open(text: text, caret: caret, dismissedStart: dismissedStart, repos: repos) {
+            return .repos(completion)
+        }
         return UpdatedCompletion.open(text: text, caret: caret, dismissedStart: dismissedStart)
             .map(SearchCompletion.updated)
     }
@@ -283,6 +306,7 @@ public enum SearchCompletion: Equatable, Sendable {
         case .statuses(let c): c.token
         case .updated(let c): c.token
         case .reviews(let c): c.token
+        case .repos(let c): c.token
         }
     }
 
@@ -294,6 +318,7 @@ public enum SearchCompletion: Equatable, Sendable {
         case .statuses(let c): c.selection
         case .updated(let c): c.selection
         case .reviews(let c): c.selection
+        case .repos(let c): c.selection
         }
     }
 
@@ -305,6 +330,7 @@ public enum SearchCompletion: Equatable, Sendable {
         case .statuses(let c): !c.candidates.isEmpty
         case .updated(let c): !c.candidates.isEmpty
         case .reviews(let c): !c.candidates.isEmpty
+        case .repos(let c): !c.candidates.isEmpty
         }
     }
 
@@ -316,6 +342,7 @@ public enum SearchCompletion: Equatable, Sendable {
         case .statuses(let c): .statuses(c.moved(by: offset))
         case .updated(let c): .updated(c.moved(by: offset))
         case .reviews(let c): .reviews(c.moved(by: offset))
+        case .repos(let c): .repos(c.moved(by: offset))
         }
     }
 
@@ -327,6 +354,7 @@ public enum SearchCompletion: Equatable, Sendable {
         case .statuses(let c): c.accepted(in: text)
         case .updated(let c): c.accepted(in: text)
         case .reviews(let c): c.accepted(in: text)
+        case .repos(let c): c.accepted(in: text)
         }
     }
 
@@ -339,6 +367,7 @@ public enum SearchCompletion: Equatable, Sendable {
         case (.statuses(let a), .statuses(let b)): a.candidates == b.candidates
         case (.updated(let a), .updated(let b)): a.candidates == b.candidates
         case (.reviews(let a), .reviews(let b)): a.candidates == b.candidates
+        case (.repos(let a), .repos(let b)): a.candidates == b.candidates
         default: false
         }
     }
@@ -351,6 +380,7 @@ public enum SearchCompletion: Equatable, Sendable {
         case .statuses(let c): c.selectedCandidate?.id
         case .updated(let c): c.selectedCandidate?.id
         case .reviews(let c): c.selectedCandidate?.id
+        case .repos(let c): c.selectedCandidate?.id
         }
     }
 
@@ -364,6 +394,7 @@ public enum SearchCompletion: Equatable, Sendable {
         case .statuses(let c): index = id.flatMap { id in c.candidates.firstIndex { $0.id == id } }
         case .updated(let c): index = id.flatMap { id in c.candidates.firstIndex { $0.id == id } }
         case .reviews(let c): index = id.flatMap { id in c.candidates.firstIndex { $0.id == id } }
+        case .repos(let c): index = id.flatMap { id in c.candidates.firstIndex { $0.id == id } }
         }
         return moved(by: (index ?? 0) - selection)
     }

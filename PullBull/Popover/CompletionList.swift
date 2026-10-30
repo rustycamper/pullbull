@@ -72,6 +72,18 @@ struct CompletionList: View {
                             }
                         }
                     }
+                case .repos(let repos):
+                    if model.snapshot == nil {
+                        message("Repositories appear once PullBull has loaded")
+                    } else if repos.candidates.isEmpty {
+                        message("No repository called “\(repos.token.prefix)” in PullBull's lists · ↩ to search anyway")
+                    } else {
+                        ForEach(Array(repos.candidates.enumerated()), id: \.element.id) { index, candidate in
+                            RepoCompletionRow(candidate: candidate, selected: index == repos.selection) {
+                                pick(index, in: completion)
+                            }
+                        }
+                    }
                 case .reviews(let reviews):
                     if reviews.candidates.isEmpty {
                         message("No review filter called “\(reviews.token.prefix)” · ↩ to search anyway")
@@ -291,6 +303,45 @@ private struct TimeStepCompletionRow: View {
                 Text(candidate.step.title)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .frame(height: 26)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(selected ? Palette.selection : hovering ? Palette.rowHover : .clear))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(CompletionSpeech.label(candidate))
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : [.isButton])
+    }
+}
+
+private struct RepoCompletionRow: View {
+    let candidate: RepoCandidate
+    let selected: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: "shippingbox")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18, height: 18)
+                Text(candidate.repo)
+                    .font(.system(size: 13))
+                Spacer(minLength: 8)
+                if candidate.openCount > 0 {
+                    Text("· \(candidate.openCount)")
+                        .font(.system(size: 11))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
             }
             .lineLimit(1)
             .padding(.horizontal, 8)

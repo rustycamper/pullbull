@@ -82,6 +82,9 @@ public enum SearchContext {
             if case .step(let step) = updated { filters.append("updated \(step.title)") } else { filters.append(updated.token) }
         }
         filters += terms.reviews.map { "review: \($0.summary)" }
+        if !terms.repos.isEmpty {
+            filters.append((terms.repos.count == 1 ? "repo " : "repos ") + SearchQuery.joinedList(terms.repos.map(\.text)))
+        }
         return filters
     }
 

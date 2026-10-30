@@ -76,6 +76,7 @@ More in the [manual](docs/manual.md#issues).
 | `~bug` | Items with that label |
 | `is:open` `is:closed` `is:merged` `is:draft` | Items in that state |
 | `is:failing` `is:ready` `review:changes` | Your PRs by what they need |
+| `repo:widgets` | Only that repo; save it with the search |
 | `status:prog` `status:"In progress"` | Issues in that Status column on the board |
 | `#123` | That number, in every repo |
 | a GitHub link | Exactly that PR or issue |

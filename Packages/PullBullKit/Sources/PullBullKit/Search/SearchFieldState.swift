@@ -61,6 +61,12 @@ public struct SearchFieldState: Equatable, Sendable {
         return nil
     }
 
+    /// The open "repo:" list; nil when none is open or the list is of another kind.
+    public var repoCompletion: RepoCompletion? {
+        if case .repos(let completion) = searchCompletion { return completion }
+        return nil
+    }
+
     /// Whether the text, read without an open completion, asks for a different query than the last one.
     public var isStale: Bool { pendingQuery != query }
 
@@ -69,7 +75,7 @@ public struct SearchFieldState: Equatable, Sendable {
     @discardableResult
     public mutating func edit(
         _ text: String, caret: Int?, people: PeopleIndex, labels: LabelIndex = .empty,
-        statuses: StatusIndex = .empty
+        statuses: StatusIndex = .empty, repos: RepoIndex = .empty
     ) -> SearchQuery? {
         let changed = text != self.text
         // A rerun of the same text without a caret leaves the last one standing.
@@ -83,7 +89,7 @@ public struct SearchFieldState: Equatable, Sendable {
             searchCompletion = Self.merge(
                 SearchCompletion.open(
                     text: text, caret: caret, dismissedStart: dismissedStart, people: people, labels: labels,
-                    statuses: statuses),
+                    statuses: statuses, repos: repos),
                 into: searchCompletion)
         } else if changed {
             searchCompletion = nil
@@ -94,13 +100,14 @@ public struct SearchFieldState: Equatable, Sendable {
     /// The caret moved without a text change: keeps the list on the same token or closes it.
     @discardableResult
     public mutating func caretMoved(
-        to caret: Int, people: PeopleIndex, labels: LabelIndex = .empty, statuses: StatusIndex = .empty
+        to caret: Int, people: PeopleIndex, labels: LabelIndex = .empty, statuses: StatusIndex = .empty,
+        repos: RepoIndex = .empty
     ) -> SearchQuery? {
         self.caret = caret
         guard let current = searchCompletion else { return nil }
         let fresh = SearchCompletion.open(
             text: text, caret: caret, dismissedStart: dismissedStart, people: people, labels: labels,
-            statuses: statuses)
+            statuses: statuses, repos: repos)
         searchCompletion = fresh?.token.start == current.token.start ? Self.merge(fresh, into: current) : nil
         return search(rerun: false)
     }
@@ -134,13 +141,15 @@ public struct SearchFieldState: Equatable, Sendable {
         dismissedKind = nil
     }
 
-    /// New people, labels and Status columns (a refresh): the open list takes their candidates and keeps
+    /// New people, labels, Status columns and repositories (a refresh): the open list takes their candidates and keeps
     /// the selected row.
-    public mutating func refresh(people: PeopleIndex, labels: LabelIndex = .empty, statuses: StatusIndex = .empty) {
+    public mutating func refresh(
+        people: PeopleIndex, labels: LabelIndex = .empty, statuses: StatusIndex = .empty, repos: RepoIndex = .empty
+    ) {
         guard let open = searchCompletion,
               let fresh = SearchCompletion.open(
                 text: text, caret: open.token.end, dismissedStart: nil, people: people, labels: labels,
-                statuses: statuses),
+                statuses: statuses, repos: repos),
               !fresh.hasSameCandidates(as: open) else { return }
         searchCompletion = fresh.selecting(open.selectedID)
     }

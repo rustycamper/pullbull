@@ -70,6 +70,9 @@ public enum SearchQuery: Equatable, Sendable {
                     continue
                 }
                 filter.words.append(trimmed[term.range].lowercased())
+            case .repo:
+                if term.value.isEmpty { continue }
+                filter[keyPath: side].add(repo: RepoToken(text: String(term.value)))
             case .status:
                 let name = term.value.trimmingCharacters(in: .whitespaces)
                 if name.isEmpty { continue }
@@ -650,11 +653,12 @@ public struct SearchEngine: Sendable {
     /// The PR and issue search strings within `scope` (`org:` or `user:`), or `repo:` for `focus`: the
     /// filter's `serverQualifiers` for `now`, newest first.
     static func remoteQuery(
-        kind: String, scope: FetchScope, focus: RepoFocus? = nil, filter: SearchFilter, now: Date = Date(),
-        calendar: Calendar = .current
+        kind: String, scope: FetchScope, focus: RepoFocus? = nil, filter: SearchFilter, repos: RepoIndex = .empty,
+        now: Date = Date(), calendar: Calendar = .current
     ) -> String {
         let qualifier = focus.map { "repo:\($0.repo)" } ?? scope.searchQualifier
-        let parts = [qualifier, "is:\(kind)"] + filter.serverQualifiers(now: now, calendar: calendar)
+        let parts = [qualifier, "is:\(kind)"]
+            + filter.serverQualifiers(now: now, calendar: calendar, repos: repos, focused: focus != nil)
         return (parts + ["sort:updated-desc"]).joined(separator: " ")
     }
 
@@ -683,14 +687,16 @@ public struct SearchEngine: Sendable {
         _ q: SearchQuery, sent: SearchFilter, snap: Snapshot, focus: RepoFocus?, api: GitHubAPI
     ) async throws -> Remote {
         let now = Date()
-        guard !sent.serverQualifiers(now: now, calendar: .current).isEmpty else { return Remote() }
+        let repos = RepoIndex.build(snap)
+        guard !sent.serverQualifiers(now: now, calendar: .current, repos: repos, focused: focus != nil).isEmpty
+        else { return Remote() }
         // A personal scope limited to an installation's repos drops matches elsewhere.
         let scope = snap.scope
-        let prQuery = remoteQuery(kind: "pr", scope: scope, focus: focus, filter: sent, now: now)
+        let prQuery = remoteQuery(kind: "pr", scope: scope, focus: focus, filter: sent, repos: repos, now: now)
         // An included `is:merged` or `is:draft`, a PR-only condition or a review matches no issue, so the issue search is skipped.
         let searchesIssues = !sent.prOnly && sent.include.states.allSatisfy(\.appliesToIssues)
         let issueQuery = searchesIssues
-            ? remoteQuery(kind: "issue", scope: scope, focus: focus, filter: sent, now: now)
+            ? remoteQuery(kind: "issue", scope: scope, focus: focus, filter: sent, repos: repos, now: now)
             : nil
         async let prSearch = api.searchPRs(prQuery, maxPages: remoteTextPages, pageSize: remotePageSize)
         async let issueSearch = searchIssues(issueQuery, api: api)

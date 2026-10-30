@@ -219,11 +219,13 @@ extension SearchFieldState {
     /// were typed, and returns the query to search for.
     @discardableResult
     public mutating func apply(
-        _ saved: SavedSearch, people: PeopleIndex, labels: LabelIndex, statuses: StatusIndex = .empty
+        _ saved: SavedSearch, people: PeopleIndex, labels: LabelIndex, statuses: StatusIndex = .empty,
+        repos: RepoIndex = .empty
     ) -> SearchQuery? {
         forgetCompletion()
         let text = saved.fieldText
-        let query = edit(text, caret: text.utf16.count, people: people, labels: labels, statuses: statuses)
+        let query = edit(
+            text, caret: text.utf16.count, people: people, labels: labels, statuses: statuses, repos: repos)
         forgetCompletion()
         return query
     }

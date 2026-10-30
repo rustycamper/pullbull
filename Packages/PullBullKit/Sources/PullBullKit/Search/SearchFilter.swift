@@ -13,10 +13,13 @@ public struct SearchTerms: Equatable, Sendable {
     /// The `is:` values that aren't states.
     public var conditions: [ItemCondition]
     public var reviews: [ReviewFilter]
+    /// Included: any of them. Excluded: none of them.
+    public var repos: [RepoToken]
 
     public init(
         logins: [String] = [], labels: [String] = [], states: [StateFilter] = [], statuses: [BoardStatusFilter] = [],
-        updated: [UpdatedFilter] = [], conditions: [ItemCondition] = [], reviews: [ReviewFilter] = []
+        updated: [UpdatedFilter] = [], conditions: [ItemCondition] = [], reviews: [ReviewFilter] = [],
+        repos: [RepoToken] = []
     ) {
         self.logins = logins
         self.labels = labels
@@ -25,18 +28,20 @@ public struct SearchTerms: Equatable, Sendable {
         self.updated = updated
         self.conditions = conditions
         self.reviews = reviews
+        self.repos = repos
     }
 
     public var isEmpty: Bool {
         logins.isEmpty && labels.isEmpty && states.isEmpty && statuses.isEmpty && updated.isEmpty
-            && conditions.isEmpty && reviews.isEmpty
+            && conditions.isEmpty && reviews.isEmpty && repos.isEmpty
     }
 
     /// The `@` tokens, then the `~` tokens, then the `is:` tokens (states, then conditions), then the
-    /// `status:` tokens, then the `updated:` tokens, then the `review:` tokens.
+    /// `status:` tokens, then the `updated:` tokens, then the `review:` tokens, then the `repo:` tokens.
     var tokens: [String] {
         logins.map { "@\($0)" } + labels.map(SearchQuery.labelToken) + states.map(\.token) + conditions.map(\.token)
             + statuses.map(\.token) + updated.map(\.token) + reviews.map(\.token)
+            + repos.map(\.token)
     }
 
     mutating func add(login: String) {
@@ -59,6 +64,10 @@ public struct SearchTerms: Equatable, Sendable {
         if !reviews.contains(review) { reviews.append(review) }
     }
 
+    mutating func add(repo: RepoToken) {
+        if !repos.contains(where: { $0.text.lowercased() == repo.text.lowercased() }) { repos.append(repo) }
+    }
+
     mutating func add(status: BoardStatusFilter) {
         if !statuses.contains(where: { $0.isSame(as: status) }) { statuses.append(status) }
     }
@@ -72,6 +81,7 @@ public struct SearchTerms: Equatable, Sendable {
             && conditions.allSatisfy { $0.matches(pr) == holds }
             && reviews.allSatisfy { $0.matches(pr) == holds }
             && statuses.allSatisfy { $0.matches(nil) == holds }
+            && inRepos(pr.key.repo, holds: holds)
     }
 
     func every(holds: Bool, _ issue: BoardIssue, viewer: String) -> Bool {
@@ -79,6 +89,12 @@ public struct SearchTerms: Equatable, Sendable {
             && labels.allSatisfy { Self.has($0, issue.labels) == holds }
             && states.allSatisfy { $0.matches(issue) == holds }
             && statuses.allSatisfy { $0.matches(issue.status?.name) == holds }
+            && inRepos(issue.key.repo, holds: holds)
+    }
+
+    /// With no `repo:` term, true. Otherwise any of them matches `repo` (`holds` true) or none does.
+    private func inRepos(_ repo: String, holds: Bool) -> Bool {
+        repos.isEmpty || repos.contains { $0.matches(repo: repo) } == holds
     }
 
     private static func has(_ label: String, _ labels: [String]) -> Bool {
@@ -161,18 +177,32 @@ public struct SearchFilter: Equatable, Sendable {
     /// and `review:none` aren't known to match exactly what the local filter does, so their `-` forms could drop
     /// rows it keeps. An included condition or review sends its form only when GitHub's match holds every row
     /// the local one does (`is:failing`, `review:none`).
-    public func serverQualifiers(now: Date, calendar: Calendar) -> [String] {
+    ///
+    /// `repos` resolves the `repo:` terms. The included ones are sent when every one resolves to a known repo
+    /// (GitHub ORs them, as the local filter does), and not at all when a `focus` already names the one repo
+    /// searched, since GitHub would OR it with the focus. An excluded one is sent as `-repo:owner/name` only
+    /// when it resolves to one known repo, so GitHub never drops more than the local filter does.
+    public func serverQualifiers(
+        now: Date, calendar: Calendar, repos: RepoIndex = .empty, focused: Bool = false
+    ) -> [String] {
         var parts = include.states.map(\.token)
         if let updated = include.updated.last { parts.append(updated.serverQualifier(now: now, calendar: calendar)) }
         if let login = include.logins.first { parts.append("involves:\(Self.serverLogin(login))") }
         parts += SearchEngine.quoted(include.labels).map { "label:\($0)" }
         parts += include.conditions.compactMap(\.serverQualifier)
         parts += include.reviews.compactMap(\.serverQualifier)
+        if !focused, !include.repos.isEmpty {
+            let resolved = include.repos.map { repos.resolve($0) }
+            if resolved.allSatisfy({ $0 != nil }) {
+                parts += Self.distinct(resolved.compactMap { $0 }).map { "repo:\($0)" }
+            }
+        }
         let quotedWords = SearchEngine.quoted(words)
         if !quotedWords.isEmpty { parts.append("in:title \(quotedWords.joined(separator: " "))") }
         parts += exclude.logins.map { "-author:\(Self.serverLogin($0))" }
         parts += SearchEngine.quoted(exclude.labels).map { "-label:\($0)" }
         parts += exclude.states.map { "-" + $0.token }
+        parts += Self.distinct(exclude.repos.compactMap { repos.resolve($0) }).map { "-repo:\($0)" }
         return parts
     }
 
@@ -185,6 +215,11 @@ public struct SearchFilter: Equatable, Sendable {
             return undated.tokens + terms.updated.map { $0.serverQualifier(now: now, calendar: calendar) }
         }
         return Set((dated(include) + dated(exclude).map { "-" + $0 }).map { $0.lowercased() }).sorted()
+    }
+
+    private static func distinct(_ repos: [String]) -> [String] {
+        var seen = Set<String>()
+        return repos.filter { seen.insert($0.lowercased()).inserted }
     }
 
     private static func serverLogin(_ login: String) -> String { login == "me" ? "@me" : login }
