@@ -83,7 +83,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - **Detail:** labels, reviewers, checks, description, conversation, files. Markdown incl. `<details>`. **Open Failing Check** beside failed checks
 - **Labels:** up to two chips per row (none in compact cards), each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail lists them all
 - **Right-click a row:** copy branch, link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · show only updated · search author
-- **Right-click a group header** (repo, author): **Open All *N* on GitHub**, from two PRs up; above 8 it asks first. An author header's menu also offers **Search @*login*** and **Show Only Updated**. Headers in search results get the tab's menus, minus Show Only Updated and the time focus
+- **Right-click a group header** (repo, author): **Open All *N* on GitHub**, from two PRs up; above 8 it asks first. An author header's menu also offers **Search @*login*** and **Show Only Updated**. Headers in search results get the tab's menus, without Show Only Updated
 - **Footer:** account · refresh · open on GitHub · settings. Turns amber with **Retry** when a refresh fails
 - **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Lists your signed-in accounts, then GitHub CLI logins, each with the org it opens in; then Add Account… and Account Settings…. Each account comes back with its last org, and each org with its last board
 
@@ -100,12 +100,12 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - **Status lanes:** the glyph takes the Status colour set on the board, on Board and Assigned
 - **Fold a lane:** click its header. Status, "No status" and "Not on board" fold; repo groups don't. Needs a board
 - **Folds:** kept per tab and per board, across relaunches. Folding on Board leaves Assigned as it is
-- **Searching:** every lane shows open; folds come back when the search ends; open issues done on the board show under Done only when the reference tab has Status lanes (Assigned or Board), not on Created; closed ones go under Closed
+- **Searching:** every lane shows open; folds come back when the search ends; open issues done on the board show under Done only when the results are laid out like Assigned or Board, not on Created; closed ones go under Closed
 - **Done:** click its header to unfold. Never counted
 - **Labels:** chips as on [pull requests](#pull-requests). The board card lists them all
 - **Switch board:** on the Board tab, click its name in the filter row, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd>
 - **Right-click a row:** copy link or Markdown link · open on GitHub · show only this repo · show only updated · search author
-- **Right-click a group header** (a Status lane, No status, Not on board or a repo): **Open All *N* on GitHub**, from two issues up; above 8 it asks first. Done has none. Headers in search results get the tab's menus, minus the time focus
+- **Right-click a group header** (a Status lane, No status, Not on board or a repo): **Open All *N* on GitHub**, from two issues up; above 8 it asks first. Done has none. Headers in search results get the tab's menus, without Show Only Updated
 - **Detail:** board card (incl. labels) · linked PRs (<kbd>Esc</kbd> returns) · description · last two comments
 
 ## Search
@@ -134,7 +134,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - With `status:`, PRs and issues not on the board don't match
 - `-status:` keeps PRs and issues not on the board
 - `#123` and links work only on their own
-- Results are laid out like the tab you're on, or the one you narrowed to: the same repo, author or Status groups and headers. Merged and closed items follow in **Closed and merged** (issues: **Closed**), open until you fold it for this search. Results span all tabs; click a tab to narrow, or press <kbd>←</kbd> / <kbd>→</kbd> at the field's start / end to narrow to the tab beside the one the results are laid out for (<kbd>←</kbd> from the first tab does nothing). No key goes back to everything; use the scope thumb or the link in the narrowed empty state
+- Results are laid out like the tab you're on, or the one you narrowed to: the same repo, author or Status groups and headers. Merged and closed items follow in **Closed and merged** (issues: **Closed**), open until you fold it for this search. Results span all tabs; click a tab to narrow, or press <kbd>←</kbd> / <kbd>→</kbd> at the field's start / end to narrow to the tab beside the one the results are laid out for (<kbd>←</kbd> from the first tab does nothing). No key goes back to everything; click the narrowed tab again, or **Search everything** in the narrowed empty state
 - The footer says what is searched and how many match, with a spinner while GitHub answers. <kbd>⌥</kbd><kbd>⌘</kbd><kbd>↩</kbd> Ask AI shows there when it fits
 - **Right-click a result:** copy branch (PRs), link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · search author. The checkout, files and failing check items are on PRs. Search author replaces the query; show only this repo keeps it and searches that repo
 - Each result looks as it does in that tab: avatars on Review and Team, the review notes and counts the tab shows, assignees on issues. Bold marks the words that matched, and `· author` (or reviewer, assignee) after the age says why an `@` matched. Merged and closed PRs carry their pill

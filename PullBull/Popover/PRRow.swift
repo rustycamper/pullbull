@@ -16,7 +16,8 @@ enum RowContext {
     case search(PRTab, SearchMarks)
 }
 
-/// One open PR in a list (merged and closed ones draw as `ClosedRow`). Review and Team rows lead with the author's avatar, Mine rows with a state glyph.
+/// One open PR in a list (merged and closed ones draw as `ClosedRow`). Review and Team rows lead with the
+/// author's avatar, Mine rows with a state glyph.
 /// Review state sits in the meta line (`RowChips`). Compact rows fit on one line. A search result draws
 /// as a row of the tab it is laid out for, with its marks.
 struct PRRow: View {

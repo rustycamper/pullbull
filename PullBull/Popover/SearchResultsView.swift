@@ -117,7 +117,10 @@ struct SearchResultsView: View {
         } else if let fallback = model.searchFallback {
             fallbackLine(fallback)
         } else if let message = results?.failure(in: model.mode) {
-            failure(message, symbol: "wifi.slash", retry: { model.retrySearch() })
+            // GitHub answering with an error, or answering part of the search, is no lost connection.
+            failure(
+                message, symbol: model.status.error == .offline ? "wifi.slash" : "exclamationmark.triangle",
+                retry: { model.retrySearch() })
         } else if let scopeTitle, let results, results.phase == .done, results.isEmpty(in: model.mode) {
             narrowedEmpty(scopeTitle)
         } else if let message = results?.emptyMessage(
@@ -126,7 +129,7 @@ struct SearchResultsView: View {
             // A name or label nothing has loaded says so in the detail, in place of the hint.
             ListStateView(
                 symbol: "magnifyingglass", title: message,
-                detail: unknownToken.map { "\($0) isn't on anything PullBull has loaded." }
+                detail: unknownToken.map { "\(Self.clipped($0)) isn't on anything PullBull has loaded." }
                     ?? (model.offersAsk ? "Try other words, or ⌥⌘↩ to Ask AI." : "Try other words."))
         } else {
             HStack(spacing: 6) {
@@ -136,6 +139,11 @@ struct SearchResultsView: View {
             .font(.system(size: 12))
             .foregroundStyle(.secondary)
         }
+    }
+
+    /// A typed name or label short enough that the detail keeps to its two lines.
+    private static func clipped(_ token: String) -> String {
+        token.count > 32 ? token.prefix(31) + "…" : token
     }
 
     /// No match among the narrowed tab's items, with the way back to everything.
@@ -388,44 +396,51 @@ struct SearchSummary: View {
     var reservesRoom = false
 
     var body: some View {
-        HStack(spacing: 6) {
-            if model.searchStartedOnTab != nil, scopeTitle == nil {
-                Image(systemName: "keyboard")
-                    .font(.system(size: 10))
-                    .accessibilityHidden(true)
-            }
-            if let login = logins.first {
-                AvatarView(login: model.people.display(login), url: model.people.avatarURL(login), size: 14)
-                    .accessibilityHidden(true)
-            } else if !labels.isEmpty {
-                Image(systemName: "tag")
-                    .font(.system(size: 10))
-                    .accessibilityHidden(true)
-            }
-            ZStack(alignment: .leading) {
-                if reservesRoom {
+        // The reserve sits behind the line, so the spinner follows the text rather than the held room.
+        ZStack(alignment: .leading) {
+            if reservesRoom {
+                HStack(spacing: 6) {
+                    leading
                     Text(widestContextText)
                         .monospacedDigit()
                         .lineLimit(1)
-                        .hidden()
-                        .accessibilityHidden(true)
+                        .layoutPriority(-1)
+                    ProgressView()
+                        .controlSize(.mini)
                 }
+                .hidden()
+                .accessibilityHidden(true)
+            }
+            HStack(spacing: 6) {
+                leading
                 Text(contextText)
                     .monospacedDigit()
                     .lineLimit(1)
+                    .layoutPriority(-1)
                     .accessibilityLabel(contextLabel)
+                if searchingGitHub {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .accessibilityLabel("Searching GitHub")
+                }
             }
-            .layoutPriority(-1)
-            if searchingGitHub {
-                ProgressView()
-                    .controlSize(.mini)
-                    .accessibilityLabel("Searching GitHub")
-            } else if reservesRoom {
-                ProgressView()
-                    .controlSize(.mini)
-                    .hidden()
-                    .accessibilityHidden(true)
-            }
+        }
+    }
+
+    /// The started-typing glyph, then the person's avatar or the label tag.
+    @ViewBuilder private var leading: some View {
+        if model.searchStartedOnTab != nil, scopeTitle == nil {
+            Image(systemName: "keyboard")
+                .font(.system(size: 10))
+                .accessibilityHidden(true)
+        }
+        if let login = logins.first {
+            AvatarView(login: model.people.display(login), url: model.people.avatarURL(login), size: 14)
+                .accessibilityHidden(true)
+        } else if !labels.isEmpty {
+            Image(systemName: "tag")
+                .font(.system(size: 10))
+                .accessibilityHidden(true)
         }
     }
 
