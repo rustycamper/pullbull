@@ -7,7 +7,7 @@ enum HeaderMenus {
     case list, search, none
 }
 
-/// A repo group's header, counting what the tab counts; in a list it offers the repo focus.
+/// A repo group's header, counting what the tab counts; in a list or in search it offers the repo focus.
 struct RepoGroupHeader: View {
     let model: AppModel
     let repo: String
@@ -27,8 +27,8 @@ struct RepoGroupHeader: View {
     }
 }
 
-/// An author group's header: their avatar and login, counting what the tab counts; in a list it offers a
-/// search for them.
+/// An author group's header: their avatar and login, counting what the tab counts; in a list or in
+/// search it offers a search for them.
 struct AuthorGroupHeader: View {
     let model: AppModel
     let author: String
