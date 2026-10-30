@@ -1,6 +1,7 @@
 // Demo data for search: Pull Requests mode, "test @al" typed with the caret at the end. The "@al" token is
-// being picked, so it is left out of the query (SearchFieldState): the results behind are for "test", and the
-// people list for "al" covers their top. Tab counts are each tab's matches; no tab is selected.
+// being picked, so it is left out of the query (SearchFieldState): the results behind are for "test", laid out
+// like the Team tab, and the people list for "al" covers their top. Tab counts are each tab's matches; no tab
+// is selected (search spans all tabs).
 window.SCENES = window.SCENES || {};
 window.SCENES.search = {
   view: "search",
@@ -24,17 +25,17 @@ window.SCENES.search = {
     ],
   },
   searchResults: {
-    context: "Titles in all of initech",
     words: ["test"],
     count: 5,
-    open: [
-      { title: "Fix flaky checkout test on CI", repo: "widgets", number: 1291, author: "bob", when: "1h", state: "open", ci: "success" },
-      { title: "Add contract tests for webhook retries", repo: "api", number: 484, author: "erin", when: "3h", state: "open", ci: "pending" },
-      { title: "Run the e2e test suite in the merge queue", repo: "gadgets", number: 79, author: "frank", when: "1d", state: "open", ci: "failure" },
+    // Laid out as the Team tab is, grouped by repo (newest group first) with Team's rows; no context line.
+    groups: [
+      { repo: "widgets", rows: [{ title: "Fix flaky checkout test on CI", number: 1291, author: "bob", age: "1h", ci: "success", info: [] }] },
+      { repo: "api", rows: [{ title: "Add contract tests for webhook retries", number: 484, author: "erin", age: "3h", ci: "pending", info: [] }] },
+      { repo: "gadgets", rows: [{ title: "Run the e2e test suite in the merge queue", number: 79, author: "frank", age: "1d", ci: "failure", info: [] }] },
     ],
     closed: [
-      { title: "Retry flaky tests once before failing", repo: "widgets", number: 1270, author: "carol", when: "Oct 21", state: "merged" },
-      { title: "Drop the legacy snapshot tests", repo: "api", number: 455, author: "alice", when: "Oct 14", state: "closed" },
+      { title: "Retry flaky tests once before failing", repo: "widgets", number: 1270, state: "merged", when: "Oct 21" },
+      { title: "Drop the legacy snapshot tests", repo: "api", number: 455, state: "closed", when: "Oct 14" },
     ],
   },
 };

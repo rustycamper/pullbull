@@ -176,7 +176,7 @@
       : avatar(pr.author, 20);
     const cls = ["row", pr.draft ? "draft" : "", pr.dimmed ? "dimmed" : "", pr.hover ? "hover" : "", pr.selected ? "selected" : ""].filter(Boolean).join(" ");
     return `<div class="${cls}" data-number="${pr.number}"><span class="leading"${pr.dimmed ? ' style="opacity:.45"' : ""}>${leading}</span>` +
-      `<div class="vstack body"><span class="title-text f13">${esc(pr.title)}</span><div class="hstack meta f11 mono">${meta}</div></div>` +
+      `<div class="vstack body"><span class="title-text f13">${opts.words ? window.PullBull.highlight(pr.title, opts.words) : esc(pr.title)}</span><div class="hstack meta f11 mono">${meta}</div></div>` +
       `${ciGlyph(pr.ci)}</div>`;
   }
 
@@ -187,19 +187,20 @@
       (count > 0 ? `<span class="w-medium mono">${count}</span>` : "") + `</span></div>`;
   }
 
-  /** ClosedRow */
-  function closedRow(pr) {
+  /** ClosedRow; a search's `words` are bold in the title. */
+  function closedRow(pr, words) {
     const merged = pr.state === "merged";
     return `<div class="hstack closed-row"><span class="glyph">${sym(PR_GLYPH[pr.state], 12, "regular", { color: merged ? "var(--merged-text)" : "var(--closed-text)" })}</span>` +
-      `<div class="vstack body"><span class="f12 ellipsis">${esc(pr.title)}</span><span class="f11 mono ellipsis">${esc(pr.repo)} #${pr.number} · ${merged ? "merged" : "closed"} ${esc(pr.when)}</span></div>` +
+      `<div class="vstack body"><span class="f12 ellipsis">${words ? window.PullBull.highlight(pr.title, words) : esc(pr.title)}</span><span class="f11 mono ellipsis">${esc(pr.repo)} #${pr.number} · ${merged ? "merged" : "closed"} ${esc(pr.when)}</span></div>` +
       `<span class="pill ${merged ? "merged" : "closed"}">${merged ? "Merged" : "Closed"}</span></div>`;
   }
 
+  /** The folding closed section: Mine's "Recently closed" with its window, or search's "Closed and merged" (`rc.title`, no `rc.window`). */
   function closedSection(rc) {
     const chevron = `<span class="lane-chevron" style="transform:rotate(${rc.expanded ? 90 : 0}deg)">${sym("chevron.right", 9, "bold")}</span>`;
-    let html = `<div class="hairline closed-rule"></div><div class="hstack closed-header f11 w-semibold">${chevron}<span>Recently closed</span>` +
-      `<span class="w-medium mono">${rc.count}</span><span class="spacer"></span><span style="font-weight:400">Last 7 days</span></div>`;
-    if (rc.expanded) html += rc.rows.map(closedRow).join("");
+    let html = `<div class="hairline closed-rule"></div><div class="hstack closed-header f11 w-semibold">${chevron}<span>${esc(rc.title || "Recently closed")}</span>` +
+      `<span class="w-medium mono">${rc.count}</span><span class="spacer"></span>${rc.title ? "" : '<span style="font-weight:400">Last 7 days</span>'}</div>`;
+    if (rc.expanded) html += rc.rows.map((pr) => closedRow(pr, rc.words)).join("");
     return html;
   }
 

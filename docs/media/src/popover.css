@@ -430,10 +430,7 @@ body {
 /* ---------- Search (SearchResultsView, CompletionList) ---------- */
 
 .below-header { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-.search-context { padding: 10px 8px 0; min-height: 24px; gap: 6px; color: var(--secondary); }
-.search-group { height: 28px; padding: 0 8px; gap: 6px; color: var(--secondary); }
-.search-row-pr .meta { gap: 5px; }
-.search-row-pr strong { font-weight: 700; }
+.row strong, .closed-row strong { font-weight: 700; }
 .caret { display: inline-block; width: 1.5px; height: 14px; margin-left: 1px; vertical-align: -2px; background: var(--accent); border-radius: 1px; }
 .completion-overlay { position: absolute; left: 0; right: 0; top: 0; padding: 4px 10px 0; z-index: 5; }
 .completion-list {
