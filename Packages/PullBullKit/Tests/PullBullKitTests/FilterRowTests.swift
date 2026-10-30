@@ -74,6 +74,13 @@ import Testing
         #expect(time.spokenLabel(tally: nil) == "Showing all repositories, updated today.")
     }
 
+    @Test func spokenLabelReplacesTheStripsMiddleDot() {
+        let row = FilterRow(
+            repoTitle: "All repos", isFocused: true, isRepoFocused: false,
+            timeTitle: "Updated in the last 3 days · since Wed", boardTitle: nil)
+        #expect(row.spokenLabel(tally: nil) == "Showing all repositories, updated in the last 3 days, since Wed.")
+    }
+
     @Test func timeAloneIsNotRepoFocused() {
         let time = FilterRow.make(
             searching: false, listsBuilt: true, focusName: nil, timeTitle: "Updated today", boardTitle: nil)

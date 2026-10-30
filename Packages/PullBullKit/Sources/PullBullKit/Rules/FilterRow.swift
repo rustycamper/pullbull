@@ -46,7 +46,9 @@ public struct FilterRow: Equatable, Sendable {
     public func spokenLabel(tally: String?) -> String {
         guard isFocused else { return "Showing all repositories" }
         let repo = isRepoFocused ? "Showing only \(repoTitle)" : "Showing all repositories"
-        let time = timeTitle.map { ", " + $0.prefix(1).lowercased() + $0.dropFirst() } ?? ""
+        let time = timeTitle.map {
+            ", " + ($0.prefix(1).lowercased() + $0.dropFirst()).replacingOccurrences(of: " · ", with: ", ")
+        } ?? ""
         return repo + time + "." + (tally.map { " \($0)." } ?? "")
     }
 
