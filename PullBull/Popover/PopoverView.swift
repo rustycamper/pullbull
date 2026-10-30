@@ -983,7 +983,7 @@ struct PopoverView: View {
         }
     }
 
-    /// A token: types its sigil into the empty field, which opens the `@`, `~`, `is:`, `status:` or `updated:` list.
+    /// A token: types its sigil into the empty field, which opens its list; `-` opens none.
     private func pickHint(_ hint: SearchHint, in window: NSWindow?) {
         hintSelection = nil
         model.startToken(hint.sigil)

@@ -139,7 +139,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - PR results show changes requested, conflicts and comments, and **Ready to merge** on yours
 - Compact cards (Settings → General) apply to results too: one line each, with checks on open PRs and the Status on issues
 - Matches in the other mode show a hint: <kbd>⌘</kbd><kbd>1</kbd> / <kbd>⌘</kbd><kbd>2</kbd>
-- Empty field shows saved searches and token hints; the first nine show their ⌃ key. <kbd>↓</kbd> to walk them
+- Empty field shows saved searches, the first nine with their ⌃ key, and two lines of token hints: `#` `@` `~` `is:` `status:` `updated:`, then `review:` `repo:` `size:` `-`. <kbd>↓</kbd> to walk them; picking a token types it, and all but `#` and `-` open their list
 - Typing `@`, `~`, `label:`, `is:`, `status:`, `updated:`, `review:`, `repo:` or `size:` opens a completion list. `status:` lists the board's Status columns with their open counts; picking one writes the full name in quotes. `updated:` lists the four steps; `review:` lists `changes` and `none`; `size:` lists `s`, `m` and `l` with their line limits; `repo:` lists the repos in your lists. Also after `-`
 - Typing the start of `status:`, `label:` or `updated:` (`st`, `la`, `up`) at the end of the field shows the rest in grey. Not `is:`, a common word; `status:` only when the board has Status columns; `updated:` only up to `upda`, so a title word like "update" is left alone. Also after `-`
 - **Save:** bookmark icon in the field. Manage in Settings → Search

@@ -15,8 +15,18 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
 
 @Suite struct SearchHintTests {
     @Test func theTokenLineInOrder() {
-        #expect(SearchHint.all == [.number, .person, .label, .state, .status, .updated])
-        #expect(SearchHint.all.map(\.word) == ["number", "person", "label", "state", "column", "time"])
+        #expect(SearchHint.all == [.number, .person, .label, .state, .status, .updated, .review, .repo, .size, .negate])
+        #expect(SearchHint.all.map(\.word)
+            == ["number", "person", "label", "state", "column", "time", "review", "repo", "size", "not"])
+    }
+
+    /// Two fixed lines that read as `all`: the six original tokens, then the PR and negation ones.
+    @Test func twoLines() {
+        #expect(SearchHint.lines == [
+            [.number, .person, .label, .state, .status, .updated],
+            [.review, .repo, .size, .negate],
+        ])
+        #expect(SearchHint.lines.flatMap { $0 } == SearchHint.all)
     }
 
     @Test func sigils() {
@@ -30,6 +40,11 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
         #expect(SearchHint.person.opensList)
         #expect(SearchHint.state.opensList)
         #expect(!SearchHint.number.opensList)
+        #expect(SearchHint.all.map(\.sigil).suffix(4) == ["review:", "repo:", "size:", "-"])
+        #expect(SearchHint.review.opensList && SearchHint.repo.opensList && SearchHint.size.opensList)
+        #expect(!SearchHint.negate.opensList)
+        #expect(!SearchHint.review.showsWord && !SearchHint.repo.showsWord && !SearchHint.size.showsWord)
+        #expect(SearchHint.negate.showsWord)
     }
 
     @Test func voiceOver() {
@@ -37,6 +52,8 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
         #expect(SearchHint.state.accessibilityLabel == "is: state")
         #expect(SearchHint.person.accessibilityHint == "Types @ in the search field")
         #expect(SearchHint.number.accessibilityHint == "Types # in the search field")
+        #expect(SearchHint.negate.accessibilityLabel == "- not")
+        #expect(SearchHint.size.accessibilityLabel == "size: size")
     }
 
     /// The caption's sentence for each token; the number's names the scope it searches.
@@ -45,6 +62,11 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
         #expect(SearchHint.label.caption(scope: nil) == "~label filters by label")
         #expect(SearchHint.state.caption(scope: nil) == "is:open, closed, merged or draft filters by state")
         #expect(SearchHint.updated.caption(scope: nil) == "updated:today, 3d, 1w or 1m filters by last activity")
+        #expect(SearchHint.review.caption(scope: nil) == "review:changes or none filters by review")
+        #expect(SearchHint.repo.caption(scope: nil) == "repo:name filters by repository")
+        #expect(SearchHint.size.caption(scope: nil) == "size:s, m or l filters pull requests by lines changed")
+        #expect(SearchHint.negate.caption(scope: nil)
+            == "- before @, ~, is:, status:, updated:, review:, repo: or size: excludes it")
         #expect(SearchHint.number.caption(scope: .org("initech")) == "A number finds it in every initech repo")
         #expect(SearchHint.number.caption(scope: .personal(login: "me")) == "A number finds it in your repos")
         #expect(SearchHint.number.caption(scope: nil) == "A number finds it in every repo")
@@ -57,10 +79,29 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
         field.edit(sigil, caret: sigil.utf16.count, people: .empty)
         #expect(field.stateCompletion?.candidates.map(\.value) == IsValue.all)
     }
+
+    /// Picking the `size:` hint lists the three sizes.
+    @Test func sizeHintOpensTheSizeList() {
+        var field = SearchFieldState()
+        let sigil = SearchHint.size.sigil
+        field.edit(sigil, caret: sigil.utf16.count, people: .empty)
+        #expect(field.sizeCompletion?.candidates.map(\.size) == [.s, .m, .l])
+    }
+
+    /// Picking the `-` hint leaves `-` in the field: no list, no ghost, nothing searched.
+    @Test func negateHintOpensNothing() {
+        var field = SearchFieldState()
+        let sigil = SearchHint.negate.sigil
+        #expect(field.edit(sigil, caret: sigil.utf16.count, people: .empty) == nil)
+        #expect(field.text == "-")
+        #expect(field.searchCompletion == nil)
+        #expect(field.ghost(statuses: .empty) == nil)
+        #expect(SearchQuery.parse(sigil) == .empty)
+    }
 }
 
 @Suite struct HintPanelItemTests {
-    private static let tokens: [HintPanelItem] = [.hint(.number), .hint(.person), .hint(.label), .hint(.state), .hint(.status), .hint(.updated)]
+    private static let tokens: [HintPanelItem] = SearchHint.all.map(HintPanelItem.hint)
 
     @Test func chipsComeBeforeTheTokens() {
         let saved = savedSearches(2)
@@ -72,11 +113,11 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
     @Test func plusNAndShowLessAreOneItem() {
         let saved = savedSearches(8)
         let folded = HintPanelItem.items(cloud: cloud(saved))
-        #expect(folded.count == 5 + 1 + 6)
+        #expect(folded.count == 5 + 1 + 10)
         #expect(folded[5] == .more)
         #expect(folded[6] == .hint(.number))
         let expanded = HintPanelItem.items(cloud: cloud(saved, expanded: true))
-        #expect(expanded.count == 8 + 1 + 6)
+        #expect(expanded.count == 8 + 1 + 10)
         #expect(expanded[8] == .more)
     }
 
@@ -88,7 +129,8 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
         #expect(HintPanelItem.move(nil, .down, in: items) == .select(.saved(ids[0])))
         #expect(HintPanelItem.move(.saved(ids[0]), .down, in: items) == .select(.saved(ids[1])))
         #expect(HintPanelItem.move(.saved(ids[1]), .down, in: items) == .select(.hint(.number)))
-        #expect(HintPanelItem.move(.hint(.updated), .down, in: items) == .select(.hint(.updated)))
+        #expect(HintPanelItem.move(.hint(.updated), .down, in: items) == .select(.hint(.review)))
+        #expect(HintPanelItem.move(.hint(.negate), .down, in: items) == .select(.hint(.negate)))
     }
 
     /// ↑ goes back, and from the first item returns to the field; in the field it stays there.
@@ -112,7 +154,9 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
         #expect(HintPanelItem.move(.saved(ids[1]), .right, in: items) == .select(.hint(.number)))
         #expect(HintPanelItem.move(.hint(.number), .left, in: items) == .select(.saved(ids[1])))
         #expect(HintPanelItem.move(.saved(ids[0]), .left, in: items) == .select(.saved(ids[0])))
-        #expect(HintPanelItem.move(.hint(.updated), .right, in: items) == .select(.hint(.updated)))
+        #expect(HintPanelItem.move(.hint(.updated), .right, in: items) == .select(.hint(.review)))
+        #expect(HintPanelItem.move(.hint(.review), .left, in: items) == .select(.hint(.updated)))
+        #expect(HintPanelItem.move(.hint(.negate), .right, in: items) == .select(.hint(.negate)))
         #expect(HintPanelItem.move(nil, .left, in: items) == .pass)
         #expect(HintPanelItem.move(nil, .right, in: items) == .pass)
     }

@@ -3,7 +3,7 @@ import SwiftUI
 import PullBullKit
 
 /// The panel under the empty search field, drawn over the top of the current list: the saved searches as a cloud of
-/// chips (`SavedChipCloud`), one line of syntax tokens, and a caption explaining the selected item. A
+/// chips (`SavedChipCloud`), two fixed lines of syntax tokens, and a caption explaining the selected item. A
 /// saved chip applies its search, "+N" expands the cloud and "Show less" folds it, and a token types its
 /// sigil into the field. Its height changes only when searches are saved or deleted or the cloud expands.
 struct SearchHints: View {
@@ -145,30 +145,37 @@ struct SearchHints: View {
         }
     }
 
+    /// Both lines of `SearchHint.lines`, always drawn.
     private var tokens: some View {
-        HStack(spacing: 4) {
-            ForEach(SearchHint.all, id: \.self) { hint in
-                PanelButton(look: .outlined, radius: 5, selected: selection == .hint(hint), action: {
-                    pick(.hint(hint))
-                }) {
-                    HStack(spacing: 5) {
-                        Text(hint.sigil)
-                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(.primary)
-                        if hint.showsWord {
-                            Text(hint.word)
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .lineLimit(1)
-                    .padding(.horizontal, 5)
-                    .frame(height: 22)
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(SearchHint.lines.enumerated()), id: \.offset) { _, line in
+                HStack(spacing: 4) {
+                    ForEach(line, id: \.self) { token($0) }
                 }
-                .accessibilityLabel(hint.accessibilityLabel)
-                .accessibilityHint(hint.accessibilityHint)
             }
         }
+    }
+
+    private func token(_ hint: SearchHint) -> some View {
+        PanelButton(look: .outlined, radius: 5, selected: selection == .hint(hint), action: {
+            pick(.hint(hint))
+        }) {
+            HStack(spacing: 5) {
+                Text(hint.sigil)
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.primary)
+                if hint.showsWord {
+                    Text(hint.word)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .lineLimit(1)
+            .padding(.horizontal, 5)
+            .frame(height: 22)
+        }
+        .accessibilityLabel(hint.accessibilityLabel)
+        .accessibilityHint(hint.accessibilityHint)
     }
 
     /// One fixed line: the selected chip's query, the token's sentence, or a default. VoiceOver reads
