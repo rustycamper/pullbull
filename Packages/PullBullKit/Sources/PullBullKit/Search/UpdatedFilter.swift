@@ -14,16 +14,12 @@ public enum UpdatedFilter: Equatable, Sendable {
         }
     }
 
-    /// `updated:>=2026-10-28` for a step (its local start date), else the raw token.
+    /// `updated:>=2026-10-28T04:00:00Z` for a step (its local start instant in UTC, since GitHub reads a
+    /// bare date as 00:00 UTC), else the raw token.
     public func serverQualifier(now: Date, calendar: Calendar) -> String {
         switch self {
         case .step(let step):
-            let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "en_US_POSIX")
-            formatter.calendar = Calendar(identifier: .gregorian)
-            formatter.timeZone = calendar.timeZone
-            formatter.dateFormat = "yyyy-MM-dd"
-            return "updated:>=" + formatter.string(from: step.start(now: now, calendar: calendar))
+            return "updated:>=" + step.start(now: now, calendar: calendar).formatted(.iso8601)
         case .raw:
             return token
         }

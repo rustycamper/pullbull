@@ -64,8 +64,16 @@ private func pr(
         let q = SearchEngine.remoteQuery(
             kind: "pr", scope: .org("initech"), logins: [], labels: [], updated: .step(.threeDays), words: [],
             now: now, calendar: calendar)
-        #expect(q.contains("updated:>=2026-10-28"))
+        #expect(q.contains("updated:>=2026-10-28T04:00:00Z"))
         #expect(q.contains("sort:updated-desc"))
+    }
+
+    @Test func serverDateCoversEastOfUTC() {
+        var sydney = Calendar(identifier: .gregorian)
+        sydney.timeZone = TimeZone(identifier: "Australia/Sydney")!
+        let morning = sydney.date(from: DateComponents(year: 2026, month: 10, day: 30, hour: 9))!
+        #expect(UpdatedFilter.step(.today).serverQualifier(now: morning, calendar: sydney)
+            == "updated:>=2026-10-29T13:00:00Z")
     }
 
     @Test func rawGoesAsWritten() {
