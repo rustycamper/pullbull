@@ -62,7 +62,7 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 | | |
 |---|---|
 | Click · <kbd>⌃</kbd><kbd>⌥</kbd><kbd>P</kbd> | Open or close (shortcut: Settings → General) |
-| Right-click | Settings · Check for Updates · Quit |
+| Right-click | About PullBull · Settings · Check for Updates (release builds) · Quit |
 
 ## Pull Requests
 

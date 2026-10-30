@@ -193,6 +193,10 @@ final class PopoverController: NSObject {
         close()
         guard let button = statusItem.button else { return }
         let menu = NSMenu()
+        let about = NSMenuItem(title: "About PullBull", action: #selector(openAbout), keyEquivalent: "")
+        about.target = self
+        menu.addItem(about)
+        menu.addItem(.separator())
         let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)
@@ -208,20 +212,32 @@ final class PopoverController: NSObject {
         quit.target = self
         menu.addItem(quit)
         statusItem.menu = menu
+        aboutChosen = false
         settingsChosen = false
         updatesChosen = false
         button.performClick(nil)
         statusItem.menu = nil
         button.highlight(false)
         // Opened only now: the menu has closed, so its closing can't take focus back from Settings.
+        if aboutChosen {
+            // As for Settings: a plain activate() is refused, and the panel would open behind the front app.
+            SettingsOpener.forceActivate()
+            NSApp.orderFrontStandardAboutPanel(nil)
+        }
         if settingsChosen { SettingsOpener.open() }
         if updatesChosen { Updater.shared.checkForUpdates() }
     }
 
+    /// Set by the menu's About item while the menu is still up, like Settings below.
+    private var aboutChosen = false
     /// Set by the menu's Settings item while the menu is still up; `showMenu()` acts on it.
     private var settingsChosen = false
     /// The same for Check for Updates…, whose window would otherwise open under the closing menu.
     private var updatesChosen = false
+
+    @objc private func openAbout() {
+        aboutChosen = true
+    }
 
     @objc private func openSettings() {
         settingsChosen = true

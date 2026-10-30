@@ -24,6 +24,8 @@
 	<string>14.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 rustycamper. MIT License.</string>
 	<key>PBGitHubAppSlug</key>
 	<string>$(PULLBULL_GITHUB_APP_SLUG)</string>
 	<key>PBGitHubClientID</key>
