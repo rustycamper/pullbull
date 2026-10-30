@@ -37,8 +37,9 @@ enum Palette {
     static let strongFill = Color.primary.opacity(0.1)
     static let rowHover = Color.primary.opacity(0.05)
     static let selection = Color.accentColor.opacity(0.15)
-    /// Behind a search match in a title; stronger than `selection` so it still shows on the selected row.
-    static let match = Color.accentColor.opacity(0.22)
+    /// Behind a search match in a title: a soft highlighter yellow, the colour macOS finds text in, kept
+    /// apart from the accent so it reads on the selected row.
+    static let match = dynamic(light: 0xFFCC00, dark: 0xFFD60A, alpha: (0.4, 0.3))
     /// A row chosen to open, for a moment: the system's emphasized selection, with its text colour.
     static let rowFlash = Color(nsColor: .selectedContentBackgroundColor)
     static let rowFlashText = Color(nsColor: .alternateSelectedControlTextColor)

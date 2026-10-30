@@ -598,14 +598,14 @@ private struct FailureBanner: View {
 }
 
 enum Highlight {
-    /// The title with every query word in bold on a soft accent background.
+    /// The title with every query word on a soft highlight. Not bold: the title keeps the tab's width, so it
+    /// wraps where the tab's does.
     static func title(_ title: String, words: [String]) -> AttributedString {
         var attributed = AttributedString(title)
         for word in words where !word.isEmpty {
             var searchStart = title.startIndex
             while let range = title.range(of: word, options: .caseInsensitive, range: searchStart..<title.endIndex) {
                 if let attributedRange = Range(range, in: attributed) {
-                    attributed[attributedRange].inlinePresentationIntent = .stronglyEmphasized
                     attributed[attributedRange].backgroundColor = Palette.match
                 }
                 searchStart = range.upperBound

@@ -5,7 +5,7 @@
   const P = window.PullBull;
   const { esc } = P;
 
-  /** Highlight.title: every query word in bold. */
+  /** Highlight.title: every query word on a soft highlight, not bold. */
   function highlight(title, words) {
     let html = esc(title);
     for (const w of words) {
