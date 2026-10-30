@@ -2036,6 +2036,47 @@ extension AppModel {
         }
     }
 
+    /// The PR that ⇧⌘↩ and ⌃⌘C act on: the selected result while searching, else the highlighted row;
+    /// nil when neither is a PR, and in Issues mode.
+    func selectedPRKey(in listKeys: [PRKey]?) -> PRKey? {
+        if route == .search {
+            guard let key = searchSelection, let results = searchResults,
+                  (results.openPRs + results.closedPRs).contains(where: { $0.key == key })
+            else { return nil }
+            return key
+        }
+        guard mode == .pullRequests, let listKeys else { return nil }
+        return ListNavigation.shown(listSelection, in: listKeys)
+    }
+
+    /// ⇧⌘↩ and the row menu: Files changed, or the changes since my review.
+    func filesLink(for pr: PullRequest) -> FilesLink {
+        FilesLink.target(for: pr, me: snapshot?.org.viewer ?? "", myTeams: snapshot?.org.myTeams ?? [])
+    }
+
+    /// Nil while the PR's list data isn't at hand.
+    func filesLink(for key: PRKey) -> FilesLink? {
+        pullRequest(for: key).map(filesLink(for:))
+    }
+
+    /// Open Failing Check: the first failed check's page, from the detail when it still matches the row,
+    /// else from a fresh detail fetch; the PR's Checks tab when that fails or finds no failed check.
+    func openFailingCheck(_ key: PRKey) {
+        if let detail = details[key], let pr = pullRequest(for: key), detail.isCurrent(for: pr) {
+            NSWorkspace.shared.open(FailingCheck.url(in: detail.checks, key: key))
+            return
+        }
+        Task { [weak self] in
+            let checks = await self?.checksForNotification(key)
+            NSWorkspace.shared.open(FailingCheck.url(in: checks ?? [], key: key))
+        }
+    }
+
+    /// ⌃⌘C and the row menu: `gh pr checkout N -R owner/repo`, then the quiet "Copied" note.
+    func copyCheckoutCommand(_ key: PRKey) {
+        PRActions.copyCheckoutCommand(key)
+    }
+
     /// The detail on screen and its GitHub page, as its Copy Link and Open on GitHub use it.
     var shownDetailLink: (key: PRKey, url: URL)? {
         switch route {

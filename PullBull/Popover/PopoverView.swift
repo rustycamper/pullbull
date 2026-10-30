@@ -521,6 +521,19 @@ struct PopoverView: View {
                 return searching ? model.copySearchSelectionMarkdownLink()
                     : listKeys.map(model.copyListSelectionMarkdownLink(in:)) ?? false
             }
+            // ⇧⌘↩ and ⌃⌘C: the selected result's or highlighted row's files and checkout command. Neither
+            // edits text, so they work with the search field focused too.
+            if Self.isShiftCommandReturn(event, flags: flags) {
+                guard let key = model.selectedPRKey(in: listKeys), let files = model.filesLink(for: key)
+                else { return false }
+                NSWorkspace.shared.open(files.url)
+                return true
+            }
+            if Self.isControlCommandC(event, flags: flags) {
+                guard let key = model.selectedPRKey(in: listKeys) else { return false }
+                model.copyCheckoutCommand(key)
+                return true
+            }
             // ⌥⌘↩: Ask, whatever row is selected. Only from the open search field, never the save row.
             if Self.isOptionCommandReturn(event, flags: flags) {
                 guard searchOpen, saveName == nil, model.settings.askEnabled else { return false }
@@ -744,6 +757,17 @@ struct PopoverView: View {
             return true
         }
         if Self.isOptionCommandC(event, flags: flags) { return model.copyShownDetailMarkdownLink() }
+        // ⇧⌘↩ and ⌃⌘C act on a PR detail only.
+        if Self.isShiftCommandReturn(event, flags: flags) {
+            guard case .detail(let key) = model.route, let files = model.filesLink(for: key) else { return false }
+            NSWorkspace.shared.open(files.url)
+            return true
+        }
+        if Self.isControlCommandC(event, flags: flags) {
+            guard case .detail(let key) = model.route else { return false }
+            model.copyCheckoutCommand(key)
+            return true
+        }
         guard flags.subtracting([.command, .shift, .capsLock, .numericPad, .function]).isEmpty,
               let link = model.shownDetailLink else { return false }
         let key = Self.commandKey(event)
@@ -829,6 +853,17 @@ struct PopoverView: View {
     private static func isOptionCommandReturn(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
         flags.subtracting([.capsLock, .numericPad, .function]) == [.command, .option]
             && (event.keyCode == SearchKeyMonitor.return || event.keyCode == SearchKeyMonitor.enter)
+    }
+
+    /// ⇧⌘↩ (or keypad Enter) exactly: no ⌥ or ⌃.
+    private static func isShiftCommandReturn(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
+        flags.subtracting([.capsLock, .numericPad, .function]) == [.command, .shift]
+            && (event.keyCode == SearchKeyMonitor.return || event.keyCode == SearchKeyMonitor.enter)
+    }
+
+    /// ⌃⌘C exactly: no ⇧ or ⌥.
+    private static func isControlCommandC(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
+        flags.subtracting([.capsLock, .numericPad, .function]) == [.control, .command] && commandKey(event) == "c"
     }
 
     /// ⌥⌘C exactly: no ⇧ or ⌃.

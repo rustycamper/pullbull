@@ -1,13 +1,13 @@
 import SwiftUI
 
-/// The quiet "Copied" after Copy as Markdown Link: the footer's age slot (the search footer's leading
-/// hint) and the detail header's link button read it for 1.5 s, in place, so nothing moves. VoiceOver
-/// hears it at once.
+/// The quiet "Copied" after Copy as Markdown Link and Copy Checkout Command: the footer's age slot (the
+/// search footer's leading hint) and the detail header's link button read it for 1.5 s, in place, so
+/// nothing moves. VoiceOver hears it at once.
 @MainActor @Observable
 final class CopyConfirmation {
     static let shared = CopyConfirmation()
 
-    /// "Copied Markdown link" while it shows; nil otherwise.
+    /// "Copied Markdown link" or "Copied checkout command" while it shows; nil otherwise.
     private(set) var message: String?
     private var generation = 0
 

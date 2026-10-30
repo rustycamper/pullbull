@@ -79,9 +79,9 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 > [!NOTE]
 > Ready to merge = approved, no changes requested, checks green or none, no conflicts, not a draft. It doesn't see branch protection (required review count).
 
-- **Detail:** labels, reviewers, checks, description, conversation, files. Markdown incl. `<details>`
+- **Detail:** labels, reviewers, checks, description, conversation, files. Markdown incl. `<details>`. **Open Failing Check** beside failed checks
 - **Labels:** up to two chips per row (none in compact cards), each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail lists them all
-- **Right-click a row:** copy branch, link or Markdown link · open on GitHub · show only this repo · show only updated · search author
+- **Right-click a row:** copy branch, link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · show only updated · search author
 - **Footer:** account · refresh · open on GitHub · settings. Turns amber with **Retry** when a refresh fails
 - **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Lists your signed-in accounts, then GitHub CLI logins, each with the org it opens in; then Add Account… and Account Settings…. Each account comes back with its last org, and each org with its last board
 
@@ -132,7 +132,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - `-status:` keeps PRs and issues not on the board
 - `#123` and links work only on their own
 - Results span all tabs; click a tab to narrow
-- **Right-click a result:** copy branch (PRs), link or Markdown link · open on GitHub · show only this repo · search author. Search author replaces the query; show only this repo keeps it and searches that repo
+- **Right-click a result:** copy branch (PRs), link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · search author. The checkout, files and failing check items are on PRs. Search author replaces the query; show only this repo keeps it and searches that repo
 - PR results show changes requested, conflicts and comments, and **Ready to merge** on yours
 - Compact cards (Settings → General) apply to results too: one line each, with checks on open PRs and the Status on issues
 - Matches in the other mode show a hint: <kbd>⌘</kbd><kbd>1</kbd> / <kbd>⌘</kbd><kbd>2</kbd>
@@ -228,6 +228,8 @@ Settings → Ask AI.
 | <kbd>⌘</kbd><kbd>C</kbd> | Copy link |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd> | Copy `owner/repo#123` |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy Markdown link |
+| <kbd>⇧</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Files changed; on a PR with new commits since your review, just those changes |
+| <kbd>⌃</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy `gh pr checkout 412 -R owner/repo` |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | [Ask AI](#ask-ai), from the search field |
 | <kbd>⌘</kbd><kbd>1</kbd> · <kbd>⌘</kbd><kbd>2</kbd> | Pull Requests · Issues |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> | Repo menu ([one repo](#one-repo)) |
@@ -243,6 +245,8 @@ Settings → Ask AI.
 | <kbd>Esc</kbd> · <kbd>←</kbd> · <kbd>⌘</kbd><kbd>[</kbd> | Back |
 | <kbd>⌘</kbd><kbd>Return</kbd> | Open on GitHub |
 | <kbd>⌘</kbd><kbd>C</kbd> · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>C</kbd> | Same copies as the list |
+| <kbd>⇧</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Files changed; on a PR with new commits since your review, just those changes |
+| <kbd>⌃</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy `gh pr checkout 412 -R owner/repo` |
 | <kbd>⌘</kbd><kbd>R</kbd> | Refresh |
 
 Reopen within a minute and the detail is still there.

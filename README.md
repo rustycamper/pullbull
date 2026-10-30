@@ -62,7 +62,7 @@ Keyboard-first · Native SwiftUI · Read-only
 - **Labels:** chips with the label's colour dot on each row (not in compact cards), all of them in the detail
 - **One repo:** right-click a repo header or row → **Show Only *repo***, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd>
 - **Recent activity:** right-click a row, a repo header or the list → **Show Only Updated**: today, 3 days, a week or a month
-- **Right-click a row:** copy branch (PRs), link or Markdown link · open on GitHub · search the author
+- **Right-click a row:** copy branch (PRs), link or Markdown link · checkout command · open on GitHub · failing check · search the author
 - **Switch board:** <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> on the Board tab
 - **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Each account keeps its org and board
 
@@ -97,6 +97,7 @@ Combine `@`, `~`, `is:`, `status:`, `updated:`, `review:`, `repo:`, `size:` and 
 | <kbd>⌃</kbd><kbd>⌥</kbd><kbd>P</kbd> | Open or close, from any app |
 | <kbd>↑</kbd> <kbd>↓</kbd> | Select |
 | <kbd>Return</kbd> · <kbd>⌘</kbd><kbd>Return</kbd> | Open detail · open on GitHub |
+| <kbd>⇧</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Files changed, or only what changed since your review |
 | <kbd>⌘</kbd><kbd>1</kbd> · <kbd>⌘</kbd><kbd>2</kbd> | Pull Requests · Issues |
 | <kbd>/</kbd> or just type | Search |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd> | Repo menu · board menu · account menu |

@@ -236,6 +236,10 @@ struct PRDetailView: View {
             if detail.checksTruncated {
                 TruncationNote(shown: checks.count, total: detail.checkTotal, noun: "checks", url: webURL)
             }
+        } accessory: {
+            if FailingCheck.hasFailure(checks) {
+                Link("Open Failing Check", destination: FailingCheck.url(in: checks, key: key))
+            }
         }
     }
 

@@ -44,7 +44,8 @@ struct PRRow: View {
         .accessibilityAddTraits(selected ? [.isSelected] : [])
         .prContextMenu(
             pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
-            time: tab == nil ? nil : TimeFocusMenu(model: model), person: .person(model: model, login: pr.author))
+            time: tab == nil ? nil : TimeFocusMenu(model: model), person: .person(model: model, login: pr.author),
+            files: model.filesLink(for: pr), failingCheck: { model.openFailingCheck(pr.key) })
     }
 
     /// A search result moves `searchSelection`, a tab row `listSelection`.
@@ -314,7 +315,8 @@ struct ClosedRow: View {
         .help(pr.title)
         .prContextMenu(
             pr, focus: FocusMenuItem(model: model, repo: pr.key.repo), time: TimeFocusMenu(model: model),
-            person: .person(model: model, login: pr.author))
+            person: .person(model: model, login: pr.author), files: model.filesLink(for: pr),
+            failingCheck: { model.openFailingCheck(pr.key) })
     }
 
     private func ended(merged: Bool) -> String {
