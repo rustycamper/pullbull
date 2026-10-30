@@ -1964,15 +1964,20 @@ extension AppModel {
         navigationKeys(for: shownTab, closedExpanded: closedExpanded, doneExpanded: doneExpanded)
     }
 
+    /// The time focus narrows only the shown tab, so another tab's rows are scoped by the repository alone.
     private func navigationKeys(for tab: ShownTab, closedExpanded: Bool, doneExpanded: Bool) -> [PRKey] {
+        let focus = ListFocus(repo: repoFocus, time: tab == shownTab ? timeFocus : nil)
         switch tab {
         case .pullRequests(let prTab):
-            guard let scoped = scopedContents(of: prTab) else { return [] }
+            guard let contents = contents(of: prTab) else { return [] }
+            let scoped = focus.isActive ? focus.scope(contents) : ScopedTab(unscoped: contents)
+            let closed = tabs?.recentlyClosed ?? []
             return ListNavigation.prKeys(
                 tab: prTab, contents: scoped.contents, groupedByRepo: listGroupedByRepo,
-                recentlyClosed: scopedRecentlyClosed, closedExpanded: closedExpanded)
+                recentlyClosed: focus.isActive ? focus.scope(closed) : closed, closedExpanded: closedExpanded)
         case .issues(let issueTab):
-            guard let issueTabs, issueTabs.isLoaded(issueTab), let scoped = scopedContents(of: issueTab) else { return [] }
+            guard let issueTabs, issueTabs.isLoaded(issueTab), let contents = contents(of: issueTab) else { return [] }
+            let scoped = focus.isActive ? focus.scope(contents) : ScopedIssueTab(unscoped: contents)
             return ListNavigation.issueKeys(
                 scoped.contents, doneExpanded: doneExpanded, folded: foldedLanes(scoped.contents.groups, on: issueTab))
         }
