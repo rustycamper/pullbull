@@ -650,15 +650,19 @@ public struct SearchEngine: Sendable {
         focus?.matches(key) ?? true
     }
 
-    /// The PR and issue search strings within `scope` (`org:` or `user:`), or `repo:` for `focus`: the
+    /// The PR and issue search strings within `scope` (`org:` or `user:`), or `repo:` for `focus` or the resolved `repo:` terms: the
     /// filter's `serverQualifiers` for `now`, newest first.
     static func remoteQuery(
         kind: String, scope: FetchScope, focus: RepoFocus? = nil, filter: SearchFilter, repos: RepoIndex = .empty,
         now: Date = Date(), calendar: Calendar = .current
     ) -> String {
-        let qualifier = focus.map { "repo:\($0.repo)" } ?? scope.searchQualifier
-        let parts = [qualifier, "is:\(kind)"]
-            + filter.serverQualifiers(now: now, calendar: calendar, repos: repos, focused: focus != nil)
+        // GitHub ORs `repo:` with the scope, so resolved `repo:` terms stand in for it. They are known repos,
+        // so they are inside the scope already.
+        let resolved = filter.resolvedRepos(repos, focused: focus != nil)
+        let head = resolved.isEmpty
+            ? [focus.map { "repo:\($0.repo)" } ?? scope.searchQualifier] : resolved.map { "repo:\($0)" }
+        let parts = head + ["is:\(kind)"]
+            + filter.serverQualifiers(now: now, calendar: calendar, repos: repos, focused: focus != nil, includingRepos: false)
         return (parts + ["sort:updated-desc"]).joined(separator: " ")
     }
 

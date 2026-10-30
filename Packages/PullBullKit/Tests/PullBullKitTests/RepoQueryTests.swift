@@ -45,7 +45,11 @@ private func prQuery(_ raw: String, known: [String], focus: RepoFocus? = nil) th
 private final class RecordingTransport: GraphQLTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var sent: [String] = []
-    var prBodies: [String] { lock.withLock { sent.filter { $0.contains("is:pr") } } }
+    var prBodies: [String] { bodies(containing: "is:pr") }
+    var issueBodies: [String] { bodies(containing: "is:issue") }
+    private func bodies(containing kind: String) -> [String] {
+        lock.withLock { sent.map { $0.replacingOccurrences(of: "\\/", with: "/") }.filter { $0.contains(kind) } }
+    }
     func send(_ body: Data, token: String) async throws -> (Data, HTTPURLResponse) {
         lock.withLock { sent.append(String(decoding: body, as: UTF8.self)) }
         let response = HTTPURLResponse(
@@ -105,11 +109,11 @@ private final class RecordingTransport: GraphQLTransport, @unchecked Sendable {
     @Test func sentWhenResolved() throws {
         #expect(
             try prQuery("repo:widgets", known: ["acme/widgets"])
-                == "org:acme is:pr repo:acme/widgets sort:updated-desc")
+                == "repo:acme/widgets is:pr sort:updated-desc")
         let both = ["acme/widgets", "other/widgets"]
         #expect(try prQuery("repo:widgets", known: both) == "org:acme is:pr sort:updated-desc")
         #expect(
-            try prQuery("repo:other/widgets", known: both) == "org:acme is:pr repo:other/widgets sort:updated-desc")
+            try prQuery("repo:other/widgets", known: both) == "repo:other/widgets is:pr sort:updated-desc")
         #expect(
             try prQuery("-repo:widgets", known: ["acme/widgets"])
                 == "org:acme is:pr -repo:acme/widgets sort:updated-desc")
@@ -119,7 +123,7 @@ private final class RecordingTransport: GraphQLTransport, @unchecked Sendable {
     @Test func positivePartsPrecedeTitleWords() throws {
         #expect(
             try prQuery("fix repo:a -repo:b", known: ["acme/a", "acme/b"])
-                == #"org:acme is:pr repo:acme/a in:title "fix" -repo:acme/b sort:updated-desc"#)
+                == #"repo:acme/a is:pr in:title "fix" -repo:acme/b sort:updated-desc"#)
     }
 
     @Test func unresolvedOfSeveralSendsNone() throws {
@@ -127,8 +131,8 @@ private final class RecordingTransport: GraphQLTransport, @unchecked Sendable {
         #expect(q == "org:acme is:pr sort:updated-desc")
         #expect(
             try prQuery("repo:a repo:b", known: ["acme/a", "acme/b"])
-                == "org:acme is:pr repo:acme/a repo:acme/b sort:updated-desc")
-        #expect(try prQuery("repo:a repo:acme/a", known: ["acme/a"]) == "org:acme is:pr repo:acme/a sort:updated-desc")
+                == "repo:acme/a repo:acme/b is:pr sort:updated-desc")
+        #expect(try prQuery("repo:a repo:acme/a", known: ["acme/a"]) == "repo:acme/a is:pr sort:updated-desc")
     }
 
     @Test func focusKeepsItsOwnRepo() throws {
@@ -136,12 +140,33 @@ private final class RecordingTransport: GraphQLTransport, @unchecked Sendable {
         #expect(q == "repo:acme/a is:pr -repo:acme/b sort:updated-desc")
     }
 
-    @Test func engineSendsTheResolvedRepo() async {
+    /// GitHub ORs `repo:` with `org:`, so the resolved repos replace the scope in the PR and the issue search.
+    @Test func engineSendsTheResolvedRepoInPlaceOfTheScope() async throws {
         let transport = RecordingTransport()
         let engine = SearchEngine(api: GitHubAPI(transport: transport, auth: StaticTokenSource("test-token")))
-        for await _ in engine.results(.parse("repo:widgets"), snap: snapshot(["acme/widgets", "acme/web"])) {}
-        #expect(transport.prBodies.count == 1)
-        #expect(transport.prBodies.first?.replacingOccurrences(of: "\\/", with: "/").contains("repo:acme/widgets") == true)
+        let known = snapshot(["acme/widgets", "acme/web"])
+        for await _ in engine.results(.parse("repo:widgets"), snap: known) {}
+        let pr = try #require(transport.prBodies.first)
+        let issue = try #require(transport.issueBodies.first)
+        #expect(transport.prBodies.count == 1 && transport.issueBodies.count == 1)
+        #expect(pr.contains("repo:acme/widgets is:pr") && !pr.contains("org:acme"))
+        #expect(issue.contains("repo:acme/widgets is:issue") && !issue.contains("org:acme"))
+    }
+
+    @Test func scopeStaysWithoutAPositiveRepo() async throws {
+        let transport = RecordingTransport()
+        let engine = SearchEngine(api: GitHubAPI(transport: transport, auth: StaticTokenSource("test-token")))
+        for await _ in engine.results(.parse("-repo:web fix"), snap: snapshot(["acme/widgets", "acme/web"])) {}
+        let pr = try #require(transport.prBodies.first)
+        #expect(pr.contains("org:acme is:pr") && pr.contains("-repo:acme/web") && !pr.contains(" repo:acme"))
+    }
+
+    @Test func issueQueryTakesTheReposToo() throws {
+        let filter = try #require(SearchQuery.parse("repo:a repo:b -repo:c").filter)
+        let index = RepoIndex.build(snapshot(["acme/a", "acme/b", "acme/c"]))
+        #expect(
+            SearchEngine.remoteQuery(kind: "issue", scope: .personal(login: "me"), filter: filter, repos: index)
+                == "repo:acme/a repo:acme/b is:issue -repo:acme/c sort:updated-desc")
     }
 
     @Test func engineSendsNothingForAnUnresolvedRepo() async {

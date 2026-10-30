@@ -148,6 +148,7 @@ final class AppModel {
     private(set) var people: PeopleIndex = .empty
     /// Every label the current snapshot holds; "~label" candidates come from here.
     private(set) var labels: LabelIndex = .empty
+    /// The focus menu's repositories; "repo:" candidates come from here.
     private(set) var repos: RepoIndex = .empty
     /// The selected board's Status columns; "status:" candidates come from here.
     private(set) var statuses: StatusIndex = .empty

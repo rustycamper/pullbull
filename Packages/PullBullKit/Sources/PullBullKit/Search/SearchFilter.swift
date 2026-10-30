@@ -182,8 +182,12 @@ public struct SearchFilter: Equatable, Sendable {
     /// (GitHub ORs them, as the local filter does), and not at all when a `focus` already names the one repo
     /// searched, since GitHub would OR it with the focus. An excluded one is sent as `-repo:owner/name` only
     /// when it resolves to one known repo, so GitHub never drops more than the local filter does.
+    ///
+    /// GitHub ORs `repo:` with the `org:` or `user:` scope, so `SearchEngine.remoteQuery` sends the repos
+    /// from `resolvedRepos` in place of the scope, and passes `includingRepos: false` to leave them out here.
     public func serverQualifiers(
-        now: Date, calendar: Calendar, repos: RepoIndex = .empty, focused: Bool = false
+        now: Date, calendar: Calendar, repos: RepoIndex = .empty, focused: Bool = false,
+        includingRepos: Bool = true
     ) -> [String] {
         var parts = include.states.map(\.token)
         if let updated = include.updated.last { parts.append(updated.serverQualifier(now: now, calendar: calendar)) }
@@ -191,12 +195,7 @@ public struct SearchFilter: Equatable, Sendable {
         parts += SearchEngine.quoted(include.labels).map { "label:\($0)" }
         parts += include.conditions.compactMap(\.serverQualifier)
         parts += include.reviews.compactMap(\.serverQualifier)
-        if !focused, !include.repos.isEmpty {
-            let resolved = include.repos.map { repos.resolve($0) }
-            if resolved.allSatisfy({ $0 != nil }) {
-                parts += Self.distinct(resolved.compactMap { $0 }).map { "repo:\($0)" }
-            }
-        }
+        if includingRepos { parts += resolvedRepos(repos, focused: focused).map { "repo:\($0)" } }
         let quotedWords = SearchEngine.quoted(words)
         if !quotedWords.isEmpty { parts.append("in:title \(quotedWords.joined(separator: " "))") }
         parts += exclude.logins.map { "-author:\(Self.serverLogin($0))" }
@@ -215,6 +214,15 @@ public struct SearchFilter: Equatable, Sendable {
             return undated.tokens + terms.updated.map { $0.serverQualifier(now: now, calendar: calendar) }
         }
         return Set((dated(include) + dated(exclude).map { "-" + $0 }).map { $0.lowercased() }).sorted()
+    }
+
+    /// The `owner/name` of every included `repo:` term, when each resolves to one known repo and no focus
+    /// already names the repo searched; else none.
+    func resolvedRepos(_ repos: RepoIndex, focused: Bool) -> [String] {
+        guard !focused, !include.repos.isEmpty else { return [] }
+        let resolved = include.repos.map { repos.resolve($0) }
+        guard resolved.allSatisfy({ $0 != nil }) else { return [] }
+        return Self.distinct(resolved.compactMap { $0 })
     }
 
     private static func distinct(_ repos: [String]) -> [String] {
