@@ -1035,6 +1035,51 @@ final class AppModel {
         searchSelection = keys[min(max(current + offset, 0), keys.count - 1)]
     }
 
+    /// ⌥↓ / ⌥↑: the first row of the next or previous group of the results (or of this one, going up from
+    /// inside it). Nothing when the reference tab's layout has no groups, or past either end.
+    func jumpSearchGroup(by offset: Int) {
+        let shown: (groups: [[PRKey]], grouped: Bool)
+        switch mode {
+        case .pullRequests:
+            guard let layout = searchPRLayout else { return }
+            shown = (layout.groups(closedExpanded: searchExpansion.closed), layout.isGrouped)
+        case .issues:
+            guard let layout = searchIssueLayout else { return }
+            shown = (
+                layout.groups(closedExpanded: searchExpansion.closed, doneExpanded: searchExpansion.done),
+                layout.isGrouped)
+        }
+        guard shown.grouped, let key = ListNavigation.jump(searchSelection, by: offset, in: shown.groups)
+        else { return }
+        keptSearchSelection = nil
+        searchSelection = key
+    }
+
+    /// ⌘↑ / ⌘↓: the first or last result shown; nothing when there are none.
+    func moveSearchSelectionToEdge(last: Bool) {
+        guard let key = ListNavigation.edge(last: last, in: searchItemKeys) else { return }
+        keptSearchSelection = nil
+        searchSelection = key
+    }
+
+    /// ← / → in the search field: narrows the search to the reference tab's neighbour, which becomes the
+    /// selected tab, and runs it. Unlike a tab click it never toggles back to everything. Nil at either end.
+    func moveSearchScope(by offset: Int) -> ShownTab? {
+        let tabs: [SearchScope] = switch mode {
+        case .pullRequests: prTabs.map { .pullRequests($0) }
+        case .issues: IssueTab.allCases.map { .issues($0) }
+        }
+        guard let next = SearchScope(searchReferenceTab).moved(by: offset, among: tabs),
+              let tab = ShownTab(next) else { return nil }
+        searchScope = next
+        switch tab {
+        case .pullRequests(let tab): selectedTab = tab
+        case .issues(let tab): selectedIssueTab = tab
+        }
+        runSearch(searchQuery, debounced: false)
+        return tab
+    }
+
     /// Return: the selected result's detail view; with no result, the fallback line's mode.
     func openSearchSelection() {
         guard let key = searchSelection, let results = searchResults else {

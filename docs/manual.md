@@ -134,7 +134,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - With `status:`, PRs and issues not on the board don't match
 - `-status:` keeps PRs and issues not on the board
 - `#123` and links work only on their own
-- Results are laid out like the tab you're on, or the one you narrowed to: the same repo, author or Status groups and headers. Merged and closed items follow in **Closed and merged** (issues: **Closed**), open until you fold it for this search. Results span all tabs; click a tab to narrow
+- Results are laid out like the tab you're on, or the one you narrowed to: the same repo, author or Status groups and headers. Merged and closed items follow in **Closed and merged** (issues: **Closed**), open until you fold it for this search. Results span all tabs; click a tab, or press <kbd>←</kbd> / <kbd>→</kbd> at the field's start / end, to narrow
 - The footer says what is searched and how many match, with a spinner while GitHub answers. <kbd>⌥</kbd><kbd>⌘</kbd><kbd>↩</kbd> Ask AI shows there when it fits
 - **Right-click a result:** copy branch (PRs), link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · search author. The checkout, files and failing check items are on PRs. Search author replaces the query; show only this repo keeps it and searches that repo
 - Each result looks as it does in that tab: avatars on Review and Team, the review notes and counts the tab shows, assignees on issues. Bold marks the words that matched, and `· author` (or reviewer, assignee) after the age says why an `@` matched. Merged and closed PRs carry their pill
@@ -226,9 +226,9 @@ Settings → Ask AI.
 | List | |
 |---|---|
 | <kbd>↑</kbd> <kbd>↓</kbd> | Select |
-| <kbd>⌥</kbd><kbd>↑</kbd> <kbd>⌥</kbd><kbd>↓</kbd> | Previous / next group (repo, author, lane). Folded lanes are skipped; nothing without groups. In search results, one row, as <kbd>↑</kbd> <kbd>↓</kbd> |
-| <kbd>⌘</kbd><kbd>↑</kbd> <kbd>⌘</kbd><kbd>↓</kbd> | First / last row |
-| <kbd>←</kbd> <kbd>→</kbd> | Previous / next tab |
+| <kbd>⌥</kbd><kbd>↑</kbd> <kbd>⌥</kbd><kbd>↓</kbd> | Previous / next group (repo, author, lane, Closed). Folded lanes are skipped; nothing without groups. Search results too |
+| <kbd>⌘</kbd><kbd>↑</kbd> <kbd>⌘</kbd><kbd>↓</kbd> | First / last row, in search results too |
+| <kbd>←</kbd> <kbd>→</kbd> | Previous / next tab. In search: narrow to the previous / next tab, with the caret at the start (<kbd>←</kbd>) or end (<kbd>→</kbd>) of the field |
 | <kbd>Return</kbd> | Detail |
 | <kbd>⌘</kbd><kbd>Return</kbd> | Open on GitHub |
 | <kbd>⌘</kbd><kbd>C</kbd> | Copy link |

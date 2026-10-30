@@ -224,3 +224,14 @@ private let issueTabs = BuiltIssueTabs(
         #expect(SearchContext.spokenMatches(.unavailable) == "unavailable")
     }
 }
+
+@Suite struct SearchScopeMovedTests {
+    private let all: [SearchScope] = [.pullRequests(.review), .pullRequests(.mine), .pullRequests(.team)]
+
+    @Test func movedAlongTabs() {
+        #expect(SearchScope.pullRequests(.review).moved(by: 1, among: all) == .pullRequests(.mine))
+        #expect(SearchScope.pullRequests(.team).moved(by: 1, among: all) == nil)
+        #expect(SearchScope.pullRequests(.review).moved(by: -1, among: all) == nil)
+        #expect(SearchScope.pullRequests(.mine).moved(by: 1, among: Array(all.prefix(2))) == nil)
+    }
+}

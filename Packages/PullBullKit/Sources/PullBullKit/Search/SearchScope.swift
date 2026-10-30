@@ -31,6 +31,12 @@ public enum SearchScope: Hashable, Sendable {
         tab == self ? .everything : tab
     }
 
+    /// The neighbour of this tab `offset` steps along `tabs` (the tabs shown); nil at either end.
+    public func moved(by offset: Int, among tabs: [SearchScope]) -> SearchScope? {
+        let next = ListNavigation.tab(self, movedBy: offset, among: tabs)
+        return next == self ? nil : next
+    }
+
     /// The scope once the field holds `text`: an empty field drops it, so the next query searches everything.
     public func edited(to text: String) -> SearchScope {
         text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .everything : self

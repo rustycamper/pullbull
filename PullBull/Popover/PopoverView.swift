@@ -550,11 +550,17 @@ struct PopoverView: View {
             // Keypad Enter carries .numericPad and fn-Return .function; neither is a modifier here.
             guard flags.subtracting([.command, .shift, .capsLock, .numericPad, .function]).isEmpty else { return false }
             let key = Self.commandKey(event)
-            // ⌘↑ / ⌘↓: the first or last row, in the list only; in the search field they move the caret.
-            if !flags.contains(.shift), let listKeys,
+            // ⌘↑ / ⌘↓: the first or last row, in the list or the search results.
+            if !flags.contains(.shift),
                event.keyCode == SearchKeyMonitor.upArrow || event.keyCode == SearchKeyMonitor.downArrow {
-                model.moveListSelectionToEdge(last: event.keyCode == SearchKeyMonitor.downArrow, in: listKeys)
-                return true
+                if searching {
+                    model.moveSearchSelectionToEdge(last: event.keyCode == SearchKeyMonitor.downArrow)
+                    return true
+                }
+                if let listKeys {
+                    model.moveListSelectionToEdge(last: event.keyCode == SearchKeyMonitor.downArrow, in: listKeys)
+                    return true
+                }
             }
             // ⌘⇧C, ⌘⇧F, ⌘⇧B and ⌘⇧A are the only shifted commands.
             if flags.contains(.shift) {
@@ -716,8 +722,12 @@ struct PopoverView: View {
         case SearchKeyMonitor.upArrow, SearchKeyMonitor.downArrow:
             let offset = event.keyCode == SearchKeyMonitor.downArrow ? 1 : -1
             if searching {
-                // ⌥↑ / ⌥↓ too: results move one row.
-                model.moveSearchSelection(by: offset)
+                // ⌥↑ / ⌥↓: the next or previous group of results; nothing when they have none.
+                if flags.subtracting([.capsLock, .numericPad, .function]) == .option {
+                    model.jumpSearchGroup(by: offset)
+                } else {
+                    model.moveSearchSelection(by: offset)
+                }
             } else if listKeys != nil, flags.subtracting([.capsLock, .numericPad, .function]) == .option {
                 // ⌥↑ / ⌥↓: the next or previous group; nothing in a list without groups.
                 model.jumpListGroup(by: offset, closedExpanded: closedExpanded, doneExpanded: doneExpanded)
@@ -729,8 +739,25 @@ struct PopoverView: View {
             return true
         case SearchKeyMonitor.leftArrow, SearchKeyMonitor.rightArrow:
             // Arrows carry .numericPad and .function; ⌥ and ⇧ arrows are left alone.
-            guard listKeys != nil, flags.subtracting([.capsLock, .numericPad, .function]).isEmpty else { return false }
-            model.moveTab(by: event.keyCode == SearchKeyMonitor.rightArrow ? 1 : -1)
+            guard flags.subtracting([.capsLock, .numericPad, .function]).isEmpty else { return false }
+            let offset = event.keyCode == SearchKeyMonitor.rightArrow ? 1 : -1
+            if searching {
+                // In the search field the arrows edit the text; they narrow the search to the neighbouring tab
+                // only from the caret at the far end, with no selection, completion or key repeat.
+                guard SearchArrows.movesScope(
+                    offset: offset, fieldFocused: fieldFocused, caret: FieldCaret.read(in: window),
+                    length: model.searchText.utf16.count, completionOpen: completionShown,
+                    isRepeat: event.isARepeat)
+                else { return false }
+                if let tab = model.moveSearchScope(by: offset) {
+                    AccessibilityNotification.Announcement(
+                        SearchContext.scopeAnnouncement(tab: tab.title, matches: model.searchMatchCount)
+                    ).post()
+                }
+                return true
+            }
+            guard listKeys != nil else { return false }
+            model.moveTab(by: offset)
             return true
         case SearchKeyMonitor.return, SearchKeyMonitor.enter:
             if searching {
