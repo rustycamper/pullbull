@@ -58,7 +58,6 @@ brew audit --cask --online --strict rustycamper/tap/pullbull
 git commit -am "pullbull 1.0.0" && git push
 ```
 
-- The first release with a `-brew.zip` (the one after 1.5.1) also changes the cask's `url` to `…/v#{version}/PullBull-#{version}-brew.zip`. Published releases are immutable, so 1.5.1 and older have no copy
 - Brew downloads per release: `gh release view v1.0.0 --json assets --jq '.assets[] | select(.name|endswith("-brew.zip")) | .downloadCount'`
 - Installed copies update through Sparkle (`auto_updates true`); the cask only matters for new installs
 - Don't test with `brew uninstall` on a Mac running PullBull: the cask's `uninstall quit:` quits it
