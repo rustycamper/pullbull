@@ -89,6 +89,18 @@ public enum SearchLayout {
         return SearchIssueLayout(tab: tab, contents: contents, ended: ended)
     }
 
+    /// The tab whose chips a result's row shows: Team's for someone else's PR on Mine, which hides the
+    /// author and offers Ready to merge; otherwise `tab`'s.
+    public static func chipTab(for pr: PullRequest, on tab: PRTab, viewer: String) -> PRTab {
+        tab == .mine && pr.author.caseInsensitiveCompare(viewer) != .orderedSame ? .team : tab
+    }
+
+    /// Whether a result's row names its repository: not under a repo header, nor inside the repo focus. A
+    /// link or `owner/repo#123` can bring a result from outside the focus.
+    public static func showsRepo(_ key: PRKey, underRepoHeader: Bool, focus: RepoFocus?) -> Bool {
+        !underRepoHeader && !(focus?.matches(key) ?? false)
+    }
+
     private static func tieBreak(_ a: PRKey, _ b: PRKey) -> Bool {
         a.repo != b.repo ? a.repo < b.repo : a.number < b.number
     }

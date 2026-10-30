@@ -88,6 +88,23 @@ private func key(_ n: Int, _ repo: String = "o/a") -> PRKey { PRKey(repo: repo, 
         }
     }
 
+    @Test func chipTabForOthersOnMine() {
+        #expect(SearchLayout.chipTab(for: pr(1, author: "alice"), on: .mine, viewer: "me") == .team)
+        #expect(SearchLayout.chipTab(for: pr(1, author: "ME"), on: .mine, viewer: "me") == .mine)
+        #expect(SearchLayout.chipTab(for: pr(1, author: "alice"), on: .review, viewer: "me") == .review)
+        let approved = pr(1, author: "alice", reviews: [Review(author: "bob", state: .approved, submittedAt: hoursAgo(5))])
+        let chips = RowChips(row: Row(pr: approved, dimmed: false, counted: true), tab: .team)
+        #expect(chips.action != .readyToMerge)
+    }
+
+    @Test func showsRepoOutsideFocus() {
+        let focus = RepoFocus(repo: "o/a")
+        #expect(!SearchLayout.showsRepo(key(1), underRepoHeader: false, focus: focus))
+        #expect(SearchLayout.showsRepo(key(2, "o/b"), underRepoHeader: false, focus: focus))
+        #expect(!SearchLayout.showsRepo(key(2, "o/b"), underRepoHeader: true, focus: nil))
+        #expect(SearchLayout.showsRepo(key(1), underRepoHeader: false, focus: nil))
+    }
+
     @Test func prGroupsByRepoAsTheTab() {
         let prs = [pr(1, author: "me", updated: 1), pr(2, repo: "o/b", author: "me", updated: 2),
                    pr(3, author: "me", updated: 3)]

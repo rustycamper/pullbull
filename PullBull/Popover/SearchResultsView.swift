@@ -210,7 +210,7 @@ struct SearchResultsView: View {
         case .repository:
             ForEach(ListNavigation.repoGroups(rows), id: \.repo) { group in
                 Section {
-                    prRows(group.rows.map(\.pr))
+                    prRows(group.rows, on: layout.tab)
                 } header: {
                     RepoGroupHeader(model: model, repo: group.repo, rows: group.rows, menus: .none)
                         .pinnedHeaderBackground()
@@ -219,7 +219,7 @@ struct SearchResultsView: View {
         case .author:
             ForEach(ListNavigation.authorGroups(rows), id: \.author) { group in
                 Section {
-                    prRows(group.rows.map(\.pr))
+                    prRows(group.rows, on: layout.tab)
                 } header: {
                     AuthorGroupHeader(model: model, author: group.author, rows: group.rows, menus: .none)
                         .pinnedHeaderBackground()
@@ -227,12 +227,12 @@ struct SearchResultsView: View {
             }
         case .none:
             // Ungrouped rows have no header to clear.
-            prRows(rows.map(\.pr), clearance: 0)
+            prRows(rows, on: layout.tab, clearance: 0)
                 .padding(.top, 6)
         }
         if !layout.ended.isEmpty {
             closedSection(title: "Closed and merged", count: layout.ended.count) {
-                prRows(layout.ended)
+                closedRows(layout.ended)
             }
         }
     }
@@ -244,10 +244,10 @@ struct SearchResultsView: View {
             if group.title.isEmpty {
                 Color.clear.frame(height: 6)
                 // No header pins above it, so there is none to clear.
-                issueRows(group.issues, clearance: 0)
+                issueRows(group.issues, on: layout.tab, clearance: 0)
             } else {
                 Section {
-                    issueRows(group.issues)
+                    issueRows(group.issues, on: layout.tab, underRepoHeader: group.isRepo)
                 } header: {
                     // Lanes never fold while searching, so their headers have no chevron.
                     IssueGroupHeader(model: model, group: group, fold: nil, menus: .none)
@@ -258,7 +258,7 @@ struct SearchResultsView: View {
         if let done = groups.first(where: { $0.kind == .done }) {
             Section {
                 if model.searchExpansion.done {
-                    issueRows(done.issues)
+                    issueRows(done.issues, on: layout.tab)
                 }
             } header: {
                 ListSectionHeader(
@@ -270,7 +270,7 @@ struct SearchResultsView: View {
         }
         if !layout.ended.isEmpty {
             closedSection(title: "Closed", count: layout.ended.count) {
-                issueRows(layout.ended)
+                issueRows(layout.ended, on: layout.tab)
             }
         }
     }
@@ -295,29 +295,37 @@ struct SearchResultsView: View {
         }
     }
 
-    private func prRows(_ prs: [PullRequest], clearance: CGFloat = PinnedHeader.clearance) -> some View {
-        ForEach(prs) { pr in
+    /// The open results as rows of `tab`, which give their review state, dimming and avatars.
+    private func prRows(_ rows: [Row], on tab: PRTab, clearance: CGFloat = PinnedHeader.clearance) -> some View {
+        ForEach(rows) { row in
             PRRow(
-                model: model, row: Row(pr: pr, dimmed: false, counted: false),
-                context: .search(words: words, role: role(of: pr), viewer: viewer),
+                model: model, row: row, context: .search(tab, SearchMarks(words: words, role: role(of: row.pr))),
                 compact: model.settings.compact, now: now,
-                selected: model.searchSelection == pr.key, wantedLabels: labels)
-            .scrollTarget(pr.key, clearance: clearance)
+                selected: model.searchSelection == row.pr.key, wantedLabels: labels)
+            .scrollTarget(row.pr.key, clearance: clearance)
         }
     }
 
-    private func issueRows(_ issues: [BoardIssue], clearance: CGFloat = PinnedHeader.clearance) -> some View {
+    /// The merged and closed results as Mine's Recently closed draws them.
+    private func closedRows(_ prs: [PullRequest]) -> some View {
+        ForEach(prs) { pr in
+            ClosedRow(
+                model: model, pr: pr, now: now, selected: model.searchSelection == pr.key,
+                search: SearchMarks(words: words, role: role(of: pr)))
+            .scrollTarget(pr.key, clearance: PinnedHeader.clearance)
+        }
+    }
+
+    private func issueRows(
+        _ issues: [BoardIssue], on tab: IssueTab, underRepoHeader: Bool = false,
+        clearance: CGFloat = PinnedHeader.clearance
+    ) -> some View {
         ForEach(issues) { issue in
-            SearchIssueRow(
-                issue: issue, words: words, labels: labels, role: role(of: issue), now: now,
-                compact: model.settings.compact,
-                selected: model.searchSelection == issue.key, flashing: model.rowFlash.key == issue.key
-            ) {
-                if PRActions.commandClicked { model.openSearchResultOnGitHub(issue) } else { model.openSearchResult(issue) }
-            }
-            .issueContextMenu(
-                issue, focus: FocusMenuItem(model: model, repo: issue.key.repo),
-                person: .person(model: model, login: issue.author))
+            IssueRow(
+                model: model, issue: issue, tab: tab, now: now, selected: model.searchSelection == issue.key,
+                inRepoGroup: !SearchLayout.showsRepo(
+                    issue.key, underRepoHeader: underRepoHeader, focus: model.repoFocus),
+                wantedLabels: labels, search: SearchMarks(words: words, role: role(of: issue)))
             .scrollTarget(issue.key, clearance: clearance)
         }
     }
@@ -548,114 +556,6 @@ private struct FailureBanner: View {
         .background(RoundedRectangle(cornerRadius: 6).fill(Palette.amberFill))
         .padding(.top, 8)
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// An issue result: the state glyph, the highlighted title, the Issues list's meta line and a muted
-/// board Status pill (search results are not grouped by Status).
-private struct SearchIssueRow: View {
-    let issue: BoardIssue
-    let words: [String]
-    /// The labels a `~label` search asks for, whose chips lead.
-    let labels: [String]
-    let role: String?
-    let now: Date
-    let compact: Bool
-    let selected: Bool
-    let flashing: Bool
-    let action: () -> Void
-
-    private var glyph: (symbol: String, color: Color, label: String) { Palette.issueGlyph(issue.glyph) }
-
-    var body: some View {
-        SearchRowButton(compact: compact, selected: selected, flashing: flashing, action: action) {
-            if compact { compactBody } else { fullBody }
-        }
-    }
-
-    private var fullBody: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(symbol: glyph.symbol)
-                .font(.system(size: 13))
-                .foregroundStyle(glyph.color)
-                .frame(width: 20, height: 20)
-                .accessibilityLabel(glyph.label)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(Highlight.title(issue.title, words: words))
-                    .font(.system(size: 13))
-                    .lineSpacing(1)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .foregroundStyle(titleStyle)
-                    .fixedSize(horizontal: false, vertical: true)
-                    // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
-                    .help(issue.title)
-                IssueMetaLine(issue: issue, now: now, role: role, wantedLabels: labels)
-                    .padding(.top, 3)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            statusPill
-        }
-    }
-
-    /// The tab rows' compact line, with the Status pill where a tab row has its assignees.
-    private var compactBody: some View {
-        CompactRowLayout(
-            repoNumber: RepoNumber(key: issue.key, compact: true),
-            age: IssueMetaLine.age(of: issue, now: now), ageWidth: issue.isOpen ? 24 : nil
-        ) {
-            Image(symbol: glyph.symbol)
-                .font(.system(size: 11))
-                .foregroundStyle(glyph.color)
-                .frame(width: 16)
-                .accessibilityLabel(glyph.label)
-        } title: {
-            Text(Highlight.title(issue.title, words: words))
-                .foregroundStyle(titleStyle)
-                .help(issue.title)
-        } badges: {
-            EmptyView()
-        } trailing: {
-            // Sized to fit, so the title truncates first.
-            statusPill
-                .fixedSize()
-        }
-    }
-
-    private var titleStyle: AnyShapeStyle {
-        issue.isOpen ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)
-    }
-
-    @ViewBuilder private var statusPill: some View {
-        if let status = issue.status?.name {
-            Pill(symbol: nil, text: status, foreground: Palette.secondaryText, fill: Palette.fill)
-                .accessibilityLabel("Status: \(status)")
-        }
-    }
-}
-
-private struct SearchRowButton<Label: View>: View {
-    /// A compact label brings its own height and padding (`CompactRowLayout`).
-    let compact: Bool
-    let selected: Bool
-    let flashing: Bool
-    let action: () -> Void
-    @ViewBuilder let label: () -> Label
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            label()
-                .padding(.horizontal, compact ? 0 : 8)
-                .padding(.top, compact ? 0 : 7)
-                .padding(.bottom, compact ? 0 : 8)
-                .contentShape(Rectangle())
-                .modifier(RowFill(
-                    cornerRadius: compact ? 6 : 7, selected: selected, hovering: hovering, flashing: flashing))
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 }
 
