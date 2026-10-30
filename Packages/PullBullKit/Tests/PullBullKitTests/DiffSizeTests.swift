@@ -84,6 +84,7 @@ private final class RecordingTransport: GraphQLTransport, @unchecked Sendable {
             org: OrgContext(org: "initech", viewer: "me", members: [], myTeams: [], repos: ["gadgets"]),
             reviewCandidates: [], mine: [], team: [], recentlyClosed: [], boardIssues: [])
         for await _ in engine.results(.parse("size:s fix"), snap: snap) {}
+        #expect(transport.bodies.contains { $0.contains("is:pr") })
         #expect(!transport.bodies.contains { $0.contains("is:issue") })
         #expect(!transport.bodies.contains { $0.contains("size:") })
     }

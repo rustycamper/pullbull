@@ -81,7 +81,10 @@ final class AppModel {
     var selectedTab: PRTab {
         didSet {
             if settings.lastTab != selectedTab { settings.lastTab = selectedTab }
-            if selectedTab != oldValue { timeFocus = nil }
+            if selectedTab != oldValue {
+                timeFocus = nil
+                detailWalk = nil
+            }
         }
     }
     /// Pull Requests or Issues; remembered across launches, as is the tab of each mode.
@@ -106,7 +109,10 @@ final class AppModel {
     var selectedIssueTab: IssueTab {
         didSet {
             if settings.lastIssueTab != selectedIssueTab { settings.lastIssueTab = selectedIssueTab }
-            if selectedIssueTab != oldValue { timeFocus = nil }
+            if selectedIssueTab != oldValue {
+                timeFocus = nil
+                detailWalk = nil
+            }
         }
     }
     /// The tab showing in the current mode.
