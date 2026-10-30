@@ -15,7 +15,7 @@ struct AccountSettingsTab: View {
             accountSection
         }
         .formStyle(.grouped)
-        .fixedSize(horizontal: false, vertical: true)
+        .settingsTabHeight()
     }
 
     private var accountSection: some View {

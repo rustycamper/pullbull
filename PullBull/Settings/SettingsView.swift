@@ -130,6 +130,30 @@ private struct BoardsKey: Equatable {
     let canRead: Bool
 }
 
+extension View {
+    /// A Settings tab's form at its full height, so the window fits it, but never taller than the screen
+    /// leaves room for: past that the form scrolls instead of running off the bottom.
+    func settingsTabHeight() -> some View {
+        ScrollView {
+            fixedSize(horizontal: false, vertical: true)
+                // The outer scroll view does the scrolling; the form's own would fight it.
+                .scrollDisabled(true)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(maxHeight: SettingsWindowFit.maxTabHeight)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+enum SettingsWindowFit {
+    /// The tallest a tab can be: the screen's visible height less the window's title bar and tab toolbar,
+    /// and a margin.
+    @MainActor static var maxTabHeight: CGFloat {
+        guard let visible = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame else { return 600 }
+        return max(300, visible.height - 120)
+    }
+}
+
 /// A setting's title with an optional secondary line, as in the Settings artboard.
 struct RowLabel: View {
     let title: String
