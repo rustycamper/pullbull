@@ -38,8 +38,8 @@ private func pr(
     }
 
     @Test func unknownValuePassesThrough() {
-        let q = SearchQuery.parse("updated:>2026-10-01 fix")
-        #expect(q.updated == .raw(">2026-10-01"))
+        let q = SearchQuery.parse("updated:soon fix")
+        #expect(q.updated == .raw("soon"))
         #expect(q.words == ["fix"])
     }
 
@@ -78,9 +78,9 @@ private func pr(
 
     @Test func rawGoesAsWritten() {
         let q = SearchEngine.remoteQuery(
-            kind: "issue", scope: .org("initech"), logins: [], labels: [], updated: .raw(">2026-10-01"), words: [],
+            kind: "issue", scope: .org("initech"), logins: [], labels: [], updated: .raw("soon"), words: [],
             now: now, calendar: calendar)
-        #expect(q.contains("updated:>2026-10-01"))
+        #expect(q.contains("updated:soon"))
     }
 
     @Test func localFilterIsExact() {
@@ -104,7 +104,7 @@ private func pr(
     }
 
     @Test func rawMatchesNothingLocally() {
-        let q = SearchQuery.parse("updated:>2026-10-01")
+        let q = SearchQuery.parse("updated:soon")
         #expect(!q.matches(pr(1, updatedAt: now), viewer: "me", now: now, calendar: calendar))
     }
 
@@ -116,7 +116,86 @@ private func pr(
             logins: [], labels: [], states: [], updated: .step(.threeDays), words: [])
         #expect(label.contains("updated in the last 3 days"))
         let raw = SearchContext.filterDescription(
-            logins: [], labels: [], states: [], updated: .raw(">2026-10-01"), words: [])
-        #expect(raw.contains("updated:>2026-10-01"))
+            logins: [], labels: [], states: [], updated: .raw("soon"), words: [])
+        #expect(raw.contains("updated:soon"))
+    }
+
+    private func utc(_ text: String) -> Date { try! Date(text, strategy: .iso8601) }
+
+    private func matches(_ value: String, _ updated: String) -> Bool {
+        SearchQuery.parse("updated:" + value)
+            .matches(pr(1, updatedAt: utc(updated)), viewer: "me", now: now, calendar: calendar)
+    }
+
+    @Test func greaterThanDayIsAfterItsEnd() {
+        #expect(!matches(">2026-10-01", "2026-10-01T23:59:59Z"))
+        #expect(matches(">2026-10-01", "2026-10-02T00:00:00Z"))
+    }
+
+    @Test func greaterOrEqualDayStartsAtMidnightUTC() {
+        #expect(!matches(">=2026-10-01", "2026-09-30T23:59:59Z"))
+        #expect(matches(">=2026-10-01", "2026-10-01T00:00:00Z"))
+    }
+
+    @Test func lessThanDayEndsBeforeIt() {
+        #expect(matches("<2026-10-01", "2026-09-30T23:59:59Z"))
+        #expect(!matches("<2026-10-01", "2026-10-01T00:00:00Z"))
+    }
+
+    @Test func lessOrEqualDayRunsThroughItsEnd() {
+        #expect(matches("<=2026-10-01", "2026-10-01T23:59:59Z"))
+        #expect(!matches("<=2026-10-01", "2026-10-02T00:00:00Z"))
+    }
+
+    @Test func bareDayIsTheWholeUTCDay() {
+        #expect(!matches("2026-10-01", "2026-09-30T23:59:59Z"))
+        #expect(matches("2026-10-01", "2026-10-01T00:00:00Z"))
+        #expect(matches("2026-10-01", "2026-10-01T23:59:59Z"))
+        #expect(!matches("2026-10-01", "2026-10-02T00:00:00Z"))
+    }
+
+    @Test func dayRangeIsInclusiveAtBothEnds() {
+        #expect(!matches("2026-10-01..2026-10-03", "2026-09-30T23:59:59Z"))
+        #expect(matches("2026-10-01..2026-10-03", "2026-10-01T00:00:00Z"))
+        #expect(matches("2026-10-01..2026-10-03", "2026-10-03T23:59:59Z"))
+        #expect(!matches("2026-10-01..2026-10-03", "2026-10-04T00:00:00Z"))
+    }
+
+    @Test func openEndedRanges() {
+        #expect(matches("2026-10-01..*", "2027-01-01T00:00:00Z"))
+        #expect(!matches("2026-10-01..*", "2026-09-30T23:59:59Z"))
+        #expect(matches("*..2026-10-01", "2020-01-01T00:00:00Z"))
+        #expect(!matches("*..2026-10-01", "2026-10-02T00:00:00Z"))
+    }
+
+    @Test func instantIsExact() {
+        #expect(!matches(">=2026-10-27T14:00:00Z", "2026-10-27T13:59:59Z"))
+        #expect(matches(">=2026-10-27T14:00:00Z", "2026-10-27T14:00:00Z"))
+        #expect(!matches(">2026-10-27T14:00:00Z", "2026-10-27T14:00:00Z"))
+        #expect(matches(">2026-10-27T10:00:00-04:00", "2026-10-27T14:00:01Z"))
+    }
+
+    @Test func dateFormsServerQueryIsVerbatim() {
+        let q = SearchEngine.remoteQuery(
+            kind: "pr", scope: .org("initech"), logins: [], labels: [],
+            updated: SearchQuery.parse("updated:2026-10-01..2026-10-07").updated, words: [], now: now, calendar: calendar)
+        #expect(q.contains("updated:2026-10-01..2026-10-07"))
+    }
+
+    @Test func malformedDatesStayRaw() {
+        #expect(SearchQuery.parse("updated:2026-13-45").updated == .raw("2026-13-45"))
+        #expect(SearchQuery.parse("updated:>=").updated == .raw(">="))
+        #expect(SearchQuery.parse("updated:*..*").updated == .raw("*..*"))
+    }
+
+    @Test func tabCountIsNotZeroedByDateForm() {
+        let tabs = BuiltTabs(
+            review: TabContents(rows: []),
+            mine: TabContents(rows: [Row(pr: pr(1, updatedAt: utc("2026-10-02T00:00:00Z")), dimmed: false, counted: true)]),
+            team: TabContents(rows: []), recentlyClosed: [], hiddenApprovedCount: 0)
+        let counts = SearchNarrowing.counts(
+            SearchQuery.parse("updated:>2026-10-01"), prTabs: [.mine], tabs: tabs, issueTabs: nil, focus: nil,
+            viewer: "me")
+        #expect(counts[.pullRequests(.mine)] == .current(1))
     }
 }

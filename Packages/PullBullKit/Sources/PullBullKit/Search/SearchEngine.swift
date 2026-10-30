@@ -66,7 +66,7 @@ public enum SearchQuery: Equatable, Sendable {
                 if !statuses.contains(where: { $0.isSame(as: status) }) { statuses.append(status) }
             case .updated:
                 if term.value.isEmpty { continue }
-                updated = TimeStep(token: String(term.value)).map(UpdatedFilter.step) ?? .raw(String(term.value))
+                updated = UpdatedFilter.parse(String(term.value))
             case .word:
                 words.append(trimmed[term.range].lowercased())
             }
@@ -169,12 +169,17 @@ public enum SearchQuery: Equatable, Sendable {
 extension SearchQuery {
     /// A `.filtered` query matches when every login has a role on the item, every label is one of its
     /// labels (by name, ignoring case), it is in every state, its board Status matches every status and
-    /// every word is in its title, and its activity date is within the `updated:` step (a raw `updated:` value matches
-    /// nothing); `.number` and `.text` match as before. A pull request has no Status.
+    /// every word is in its title, and its activity date is within the `updated:` step or date form (a raw `updated:` value
+    /// matches nothing); `.number` and `.text` match as before. A pull request has no Status.
     func matches(_ pr: PullRequest, viewer: String, now: Date = Date(), calendar: Calendar = .current) -> Bool {
+        matches(pr, viewer: viewer, window: updated?.resolved(now: now, calendar: calendar))
+    }
+
+    /// As above, with the `updated:` window already worked out, for a loop over many rows.
+    func matches(_ pr: PullRequest, viewer: String, window: UpdatedFilter.Window?) -> Bool {
         switch self {
-        case .filtered(let logins, let labels, _, let states, let statuses, let updated):
-            return statuses.isEmpty && updated.map({ $0.matches(pr, now: now, calendar: calendar) }) != false
+        case .filtered(let logins, let labels, _, let states, let statuses, _):
+            return statuses.isEmpty && window?.matches(pr) != false
                 && matchesTitle(pr.title) && Self.hasLabels(labels, pr.labels) && states.allSatisfy { $0.matches(pr) }
                 && logins.allSatisfy { !PersonMatch.roles(of: pr, login: $0, viewer: viewer).isEmpty }
         case .item:
@@ -185,9 +190,13 @@ extension SearchQuery {
     }
 
     func matches(_ issue: BoardIssue, viewer: String, now: Date = Date(), calendar: Calendar = .current) -> Bool {
+        matches(issue, viewer: viewer, window: updated?.resolved(now: now, calendar: calendar))
+    }
+
+    func matches(_ issue: BoardIssue, viewer: String, window: UpdatedFilter.Window?) -> Bool {
         switch self {
-        case .filtered(let logins, let labels, _, let states, let statuses, let updated):
-            return updated.map({ $0.matches(issue, now: now, calendar: calendar) }) != false
+        case .filtered(let logins, let labels, _, let states, let statuses, _):
+            return window?.matches(issue) != false
                 && matchesTitle(issue.title) && Self.hasLabels(labels, issue.labels)
                 && states.allSatisfy { $0.matches(issue) } && statuses.allSatisfy { $0.matches(issue.status?.name) }
                 && logins.allSatisfy { !PersonMatch.roles(of: issue, login: $0, viewer: viewer).isEmpty }
@@ -383,9 +392,10 @@ public struct SearchEngine: Sendable {
             return SearchResults(openPRs: [], closedPRs: [], issues: [], phase: .searching)
         }
         let prs = snap.reviewCandidates + snap.mine + snap.team + snap.recentlyClosed
-        let matching = prs.filter { q.matches($0, viewer: snap.org.viewer) && Self.inFocus($0.key, focus) }
+        let window = q.updated?.resolved(now: Date(), calendar: .current)
+        let matching = prs.filter { q.matches($0, viewer: snap.org.viewer, window: window) && Self.inFocus($0.key, focus) }
         let issues = Self.cachedIssues(snap).filter {
-            q.matches($0, viewer: snap.org.viewer) && Self.inFocus($0.key, focus)
+            q.matches($0, viewer: snap.org.viewer, window: window) && Self.inFocus($0.key, focus)
         }
         return Self.assemble(prs: matching, issues: issues, phase: .searching)
     }
@@ -677,10 +687,11 @@ public struct SearchEngine: Sendable {
         async let prSearch = api.searchPRs(prQuery, maxPages: remoteTextPages, pageSize: remotePageSize)
         async let issueSearch = searchIssues(issueQuery, api: api)
         var remote = Remote()
+        let window = q.updated?.resolved(now: Date(), calendar: .current)
         do {
             let prs = try await prSearch
             remote.prs = prs.prs.filter {
-                q.matches($0, viewer: snap.org.viewer) && scope.covers($0.key.repo) && inFocus($0.key, focus)
+                q.matches($0, viewer: snap.org.viewer, window: window) && scope.covers($0.key.repo) && inFocus($0.key, focus)
             }
             remote.truncated = prs.hasMore
         } catch is CancellationError {
@@ -693,7 +704,7 @@ public struct SearchEngine: Sendable {
         do {
             guard let issues = try await issueSearch else { return remote }
             remote.issues = issues.issues.filter {
-                q.matches($0, viewer: snap.org.viewer) && scope.covers($0.key.repo) && inFocus($0.key, focus)
+                q.matches($0, viewer: snap.org.viewer, window: window) && scope.covers($0.key.repo) && inFocus($0.key, focus)
             }
             remote.truncated = remote.truncated || issues.hasMore
         } catch is CancellationError {

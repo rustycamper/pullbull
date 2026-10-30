@@ -107,7 +107,8 @@ public enum SearchNarrowing {
     private static func matching(
         _ q: SearchQuery, _ prs: [PullRequest], focus: RepoFocus?, viewer: String
     ) -> [PullRequest] {
-        prs.filter { q.matches($0, viewer: viewer) && SearchEngine.inFocus($0.key, q.keeping(focus)) }
+        let window = q.updated?.resolved(now: Date(), calendar: .current)
+        return prs.filter { q.matches($0, viewer: viewer, window: window) && SearchEngine.inFocus($0.key, q.keeping(focus)) }
     }
 
     /// The tab's items, with their board copy's Status when `snap` is given.
@@ -119,7 +120,8 @@ public enum SearchNarrowing {
     private static func matching(
         _ q: SearchQuery, _ issues: [BoardIssue], focus: RepoFocus?, viewer: String
     ) -> [BoardIssue] {
-        issues.filter { q.matches($0, viewer: viewer) && SearchEngine.inFocus($0.key, q.keeping(focus)) }
+        let window = q.updated?.resolved(now: Date(), calendar: .current)
+        return issues.filter { q.matches($0, viewer: viewer, window: window) && SearchEngine.inFocus($0.key, q.keeping(focus)) }
     }
 
     /// As many as the results list: an item listed twice shows once.
