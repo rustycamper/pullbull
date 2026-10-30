@@ -160,6 +160,45 @@ private func page(_ nodes: [String], cursor: String, next: Bool) -> String {
         #expect(!body.contains("r1:"))
     }
 
+    @Test func pullRequestsQuery() async throws {
+        let stub = StubTransport(json: [
+            #"{"data":{"p0":{"pullRequest":\#(prNode(1))},"p1":{"pullRequest":null}}}"#
+        ])
+        let keys = [
+            PRKey(repo: "initech/gadgets", number: 1), PRKey(repo: "bad\"owner/x", number: 5),
+            PRKey(repo: "initech/gone.repo", number: 2),
+        ]
+        let prs = try await api(stub).pullRequests(keys)
+        #expect(prs.map(\.key) == [PRKey(repo: "initech/gadgets", number: 1)])
+        #expect(stub.bodies.count == 1)
+        let body = stub.bodies[0]
+        let json = try #require(try JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: Any])
+        let variables = try #require(json["variables"] as? [String: Any])
+        #expect(variables["o0"] as? String == "initech")
+        #expect(variables["r0"] as? String == "gadgets")
+        #expect(variables["n0"] as? Int == 1)
+        #expect(variables["o1"] as? String == "initech")
+        #expect(variables["r1"] as? String == "gone.repo")
+        #expect(variables["n1"] as? Int == 2)
+        #expect(variables.count == 6)
+        let query = try #require(json["query"] as? String)
+        #expect(query.contains("$o0:String!,$r0:String!,$n0:Int!,$o1:String!,$r1:String!,$n1:Int!"))
+        #expect(query.contains("p0: repository(owner:$o0, name:$r0){pullRequest(number:$n0){...prFields}}"))
+        #expect(query.contains("p1: repository(owner:$o1, name:$r1){pullRequest(number:$n1){...prFields}}"))
+        #expect(!query.contains("p2:"))
+        #expect(query.contains("fragment prFields on PullRequest"))
+        #expect(!body.contains("bad"))
+    }
+
+    @Test func pullRequestsWithOnlyInvalidNamesSendsNothing() async throws {
+        let stub = StubTransport(json: [])
+        let prs = try await api(stub).pullRequests([PRKey(repo: "o/bad name", number: 1), PRKey(repo: "noslash", number: 2)])
+        #expect(prs.isEmpty)
+        #expect(stub.bodies.isEmpty)
+        #expect(try await api(stub).pullRequests([]).isEmpty)
+        #expect(stub.bodies.isEmpty)
+    }
+
     @Test func boardIssuesKeepsIssuesOnly() async throws {
         let stub = StubTransport([(try fixture("board_items"), response(200))])
         let issues = try await api(stub).boardIssues(.org("initech", 3))

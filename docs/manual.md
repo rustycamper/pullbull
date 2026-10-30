@@ -79,6 +79,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 > [!NOTE]
 > Ready to merge = approved, no changes requested, checks green or none, no conflicts, not a draft. It doesn't see branch protection (required review count).
 
+- **Pending CI:** while checks run on your PRs, PullBull checks up to 5 of them (newest commits first) every 30 s, for up to 20 minutes each, so *CI failed* and *Ready to merge* arrive sooner. Not while offline or rate-limited. Settings → General → Check my pending CI more often
 - **Detail:** labels, reviewers, checks, description, conversation, files. Markdown incl. `<details>`. **Open Failing Check** beside failed checks
 - **Labels:** up to two chips per row (none in compact cards), each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail lists them all
 - **Right-click a row:** copy branch, link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · show only updated · search author
@@ -233,7 +234,7 @@ Settings → Ask AI.
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd> | Copy `owner/repo#123` |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy Markdown link |
 | <kbd>⇧</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Files changed; on a PR with new commits since your review, just those changes |
-| <kbd>⌃</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy `gh pr checkout 412 -R owner/repo` |
+| <kbd>⌃</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy Checkout Command: `gh pr checkout 412 -R owner/repo` |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | [Ask AI](#ask-ai), from the search field |
 | <kbd>⌘</kbd><kbd>1</kbd> · <kbd>⌘</kbd><kbd>2</kbd> | Pull Requests · Issues |
 | <kbd>⌃</kbd><kbd>1</kbd>…<kbd>⌃</kbd><kbd>9</kbd> | Saved search 1–9, in Settings order. Off while macOS uses ⌃1… to switch desktops (System Settings → Keyboard → Shortcuts → Mission Control) |
@@ -252,7 +253,7 @@ Settings → Ask AI.
 | <kbd>⌘</kbd><kbd>Return</kbd> | Open on GitHub |
 | <kbd>⌘</kbd><kbd>C</kbd> · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>C</kbd> | Same copies as the list |
 | <kbd>⇧</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Files changed; on a PR with new commits since your review, just those changes |
-| <kbd>⌃</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy `gh pr checkout 412 -R owner/repo` |
+| <kbd>⌃</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy Checkout Command: `gh pr checkout 412 -R owner/repo` |
 | <kbd>⌘</kbd><kbd>R</kbd> | Refresh |
 
 The order is the one on screen when you opened the first item; a refresh doesn't reshuffle it. An item that has left the lists since is skipped, unless its detail was already loaded.
@@ -287,7 +288,7 @@ Reopen within a minute and the detail is still there.
 
 | Tab | |
 |---|---|
-| General | Grouping, Team by author, oldest review first, compact cards, background, filters (Review and Team), menu bar count, refresh interval, shortcut, launch at login, updates |
+| General | Grouping, Team by author, oldest review first, compact cards, background, filters (Review and Team), menu bar count, refresh interval, pending CI checks, shortcut, launch at login, updates |
 | Account | Account, org, board, access notices |
 | Notifications | One toggle per event, grouped: my pull requests · pull requests I review · issues assigned to me · issues I created |
 | Search | Saved searches: rename, edit the query, drag to reorder, **+** and **−**. Apply one from the empty search field; the first nine have ⌃1–⌃9 |
@@ -311,7 +312,7 @@ Reopen within a minute and the detail is still there.
 | | Status changed on the board | off |
 | | Closed or reopened | on |
 
-Your own comments, moves and closes never notify. Several comments on one issue between refreshes make one notification ("3 new comments"). Status changes count on the board the Board tab shows, as "In Progress → In Review"; moves the board's automation makes after a close or a merge don't notify, the close does.
+CI failed and Ready to merge arrive within about 30 s while your checks run. Your own comments, moves and closes never notify. Several comments on one issue between refreshes make one notification ("3 new comments"). Status changes count on the board the Board tab shows, as "In Progress → In Review"; moves the board's automation makes after a close or a merge don't notify, the close does.
 
 Click a notification to open the detail.
 

@@ -346,6 +346,7 @@ final class AppModel {
         let board: BoardRef?
         let refreshMinutes: Int
         let canReadProjects: Bool
+        let followsPendingCI: Bool
 
         var ref: AccountRef { AccountRef(login: account, source: source) }
     }
@@ -1485,7 +1486,8 @@ final class AppModel {
         pickPersonalBoardIfNeeded()
         let config = RunConfig(
             account: account.login, source: account.source, scope: scope, board: settings.board,
-            refreshMinutes: max(1, settings.refreshMinutes), canReadProjects: canReadProjects)
+            refreshMinutes: max(1, settings.refreshMinutes), canReadProjects: canReadProjects,
+            followsPendingCI: settings.followPendingCI)
         guard config != running else { return }
         let interval = Duration.seconds(config.refreshMinutes * 60)
         if let coordinator, running?.ref == account, running?.scope == scope {
@@ -1493,7 +1495,8 @@ final class AppModel {
             running = config
             command {
                 await coordinator.update(
-                    board: config.board, canReadProjects: config.canReadProjects, interval: interval)
+                    board: config.board, canReadProjects: config.canReadProjects, interval: interval,
+                    followsPendingCI: config.followsPendingCI)
             }
             return
         }
@@ -1534,7 +1537,8 @@ final class AppModel {
         command {
             await coordinator.start(
                 account: account.login, scope: scope, board: config.board,
-                canReadProjects: config.canReadProjects, interval: interval, activity: activity)
+                canReadProjects: config.canReadProjects, interval: interval, activity: activity,
+                followsPendingCI: config.followsPendingCI)
             // The last path seen: on its own it refreshes nothing (nothing has failed yet).
             if let satisfied = self.networkSatisfied { await coordinator.networkPathChanged(satisfied: satisfied) }
         }

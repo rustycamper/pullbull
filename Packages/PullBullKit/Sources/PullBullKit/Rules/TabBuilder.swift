@@ -115,6 +115,19 @@ public struct Snapshot: Codable, Sendable, Equatable {
         return snapshot
     }
 
+    /// This snapshot with each of `followed` replacing the pull request of the same key in Mine, Review
+    /// and Team. Keys it doesn't hold are ignored; `fetchedAt` and every other list are unchanged.
+    public func merging(followed: [PullRequest]) -> Snapshot {
+        guard !followed.isEmpty else { return self }
+        let byKey = Dictionary(followed.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
+        let replace = { (list: [PullRequest]) in list.map { byKey[$0.key] ?? $0 } }
+        var snapshot = self
+        snapshot.mine = replace(mine)
+        snapshot.reviewCandidates = replace(reviewCandidates)
+        snapshot.team = replace(team)
+        return snapshot
+    }
+
     /// The board `boardIssues` belong to. A snapshot cached before the owner was stored had an org's
     /// board; a personal one had none, so its number is never read as a personal board.
     public var board: BoardRef? {

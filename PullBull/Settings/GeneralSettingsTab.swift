@@ -100,6 +100,10 @@ struct GeneralSettingsTab: View {
                     .hidden()
                     .overlay(alignment: .topLeading) { RowLabel("Refresh every", note: refreshNote) }
             }
+            Toggle(isOn: $model.settings.followPendingCI) {
+                RowLabel("Check my pending CI more often",
+                         note: "Every 30 s while checks run on up to 5 of your pull requests")
+            }
             LabeledContent {
                 ShortcutRecorderField(
                     recorder: shortcutRecorder, combo: model.settings.toggleHotkey,

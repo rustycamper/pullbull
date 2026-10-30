@@ -52,7 +52,7 @@ Keyboard-first · Native SwiftUI · Read-only
 | &emsp;&emsp;&emsp; | Mode | Tab | Shows |
 |:-:|---|---|---|
 | <kbd>⌘</kbd><kbd>1</kbd> | **Pull Requests** | Review | PRs requesting your or your team's review, re-requests, new commits since your review, with lines changed |
-| | | Mine | Your open PRs, review pills, checks, *Ready to merge*. Folded *Recently closed*: last 7 days |
+| | | Mine | Your open PRs, review pills, checks, *Ready to merge*, checked every 30 s while CI runs. Folded *Recently closed*: last 7 days |
 | | | Team | Other open PRs in the org, by repo or by author |
 | <kbd>⌘</kbd><kbd>2</kbd> | **Issues** | Assigned | Your issues, grouped by board Status (by repo without a board). Folded *Done*: done on the board, still open |
 | | | Created | Issues you opened |

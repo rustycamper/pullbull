@@ -539,6 +539,31 @@ public struct GitHubAPI: Sendable {
         return (prs, issues)
     }
 
+    /// The pull requests `keys` name, as a search row lists them, in one query. A key whose owner or
+    /// name isn't a valid repository name is skipped (no query when none is left); one GitHub returns
+    /// null for (deleted, or no longer readable) is left out.
+    public func pullRequests(_ keys: [PRKey]) async throws -> [PullRequest] {
+        let targets = keys.compactMap { key -> (owner: String, name: String, number: Int)? in
+            let parts = key.repo.split(separator: "/", maxSplits: 1).map(String.init)
+            guard parts.count == 2, parts.allSatisfy(Self.isValidRepoName) else { return nil }
+            return (parts[0], parts[1], key.number)
+        }
+        guard !targets.isEmpty else { return [] }
+        var variables: [String: Any] = [:]
+        for (index, target) in targets.enumerated() {
+            variables["o\(index)"] = target.owner
+            variables["r\(index)"] = target.name
+            variables["n\(index)"] = target.number
+        }
+        let data = try await execute(Queries.pullRequests(count: targets.count), variables)
+        return targets.indices.compactMap { index in
+            guard let repo = data["p\(index)"] as? [String: Any],
+                  let node = repo["pullRequest"] as? [String: Any]
+            else { return nil }
+            return try? Decoding.pullRequest(from: node)
+        }
+    }
+
     public func boardIssues(_ board: BoardRef) async throws -> [BoardIssue] {
         try await self.board(board).issues
     }

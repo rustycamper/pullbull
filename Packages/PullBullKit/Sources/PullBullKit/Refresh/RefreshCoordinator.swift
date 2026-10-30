@@ -117,12 +117,19 @@ public struct RefreshStatus: Equatable, Sendable {
     public var error: RefreshError?
     public var isRefreshing: Bool
     public var activity: ActivityCheckState
+    /// This update is a fast CI follow merged into the last full refresh's snapshot (its `fetchedAt`
+    /// and `lastSuccess` unchanged). Set on that one update only.
+    public var isCIFollow: Bool
 
-    public init(lastSuccess: Date?, error: RefreshError?, isRefreshing: Bool, activity: ActivityCheckState = .off) {
+    public init(
+        lastSuccess: Date?, error: RefreshError?, isRefreshing: Bool, activity: ActivityCheckState = .off,
+        isCIFollow: Bool = false
+    ) {
         self.lastSuccess = lastSuccess
         self.error = error
         self.isRefreshing = isRefreshing
         self.activity = activity
+        self.isCIFollow = isCIFollow
     }
 
     /// The data is older than two poll intervals, e.g. because a refresh has not finished.
@@ -143,6 +150,15 @@ public protocol SnapshotFetching: Sendable {
     func fetch(
         account: String, scope: FetchScope, board: BoardRef?, canReadProjects: Bool, previous: Snapshot?
     ) async throws -> Snapshot
+
+    /// The pull requests `keys` name, looked up directly rather than searched (`CIFollow`).
+    func pullRequests(_ keys: [PRKey], account: String) async throws -> [PullRequest]
+}
+
+extension SnapshotFetching {
+    public func pullRequests(_ keys: [PRKey], account: String) async throws -> [PullRequest] {
+        throw CancellationError()
+    }
 }
 
 public struct LiveSnapshotFetcher: SnapshotFetching {
@@ -233,6 +249,10 @@ public struct LiveSnapshotFetcher: SnapshotFetching {
             closedIssues: closed?.found,
             pendingClosedLookups: closed.flatMap { $0.pending.isEmpty ? nil : $0.pending }
         ).limited(to: scope)
+    }
+
+    public func pullRequests(_ keys: [PRKey], account: String) async throws -> [PullRequest] {
+        try await api.pullRequests(keys)
     }
 
     /// The issues that left Assigned or Created since `previous` and are now closed, looked up one by
@@ -462,6 +482,8 @@ public actor RefreshCoordinator {
         let chosenBoard: BoardRef?
         let canReadProjects: Bool
         let interval: Duration
+        /// Mine's pending CI is looked at every `CIFollow.interval` between full refreshes.
+        let followsPendingCI: Bool
 
         /// The board this config fetches, if any: the chosen one when the token can read it and it
         /// belongs to the scope's owner.
@@ -503,11 +525,21 @@ public actor RefreshCoordinator {
     private var recovery = NetworkRecovery()
     private var recoveryTimer: Task<Void, Never>?
     private(set) var recoveryToken = 0
+    /// The fast CI follow: what it follows, its timer, and when the next full refresh is due. A failed
+    /// follow sets `followBlocked` until a full refresh succeeds. `fullStarts` counts full attempts, so a
+    /// follow that one overtook while it ran is dropped.
+    private var ciFollow = CIFollow()
+    private var followTimer: Task<Void, Never>?
+    private var followBlocked = false
+    private var nextFullAt: Date?
+    private var fullStarts = 0
 
     /// Callers currently waiting on someone else's in-flight fetch.
     private(set) var joinedWaiters = 0
     /// Fetch results discarded because the loop was restarted or stopped while they ran.
     private(set) var droppedResults = 0
+    /// Follow results discarded because a full refresh started, or the loop changed, while they ran.
+    private(set) var droppedFollows = 0
     /// The snapshot the loop currently holds (tests).
     var heldSnapshot: Snapshot? { snapshot }
     /// The status the loop last emitted (tests).
@@ -532,21 +564,23 @@ public actor RefreshCoordinator {
         timer?.cancel()
         checkTimer?.cancel()
         recoveryTimer?.cancel()
+        followTimer?.cancel()
         inFlight?.task.cancel()
         continuation.finish()
     }
 
     /// Cancels any previous loop and starts polling for this account and scope. Results of fetches
     /// started before this call are dropped. With `activity` (a fresh checker for this loop), new
-    /// activity found between polls starts a full refresh at once; the poll interval is unchanged.
+    /// activity found between polls starts a full refresh at once; the poll interval is unchanged. With
+    /// `followsPendingCI`, Mine's pending CI is looked at between polls (`CIFollow`).
     public func start(
         account: String, scope: FetchScope, board: BoardRef?, canReadProjects: Bool, interval: Duration,
-        activity: (any ActivityChecking)? = nil
+        activity: (any ActivityChecking)? = nil, followsPendingCI: Bool = false
     ) {
         cancelLoop()
         config = Config(
             account: account, scope: scope, chosenBoard: board,
-            canReadProjects: canReadProjects, interval: interval)
+            canReadProjects: canReadProjects, interval: interval, followsPendingCI: followsPendingCI)
         snapshot = nil
         status = RefreshStatus(
             lastSuccess: nil, error: nil, isRefreshing: false, activity: activity == nil ? .off : .probing)
@@ -562,12 +596,13 @@ public actor RefreshCoordinator {
     /// Changes the board, project access or interval of the running loop without restarting it: the
     /// snapshot and status (including an error) stay. Turning the board off or switching to another
     /// drops the old board's items at once; a new board is fetched once, after the fetch in flight if
-    /// there is one. A new interval counts from the last success.
-    public func update(board: BoardRef?, canReadProjects: Bool, interval: Duration) {
+    /// there is one. A new interval counts from the last success. Turning `followsPendingCI` off
+    /// cancels the next follow; turning it on schedules one when Mine has pending CI.
+    public func update(board: BoardRef?, canReadProjects: Bool, interval: Duration, followsPendingCI: Bool = false) {
         guard let old = config else { return }
         let new = Config(
             account: old.account, scope: old.scope, chosenBoard: board,
-            canReadProjects: canReadProjects, interval: interval)
+            canReadProjects: canReadProjects, interval: interval, followsPendingCI: followsPendingCI)
         guard new != old else { return }
         config = new
         if let current = snapshot, current.boardStatus != .none, !(new.board?.matches(current.board) ?? false) {
@@ -575,6 +610,7 @@ public actor RefreshCoordinator {
             emit()
         }
         let current = generation
+        if new.followsPendingCI != old.followsPendingCI { scheduleFollow(current) }
         // The attempt in flight reschedules when it ends, refetching if the board changed meanwhile.
         if let inFlight, inFlight.generation == current { return }
         // During backoff or a rate-limit wait the pending retry picks the new config up.
@@ -627,14 +663,16 @@ public actor RefreshCoordinator {
         scheduleRecovery()
     }
 
-    /// Returns once the fetch in flight, if any, has finished: after that no poll writes the cache,
-    /// so a caller may delete it.
+    /// Returns once the fetch or follow in flight, if any, has finished: after that no poll writes the
+    /// cache, so a caller may delete it.
     public func stop() async {
         let running = inFlight?.task
+        let following = followTimer
         cancelLoop()
         config = nil
         activity = nil
         await running?.value
+        await following?.value
     }
 
     // MARK: Loop
@@ -643,6 +681,10 @@ public actor RefreshCoordinator {
         generation += 1
         timer?.cancel()
         timer = nil
+        nextFullAt = nil
+        cancelFollow()
+        ciFollow = CIFollow()
+        followBlocked = false
         checkTimer?.cancel()
         checkTimer = nil
         inFlight?.task.cancel()
@@ -725,6 +767,7 @@ public actor RefreshCoordinator {
         let started = now()
         let task = Task { await self.perform(current, config, previous: previous, started: started) }
         inFlight = (current, task)
+        fullStarts += 1
         inFlightStarted = started
         await task.value
     }
@@ -774,6 +817,8 @@ public actor RefreshCoordinator {
             status.error = nil
             lastSuccessStarted = started
             recovery.refreshSucceeded()
+            ciFollow.observe(fresh, now: now())
+            followBlocked = false
             delay = again ? .zero : latest.interval
         case .failure(is CancellationError):
             // After a failure, the wait that failure sets: a 403 or a rate limit never retries early.
@@ -782,10 +827,13 @@ public actor RefreshCoordinator {
             failures += 1
             let mapped = RefreshError(error)
             status.error = mapped
+            // A failing poll stops following until a full refresh succeeds again.
+            cancelFollow()
             if case .signedOut = mapped {
                 // Retrying can't sign back in: nothing is scheduled until `refreshNow()` or a restart.
                 timer?.cancel()
                 timer = nil
+                nextFullAt = nil
                 emit()
                 return
             }
@@ -795,10 +843,12 @@ public actor RefreshCoordinator {
         if latest.board != nil, latest.board != config.board, failures == 0 { delay = .zero }
         emit()
         schedule(after: delay, expected)
+        if case .success = result { scheduleFollow(expected) }
     }
 
     private func schedule(after delay: Duration, _ expected: Int) {
         timer?.cancel()
+        nextFullAt = now().addingTimeInterval(Self.seconds(delay))
         let clock = clock
         timer = Task { [weak self] in
             do {
@@ -808,6 +858,79 @@ public actor RefreshCoordinator {
             }
             await self?.tick(expected)
         }
+    }
+
+    // MARK: Fast CI follow
+
+    private func cancelFollow() {
+        followTimer?.cancel()
+        followTimer = nil
+    }
+
+    /// Sets the follow timer when following is on, not blocked by a failed follow, the last poll
+    /// succeeded and Mine has pending CI to follow; otherwise cancels it.
+    private func scheduleFollow(_ expected: Int) {
+        cancelFollow()
+        guard expected == generation, let config, config.followsPendingCI, !followBlocked, status.error == nil,
+              let snapshot, !ciFollow.selection(in: snapshot, now: now()).isEmpty
+        else { return }
+        let clock = clock
+        followTimer = Task { [weak self] in
+            do {
+                try await clock.sleep(for: CIFollow.interval)
+            } catch {
+                return
+            }
+            await self?.follow(expected)
+        }
+    }
+
+    /// One follow, run by `followTimer` (which `stop()` waits for): looks Mine's pending pull requests
+    /// up, merges them into the snapshot, saves it and emits it as a full refresh would, with
+    /// `isCIFollow` set (nothing when nothing changed). Skipped, and not rescheduled (the next full
+    /// refresh schedules again), when `CIFollow.shouldRun` says so. A failure is silent and blocks
+    /// following until a full refresh succeeds. The result is dropped when it was cancelled, or a full
+    /// refresh started while it ran, since that refresh's data is as new or newer.
+    private func follow(_ expected: Int) async {
+        guard expected == generation, let config, config.followsPendingCI, !followBlocked, let snapshot else { return }
+        let fullInFlight = inFlight?.generation == expected
+        guard CIFollow.shouldRun(now: now(), nextFullAt: nextFullAt, fullInFlight: fullInFlight, error: status.error)
+        else { return }
+        let keys = ciFollow.selection(in: snapshot, now: now())
+        guard !keys.isEmpty else { return }
+        let starts = fullStarts
+        let result: Result<[PullRequest], any Error>
+        do {
+            result = .success(try await fetcher.pullRequests(keys, account: config.account))
+        } catch {
+            result = .failure(error)
+        }
+        guard !Task.isCancelled, expected == generation, starts == fullStarts, inFlight == nil,
+              status.error == nil, self.config?.followsPendingCI == true, let current = self.snapshot
+        else {
+            droppedFollows += 1
+            return
+        }
+        guard case .success(let followed) = result else {
+            followBlocked = true
+            return
+        }
+        let merged = current.merging(followed: followed)
+        if merged != current {
+            try? await store.save(merged, account: config.account, scope: config.scope)
+            // A full refresh that started during the save saves and emits its own data.
+            guard expected == generation, starts == fullStarts, inFlight == nil, let latest = self.snapshot else {
+                droppedFollows += 1
+                return
+            }
+            // The board may have been turned off meanwhile: merged into what the loop holds now.
+            self.snapshot = latest.merging(followed: followed)
+            status.isCIFollow = true
+            emit()
+            status.isCIFollow = false
+        }
+        ciFollow.observe(self.snapshot ?? merged, now: now())
+        scheduleFollow(expected)
     }
 
     // MARK: Activity check

@@ -140,6 +140,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var badge: BadgeSource = .review
     public var notify = NotificationToggles()
     public var refreshMinutes = 2
+    /// Between refreshes, my pull requests with pending CI are checked every 30 s (`CIFollow`).
+    public var followPendingCI = true
     public var lastTab: PRTab = .review
     /// The global shortcut that shows and hides the popover; nil when turned off.
     public var toggleHotkey: KeyCombo? = .togglePopoverDefault
@@ -174,7 +176,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case account, org, projectNumber, projectOwner, projectOrg, orgByAccount, boardByOwner, grouping, groupTeamByAuthor, reviewOldestFirst, compact,
-            hideOlderThanTwoMonths, hideApprovedByMe, hideDrafts, badge, notify, refreshMinutes, lastTab, toggleHotkey, mode, lastIssueTab,
+            hideOlderThanTwoMonths, hideApprovedByMe, hideDrafts, badge, notify, refreshMinutes, followPendingCI, lastTab, toggleHotkey, mode, lastIssueTab,
             countAssignedIssues, solidBackground, accountSource, appAccounts, signedOutByUser, laneFolds,
             askEnabled, askModel, askModelChoices, askExcludedRepos
     }
@@ -214,6 +216,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         d.badge = c.readable(BadgeSource.self, forKey: .badge) ?? d.badge
         d.notify = c.readable(NotificationToggles.self, forKey: .notify) ?? d.notify
         d.refreshMinutes = c.readable(Int.self, forKey: .refreshMinutes) ?? d.refreshMinutes
+        d.followPendingCI = c.readable(Bool.self, forKey: .followPendingCI) ?? d.followPendingCI
         d.lastTab = c.readable(PRTab.self, forKey: .lastTab) ?? d.lastTab
         // A saved null is "turned off"; a missing key (settings saved before the shortcut) is the default.
         if let hotkey = c.readableOrNull(KeyCombo.self, forKey: .toggleHotkey) { d.toggleHotkey = hotkey }
@@ -257,6 +260,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         try c.encode(badge, forKey: .badge)
         try c.encode(notify, forKey: .notify)
         try c.encode(refreshMinutes, forKey: .refreshMinutes)
+        try c.encode(followPendingCI, forKey: .followPendingCI)
         try c.encode(lastTab, forKey: .lastTab)
         try c.encode(toggleHotkey, forKey: .toggleHotkey)
         try c.encode(mode, forKey: .mode)

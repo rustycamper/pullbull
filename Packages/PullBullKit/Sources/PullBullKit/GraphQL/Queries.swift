@@ -201,6 +201,17 @@ enum Queries {
         return "query($org:String!,$n:Int!){\n\(aliases)\n}\n\(prFields)\n\(issueRowFields)"
     }
 
+    /// `count` pull requests by owner, name and number (variables `o0, r0, n0`, …), aliased `p0...pN`.
+    /// A deleted or hidden one comes back null.
+    static func pullRequests(count: Int) -> String {
+        let indices = 0..<count
+        let variables = indices.map { "$o\($0):String!,$r\($0):String!,$n\($0):Int!" }.joined(separator: ",")
+        let aliases = indices.map {
+            "p\($0): repository(owner:$o\($0), name:$r\($0)){pullRequest(number:$n\($0)){...prFields}}"
+        }.joined(separator: "\n")
+        return "query(\(variables)){\n\(aliases)\n}\n\(prFields)"
+    }
+
     /// One issue with its row fields, body, last two comments and the PRs that close it. The comments
     /// are aliased: `issueRowFields` already selects `comments{totalCount}` without arguments.
     static let issueDetail = """

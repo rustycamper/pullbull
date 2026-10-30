@@ -408,6 +408,21 @@ private func sample() -> Snapshot {
         #expect(!old.groupTeamByAuthor && !old.reviewOldestFirst)
     }
 
+    @Test func followPendingCIDefaultsOn() throws {
+        let d = defaults()
+        let store = SettingsStore(defaults: d)
+        var s = AppSettings()
+        #expect(s.followPendingCI)
+        s.followPendingCI = false
+        store.save(s)
+        #expect(!store.load().followPendingCI)
+        s.followPendingCI = true
+        store.save(s)
+        #expect(store.load().followPendingCI)
+        d.set(Data(#"{"account":"me","org":"o"}"#.utf8), forKey: "settings.v1")
+        #expect(store.load().followPendingCI)
+    }
+
     @Test func savedSearchesSurviveSaveAndLoad() {
         let store = SettingsStore(defaults: defaults())
         var s = AppSettings()
