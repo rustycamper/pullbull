@@ -101,3 +101,20 @@ public struct TimeFocus: Equatable, Sendable {
         return "Updated \(step.title) · since \(since)"
     }
 }
+
+public struct TimeStepCandidate: CompletionCandidate {
+    public let step: TimeStep
+
+    public var id: String { step.rawValue }
+    public var insertText: String { QueryScanner.updatedQualifier + step.token }
+
+    public init(step: TimeStep) {
+        self.step = step
+    }
+
+    /// The steps whose token starts with `prefix`, ignoring case, in `TimeStep` order.
+    static func candidates(prefix: String) -> [TimeStepCandidate] {
+        let p = prefix.lowercased()
+        return TimeStep.allCases.filter { $0.token.hasPrefix(p) }.map(TimeStepCandidate.init)
+    }
+}

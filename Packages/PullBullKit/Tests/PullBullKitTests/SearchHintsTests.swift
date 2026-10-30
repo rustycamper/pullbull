@@ -15,8 +15,8 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
 
 @Suite struct SearchHintTests {
     @Test func theTokenLineInOrder() {
-        #expect(SearchHint.all == [.number, .person, .label, .state, .status])
-        #expect(SearchHint.all.map(\.word) == ["number", "person", "label", "state", "column"])
+        #expect(SearchHint.all == [.number, .person, .label, .state, .status, .updated])
+        #expect(SearchHint.all.map(\.word) == ["number", "person", "label", "state", "column", "time"])
     }
 
     @Test func sigils() {
@@ -24,6 +24,9 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
         #expect(SearchHint.person.sigil == "@")
         #expect(SearchHint.label.sigil == "~")
         #expect(SearchHint.state.sigil == "is:")
+        #expect(SearchHint.updated.sigil == "updated:")
+        #expect(SearchHint.updated.opensList)
+        #expect(!SearchHint.updated.showsWord)
         #expect(SearchHint.person.opensList)
         #expect(SearchHint.state.opensList)
         #expect(!SearchHint.number.opensList)
@@ -41,6 +44,7 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
         #expect(SearchHint.person.caption(scope: nil) == "@name filters by author, assignee or reviewer")
         #expect(SearchHint.label.caption(scope: nil) == "~label filters by label")
         #expect(SearchHint.state.caption(scope: nil) == "is:open, closed, merged or draft filters by state")
+        #expect(SearchHint.updated.caption(scope: nil) == "updated:today, 3d, 1w or 1m filters by last activity")
         #expect(SearchHint.number.caption(scope: .org("initech")) == "A number finds it in every initech repo")
         #expect(SearchHint.number.caption(scope: .personal(login: "me")) == "A number finds it in your repos")
         #expect(SearchHint.number.caption(scope: nil) == "A number finds it in every repo")
@@ -56,7 +60,7 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
 }
 
 @Suite struct HintPanelItemTests {
-    private static let tokens: [HintPanelItem] = [.hint(.number), .hint(.person), .hint(.label), .hint(.state), .hint(.status)]
+    private static let tokens: [HintPanelItem] = [.hint(.number), .hint(.person), .hint(.label), .hint(.state), .hint(.status), .hint(.updated)]
 
     @Test func chipsComeBeforeTheTokens() {
         let saved = savedSearches(2)
@@ -68,11 +72,11 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
     @Test func plusNAndShowLessAreOneItem() {
         let saved = savedSearches(8)
         let folded = HintPanelItem.items(cloud: cloud(saved))
-        #expect(folded.count == 5 + 1 + 5)
+        #expect(folded.count == 5 + 1 + 6)
         #expect(folded[5] == .more)
         #expect(folded[6] == .hint(.number))
         let expanded = HintPanelItem.items(cloud: cloud(saved, expanded: true))
-        #expect(expanded.count == 8 + 1 + 5)
+        #expect(expanded.count == 8 + 1 + 6)
         #expect(expanded[8] == .more)
     }
 
@@ -84,7 +88,7 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
         #expect(HintPanelItem.move(nil, .down, in: items) == .select(.saved(ids[0])))
         #expect(HintPanelItem.move(.saved(ids[0]), .down, in: items) == .select(.saved(ids[1])))
         #expect(HintPanelItem.move(.saved(ids[1]), .down, in: items) == .select(.hint(.number)))
-        #expect(HintPanelItem.move(.hint(.status), .down, in: items) == .select(.hint(.status)))
+        #expect(HintPanelItem.move(.hint(.updated), .down, in: items) == .select(.hint(.updated)))
     }
 
     /// ↑ goes back, and from the first item returns to the field; in the field it stays there.
@@ -108,7 +112,7 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
         #expect(HintPanelItem.move(.saved(ids[1]), .right, in: items) == .select(.hint(.number)))
         #expect(HintPanelItem.move(.hint(.number), .left, in: items) == .select(.saved(ids[1])))
         #expect(HintPanelItem.move(.saved(ids[0]), .left, in: items) == .select(.saved(ids[0])))
-        #expect(HintPanelItem.move(.hint(.status), .right, in: items) == .select(.hint(.status)))
+        #expect(HintPanelItem.move(.hint(.updated), .right, in: items) == .select(.hint(.updated)))
         #expect(HintPanelItem.move(nil, .left, in: items) == .pass)
         #expect(HintPanelItem.move(nil, .right, in: items) == .pass)
     }

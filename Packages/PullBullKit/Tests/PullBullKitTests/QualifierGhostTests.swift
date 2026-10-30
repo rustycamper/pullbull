@@ -15,6 +15,15 @@ private func ghost(_ text: String, statuses: Bool = true) -> QualifierGhost? {
         #expect(ghost("Label")?.remainder == ":")
     }
 
+    @Test func updatedGhost() {
+        #expect(ghost("up")?.remainder == "dated:")
+        #expect(ghost("UPD")?.remainder == "ated:")
+        #expect(ghost("u") == nil)
+        #expect(ghost("upx") == nil)
+        #expect(ghost("st")?.remainder == "atus:")
+        #expect(ghost("up", statuses: false)?.remainder == "dated:")
+    }
+
     @Test func noGhost() {
         #expect(ghost("s") == nil)
         #expect(ghost("l") == nil)

@@ -1,6 +1,6 @@
 import Foundation
 
-/// What VoiceOver says for the "@user", "~label", "is:" and "status:" completion lists, which never take focus from the
+/// What VoiceOver says for the "@user", "~label", "is:", "status:" and "updated:" completion lists, which never take focus from the
 /// search field.
 public enum CompletionSpeech {
     /// The list opened on a new token. `loaded` is false before the first snapshot.
@@ -28,6 +28,15 @@ public enum CompletionSpeech {
         case 0: return "No matching states. Return to search anyway."
         case 1: return "1 state. Up and down arrows to choose, Return to complete."
         case let count: return "\(count) states. Up and down arrows to choose, Return to complete."
+        }
+    }
+
+    /// The steps never wait for a snapshot.
+    public static func opened(_ completion: UpdatedCompletion) -> String {
+        switch completion.candidates.count {
+        case 0: return "No matching steps. Return to search anyway."
+        case 1: return "1 step. Up and down arrows to choose, Return to complete."
+        case let count: return "\(count) steps. Up and down arrows to choose, Return to complete."
         }
     }
 
@@ -63,6 +72,11 @@ public enum CompletionSpeech {
         "\(candidate.state.rawValue), \(candidate.state.summary)"
     }
 
+    /// One row: `<token>, <title>`.
+    public static func label(_ candidate: TimeStepCandidate) -> String {
+        "\(candidate.insertText), \(candidate.step.title)"
+    }
+
     /// The selected row after ↑ / ↓, with its position: `<label>, <i> of <count>`; nil with no candidate.
     public static func selected(_ completion: PersonCompletion) -> String? {
         completion.selectedCandidate.map { position(label($0), in: completion) }
@@ -77,6 +91,10 @@ public enum CompletionSpeech {
     }
 
     public static func selected(_ completion: StatusCompletion) -> String? {
+        completion.selectedCandidate.map { position(label($0), in: completion) }
+    }
+
+    public static func selected(_ completion: UpdatedCompletion) -> String? {
         completion.selectedCandidate.map { position(label($0), in: completion) }
     }
 
@@ -98,6 +116,10 @@ public enum CompletionSpeech {
         change(from: old, to: new, opened: { opened($0, loaded: loaded) }, selected: selected)
     }
 
+    public static func change(from old: UpdatedCompletion?, to new: UpdatedCompletion?) -> String? {
+        change(from: old, to: new, opened: opened, selected: selected)
+    }
+
     /// As for one kind; a list of another kind counts as a new token.
     public static func change(from old: SearchCompletion?, to new: SearchCompletion?, loaded: Bool) -> String? {
         switch (old, new) {
@@ -106,10 +128,12 @@ public enum CompletionSpeech {
         case (.labels(let o), .labels(let n)): return change(from: o, to: n, loaded: loaded)
         case (.states(let o), .states(let n)): return change(from: o, to: n)
         case (.statuses(let o), .statuses(let n)): return change(from: o, to: n, loaded: loaded)
+        case (.updated(let o), .updated(let n)): return change(from: o, to: n)
         case (_, .people(let n)): return opened(n, loaded: loaded)
         case (_, .labels(let n)): return opened(n, loaded: loaded)
         case (_, .states(let n)): return opened(n)
         case (_, .statuses(let n)): return opened(n, loaded: loaded)
+        case (_, .updated(let n)): return opened(n)
         }
     }
 
@@ -126,6 +150,10 @@ public enum CompletionSpeech {
         case .open, .closed: "Showing \(candidate.state.rawValue) items"
         case .merged, .draft: "Showing \(candidate.state.rawValue) pull requests"
         }
+    }
+
+    public static func completed(_ candidate: TimeStepCandidate) -> String {
+        "Showing items updated \(candidate.step.title)"
     }
 
     public static func completed(_ candidate: StatusCandidate) -> String {

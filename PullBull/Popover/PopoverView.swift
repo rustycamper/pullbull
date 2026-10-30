@@ -870,6 +870,7 @@ struct PopoverView: View {
         case .labels(let labels): labels.selectedCandidate.map(CompletionSpeech.completed)
         case .states(let states): states.selectedCandidate.map(CompletionSpeech.completed)
         case .statuses(let statuses): statuses.selectedCandidate.map(CompletionSpeech.completed)
+        case .updated(let steps): steps.selectedCandidate.map(CompletionSpeech.completed)
         case nil: nil
         }
         guard let caret = model.acceptCompletion() else { return }
@@ -901,7 +902,7 @@ struct PopoverView: View {
         }
     }
 
-    /// A token: types its sigil into the empty field, which opens the `@`, `~`, `is:` or `status:` list.
+    /// A token: types its sigil into the empty field, which opens the `@`, `~`, `is:`, `status:` or `updated:` list.
     private func pickHint(_ hint: SearchHint, in window: NSWindow?) {
         hintSelection = nil
         model.startToken(hint.sigil)

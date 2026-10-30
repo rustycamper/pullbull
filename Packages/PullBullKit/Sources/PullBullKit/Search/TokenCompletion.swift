@@ -10,9 +10,11 @@ public struct PendingToken: Equatable, Sendable {
         case state
         /// `status:prog` or `status:"In progress"`
         case status
+        /// `updated:3d`
+        case updated
     }
 
-    /// UTF-16 offset of the sigil ("@", "＠", "~", "～", "label:", "is:" or "status:", any case).
+    /// UTF-16 offset of the sigil ("@", "＠", "~", "～", "label:", "is:", "status:" or "updated:", any case).
     public let start: Int
     /// UTF-16 offset of the caret.
     public let end: Int
@@ -27,8 +29,8 @@ public struct PendingToken: Equatable, Sendable {
         self.kind = kind
     }
 
-    /// The `@`, `~`, `label:`, `is:` or `status:` token that ends at the caret, if any. A label or status may
-    /// be quoted; a closed quote ends it. An `is:` value is letters only.
+    /// The `@`, `~`, `label:`, `is:`, `status:` or `updated:` token that ends at the caret, if any. A label or
+    /// status may be quoted; a closed quote ends it. An `is:` value is letters only.
     public static func at(caret: Int, in text: String) -> PendingToken? {
         let scalars = text.unicodeScalars
         guard caret >= 0, caret <= text.utf16.count else { return nil }
@@ -49,7 +51,10 @@ public struct PendingToken: Equatable, Sendable {
         case .state:
             guard prefix.allSatisfy(\.isLetter) else { return nil }
             return PendingToken(start: start, end: caret, prefix: prefix, kind: .state)
-        case .updated, .word:
+        case .updated:
+            guard prefix.allSatisfy({ $0.isLetter || $0.isNumber }) else { return nil }
+            return PendingToken(start: start, end: caret, prefix: prefix, kind: .updated)
+        case .word:
             return nil
         }
     }
@@ -82,7 +87,7 @@ public struct PendingToken: Equatable, Sendable {
     static func sigilEnd(in text: String, at index: String.Index, of kind: Kind?) -> String.Index? {
         let scalars = text.unicodeScalars
         let character = Character(scalars[index])
-        let kinds: [Kind] = kind.map { [$0] } ?? [.person, .label, .state, .status]
+        let kinds: [Kind] = kind.map { [$0] } ?? [.person, .label, .state, .status, .updated]
         for kind in kinds {
             switch kind {
             case .person where QueryScanner.personSigils.contains(character),
@@ -94,6 +99,8 @@ public struct PendingToken: Equatable, Sendable {
                 return text.index(index, offsetBy: QueryScanner.stateQualifier.count)
             case .status where QueryScanner.startsStatus(text[index...]):
                 return text.index(index, offsetBy: QueryScanner.statusQualifier.count)
+            case .updated where QueryScanner.startsUpdated(text[index...]):
+                return text.index(index, offsetBy: QueryScanner.updatedQualifier.count)
             default:
                 continue
             }
@@ -155,6 +162,7 @@ public typealias PersonCompletion = TokenCompletion<PersonCandidate>
 public typealias LabelCompletion = TokenCompletion<LabelCandidate>
 public typealias StateCompletion = TokenCompletion<StateCandidate>
 public typealias StatusCompletion = TokenCompletion<StatusCandidate>
+public typealias UpdatedCompletion = TokenCompletion<TimeStepCandidate>
 
 extension TokenCompletion where Candidate == PersonCandidate {
     /// Nil when no `@` token ends at the caret or the token at `dismissedStart` is the one there.
@@ -198,13 +206,23 @@ extension TokenCompletion where Candidate == StatusCandidate {
     }
 }
 
+extension TokenCompletion where Candidate == TimeStepCandidate {
+    /// Nil when no `updated:` token ends at the caret or the token at `dismissedStart` is the one there.
+    public static func open(text: String, caret: Int, dismissedStart: Int?) -> UpdatedCompletion? {
+        token(.updated, text: text, caret: caret, dismissedStart: dismissedStart).map {
+            UpdatedCompletion(token: $0, candidates: TimeStepCandidate.candidates(prefix: $0.prefix), selection: 0)
+        }
+    }
+}
+
 /// The one completion list the search field can show: people for an `@` token, labels for a `~` token,
-/// states for an `is:` token, board Status columns for a `status:` token.
+/// states for an `is:` token, board Status columns for a `status:` token, time steps for an `updated:` token.
 public enum SearchCompletion: Equatable, Sendable {
     case people(PersonCompletion)
     case labels(LabelCompletion)
     case states(StateCompletion)
     case statuses(StatusCompletion)
+    case updated(UpdatedCompletion)
 
     /// The list for the token at the caret, of whichever kind it is.
     public static func open(
@@ -220,8 +238,12 @@ public enum SearchCompletion: Equatable, Sendable {
         if let completion = StateCompletion.open(text: text, caret: caret, dismissedStart: dismissedStart) {
             return .states(completion)
         }
-        return StatusCompletion.open(text: text, caret: caret, dismissedStart: dismissedStart, statuses: statuses)
-            .map(SearchCompletion.statuses)
+        if let completion = StatusCompletion.open(
+            text: text, caret: caret, dismissedStart: dismissedStart, statuses: statuses) {
+            return .statuses(completion)
+        }
+        return UpdatedCompletion.open(text: text, caret: caret, dismissedStart: dismissedStart)
+            .map(SearchCompletion.updated)
     }
 
     public var token: PendingToken {
@@ -230,6 +252,7 @@ public enum SearchCompletion: Equatable, Sendable {
         case .labels(let c): c.token
         case .states(let c): c.token
         case .statuses(let c): c.token
+        case .updated(let c): c.token
         }
     }
 
@@ -239,6 +262,7 @@ public enum SearchCompletion: Equatable, Sendable {
         case .labels(let c): c.selection
         case .states(let c): c.selection
         case .statuses(let c): c.selection
+        case .updated(let c): c.selection
         }
     }
 
@@ -248,6 +272,7 @@ public enum SearchCompletion: Equatable, Sendable {
         case .labels(let c): !c.candidates.isEmpty
         case .states(let c): !c.candidates.isEmpty
         case .statuses(let c): !c.candidates.isEmpty
+        case .updated(let c): !c.candidates.isEmpty
         }
     }
 
@@ -257,6 +282,7 @@ public enum SearchCompletion: Equatable, Sendable {
         case .labels(let c): .labels(c.moved(by: offset))
         case .states(let c): .states(c.moved(by: offset))
         case .statuses(let c): .statuses(c.moved(by: offset))
+        case .updated(let c): .updated(c.moved(by: offset))
         }
     }
 
@@ -266,6 +292,7 @@ public enum SearchCompletion: Equatable, Sendable {
         case .labels(let c): c.accepted(in: text)
         case .states(let c): c.accepted(in: text)
         case .statuses(let c): c.accepted(in: text)
+        case .updated(let c): c.accepted(in: text)
         }
     }
 
@@ -276,6 +303,7 @@ public enum SearchCompletion: Equatable, Sendable {
         case (.labels(let a), .labels(let b)): a.candidates == b.candidates
         case (.states(let a), .states(let b)): a.candidates == b.candidates
         case (.statuses(let a), .statuses(let b)): a.candidates == b.candidates
+        case (.updated(let a), .updated(let b)): a.candidates == b.candidates
         default: false
         }
     }
@@ -286,6 +314,7 @@ public enum SearchCompletion: Equatable, Sendable {
         case .labels(let c): c.selectedCandidate?.id
         case .states(let c): c.selectedCandidate?.id
         case .statuses(let c): c.selectedCandidate?.id
+        case .updated(let c): c.selectedCandidate?.id
         }
     }
 
@@ -297,6 +326,7 @@ public enum SearchCompletion: Equatable, Sendable {
         case .labels(let c): index = id.flatMap { id in c.candidates.firstIndex { $0.id == id } }
         case .states(let c): index = id.flatMap { id in c.candidates.firstIndex { $0.id == id } }
         case .statuses(let c): index = id.flatMap { id in c.candidates.firstIndex { $0.id == id } }
+        case .updated(let c): index = id.flatMap { id in c.candidates.firstIndex { $0.id == id } }
         }
         return moved(by: (index ?? 0) - selection)
     }

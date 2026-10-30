@@ -1,9 +1,9 @@
 import Foundation
 
 /// The rest of a qualifier that the word before the caret starts (`sta` → `tus:`), drawn after the caret in
-/// the search field; Tab writes it. Only `status:` and `label:`: `is` is too common a title word.
+/// the search field; Tab writes it. Only `status:`, `label:` and `updated:`: `is` is too common a title word.
 public struct QualifierGhost: Equatable, Sendable {
-    /// `status:` or `label:`.
+    /// `status:`, `label:` or `updated:`.
     public let qualifier: String
     /// What the field draws after the caret.
     public let remainder: String
@@ -22,7 +22,7 @@ public struct QualifierGhost: Equatable, Sendable {
               term.value.count >= minimumWord
         else { return nil }
         let word = term.value.lowercased()
-        let qualifiers = (statuses ? [QueryScanner.statusQualifier] : []) + [QueryScanner.labelQualifier]
+        let qualifiers = (statuses ? [QueryScanner.statusQualifier] : []) + [QueryScanner.labelQualifier, QueryScanner.updatedQualifier]
         guard let qualifier = qualifiers.first(where: { $0.dropLast().hasPrefix(word) }) else { return nil }
         return QualifierGhost(
             qualifier: qualifier, remainder: String(qualifier.dropFirst(word.count)),
