@@ -58,6 +58,13 @@ import Testing
         #expect(TimeStep.today.start(now: now, calendar: santiago) == santiago.startOfDay(for: now))
     }
 
+    /// Nuuk skips 23:00 on 2026-03-28: a late `now` must still land on that day, not the one after.
+    @Test func stepStartWhereNowsHourIsSkipped() {
+        let nuuk = Self.calendar("America/Nuuk")
+        let now = Self.date(2026, 3, 30, 23, in: nuuk)
+        #expect(TimeStep.threeDays.start(now: now, calendar: nuuk) == Self.date(2026, 3, 28, in: nuuk))
+    }
+
     @Test func stepStartFollowsTimeZone() {
         let now = Date(timeIntervalSince1970: 1_798_632_000)
         let auckland = TimeStep.today.start(now: now, calendar: Self.calendar("Pacific/Auckland"))
