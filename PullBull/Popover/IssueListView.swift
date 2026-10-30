@@ -63,7 +63,8 @@ struct IssueListView: View {
                                 rows(group.issues, inRepoGroup: group.isRepo)
                             }
                         } header: {
-                            IssueGroupHeader(model: model, group: group, fold: fold(group, folded: folded))
+                            IssueGroupHeader(
+                                model: model, group: group, fold: fold(group, folded: folded), menus: .list)
                                 .pinnedHeaderBackground()
                         }
                     }
@@ -114,57 +115,6 @@ struct IssueListView: View {
         ListSectionHeader(
             glyph: "checkmark.circle", title: "Done", count: group.issues.count, note: doneNote,
             fold: .init(isOpen: doneExpanded) { doneExpanded.toggle() }, compact: compact)
-    }
-}
-
-private extension IssueGroup {
-    /// A repo group, whose header names the repo its rows are in.
-    var isRepo: Bool {
-        if case .repo = kind { return true }
-        return false
-    }
-}
-
-/// A group's header: its Status, "No status", "Not on board" or repo, with the lane's fold.
-private struct IssueGroupHeader: View {
-    let model: AppModel
-    let group: IssueGroup
-    /// A lane's fold; nil for headers that don't fold.
-    var fold: ListSectionHeader.Fold? = nil
-
-    /// Only a repo group's header offers the repo focus.
-    private var focusItem: FocusMenuItem? {
-        guard case .repo(let repo) = group.kind else { return nil }
-        return FocusMenuItem(model: model, repo: repo)
-    }
-
-    var body: some View {
-        ListSectionHeader(
-            glyph: symbol, glyphColor: symbolColor, title: group.title,
-            count: group.counted ? group.issues.count : nil, fold: fold, compact: model.settings.compact)
-            .focusContextMenu(focusItem, time: TimeFocusMenu(model: model), openAll: openAll)
-    }
-
-    /// Every lane and repo group offers it; the merged untitled group has no header.
-    private var openAll: BulkOpenItem? {
-        BulkOpenItem(urls: group.issues.map(\.url))
-    }
-
-    /// Status lanes take the owner's Status colour; the colour is decorative, the title names the status.
-    private var symbolColor: Color {
-        guard case .status(let option) = group.kind, let color = option.color else { return .secondary }
-        return Palette.statusOptionColor(color)
-    }
-
-    private var symbol: String {
-        switch group.kind {
-        case .status(let option): return BoardStatusGlyph.symbol(forStatusNamed: option.name)
-        case .noStatus: return "circle.dotted"
-        case .notOnBoard: return BoardStatusGlyph.notOnBoard
-        case .repo: return "book.closed"
-        case .all: return "list.bullet"
-        case .done: return "checkmark.circle"
-        }
     }
 }
 

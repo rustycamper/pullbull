@@ -79,6 +79,19 @@ private let issueTabs = BuiltIssueTabs(
         #expect(SearchScope.issues(.created).isNarrowed)
     }
 
+    /// The scope tab, else the tab typing started on when it is in the shown mode, else the shown tab.
+    @Test func reference() {
+        #expect(SearchScope.reference(
+            scope: .pullRequests(.mine), startedOn: .pullRequests(.review), shown: .pullRequests(.review))
+            == .pullRequests(.mine))
+        #expect(SearchScope.reference(
+            scope: .everything, startedOn: .pullRequests(.review), shown: .pullRequests(.mine))
+            == .pullRequests(.review))
+        #expect(SearchScope.reference(scope: .everything, startedOn: .issues(.board), shown: .pullRequests(.team))
+            == .pullRequests(.team))
+        #expect(SearchScope.reference(scope: .everything, startedOn: nil, shown: .issues(.created)) == .issues(.created))
+    }
+
     // MARK: Items and results
 
     @Test func aPRTabListsEveryRowAndMineItsRecentlyClosed() {

@@ -1,8 +1,9 @@
 import SwiftUI
 import PullBullKit
 
-/// The current mode's search results in two groups (open and closed-or-merged PRs, or open and closed
-/// issues), with an explicit state: "Searching…", the line pointing to the other mode when only its kind
+/// The current mode's search results laid out as the reference tab lays out its list (its repo, author
+/// or Status groups and headers, and Done), then the merged and closed ones under a folding Closed
+/// section, with an explicit state: "Searching…", the line pointing to the other mode when only its kind
 /// matches, the no-match message, or the remote failure. Narrowed to a tab, the context line names it and
 /// the no-match state offers everything instead.
 struct SearchResultsView: View {
@@ -20,7 +21,7 @@ struct SearchResultsView: View {
                         if let message = results.failure(in: model.mode) {
                             FailureBanner(message: message)
                         }
-                        groups(results)
+                        groups
                         if let note = results.truncationNote {
                             Text(note)
                                 .font(.system(size: 11))
@@ -144,7 +145,7 @@ struct SearchResultsView: View {
     /// The tab the results are narrowed to; nil for everything.
     private var scopeTitle: String? { model.searchScopeTitle }
 
-    private var matchCount: Int { model.searchItemKeys.count }
+    private var matchCount: Int { model.searchMatchCount }
 
     private var contextText: String {
         // The filter row above names the focus.
@@ -271,66 +272,131 @@ struct SearchResultsView: View {
 
     // MARK: Groups
 
-    @ViewBuilder private func groups(_ results: SearchResults) -> some View {
+    @ViewBuilder private var groups: some View {
         switch model.mode {
-        case .pullRequests: prGroups(results)
-        case .issues: issueGroups(results)
+        case .pullRequests:
+            if let layout = model.searchPRLayout { prGroups(layout) }
+        case .issues:
+            if let layout = model.searchIssueLayout { issueGroups(layout) }
         }
     }
 
-    @ViewBuilder private func prGroups(_ results: SearchResults) -> some View {
-        prGroup("Open pull requests", results.openPRs)
-        prGroup("Closed and merged pull requests", results.closedPRs)
-    }
-
-    @ViewBuilder private func issueGroups(_ results: SearchResults) -> some View {
-        issueGroup("Open issues", results.openIssues)
-        issueGroup("Closed issues", results.closedIssues)
-    }
-
-    @ViewBuilder private func prGroup(_ title: String, _ prs: [PullRequest]) -> some View {
-        if !prs.isEmpty {
-            Section {
-                ForEach(prs) { pr in
-                    PRRow(
-                        model: model, row: Row(pr: pr, dimmed: false, counted: false),
-                        context: .search(words: words, role: role(of: pr), viewer: viewer),
-                        compact: model.settings.compact, now: now,
-                        selected: model.searchSelection == pr.key, wantedLabels: labels)
-                    .scrollTarget(pr.key, clearance: PinnedHeader.clearance)
+    @ViewBuilder private func prGroups(_ layout: SearchPRLayout) -> some View {
+        let rows = layout.contents.rows
+        switch layout.grouping {
+        case .repository:
+            ForEach(ListNavigation.repoGroups(rows), id: \.repo) { group in
+                Section {
+                    prRows(group.rows.map(\.pr))
+                } header: {
+                    RepoGroupHeader(model: model, repo: group.repo, rows: group.rows, menus: .none)
+                        .pinnedHeaderBackground()
                 }
-            } header: {
-                groupHeader(title, count: prs.count)
+            }
+        case .author:
+            ForEach(ListNavigation.authorGroups(rows), id: \.author) { group in
+                Section {
+                    prRows(group.rows.map(\.pr))
+                } header: {
+                    AuthorGroupHeader(model: model, author: group.author, rows: group.rows, menus: .none)
+                        .pinnedHeaderBackground()
+                }
+            }
+        case .none:
+            // Ungrouped rows have no header to clear.
+            prRows(rows.map(\.pr), clearance: 0)
+                .padding(.top, 6)
+        }
+        if !layout.ended.isEmpty {
+            closedSection(title: "Closed and merged", count: layout.ended.count) {
+                prRows(layout.ended)
             }
         }
     }
 
-    @ViewBuilder private func issueGroup(_ title: String, _ issues: [BoardIssue]) -> some View {
-        if !issues.isEmpty {
+    @ViewBuilder private func issueGroups(_ layout: SearchIssueLayout) -> some View {
+        let groups = layout.contents.groups
+        ForEach(groups.filter { $0.kind != .done }) { group in
+            // Under a focus the kit merges repo groups into one untitled group.
+            if group.title.isEmpty {
+                Color.clear.frame(height: 6)
+                // No header pins above it, so there is none to clear.
+                issueRows(group.issues, clearance: 0)
+            } else {
+                Section {
+                    issueRows(group.issues)
+                } header: {
+                    // Lanes never fold while searching, so their headers have no chevron.
+                    IssueGroupHeader(model: model, group: group, fold: nil, menus: .none)
+                        .pinnedHeaderBackground()
+                }
+            }
+        }
+        if let done = groups.first(where: { $0.kind == .done }) {
             Section {
-                ForEach(issues) { issue in
-                    SearchIssueRow(
-                        issue: issue, words: words, labels: labels, role: role(of: issue), now: now,
-                        compact: model.settings.compact,
-                        selected: model.searchSelection == issue.key, flashing: model.rowFlash.key == issue.key
-                    ) {
-                        if PRActions.commandClicked { model.openSearchResultOnGitHub(issue) } else { model.openSearchResult(issue) }
-                    }
-                    .issueContextMenu(
-                        issue, focus: FocusMenuItem(model: model, repo: issue.key.repo),
-                        person: .person(model: model, login: issue.author))
-                    .scrollTarget(issue.key, clearance: PinnedHeader.clearance)
+                if model.searchExpansion.done {
+                    issueRows(done.issues)
                 }
             } header: {
-                groupHeader(title, count: issues.count)
+                ListSectionHeader(
+                    glyph: "checkmark.circle", title: "Done", count: done.issues.count, note: "still open",
+                    fold: .init(isOpen: model.searchExpansion.done) { model.toggleSearchDone() },
+                    compact: model.settings.compact)
+                    .pinnedHeaderBackground()
+            }
+        }
+        if !layout.ended.isEmpty {
+            closedSection(title: "Closed", count: layout.ended.count) {
+                issueRows(layout.ended)
             }
         }
     }
 
-    /// An open or closed group's header; search groups never fold.
-    private func groupHeader(_ title: String, count: Int) -> some View {
-        ListSectionHeader(glyph: nil, title: title, count: count, compact: model.settings.compact)
-            .pinnedHeaderBackground()
+    /// The merged and closed results under a hairline, folded with the header's chevron.
+    @ViewBuilder private func closedSection<Rows: View>(
+        title: String, count: Int, @ViewBuilder rows: () -> Rows
+    ) -> some View {
+        Hairline()
+            .padding(.horizontal, 8)
+            .padding(.top, 6)
+        Section {
+            if model.searchExpansion.closed {
+                rows()
+            }
+        } header: {
+            ListSectionHeader(
+                glyph: nil, title: title, count: count,
+                fold: .init(isOpen: model.searchExpansion.closed) { model.toggleSearchClosed() },
+                compact: model.settings.compact)
+                .pinnedHeaderBackground()
+        }
+    }
+
+    private func prRows(_ prs: [PullRequest], clearance: CGFloat = PinnedHeader.clearance) -> some View {
+        ForEach(prs) { pr in
+            PRRow(
+                model: model, row: Row(pr: pr, dimmed: false, counted: false),
+                context: .search(words: words, role: role(of: pr), viewer: viewer),
+                compact: model.settings.compact, now: now,
+                selected: model.searchSelection == pr.key, wantedLabels: labels)
+            .scrollTarget(pr.key, clearance: clearance)
+        }
+    }
+
+    private func issueRows(_ issues: [BoardIssue], clearance: CGFloat = PinnedHeader.clearance) -> some View {
+        ForEach(issues) { issue in
+            SearchIssueRow(
+                issue: issue, words: words, labels: labels, role: role(of: issue), now: now,
+                compact: model.settings.compact,
+                selected: model.searchSelection == issue.key, flashing: model.rowFlash.key == issue.key
+            ) {
+                if PRActions.commandClicked { model.openSearchResultOnGitHub(issue) } else { model.openSearchResult(issue) }
+            }
+            .issueContextMenu(
+                issue, focus: FocusMenuItem(model: model, repo: issue.key.repo),
+                person: .person(model: model, login: issue.author))
+            .scrollTarget(issue.key, clearance: clearance)
+        }
     }
 }
 
@@ -369,7 +435,7 @@ struct SearchFooter: View {
     }
 
     private var countText: String {
-        let count = model.searchItemKeys.count
+        let count = model.searchMatchCount
         guard let results = model.searchResults, count > 0 || results.phase != .searching else { return "" }
         return count == 1 ? "1 result" : "\(count) results"
     }

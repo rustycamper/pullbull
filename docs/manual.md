@@ -100,7 +100,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - **Status lanes:** the glyph takes the Status colour set on the board, on Board and Assigned
 - **Fold a lane:** click its header. Status, "No status" and "Not on board" fold; repo groups don't. Needs a board
 - **Folds:** kept per tab and per board, across relaunches. Folding on Board leaves Assigned as it is
-- **Searching:** every lane shows open; folds come back when the search ends
+- **Searching:** every lane shows open; folds come back when the search ends; open issues done on the board show under Done, closed ones under Closed
 - **Done:** click its header to unfold. Never counted
 - **Labels:** chips as on [pull requests](#pull-requests). The board card lists them all
 - **Switch board:** on the Board tab, click its name in the filter row, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd>
@@ -134,7 +134,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - With `status:`, PRs and issues not on the board don't match
 - `-status:` keeps PRs and issues not on the board
 - `#123` and links work only on their own
-- Results span all tabs; click a tab to narrow
+- Results are laid out like the tab you're on, or the one you narrowed to: the same repo, author or Status groups and headers. Merged and closed items follow in **Closed and merged** (issues: **Closed**), open until you fold it for this search. Results span all tabs; click a tab to narrow
 - **Right-click a result:** copy branch (PRs), link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · search author. The checkout, files and failing check items are on PRs. Search author replaces the query; show only this repo keeps it and searches that repo
 - PR results show changes requested, conflicts and comments, and **Ready to merge** on yours
 - Compact cards (Settings → General) apply to results too: one line each, with checks on open PRs and the Status on issues

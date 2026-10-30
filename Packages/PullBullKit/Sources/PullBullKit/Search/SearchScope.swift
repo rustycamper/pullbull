@@ -18,6 +18,14 @@ public enum SearchScope: Hashable, Sendable {
         }
     }
 
+    /// The tab whose layout the results take: the `scope` tab when narrowed, else the tab typing started
+    /// on when it is in `shown`'s mode, else `shown`, the current mode's selected tab.
+    public static func reference(scope: SearchScope, startedOn: SearchScope?, shown: SearchScope) -> SearchScope {
+        if scope.isNarrowed { return scope }
+        if let startedOn, startedOn.mode == shown.mode { return startedOn }
+        return shown
+    }
+
     /// A tab clicked during a search: narrows to it, or back to everything when it is the scope already.
     public func picking(_ tab: SearchScope) -> SearchScope {
         tab == self ? .everything : tab
