@@ -18,7 +18,10 @@ struct PRListView: View {
     /// What the focus leaves listed: the rows, and on Mine the recently closed PRs.
     private var scopedTotal: Int { contents.rows.count + (tab == .mine ? recentlyClosed.count : 0) }
     /// A focus hides every open row but leaves recently closed ones: the section stands in for the empty state.
-    private var closedOnly: Bool { contents.rows.isEmpty && focus.isActive && tab == .mine && !recentlyClosed.isEmpty }
+    /// With no open PRs at all nothing is hidden, so the empty state stays, as it does without a focus.
+    private var closedOnly: Bool {
+        contents.rows.isEmpty && focus.isActive && tab == .mine && !recentlyClosed.isEmpty && scoped.hiddenCount > 0
+    }
     /// The section holds the last 7×24 hours; a step that starts later, the week included, says so.
     private var closedWindow: String {
         guard let step = focus.time?.step, step.daysBack <= 6 else { return "Last 7 days" }
