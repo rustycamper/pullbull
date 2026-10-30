@@ -135,6 +135,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - `-status:` keeps PRs and issues not on the board
 - `#123` and links work only on their own
 - Results are laid out like the tab you're on, or the one you narrowed to: the same repo, author or Status groups and headers. Merged and closed items follow in **Closed and merged** (issues: **Closed**), open until you fold it for this search. Results span all tabs; click a tab to narrow
+- The footer says what is searched and how many match, with a spinner while GitHub answers. <kbd>⌥</kbd><kbd>⌘</kbd><kbd>↩</kbd> Ask AI shows there when it fits
 - **Right-click a result:** copy branch (PRs), link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · search author. The checkout, files and failing check items are on PRs. Search author replaces the query; show only this repo keeps it and searches that repo
 - PR results show changes requested, conflicts and comments, and **Ready to merge** on yours
 - Compact cards (Settings → General) apply to results too: one line each, with checks on open PRs and the Status on issues

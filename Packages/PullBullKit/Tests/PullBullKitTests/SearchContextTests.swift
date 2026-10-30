@@ -3,6 +3,12 @@ import Testing
 @testable import PullBullKit
 
 @Suite struct SearchContextTests {
+    @Test func footerTextAddsMatches() {
+        #expect(SearchContext.footerText("Titles in all of acme", matches: 3) == "Titles in all of acme · 3 matches")
+        #expect(SearchContext.footerText("Titles in all of acme", matches: 1) == "Titles in all of acme · 1 match")
+        #expect(SearchContext.footerText("Titles in all of acme", matches: nil) == "Titles in all of acme")
+    }
+
     /// A focused search names the repo instead of the whole org; the rest of the line is unchanged.
     @Test func focusedNamesTheRepo() {
         #expect(SearchContext.text(

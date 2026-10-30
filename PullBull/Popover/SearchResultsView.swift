@@ -4,7 +4,7 @@ import PullBullKit
 /// The current mode's search results laid out as the reference tab lays out its list (its repo, author
 /// or Status groups and headers, and Done), then the merged and closed ones under a folding Closed
 /// section, with an explicit state: "Searching…", the line pointing to the other mode when only its kind
-/// matches, the no-match message, or the remote failure. Narrowed to a tab, the context line names it and
+/// matches, the no-match message, or the remote failure. Narrowed to a tab, the footer's summary names it and
 /// the no-match state offers everything instead.
 struct SearchResultsView: View {
     let model: AppModel
@@ -13,9 +13,8 @@ struct SearchResultsView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                // Only the groups' headers pin; the context line, Ask line and banners scroll away.
+                // Only the groups' headers pin; the Ask line and banners scroll away.
                 LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
-                    contextLine
                     askLine
                     if let results = model.searchResults, !results.isEmpty(in: model.mode) {
                         if let message = results.failure(in: model.mode) {
@@ -79,44 +78,6 @@ struct SearchResultsView: View {
 
     // MARK: State
 
-    private var contextLine: some View {
-        HStack(spacing: 6) {
-            if model.searchStartedOnTab != nil, scopeTitle == nil {
-                Image(systemName: "keyboard")
-                    .font(.system(size: 10))
-                    .accessibilityHidden(true)
-            }
-            if let login = logins.first {
-                AvatarView(login: model.people.display(login), url: model.people.avatarURL(login), size: 14)
-                    .accessibilityHidden(true)
-            } else if !labels.isEmpty {
-                Image(systemName: "tag")
-                    .font(.system(size: 10))
-                    .accessibilityHidden(true)
-            }
-            Text(contextText)
-                .lineLimit(1)
-                .accessibilityLabel(contextLabel)
-            Spacer(minLength: 0)
-            if let results = model.searchResults, results.phase == .searching, !results.isEmpty(in: model.mode) {
-                ProgressView()
-                    .controlSize(.mini)
-                    .accessibilityLabel("Searching GitHub")
-            }
-            // Ask is offered only once a key is saved; ⌥⌘↩ is the one way to send anything to Anthropic.
-            if model.offersAsk {
-                Text("⌥⌘↩ Ask AI")
-                    .fixedSize()
-                    .accessibilityLabel("Option Command Return to Ask AI")
-            }
-        }
-        .font(.system(size: 11))
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 8)
-        .padding(.top, 10)
-        .frame(minHeight: 24)
-    }
-
     /// "Asking…" while an Ask runs, else its failure or the no-key notice; the normal results stay below.
     @ViewBuilder private var askLine: some View {
         if model.asking != nil {
@@ -144,44 +105,6 @@ struct SearchResultsView: View {
 
     /// The tab the results are narrowed to; nil for everything.
     private var scopeTitle: String? { model.searchScopeTitle }
-
-    private var matchCount: Int { model.searchMatchCount }
-
-    private var contextText: String {
-        // The filter row above names the focus.
-        if let scopeTitle {
-            return SearchContext.narrowedText(model.searchQuery, tab: scopeTitle, matches: matchCount)
-        }
-        // A pasted link names its own repository, whatever the focus.
-        if case .item(let repo, let n) = model.searchQuery { return "\(model.displayName(of: repo)) #\(n)" }
-        if let filter = model.searchQuery.filter {
-            return SearchContext.text(
-                filter: filter, org: org, repo: focusName, startedOnTab: model.searchStartedOnTab?.title)
-        }
-        // The filter row above names the focus too.
-        if let focusName {
-            if case .number(let n) = model.searchQuery { return "#\(n) in \(focusName)" }
-            if let tab = model.searchStartedOnTab { return "Started typing on \(tab.title) · searching \(focusName)" }
-            return "Titles in \(focusName)"
-        }
-        // Before the first launch has found an org there is no name to show; no-org mode searches the
-        // user's own repos.
-        let personal = model.snapshot.map { $0.scope.org == nil } ?? false
-        let repos = personal ? "your repos" : org.isEmpty ? "every repo" : "every \(org) repo"
-        let scope = personal ? "your repos" : org.isEmpty ? "the organization" : org
-        if case .number(let n) = model.searchQuery { return "#\(n) in \(repos)" }
-        if let tab = model.searchStartedOnTab { return "Started typing on \(tab.title) · searching all of \(scope)" }
-        return "Titles in all of \(scope)"
-    }
-
-    private var contextLabel: String {
-        if let scopeTitle {
-            return SearchContext.narrowedAccessibilityLabel(
-                model.searchQuery, tab: scopeTitle, matches: matchCount, repo: focusName)
-        }
-        guard let filter = model.searchQuery.filter else { return contextText }
-        return SearchContext.accessibilityLabel(filter: filter, org: org, repo: focusName)
-    }
 
     @ViewBuilder private var stateMessage: some View {
         let results = model.searchResults
@@ -400,30 +323,23 @@ struct SearchResultsView: View {
     }
 }
 
-/// The result count (or the arrow-key hint after typing anywhere) and the Return / Esc hints, in place of
-/// the list footer while searching.
+/// What the search covers and how many match, then the Ask AI, Return and Esc hints, in place of the list
+/// footer while searching. The Ask hint shows only when the whole line fits.
 struct SearchFooter: View {
     let model: AppModel
 
     var body: some View {
         HStack(spacing: 10) {
-            // "Copied" takes the leading hint's or count's place for a moment.
+            // "Copied" takes the summary's place for a moment.
             if let copied = CopyConfirmation.shared.message {
                 CopiedNote(message: copied)
                 Spacer()
-                hint(["↩"], returnLabel)
-                hint(["esc"], model.searchStartedOnTab.map { "Back to \($0.title)" } ?? "Clear")
-            } else if let tab = model.searchStartedOnTab {
-                hint(["↑", "↓"], "Select")
-                Spacer()
-                hint(["↩"], returnLabel)
-                hint(["esc"], "Back to \(tab.title)")
+                hints
             } else {
-                Text(countText)
-                    .monospacedDigit()
-                Spacer()
-                hint(["↩"], returnLabel)
-                hint(["esc"], "Clear")
+                ViewThatFits(in: .horizontal) {
+                    line(withAsk: model.offersAsk)
+                    line(withAsk: false)
+                }
             }
         }
         .font(.system(size: 11))
@@ -434,10 +350,23 @@ struct SearchFooter: View {
         .overlay(alignment: .top) { Hairline() }
     }
 
-    private var countText: String {
-        let count = model.searchMatchCount
-        guard let results = model.searchResults, count > 0 || results.phase != .searching else { return "" }
-        return count == 1 ? "1 result" : "\(count) results"
+    private func line(withAsk: Bool) -> some View {
+        HStack(spacing: 10) {
+            SearchSummary(model: model)
+            Spacer()
+            if withAsk {
+                // Ask is offered only once a key is saved; ⌥⌘↩ is the one way to send anything to Anthropic.
+                Text("⌥⌘↩ Ask AI")
+                    .fixedSize()
+                    .accessibilityLabel("Option Command Return to Ask AI")
+            }
+            hints
+        }
+    }
+
+    @ViewBuilder private var hints: some View {
+        hint(["↩"], returnLabel)
+        hint(["esc"], model.searchStartedOnTab.map { "Back to \($0.title)" } ?? "Clear")
     }
 
     /// Return follows the fallback line when it is all there is.
@@ -447,6 +376,106 @@ struct SearchFooter: View {
     }
 
     private func hint(_ keys: [String], _ label: String) -> some View { KeyHint(keys: keys, label: label) }
+}
+
+/// The footer's leading text: what the search covers and, once known, how many match, led by the
+/// started-typing, person or label glyph, and trailed by a spinner while GitHub answers.
+struct SearchSummary: View {
+    let model: AppModel
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if model.searchStartedOnTab != nil, scopeTitle == nil {
+                Image(systemName: "keyboard")
+                    .font(.system(size: 10))
+                    .accessibilityHidden(true)
+            }
+            if let login = logins.first {
+                AvatarView(login: model.people.display(login), url: model.people.avatarURL(login), size: 14)
+                    .accessibilityHidden(true)
+            } else if !labels.isEmpty {
+                Image(systemName: "tag")
+                    .font(.system(size: 10))
+                    .accessibilityHidden(true)
+            }
+            Text(contextText)
+                .monospacedDigit()
+                .lineLimit(1)
+                .layoutPriority(-1)
+                .accessibilityLabel(contextLabel)
+            if let results = model.searchResults, results.phase == .searching, !results.isEmpty(in: model.mode) {
+                ProgressView()
+                    .controlSize(.mini)
+                    .accessibilityLabel("Searching GitHub")
+            }
+        }
+    }
+
+    /// Where a number was looked up: the org, or "your repos" in no-org mode.
+    private var org: String {
+        guard let snapshot = model.snapshot else { return model.settings.org ?? "" }
+        return snapshot.scope.org ?? "your repos"
+    }
+
+    /// The focused repository's display name; nil unfocused.
+    private var focusName: String? { model.repoFocus.map { model.displayName(of: $0.repo) } }
+
+    private var logins: [String] { model.searchQuery.logins }
+
+    private var labels: [String] { model.searchQuery.labels }
+
+    /// The tab the results are narrowed to; nil for everything.
+    private var scopeTitle: String? { model.searchScopeTitle }
+
+    private var matchCount: Int { model.searchMatchCount }
+
+    /// The count of an unscoped search, once known; a narrowed text already ends with it.
+    private var matches: Int? {
+        guard let results = model.searchResults, matchCount > 0 || results.phase != .searching else { return nil }
+        return matchCount
+    }
+
+    private var contextText: String {
+        if let scopeTitle {
+            return SearchContext.narrowedText(model.searchQuery, tab: scopeTitle, matches: matchCount)
+        }
+        return SearchContext.footerText(coverage, matches: matches)
+    }
+
+    /// What an unscoped search covers.
+    private var coverage: String {
+        // A pasted link names its own repository, whatever the focus.
+        if case .item(let repo, let n) = model.searchQuery { return "\(model.displayName(of: repo)) #\(n)" }
+        if let filter = model.searchQuery.filter {
+            return SearchContext.text(
+                filter: filter, org: org, repo: focusName, startedOnTab: model.searchStartedOnTab?.title)
+        }
+        // The filter row above names the focus.
+        if let focusName {
+            if case .number(let n) = model.searchQuery { return "#\(n) in \(focusName)" }
+            if let tab = model.searchStartedOnTab { return "Started typing on \(tab.title) · searching \(focusName)" }
+            return "Titles in \(focusName)"
+        }
+        // Before the first launch has found an org there is no name to show; no-org mode searches the
+        // user's own repos.
+        let personal = model.snapshot.map { $0.scope.org == nil } ?? false
+        let repos = personal ? "your repos" : org.isEmpty ? "every repo" : "every \(org) repo"
+        let scope = personal ? "your repos" : org.isEmpty ? "the organization" : org
+        if case .number(let n) = model.searchQuery { return "#\(n) in \(repos)" }
+        if let tab = model.searchStartedOnTab { return "Started typing on \(tab.title) · searching all of \(scope)" }
+        return "Titles in all of \(scope)"
+    }
+
+    private var contextLabel: String {
+        if let scopeTitle {
+            return SearchContext.narrowedAccessibilityLabel(
+                model.searchQuery, tab: scopeTitle, matches: matchCount, repo: focusName)
+        }
+        let label = model.searchQuery.filter.map {
+            SearchContext.accessibilityLabel(filter: $0, org: org, repo: focusName)
+        } ?? coverage
+        return matches.map { label + ", " + SearchContext.matchCount($0) } ?? label
+    }
 }
 
 /// The completion list's keys, in place of the search or list footer while the list is open.
@@ -648,12 +677,12 @@ enum Highlight {
 }
 
 private extension View {
-    /// The Ask line's place under the context line: small, muted, and as wide as the rows.
+    /// The Ask line's place at the top of the results: small, muted, and as wide as the rows.
     func askLineStyle() -> some View {
         font(.system(size: 11))
             .foregroundStyle(.secondary)
             .padding(.horizontal, 8)
-            .padding(.top, 4)
+            .padding(.top, 6)
             .frame(maxWidth: .infinity, minHeight: 20, alignment: .leading)
     }
 }
