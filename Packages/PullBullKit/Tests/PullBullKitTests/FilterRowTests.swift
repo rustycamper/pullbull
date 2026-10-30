@@ -4,12 +4,12 @@ import Testing
 @Suite struct FilterRowTests {
     @Test func unfocusedShowsAllRepos() {
         let row = FilterRow.make(searching: false, listsBuilt: true, focusName: nil, timeTitle: nil, boardTitle: nil)
-        #expect(row == FilterRow(repoTitle: "All repos", isFocused: false, boardTitle: nil))
+        #expect(row == FilterRow(repoTitle: "All repos", isFocused: false, isRepoFocused: false, boardTitle: nil))
     }
 
     @Test func focusedShowsTheRepoName() {
         let row = FilterRow.make(searching: false, listsBuilt: true, focusName: "widgets", timeTitle: nil, boardTitle: nil)
-        #expect(row == FilterRow(repoTitle: "widgets", isFocused: true, boardTitle: nil))
+        #expect(row == FilterRow(repoTitle: "widgets", isFocused: true, isRepoFocused: true, boardTitle: nil))
     }
 
     @Test func boardTabAddsTheBoardPart() {
@@ -21,9 +21,9 @@ import Testing
     /// Search keeps the repo part, so ✕ clears the focus there too; search isn't board-scoped.
     @Test func searchShowsTheRepoPartOnly() {
         let all = FilterRow.make(searching: true, listsBuilt: true, focusName: nil, timeTitle: nil, boardTitle: "Roadmap")
-        #expect(all == FilterRow(repoTitle: "All repos", isFocused: false, boardTitle: nil))
+        #expect(all == FilterRow(repoTitle: "All repos", isFocused: false, isRepoFocused: false, boardTitle: nil))
         let focused = FilterRow.make(searching: true, listsBuilt: true, focusName: "widgets", timeTitle: nil, boardTitle: "Roadmap")
-        #expect(focused == FilterRow(repoTitle: "widgets", isFocused: true, boardTitle: nil))
+        #expect(focused == FilterRow(repoTitle: "widgets", isFocused: true, isRepoFocused: true, boardTitle: nil))
         #expect(FilterRow.make(searching: true, listsBuilt: false, focusName: nil, timeTitle: nil, boardTitle: nil) == nil)
     }
 
@@ -31,14 +31,14 @@ import Testing
     @Test func unbuiltListsShowTheRowOnlyWithAFocus() {
         #expect(FilterRow.make(searching: false, listsBuilt: false, focusName: nil, timeTitle: nil, boardTitle: nil) == nil)
         let row = FilterRow.make(searching: false, listsBuilt: false, focusName: "widgets", timeTitle: nil, boardTitle: "Roadmap")
-        #expect(row == FilterRow(repoTitle: "widgets", isFocused: true, boardTitle: nil))
+        #expect(row == FilterRow(repoTitle: "widgets", isFocused: true, isRepoFocused: true, boardTitle: nil))
     }
 
     @Test func spokenLabels() {
-        let all = FilterRow(repoTitle: "All repos", isFocused: false, boardTitle: "Roadmap")
+        let all = FilterRow(repoTitle: "All repos", isFocused: false, isRepoFocused: false, boardTitle: "Roadmap")
         #expect(all.spokenLabel(tally: "2 of 4 in Review") == "Showing all repositories")
         #expect(all.boardSpokenLabel == "Board, Roadmap")
-        let focused = FilterRow(repoTitle: "widgets", isFocused: true, boardTitle: nil)
+        let focused = FilterRow(repoTitle: "widgets", isFocused: true, isRepoFocused: true, boardTitle: nil)
         #expect(focused.spokenLabel(tally: "2 of 4 in Review") == "Showing only widgets. 2 of 4 in Review.")
         #expect(focused.spokenLabel(tally: nil) == "Showing only widgets.")
         #expect(focused.boardSpokenLabel == nil)
@@ -68,10 +68,21 @@ import Testing
     }
 
     @Test func spokenLabelsWithATimeFocus() {
-        let both = FilterRow(repoTitle: "widgets", isFocused: true, timeTitle: "Updated today", boardTitle: nil)
+        let both = FilterRow(repoTitle: "widgets", isFocused: true, isRepoFocused: true, timeTitle: "Updated today", boardTitle: nil)
         #expect(both.spokenLabel(tally: "2 of 4 in Review") == "Showing only widgets, updated today. 2 of 4 in Review.")
-        let time = FilterRow(repoTitle: "All repos", isFocused: true, timeTitle: "Updated today", boardTitle: nil)
+        let time = FilterRow(repoTitle: "All repos", isFocused: true, isRepoFocused: false, timeTitle: "Updated today", boardTitle: nil)
         #expect(time.spokenLabel(tally: nil) == "Showing all repositories, updated today.")
+    }
+
+    @Test func timeAloneIsNotRepoFocused() {
+        let time = FilterRow.make(
+            searching: false, listsBuilt: true, focusName: nil, timeTitle: "Updated today", boardTitle: nil)
+        #expect(time?.isFocused == true)
+        #expect(time?.isRepoFocused == false)
+        let repo = FilterRow.make(
+            searching: false, listsBuilt: true, focusName: "widgets", timeTitle: nil, boardTitle: nil)
+        #expect(repo?.isFocused == true)
+        #expect(repo?.isRepoFocused == true)
     }
 
     @Test func tally() {

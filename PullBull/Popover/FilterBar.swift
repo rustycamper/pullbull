@@ -22,7 +22,7 @@ struct FilterBar: View {
             // When tight, the board name truncates first.
             repoPart.layoutPriority(1)
             if let time = row.timeTitle {
-                timePart(time)
+                timePart(time).layoutPriority(-1)
             }
             if row.isFocused {
                 Button { model.clearFocus() } label: {
@@ -86,7 +86,7 @@ struct FilterBar: View {
         HStack(spacing: 6) {
             Image(systemName: "line.3.horizontal.decrease")
                 .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(row.isFocused ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+                .foregroundStyle(row.isRepoFocused ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
                 .accessibilityHidden(true)
             Button { showRepoMenu() } label: {
                 Text("\(row.repoTitle) ▾")
@@ -98,7 +98,7 @@ struct FilterBar: View {
             .background(MenuAnchorView(anchor: repoAnchor))
             .help("Change Repository")
         }
-        .foregroundStyle(row.isFocused ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+        .foregroundStyle(row.isRepoFocused ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(row.spokenLabel(tally: tally))
         .accessibilityAction(named: "Change Repository") { showRepoMenu() }

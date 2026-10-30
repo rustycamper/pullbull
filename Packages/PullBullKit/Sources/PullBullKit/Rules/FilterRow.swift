@@ -6,16 +6,19 @@ import Foundation
 public struct FilterRow: Equatable, Sendable {
     /// The repo part's label: "All repos", or the focused repository's display name.
     public let repoTitle: String
-    /// A repo or time focus is active: the repo label is tinted when it names a repository and ✕ clears both.
+    /// A repo or time focus is active: ✕ clears both.
     public let isFocused: Bool
+    /// A repo focus is active: the repo label is tinted.
+    public let isRepoFocused: Bool
     /// The time focus's strip text ("Updated today"), nil without one and in search.
     public let timeTitle: String?
     /// The board part's name, only on the Board tab while it offers the board menu, and never in search.
     public let boardTitle: String?
 
-    public init(repoTitle: String, isFocused: Bool, timeTitle: String? = nil, boardTitle: String?) {
+    public init(repoTitle: String, isFocused: Bool, isRepoFocused: Bool, timeTitle: String? = nil, boardTitle: String?) {
         self.repoTitle = repoTitle
         self.isFocused = isFocused
+        self.isRepoFocused = isRepoFocused
         self.timeTitle = timeTitle
         self.boardTitle = boardTitle
     }
@@ -33,7 +36,7 @@ public struct FilterRow: Equatable, Sendable {
         let time = searching ? nil : timeTitle
         guard listsBuilt || focusName != nil || time != nil else { return nil }
         return FilterRow(
-            repoTitle: focusName ?? allRepos, isFocused: focusName != nil || time != nil, timeTitle: time,
+            repoTitle: focusName ?? allRepos, isFocused: focusName != nil || time != nil, isRepoFocused: focusName != nil, timeTitle: time,
             boardTitle: listsBuilt && !searching ? boardTitle : nil)
     }
 
@@ -42,7 +45,7 @@ public struct FilterRow: Equatable, Sendable {
     /// with a time focus alone, "Showing all repositories" without.
     public func spokenLabel(tally: String?) -> String {
         guard isFocused else { return "Showing all repositories" }
-        let repo = repoTitle == Self.allRepos ? "Showing all repositories" : "Showing only \(repoTitle)"
+        let repo = isRepoFocused ? "Showing only \(repoTitle)" : "Showing all repositories"
         let time = timeTitle.map { ", " + $0.prefix(1).lowercased() + $0.dropFirst() } ?? ""
         return repo + time + "." + (tally.map { " \($0)." } ?? "")
     }
