@@ -53,7 +53,7 @@ struct PRListView: View {
                         EmptyTabView(model: model, tab: tab, now: now)
                     }
                 }
-                .frame(height: tab == .mine && !recentlyClosed.isEmpty ? 260 : 400)
+                .frame(height: EmptyListFrame.height(sectionBelow: tab == .mine && !recentlyClosed.isEmpty))
             } else if grouping == .repository {
                 ForEach(groups, id: \.repo) { group in
                     Section {

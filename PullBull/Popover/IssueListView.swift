@@ -48,7 +48,7 @@ struct IssueListView: View {
                         IssueEmptyView(model: model, tab: tab, now: now)
                     }
                 }
-                .frame(height: done == nil ? 400 : 260)
+                .frame(height: EmptyListFrame.height(sectionBelow: done != nil))
             } else {
                 let folded = foldedLanes
                 ForEach(listed) { group in
