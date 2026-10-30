@@ -17,8 +17,8 @@ public struct QualifierGhost: Equatable, Sendable {
     static let maximumUpdatedWord = 4
 
     /// The ghost for the word ending at `caret`, which must be the end of `text`: a plain word of at least
-    /// two letters that starts a qualifier's name, ignoring case; `updated:` only for two to four letters. `statuses` is false when the board has no
-    /// Status columns, so `status:` would have nothing to list.
+    /// two letters that starts a qualifier's name, ignoring case; `updated:` only for two to four letters.
+    /// `statuses` is false when the board has no Status columns, so `status:` would have nothing to list.
     public static func at(caret: Int, in text: String, statuses: Bool) -> QualifierGhost? {
         guard caret == text.utf16.count, let term = QueryScanner.terms(in: text).last,
               term.kind == .word, term.range.upperBound == text.endIndex,

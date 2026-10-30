@@ -70,8 +70,8 @@ struct FilterBar: View {
         .accessibilityAction(named: "Change Board") { showBoardMenu() }
     }
 
-    /// "◷ Updated today": a plain label, cut off with an ellipsis before the repo and board parts give way.
-    /// The step's short name; `help` is its full line with the start date.
+    /// "◷ Today", "◷ Last 3 days", …: the step's short name as a plain label, cut off with an ellipsis before
+    /// the repo and board parts give way. `help` is its full line, with the start date past Today.
     private func timePart(_ title: String, help: String) -> some View {
         HStack(spacing: 6) {
             Text("·")
