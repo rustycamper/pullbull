@@ -11,6 +11,15 @@ public struct RepoToken: Hashable, Sendable {
 
     public var token: String { "repo:\(text)" }
 
+    /// The text is one `owner/name`: a `/` between two non-empty parts of letters, digits, `.`, `-` and `_`.
+    public var isExact: Bool {
+        let parts = text.split(separator: "/", omittingEmptySubsequences: false)
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: ".-_"))
+        return parts.count == 2 && parts.allSatisfy {
+            !$0.isEmpty && $0.unicodeScalars.allSatisfy { $0.isASCII && allowed.contains($0) }
+        }
+    }
+
     /// `repo` is `owner/name`. With a `/` the whole of it has to match, else only the name part does; case
     /// is ignored.
     public func matches(repo: String) -> Bool {

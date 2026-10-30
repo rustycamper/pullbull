@@ -203,10 +203,11 @@ public struct SearchFilter: Equatable, Sendable {
     /// rows it keeps. An included condition or review sends its form only when GitHub's match holds every row
     /// the local one does (`is:failing`, `review:none`).
     ///
-    /// `repos` resolves the `repo:` terms. The included ones are sent when every one resolves to a known repo
-    /// (GitHub ORs them, as the local filter does), and not at all when a `focus` already names the one repo
-    /// searched, since GitHub would OR it with the focus. An excluded one is sent as `-repo:owner/name` only
-    /// when it resolves to one known repo, so GitHub never drops more than the local filter does.
+    /// `repos` resolves the `repo:` terms. A term is sent as the one known repo it resolves to, or as typed
+    /// when it names one `owner/name` exactly; a name no known repo has, or several do, isn't. The included ones
+    /// are sent when every one is sent (GitHub ORs them, as the local filter does), and not at all when a `focus`
+    /// already names the one repo searched, since GitHub would OR it with the focus. An excluded one is sent as
+    /// `-repo:owner/name` only when it is sent, so GitHub never drops more than the local filter does.
     ///
     /// GitHub ORs `repo:` with the `org:` or `user:` scope, so `SearchEngine.remoteQuery` sends the repos
     /// from `resolvedRepos` in place of the scope, and passes `includingRepos: false` to leave them out here.
@@ -226,7 +227,7 @@ public struct SearchFilter: Equatable, Sendable {
         parts += exclude.logins.map { "-author:\(Self.serverLogin($0))" }
         parts += SearchEngine.quoted(exclude.labels).map { "-label:\($0)" }
         parts += exclude.states.map { "-" + $0.token }
-        parts += Self.distinct(exclude.repos.compactMap { repos.resolve($0) }).map { "-repo:\($0)" }
+        parts += Self.distinct(exclude.repos.compactMap { Self.sent($0, repos) }).map { "-repo:\($0)" }
         return parts
     }
 
@@ -241,13 +242,20 @@ public struct SearchFilter: Equatable, Sendable {
         return Set((dated(include) + dated(exclude).map { "-" + $0 }).map { $0.lowercased() }).sorted()
     }
 
-    /// The `owner/name` of every included `repo:` term, when each resolves to one known repo and no focus
-    /// already names the repo searched; else none.
+    /// The `owner/name` of every included `repo:` term, when each is sent and no focus already names the repo
+    /// searched; else none.
     func resolvedRepos(_ repos: RepoIndex, focused: Bool) -> [String] {
         guard !focused, !include.repos.isEmpty else { return [] }
-        let resolved = include.repos.map { repos.resolve($0) }
+        let resolved = include.repos.map { Self.sent($0, repos) }
         guard resolved.allSatisfy({ $0 != nil }) else { return [] }
         return Self.distinct(resolved.compactMap { $0 })
+    }
+
+    /// The `owner/name` GitHub gets for `token`: the one known repo it resolves to, else the token as typed when
+    /// it names one `owner/name` exactly, since GitHub then matches the same repo the local filter does; nil for
+    /// a name no known repo has, or several do.
+    private static func sent(_ token: RepoToken, _ repos: RepoIndex) -> String? {
+        repos.resolve(token) ?? (token.isExact ? token.text : nil)
     }
 
     private static func distinct(_ repos: [String]) -> [String] {

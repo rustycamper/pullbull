@@ -135,6 +135,34 @@ private final class RecordingTransport: GraphQLTransport, @unchecked Sendable {
         #expect(try prQuery("repo:a repo:acme/a", known: ["acme/a"]) == "repo:acme/a is:pr sort:updated-desc")
     }
 
+    /// An exact `owner/name` the app hasn't seen is sent as typed; an ambiguous name still keeps the search local.
+    @Test func unknownExactRepoIsSent() throws {
+        let known = ["acme/widgets", "other/widgets"]
+        #expect(try prQuery("repo:cli/cli", known: known) == "repo:cli/cli is:pr sort:updated-desc")
+        #expect(
+            try prQuery("-repo:cli/cli", known: known) == "org:acme is:pr -repo:cli/cli sort:updated-desc")
+        #expect(
+            try prQuery("repo:cli/cli repo:acme/widgets", known: known)
+                == "repo:cli/cli repo:acme/widgets is:pr sort:updated-desc")
+        #expect(try prQuery("repo:cli/cli repo:widgets", known: known) == "org:acme is:pr sort:updated-desc")
+        #expect(
+            try prQuery("repo:cli/cli -repo:widgets", known: known) == "repo:cli/cli is:pr sort:updated-desc")
+        #expect(
+            try prQuery("-repo:cli/cli -repo:widgets", known: known)
+                == "org:acme is:pr -repo:cli/cli sort:updated-desc")
+        #expect(try prQuery("repo:a/b/c", known: known) == "org:acme is:pr sort:updated-desc")
+        #expect(try prQuery("repo:/cli", known: known) == "org:acme is:pr sort:updated-desc")
+    }
+
+    @Test func exactness() {
+        #expect(RepoToken(text: "cli/cli").isExact)
+        #expect(RepoToken(text: "my-org/repo.name_2").isExact)
+        #expect(!RepoToken(text: "cli").isExact)
+        #expect(!RepoToken(text: "cli/").isExact)
+        #expect(!RepoToken(text: "a/b/c").isExact)
+        #expect(!RepoToken(text: "a/b\"c").isExact)
+    }
+
     @Test func focusKeepsItsOwnRepo() throws {
         let q = try prQuery("repo:a -repo:b", known: ["acme/a", "acme/b"], focus: RepoFocus(repo: "acme/a"))
         #expect(q == "repo:acme/a is:pr -repo:acme/b sort:updated-desc")
@@ -174,6 +202,14 @@ private final class RecordingTransport: GraphQLTransport, @unchecked Sendable {
         let engine = SearchEngine(api: GitHubAPI(transport: transport, auth: StaticTokenSource("test-token")))
         for await _ in engine.results(.parse("repo:zzz"), snap: snapshot(["acme/widgets"])) {}
         #expect(transport.prBodies.isEmpty)
+    }
+
+    @Test func engineSendsAnUnknownExactRepo() async throws {
+        let transport = RecordingTransport()
+        let engine = SearchEngine(api: GitHubAPI(transport: transport, auth: StaticTokenSource("test-token")))
+        for await _ in engine.results(.parse("repo:cli/cli"), snap: snapshot(["acme/widgets"])) {}
+        let pr = try #require(transport.prBodies.first)
+        #expect(pr.contains("repo:cli/cli is:pr") && !pr.contains("org:acme"))
     }
 
     @Test func completionFromChoices() throws {

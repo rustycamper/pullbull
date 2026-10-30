@@ -78,7 +78,7 @@ More in the [manual](docs/manual.md#issues).
 | `is:failing` `is:ready` `review:changes` | Your PRs by what they need |
 | `is:unanswered` | Your PRs and issues waiting on your reply |
 | `size:s` `size:m` `size:l` | PRs by lines changed: up to 50, up to 300, more |
-| `repo:widgets` | Only that repo; save it with the search |
+| `repo:widgets` `repo:acme/widgets` | Only that repo; `owner/name` also finds repos PullBull hasn't seen. Save it with the search |
 | `status:prog` `status:"In progress"` | Issues in that Status column on the board |
 | `#123` | That number, in every repo |
 | a GitHub link | Exactly that PR or issue |

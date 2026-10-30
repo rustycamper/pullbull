@@ -120,7 +120,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 | `is:ready` `is:conflict` `is:failing` `is:approved` | Ready to merge · merge conflicts · checks failed · has an approval. PRs only |
 | `review:changes` `review:none` | Changes requested · no reviews yet. PRs only |
 | `size:s` `size:m` `size:l` | Lines changed: up to 50, up to 300, more. PRs only |
-| `repo:widgets` `repo:acme/widgets` | That repo. The name alone matches every owner's; several `repo:` match any of them. Saved searches keep it |
+| `repo:widgets` `repo:acme/widgets` | That repo. The name alone matches every owner's; several `repo:` match any of them. An exact `owner/name` goes to GitHub even for a repo PullBull hasn't seen; a name alone goes as the one known repo it names, and filters your lists only when no known repo or several have it. Saved searches keep it |
 | `is:unanswered` | Your open PRs and your Assigned or Created issues whose last comment is someone else's, not a bot's. Searches your lists only |
 | `status:prog` `status:"In progress"` | Status column on the board. Issues only |
 | `#123` | That number, every repo |
