@@ -13,6 +13,7 @@
   /* The field's placeholder reads at about secondary strength in the reference. */
   --placeholder: rgba(255, 255, 255, 0.6);
   --accent: #007aff;
+  --match: rgba(0, 122, 255, 0.22);
   --red: #ff4245;
   /* Palette */
   --secondary-text: rgba(255, 255, 255, 0.549);
@@ -63,6 +64,7 @@
   --separator: rgba(0, 0, 0, 0.098);
   --placeholder: rgba(0, 0, 0, 0.45);
   --accent: #007aff;
+  --match: rgba(0, 122, 255, 0.22);
   --red: #ff383c;
   /* Palette */
   --secondary-text: rgba(0, 0, 0, 0.6);
@@ -427,7 +429,7 @@ body {
 /* ---------- Search (SearchResultsView, CompletionList) ---------- */
 
 .below-header { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-.row strong, .closed-row strong { font-weight: 700; }
+.row strong, .closed-row strong { font-weight: 700; background: var(--match); }
 .caret { display: inline-block; width: 1.5px; height: 14px; margin-left: 1px; vertical-align: -2px; background: var(--accent); border-radius: 1px; }
 .keycap {
   display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 16px; padding: 0 6px;

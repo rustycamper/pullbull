@@ -598,7 +598,7 @@ private struct FailureBanner: View {
 }
 
 enum Highlight {
-    /// The title with every query word in bold.
+    /// The title with every query word in bold on a soft accent background.
     static func title(_ title: String, words: [String]) -> AttributedString {
         var attributed = AttributedString(title)
         for word in words where !word.isEmpty {
@@ -606,6 +606,7 @@ enum Highlight {
             while let range = title.range(of: word, options: .caseInsensitive, range: searchStart..<title.endIndex) {
                 if let attributedRange = Range(range, in: attributed) {
                     attributed[attributedRange].inlinePresentationIntent = .stronglyEmphasized
+                    attributed[attributedRange].backgroundColor = Palette.match
                 }
                 searchStart = range.upperBound
             }
