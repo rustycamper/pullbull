@@ -32,6 +32,7 @@ targets:
         CFBundleExecutable: PullBull
         CFBundlePackageType: APPL
         CFBundleShortVersionString: $(MARKETING_VERSION)
+        NSHumanReadableCopyright: "Copyright © 2026 rustycamper. MIT License."
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSMinimumSystemVersion: "14.0"
         LSUIElement: true
