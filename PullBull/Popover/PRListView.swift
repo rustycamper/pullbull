@@ -17,6 +17,13 @@ struct PRListView: View {
     private var focus: ListFocus { model.listFocus }
     /// What the focus leaves listed: the rows, and on Mine the recently closed PRs.
     private var scopedTotal: Int { contents.rows.count + (tab == .mine ? recentlyClosed.count : 0) }
+    /// A focus hides every open row but leaves recently closed ones: the section stands in for the empty state.
+    private var closedOnly: Bool { contents.rows.isEmpty && focus.isActive && tab == .mine && !recentlyClosed.isEmpty }
+    /// The section holds the last 7 days; a narrower time step says so.
+    private var closedWindow: String {
+        guard let step = focus.time?.step, step.daysBack < 6 else { return "Last 7 days" }
+        return step.stripTitle
+    }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -34,7 +41,7 @@ struct PRListView: View {
 
     private var list: some View {
         LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
-            if contents.rows.isEmpty {
+            if contents.rows.isEmpty && !closedOnly {
                 Group {
                     if focus.isActive, total > scopedTotal {
                         FocusedEmptyView(model: model, tabTitle: tab.title, hiddenCount: scoped.hiddenCount)
@@ -56,7 +63,7 @@ struct PRListView: View {
                 rows(contents.rows)
                     .padding(.top, 6)
             }
-            if !contents.rows.isEmpty && scoped.hiddenCount > 0 {
+            if (!contents.rows.isEmpty || closedOnly) && scoped.hiddenCount > 0 {
                 OtherReposLine(model: model, count: scoped.hiddenCount)
             }
             if tab == .mine && !recentlyClosed.isEmpty {
@@ -102,7 +109,7 @@ struct PRListView: View {
 
     private var closedHeader: some View {
         ListSectionHeader(
-            glyph: nil, title: "Recently closed", count: recentlyClosed.count, trailing: "Last 7 days",
+            glyph: nil, title: "Recently closed", count: recentlyClosed.count, trailing: closedWindow,
             fold: .init(isOpen: closedExpanded) { closedExpanded.toggle() }, compact: model.settings.compact)
     }
 
