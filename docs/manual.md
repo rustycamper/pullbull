@@ -127,7 +127,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 | `owner/repo#123` or a link | Exactly that item |
 | `updated:today` `3d` `1w` `1m` | Items active since 00:00 today, or 2, 6 or 29 days before. GitHub's date forms (`updated:>2026-10-01`, `updated:2026-10-01..2026-10-07`) go to GitHub as written and also filter locally; any other value goes to GitHub as written |
 | words | Title |
-| `-@bot` `-~wontfix` `-is:draft` `-status:done` `-updated:1w` | Not that. Works on every qualifier; a bare `-word` is a word. `-is:draft` and the other states still go to GitHub. These filter locally only and send nothing to GitHub: `-status:`, `-updated:`, `-is:ready`, `-is:conflict`, `-is:failing`, `-is:approved`, `-is:unanswered`, `-review:`, `size:` and `-size:`, and positive `is:ready`, `is:conflict`, `is:approved`, `review:changes` and a `repo:` that matches no known repo. The rest of the search still goes to GitHub, except with `is:unanswered`, which keeps the whole search in your lists |
+| `-@bot` `-~wontfix` `-is:draft` `-status:done` `-updated:1w` | Not that. Works on every qualifier; a bare `-word` is a word. `-is:draft` and the other states still go to GitHub. These filter locally only and send nothing to GitHub: `-status:`, `-updated:`, `-is:ready`, `-is:conflict`, `-is:failing`, `-is:approved`, `-is:unanswered`, `-review:`, `size:` and `-size:`, and positive `is:ready`, `is:conflict`, `is:approved` and `review:changes`. A `repo:` or `-repo:` name alone that matches no known repo, or several, filters locally only too; an exact `-repo:owner/name` is sent. The rest of the search still goes to GitHub, except with `is:unanswered` or `-is:unanswered`, which keep the whole search in your lists |
 
 - `@`, `~`, `is:`, `status:`, `updated:`, `review:`, `repo:`, `size:` and words combine; everything must match; a leading `-` excludes
 - `status:` uses the board shown in the Board tab. Unquoted matches part of a Status name, quoted the whole name; case is ignored. Names with spaces need quotes to match exactly
@@ -225,7 +225,7 @@ Settings → Ask AI.
 | List | |
 |---|---|
 | <kbd>↑</kbd> <kbd>↓</kbd> | Select |
-| <kbd>⌥</kbd><kbd>↑</kbd> <kbd>⌥</kbd><kbd>↓</kbd> | Previous / next group (repo, author, lane). Folded lanes are skipped; nothing without groups |
+| <kbd>⌥</kbd><kbd>↑</kbd> <kbd>⌥</kbd><kbd>↓</kbd> | Previous / next group (repo, author, lane). Folded lanes are skipped; nothing without groups. In search results, one row, as <kbd>↑</kbd> <kbd>↓</kbd> |
 | <kbd>⌘</kbd><kbd>↑</kbd> <kbd>⌘</kbd><kbd>↓</kbd> | First / last row |
 | <kbd>←</kbd> <kbd>→</kbd> | Previous / next tab |
 | <kbd>Return</kbd> | Detail |
@@ -312,7 +312,7 @@ Reopen within a minute and the detail is still there.
 | | Status changed on the board | off |
 | | Closed or reopened | on |
 
-CI failed and Ready to merge arrive within about 30 s while your checks run. Your own comments, moves and closes never notify. Several comments on one issue between refreshes make one notification ("3 new comments"). Status changes count on the board the Board tab shows, as "In Progress → In Review"; moves the board's automation makes after a close or a merge don't notify, the close does.
+With Settings → General → Check my pending CI more often, CI failed and Ready to merge arrive within about 30 s while your checks run: for up to 5 of your PRs, for 20 minutes each, and not at a 1-minute refresh interval. Your own comments, moves and closes never notify. Several comments on one issue between refreshes make one notification ("3 new comments"). Status changes count on the board the Board tab shows, as "In Progress → In Review"; moves the board's automation makes after a close or a merge don't notify, the close does.
 
 Click a notification to open the detail.
 

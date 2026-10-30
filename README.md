@@ -75,7 +75,7 @@ More in the [manual](docs/manual.md#issues).
 | `@alice` | PRs alice authored or reviews, issues they opened or are assigned |
 | `~bug` | Items with that label |
 | `is:open` `is:closed` `is:merged` `is:draft` | Items in that state |
-| `is:failing` `is:ready` `review:changes` | Your PRs by what they need |
+| `is:failing` `is:ready` `review:changes` | PRs by what they need |
 | `is:unanswered` | Your PRs and issues waiting on your reply |
 | `size:s` `size:m` `size:l` | PRs by lines changed: up to 50, up to 300, more |
 | `repo:widgets` `repo:acme/widgets` | Only that repo; `owner/name` also finds repos PullBull hasn't seen. Save it with the search |
