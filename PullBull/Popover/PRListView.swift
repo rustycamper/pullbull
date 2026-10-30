@@ -14,7 +14,7 @@ struct PRListView: View {
     @Binding var closedExpanded: Bool
 
     private var contents: TabContents { scoped.contents }
-    private var focus: RepoFocus? { model.repoFocus }
+    private var focus: ListFocus { model.listFocus }
     /// What the focus leaves listed: the rows, and on Mine the recently closed PRs.
     private var scopedTotal: Int { contents.rows.count + (tab == .mine ? recentlyClosed.count : 0) }
 
@@ -35,9 +35,8 @@ struct PRListView: View {
         LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
             if contents.rows.isEmpty {
                 Group {
-                    if let focus, total > scopedTotal {
-                        FocusedEmptyView(
-                            model: model, repoName: model.displayName(of: focus.repo), tabTitle: tab.title, hiddenCount: scoped.hiddenCount)
+                    if focus.isActive, total > scopedTotal {
+                        FocusedEmptyView(model: model, tabTitle: tab.title, hiddenCount: scoped.hiddenCount)
                     } else {
                         EmptyTabView(model: model, tab: tab, now: now)
                     }

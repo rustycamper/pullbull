@@ -1,18 +1,22 @@
 import Foundation
 
 /// The row at the top of every list: "▦ Roadmap ▾ · ▤ All repos ▾" on the Board tab, "▤ All repos ▾"
-/// elsewhere, "▤ widgets ▾ ✕" with a repo focus. Each part opens its menu.
+/// elsewhere, "▤ widgets ▾ ✕" with a repo focus. Each part opens its menu; a time focus adds a plain label
+/// ("◷ Updated today") after the repo part.
 public struct FilterRow: Equatable, Sendable {
     /// The repo part's label: "All repos", or the focused repository's display name.
     public let repoTitle: String
-    /// A repo focus is active: the label is tinted and ✕ clears it.
+    /// A repo or time focus is active: the repo label is tinted when it names a repository and ✕ clears both.
     public let isFocused: Bool
+    /// The time focus's strip text ("Updated today"), nil without one and in search.
+    public let timeTitle: String?
     /// The board part's name, only on the Board tab while it offers the board menu, and never in search.
     public let boardTitle: String?
 
-    public init(repoTitle: String, isFocused: Bool, boardTitle: String?) {
+    public init(repoTitle: String, isFocused: Bool, timeTitle: String? = nil, boardTitle: String?) {
         self.repoTitle = repoTitle
         self.isFocused = isFocused
+        self.timeTitle = timeTitle
         self.boardTitle = boardTitle
     }
 
@@ -20,22 +24,27 @@ public struct FilterRow: Equatable, Sendable {
 
     /// The row for the list or search results on screen; nil while there is nothing to filter yet (the
     /// loading or error state fills the popover) unless a focus is active, so ✕ stays in reach. Search
-    /// shows the repo part only, as it isn't board-scoped. `focusName` is the focused repository's display
-    /// name; `boardTitle` is given only on the Board tab while it offers the board menu.
+    /// shows the repo part only, as it isn't board-scoped and ignores the tab's time focus. `focusName` is
+    /// the focused repository's display name; `timeTitle` the time focus's strip text; `boardTitle` is given
+    /// only on the Board tab while it offers the board menu.
     public static func make(
-        searching: Bool, listsBuilt: Bool, focusName: String?, boardTitle: String?
+        searching: Bool, listsBuilt: Bool, focusName: String?, timeTitle: String?, boardTitle: String?
     ) -> FilterRow? {
-        guard listsBuilt || focusName != nil else { return nil }
+        let time = searching ? nil : timeTitle
+        guard listsBuilt || focusName != nil || time != nil else { return nil }
         return FilterRow(
-            repoTitle: focusName ?? allRepos, isFocused: focusName != nil,
+            repoTitle: focusName ?? allRepos, isFocused: focusName != nil || time != nil, timeTitle: time,
             boardTitle: listsBuilt && !searching ? boardTitle : nil)
     }
 
-    /// VoiceOver's label for the repo part: "Showing only widgets. 2 of 4 in Review." with a focus
-    /// (the tally only when the tab has one), "Showing all repositories" without.
-    public func repoSpokenLabel(tally: String?) -> String {
+    /// VoiceOver's label for the repo and time parts: "Showing only widgets, updated today. 2 of 4 in
+    /// Review." with both (the tally only when the tab has one), "Showing all repositories, updated today."
+    /// with a time focus alone, "Showing all repositories" without.
+    public func spokenLabel(tally: String?) -> String {
         guard isFocused else { return "Showing all repositories" }
-        return "Showing only \(repoTitle)." + (tally.map { " \($0)." } ?? "")
+        let repo = repoTitle == Self.allRepos ? "Showing all repositories" : "Showing only \(repoTitle)"
+        let time = timeTitle.map { ", " + $0.prefix(1).lowercased() + $0.dropFirst() } ?? ""
+        return repo + time + "." + (tally.map { " \($0)." } ?? "")
     }
 
     /// VoiceOver's label for the board part: "Board, Roadmap".

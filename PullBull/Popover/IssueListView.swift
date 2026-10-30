@@ -15,7 +15,7 @@ struct IssueListView: View {
     @Binding var doneExpanded: Bool
 
     private var contents: IssueTabContents { scoped.contents }
-    private var focus: RepoFocus? { model.repoFocus }
+    private var focus: ListFocus { model.listFocus }
     private var listed: [IssueGroup] { contents.groups.filter { $0.kind != .done } }
     private var done: IssueGroup? { contents.groups.first { $0.kind == .done } }
     /// Board and Assigned lanes folded to their header; none while a search is active.
@@ -41,9 +41,8 @@ struct IssueListView: View {
         LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
             if listed.isEmpty {
                 Group {
-                    if let focus, total > contents.issues.count {
-                        FocusedEmptyView(
-                            model: model, repoName: model.displayName(of: focus.repo), tabTitle: tab.title, hiddenCount: scoped.hiddenCount)
+                    if focus.isActive, total > contents.issues.count {
+                        FocusedEmptyView(model: model, tabTitle: tab.title, hiddenCount: scoped.hiddenCount)
                     } else {
                         IssueEmptyView(model: model, tab: tab, now: now)
                     }
@@ -94,7 +93,7 @@ struct IssueListView: View {
         let wantedLabels = model.searchQuery.labels
         return ForEach(issues) { issue in
             IssueRow(model: model, issue: issue, tab: tab, now: now, selected: model.listSelection == issue.key,
-                     inRepoGroup: inRepoGroup || focus != nil, wantedLabels: wantedLabels)
+                     inRepoGroup: inRepoGroup || model.repoFocus != nil, wantedLabels: wantedLabels)
                 .scrollTarget(issue.key, clearance: clearance)
         }
     }

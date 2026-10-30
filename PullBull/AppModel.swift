@@ -72,13 +72,17 @@ final class AppModel {
     private(set) var modeNews = ModeNews()
 
     var selectedTab: PRTab {
-        didSet { if settings.lastTab != selectedTab { settings.lastTab = selectedTab } }
+        didSet {
+            if settings.lastTab != selectedTab { settings.lastTab = selectedTab }
+            if selectedTab != oldValue { timeFocus = nil }
+        }
     }
     /// Pull Requests or Issues; remembered across launches, as is the tab of each mode.
     var mode: PopoverMode {
         didSet {
             if settings.mode != mode { settings.mode = mode }
             guard mode != oldValue else { return }
+            timeFocus = nil
             modeNews.show(mode)
             // The other mode's tabs don't narrow this mode's search.
             let wasNarrowed = searchScope.isNarrowed
@@ -92,7 +96,10 @@ final class AppModel {
         }
     }
     var selectedIssueTab: IssueTab {
-        didSet { if settings.lastIssueTab != selectedIssueTab { settings.lastIssueTab = selectedIssueTab } }
+        didSet {
+            if settings.lastIssueTab != selectedIssueTab { settings.lastIssueTab = selectedIssueTab }
+            if selectedIssueTab != oldValue { timeFocus = nil }
+        }
     }
     /// The tab showing in the current mode.
     var shownTab: ShownTab {
@@ -115,6 +122,19 @@ final class AppModel {
             if route == .search { runSearch(searchQuery, debounced: false) }
         }
     }
+    /// How recently the items of the tab on screen were updated; narrows that tab's list only (search has
+    /// its own `updated:` token), and counts, the badge and notifications ignore it. Never persisted, and
+    /// switching tab or mode clears it. A selection the new focus hides is dropped.
+    private(set) var timeFocus: TimeFocus? {
+        didSet {
+            guard timeFocus != oldValue else { return }
+            listSelections = listSelections.filter { tab, key in
+                navigationKeys(for: tab, closedExpanded: true, doneExpanded: true).contains(key)
+            }
+        }
+    }
+    /// The repository and time focus together.
+    var listFocus: ListFocus { ListFocus(repo: repoFocus, time: timeFocus) }
     /// The field's text, its "@user", "~label" or "is:" completion and the query searched for
     /// (`SearchFieldState`).
     private var searchField = SearchFieldState()
@@ -509,20 +529,37 @@ final class AppModel {
         repoFocus = RepoFocus(repo: repo)
     }
 
+    /// Focuses items updated within `step`, counted from now, or clears the time focus for nil. The step
+    /// already focused stays focused, with its start unchanged.
+    func focus(time step: TimeStep?) {
+        guard let step else {
+            timeFocus = nil
+            return
+        }
+        guard timeFocus?.step != step else { return }
+        timeFocus = TimeFocus(step: step, now: Date())
+    }
+
+    /// Clears the repository and the time focus: ✕ and "Show all".
+    func clearFocus() {
+        repoFocus = nil
+        timeFocus = nil
+    }
+
     /// `contents(of:)` narrowed to the focus; unchanged, with nothing in other repositories, without one.
     func scopedContents(of tab: PRTab) -> ScopedTab? {
         guard let contents = contents(of: tab) else { return nil }
-        return repoFocus?.scope(contents) ?? ScopedTab(unscoped: contents)
+        return listFocus.isActive ? listFocus.scope(contents) : ScopedTab(unscoped: contents)
     }
 
     func scopedContents(of tab: IssueTab) -> ScopedIssueTab? {
         guard let contents = contents(of: tab) else { return nil }
-        return repoFocus?.scope(contents) ?? ScopedIssueTab(unscoped: contents)
+        return listFocus.isActive ? listFocus.scope(contents) : ScopedIssueTab(unscoped: contents)
     }
 
     var scopedRecentlyClosed: [PullRequest] {
         let closed = tabs?.recentlyClosed ?? []
-        return repoFocus?.scope(closed) ?? closed
+        return listFocus.isActive ? listFocus.scope(closed) : closed
     }
 
     /// PR tabs show repo group headers: Group by Repository is on and no focus merges them into one list.
@@ -1563,6 +1600,7 @@ final class AppModel {
         assignedCleared.reset()
         modeNews.reset()
         repoFocus = nil
+        timeFocus = nil
         boardList = BoardList()
         resetDetails()
         NotificationService.shared.resetBaseline()

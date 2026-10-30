@@ -2,8 +2,8 @@ import SwiftUI
 import PullBullKit
 
 /// The slim row at the top of every list: "▦ Roadmap ▾ · ▤ All repos ▾" on the Board tab, "▤ All repos ▾"
-/// elsewhere, "▤ widgets ▾ ✕" with a repo focus. The board name opens the board menu (⌘⇧B), the repo
-/// name the repository menu (⌘⇧F); ✕ clears the focus.
+/// elsewhere, "▤ widgets ▾ ✕" with a repo focus, plus "◷ Updated today" with a time focus. The board name opens
+/// the board menu (⌘⇧B), the repo name the repository menu (⌘⇧F); ✕ clears both focuses.
 struct FilterBar: View {
     let model: AppModel
     let row: FilterRow
@@ -21,16 +21,19 @@ struct FilterBar: View {
             }
             // When tight, the board name truncates first.
             repoPart.layoutPriority(1)
+            if let time = row.timeTitle {
+                timePart(time)
+            }
             if row.isFocused {
-                Button { model.focus(on: nil) } label: {
+                Button { model.clearFocus() } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .medium))
                         .frame(width: 20, height: 20)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("Show all repos")
-                .accessibilityLabel("Clear repo filter")
+                .help("Show everything")
+                .accessibilityLabel("Clear filters")
             }
             Spacer(minLength: 8)
         }
@@ -62,6 +65,22 @@ struct FilterBar: View {
         .accessibilityAction(named: "Change Board") { showBoardMenu() }
     }
 
+    /// "◷ Updated today": a plain label, cut off with an ellipsis before the repo and board parts give way.
+    private func timePart(_ title: String) -> some View {
+        HStack(spacing: 6) {
+            Text("·")
+                .foregroundStyle(Palette.tertiary)
+            Image(systemName: "clock")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Color.accentColor)
+            Text(title)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .foregroundStyle(.primary)
+        }
+        .accessibilityHidden(true)
+    }
+
     /// The glyph in the accent colour and the name in primary while a focus narrows the list.
     private var repoPart: some View {
         HStack(spacing: 6) {
@@ -81,7 +100,7 @@ struct FilterBar: View {
         }
         .foregroundStyle(row.isFocused ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(row.repoSpokenLabel(tally: tally))
+        .accessibilityLabel(row.spokenLabel(tally: tally))
         .accessibilityAction(named: "Change Repository") { showRepoMenu() }
     }
 
@@ -89,7 +108,8 @@ struct FilterBar: View {
     /// the tab's own count (the stale one after a failed fetch); nil without a focus and while it reads
     /// "–" (not loaded, failed with nothing kept, Board unavailable), whose own states show instead.
     private var tally: String? {
-        guard let focus = model.repoFocus else { return nil }
+        guard model.listFocus.isActive else { return nil }
+        let focus = model.listFocus
         switch model.mode {
         case .pullRequests:
             let tab = model.selectedTab
