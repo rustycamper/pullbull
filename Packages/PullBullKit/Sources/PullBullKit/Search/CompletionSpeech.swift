@@ -1,6 +1,6 @@
 import Foundation
 
-/// What VoiceOver says for the "@user", "~label", "is:", "status:", "updated:", "review:" and "repo:" completion lists, which never take focus from the
+/// What VoiceOver says for the "@user", "~label", "is:", "status:", "updated:", "review:", "repo:" and "size:" completion lists, which never take focus from the
 /// search field.
 public enum CompletionSpeech {
     /// The list opened on a new token. `loaded` is false before the first snapshot.
@@ -46,6 +46,15 @@ public enum CompletionSpeech {
         case 0: return "No matching review filters. Return to search anyway."
         case 1: return "1 review filter. Up and down arrows to choose, Return to complete."
         case let count: return "\(count) review filters. Up and down arrows to choose, Return to complete."
+        }
+    }
+
+    /// The sizes never wait for a snapshot.
+    public static func opened(_ completion: SizeCompletion) -> String {
+        switch completion.candidates.count {
+        case 0: return "No matching sizes. Return to search anyway."
+        case 1: return "1 size. Up and down arrows to choose, Return to complete."
+        case let count: return "\(count) sizes. Up and down arrows to choose, Return to complete."
         }
     }
 
@@ -95,6 +104,11 @@ public enum CompletionSpeech {
         "\(candidate.review.rawValue), \(candidate.review.summary)"
     }
 
+    /// One row: `<letter>, <summary>, <limit>`.
+    public static func label(_ candidate: SizeCandidate) -> String {
+        "\(candidate.size.rawValue), \(candidate.size.summary), \(candidate.size.limit)"
+    }
+
     /// One row: `<owner/name>, on <n> items`, the count part only when it applies.
     public static func label(_ candidate: RepoCandidate) -> String {
         [candidate.repo, items(candidate.openCount)].compactMap { $0 }.joined(separator: ", ")
@@ -130,6 +144,10 @@ public enum CompletionSpeech {
         completion.selectedCandidate.map { position(label($0), in: completion) }
     }
 
+    public static func selected(_ completion: SizeCompletion) -> String? {
+        completion.selectedCandidate.map { position(label($0), in: completion) }
+    }
+
     public static func selected(_ completion: RepoCompletion) -> String? {
         completion.selectedCandidate.map { position(label($0), in: completion) }
     }
@@ -160,6 +178,10 @@ public enum CompletionSpeech {
         change(from: old, to: new, opened: opened, selected: selected)
     }
 
+    public static func change(from old: SizeCompletion?, to new: SizeCompletion?) -> String? {
+        change(from: old, to: new, opened: opened, selected: selected)
+    }
+
     public static func change(from old: RepoCompletion?, to new: RepoCompletion?, loaded: Bool) -> String? {
         change(from: old, to: new, opened: { opened($0, loaded: loaded) }, selected: selected)
     }
@@ -175,6 +197,7 @@ public enum CompletionSpeech {
         case (.updated(let o), .updated(let n)): return change(from: o, to: n)
         case (.reviews(let o), .reviews(let n)): return change(from: o, to: n)
         case (.repos(let o), .repos(let n)): return change(from: o, to: n, loaded: loaded)
+        case (.sizes(let o), .sizes(let n)): return change(from: o, to: n)
         case (_, .repos(let n)): return opened(n, loaded: loaded)
         case (_, .people(let n)): return opened(n, loaded: loaded)
         case (_, .labels(let n)): return opened(n, loaded: loaded)
@@ -182,6 +205,7 @@ public enum CompletionSpeech {
         case (_, .statuses(let n)): return opened(n, loaded: loaded)
         case (_, .updated(let n)): return opened(n)
         case (_, .reviews(let n)): return opened(n)
+        case (_, .sizes(let n)): return opened(n)
         }
     }
 
@@ -203,6 +227,10 @@ public enum CompletionSpeech {
 
     public static func completed(_ candidate: ReviewCandidate) -> String {
         "Showing pull requests: \(candidate.review.summary)"
+    }
+
+    public static func completed(_ candidate: SizeCandidate) -> String {
+        "Showing pull requests: \(candidate.size.summary), \(candidate.size.limit)"
     }
 
     public static func completed(_ candidate: TimeStepCandidate) -> String {

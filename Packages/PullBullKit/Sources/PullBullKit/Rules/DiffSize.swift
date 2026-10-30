@@ -20,6 +20,18 @@ public enum SizeFilter: String, CaseIterable, Sendable {
         }
     }
 
+    /// The bucket's bounds, as `of` draws them.
+    public var limit: String {
+        switch self {
+        case .s: "up to 50 lines changed"
+        case .m: "up to 300 lines changed"
+        case .l: "over 300 lines changed"
+        }
+    }
+
+    /// `Small · up to 50 lines changed`, for the completion row.
+    public var caption: String { summary.prefix(1).uppercased() + summary.dropFirst() + " · " + limit }
+
     /// The bucket of a pull request, nil when either total is unknown.
     public static func of(additions: Int?, deletions: Int?) -> SizeFilter? {
         guard let additions, let deletions else { return nil }
@@ -28,6 +40,23 @@ public enum SizeFilter: String, CaseIterable, Sendable {
         case ...300: return .m
         default: return .l
         }
+    }
+}
+
+public struct SizeCandidate: CompletionCandidate {
+    public let size: SizeFilter
+
+    public var id: String { size.rawValue }
+    public var insertText: String { size.token }
+
+    public init(size: SizeFilter) {
+        self.size = size
+    }
+
+    /// The sizes whose letter starts with `prefix`, ignoring case, in `SizeFilter` order.
+    static func candidates(prefix: String) -> [SizeCandidate] {
+        let p = prefix.lowercased()
+        return SizeFilter.allCases.filter { $0.rawValue.hasPrefix(p) }.map(SizeCandidate.init)
     }
 }
 

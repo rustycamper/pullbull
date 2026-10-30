@@ -1,9 +1,9 @@
 import SwiftUI
 import PullBullKit
 
-/// The "@user", "~label", "is:", "status:" or "updated:" completion: people, labels, states, board Status
-/// columns or time steps matching the token at the caret,
-/// drawn over the top of the hints or results. Focus stays in the search field; the keys are handled in
+/// The "@user", "~label", "is:", "status:", "updated:", "review:", "repo:" or "size:" completion: people,
+/// labels, states, board Status columns, time steps, review filters, repositories or sizes matching the
+/// token at the caret, drawn over the top of the hints or results. Focus stays in the search field; the keys are handled in
 /// `PopoverView.handleKey`.
 struct CompletionList: View {
     let model: AppModel
@@ -90,6 +90,16 @@ struct CompletionList: View {
                     } else {
                         ForEach(Array(reviews.candidates.enumerated()), id: \.element.id) { index, candidate in
                             ReviewCompletionRow(candidate: candidate, selected: index == reviews.selection) {
+                                pick(index, in: completion)
+                            }
+                        }
+                    }
+                case .sizes(let sizes):
+                    if sizes.candidates.isEmpty {
+                        message("No size called “\(sizes.token.prefix)” · ↩ to search anyway")
+                    } else {
+                        ForEach(Array(sizes.candidates.enumerated()), id: \.element.id) { index, candidate in
+                            SizeCompletionRow(candidate: candidate, selected: index == sizes.selection) {
                                 pick(index, in: completion)
                             }
                         }
@@ -376,6 +386,42 @@ private struct ReviewCompletionRow: View {
                     .font(.system(size: 13))
                 Spacer(minLength: 8)
                 Text(candidate.review.summary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .frame(height: 26)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(selected ? Palette.selection : hovering ? Palette.rowHover : .clear))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(CompletionSpeech.label(candidate))
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : [.isButton])
+    }
+}
+
+private struct SizeCompletionRow: View {
+    let candidate: SizeCandidate
+    let selected: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: "plusminus")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18, height: 18)
+                Text(candidate.insertText)
+                    .font(.system(size: 13))
+                Spacer(minLength: 8)
+                Text(candidate.size.caption)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }

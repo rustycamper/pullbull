@@ -94,3 +94,62 @@ private final class RecordingTransport: GraphQLTransport, @unchecked Sendable {
         #expect(SearchContext.filterDescription(filter) == "Filtered by size: small, excluding size: large")
     }
 }
+
+@Suite struct SizeCompletionTests {
+    private func size(_ text: String) -> SizeCompletion? {
+        SizeCompletion.open(text: text, caret: text.utf16.count, dismissedStart: nil)
+    }
+
+    private func open(_ text: String) -> SearchCompletion? {
+        SearchCompletion.open(text: text, caret: text.utf16.count, dismissedStart: nil, people: .empty, labels: .empty)
+    }
+
+    @Test func sizeList() throws {
+        let list = try #require(size("size:"))
+        #expect(list.candidates.map(\.size) == [.s, .m, .l])
+        #expect(list.candidates.map(\.insertText) == ["size:s", "size:m", "size:l"])
+        #expect(list.token == PendingToken(start: 0, end: 5, prefix: "", kind: .size))
+        #expect(try #require(list.accepted(in: "size:")).text == "size:s ")
+        #expect(try #require(size("fix SIZE:M")).candidates.map(\.size) == [.m])
+        #expect(try #require(size("size:x")).candidates.isEmpty)
+        #expect(size("size:1") == nil)
+    }
+
+    @Test func captions() {
+        #expect(SizeFilter.allCases.map(\.caption) == [
+            "Small · up to 50 lines changed", "Medium · up to 300 lines changed", "Large · over 300 lines changed",
+        ])
+    }
+
+    @Test func negatedSizeCompletes() throws {
+        let list = try #require(size("-size:l"))
+        #expect(list.candidates.map(\.size) == [.l])
+        #expect(try #require(list.accepted(in: "-size:l")).text == "-size:l ")
+        #expect(try #require(size("fix -size:")).accepted(in: "fix -size:")?.text == "fix -size:s ")
+    }
+
+    @Test func searchCompletionOpensSizes() throws {
+        guard case .sizes = try #require(open("size:m")) else { Issue.record("not a size list"); return }
+        #expect(PendingToken.startsToken(at: 4, in: "fix size:", kind: .size))
+        #expect(!PendingToken.startsToken(at: 4, in: "fix size:", kind: .review))
+    }
+
+    @Test func fieldStateExposesIt() {
+        var state = SearchFieldState()
+        state.edit("size:", caret: 5, people: .empty)
+        #expect(state.sizeCompletion?.candidates.count == 3)
+        #expect(state.reviewCompletion == nil)
+    }
+
+    @Test func speech() throws {
+        let all = try #require(size("size:"))
+        #expect(CompletionSpeech.opened(all) == "3 sizes. Up and down arrows to choose, Return to complete.")
+        #expect(CompletionSpeech.selected(all.moved(by: 1)) == "m, medium, up to 300 lines changed, 2 of 3")
+        #expect(CompletionSpeech.completed(SizeCandidate(size: .s))
+            == "Showing pull requests: small, up to 50 lines changed")
+        #expect(CompletionSpeech.change(from: nil, to: open("size:"), loaded: false)
+            == "3 sizes. Up and down arrows to choose, Return to complete.")
+        #expect(CompletionSpeech.opened(try #require(size("size:x")))
+            == "No matching sizes. Return to search anyway.")
+    }
+}

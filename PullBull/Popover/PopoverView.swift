@@ -951,6 +951,7 @@ struct PopoverView: View {
         case .updated(let steps): steps.selectedCandidate.map(CompletionSpeech.completed)
         case .reviews(let reviews): reviews.selectedCandidate.map(CompletionSpeech.completed)
         case .repos(let repos): repos.selectedCandidate.map(CompletionSpeech.completed)
+        case .sizes(let sizes): sizes.selectedCandidate.map(CompletionSpeech.completed)
         case nil: nil
         }
         guard let caret = model.acceptCompletion() else { return }

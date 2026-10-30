@@ -67,6 +67,12 @@ public struct SearchFieldState: Equatable, Sendable {
         return nil
     }
 
+    /// The open "size:" list; nil when none is open or the list is of another kind.
+    public var sizeCompletion: SizeCompletion? {
+        if case .sizes(let completion) = searchCompletion { return completion }
+        return nil
+    }
+
     /// Whether the text, read without an open completion, asks for a different query than the last one.
     public var isStale: Bool { pendingQuery != query }
 
