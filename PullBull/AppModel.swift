@@ -124,12 +124,15 @@ final class AppModel {
     }
     /// How recently the items of the tab on screen were updated; narrows that tab's list only (search has
     /// its own `updated:` token), and counts, the badge and notifications ignore it. Never persisted, and
-    /// switching tab or mode clears it. A selection the new focus hides is dropped.
+    /// switching tab or mode clears it. The shown tab's selection is dropped if the new focus hides it.
     private(set) var timeFocus: TimeFocus? {
         didSet {
             guard timeFocus != oldValue else { return }
-            listSelections = listSelections.filter { tab, key in
-                navigationKeys(for: tab, closedExpanded: true, doneExpanded: true).contains(key)
+            let tab = shownTab
+            if let key = listSelections[tab],
+                !navigationKeys(for: tab, closedExpanded: true, doneExpanded: true).contains(key)
+            {
+                listSelections[tab] = nil
             }
         }
     }
