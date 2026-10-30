@@ -43,8 +43,8 @@ struct PRRow: View {
         .onHover { hovering = $0 }
         .accessibilityAddTraits(selected ? [.isSelected] : [])
         .prContextMenu(
-            pr, focus: FocusMenuItem(model: model, repo: pr.key.repo), time: TimeFocusMenu(model: model),
-            person: .person(model: model, login: pr.author))
+            pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
+            time: tab == nil ? nil : TimeFocusMenu(model: model), person: .person(model: model, login: pr.author))
     }
 
     /// A search result moves `searchSelection`, a tab row `listSelection`.
@@ -302,7 +302,7 @@ struct ClosedRow: View {
         .accessibilityAddTraits(selected ? [.isSelected] : [])
         .help(pr.title)
         .prContextMenu(
-            pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
+            pr, focus: FocusMenuItem(model: model, repo: pr.key.repo), time: TimeFocusMenu(model: model),
             person: .person(model: model, login: pr.author))
     }
 

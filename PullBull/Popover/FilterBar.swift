@@ -25,7 +25,7 @@ struct FilterBar: View {
                 timePart(time).layoutPriority(-1)
             }
             if row.isFocused {
-                Button { model.clearFocus() } label: {
+                Button { clear() } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .medium))
                         .frame(width: 20, height: 20)
@@ -43,6 +43,11 @@ struct FilterBar: View {
         .padding(.trailing, 8)
         .frame(height: 26)
         .overlay(alignment: .bottom) { Hairline() }
+    }
+
+    /// ✕ clears both focuses, but only the repo one while the time part is hidden (searching).
+    private func clear() {
+        if row.timeTitle == nil { model.focus(on: nil) } else { model.clearFocus() }
     }
 
     private func boardPart(_ title: String) -> some View {
@@ -108,8 +113,8 @@ struct FilterBar: View {
     /// the tab's own count (the stale one after a failed fetch); nil without a focus and while it reads
     /// "–" (not loaded, failed with nothing kept, Board unavailable), whose own states show instead.
     private var tally: String? {
-        guard model.listFocus.isActive else { return nil }
-        let focus = model.listFocus
+        let focus = row.timeTitle == nil ? ListFocus(repo: model.repoFocus, time: nil) : model.listFocus
+        guard focus.isActive else { return nil }
         switch model.mode {
         case .pullRequests:
             let tab = model.selectedTab

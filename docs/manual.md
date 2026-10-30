@@ -117,7 +117,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 | `status:prog` `status:"In progress"` | Status column on the board. Issues only |
 | `#123` | That number, every repo |
 | `owner/repo#123` or a link | Exactly that item |
-| `updated:today` `3d` `1w` `1m` | Items active since 00:00 today, or 2, 6 or 29 days before. Any other value goes to GitHub as written (`updated:>2026-10-01`) |
+| `updated:today` `3d` `1w` `1m` | Items active since 00:00 today, or 2, 6 or 29 days before. GitHub's date forms (`updated:>2026-10-01`, `updated:2026-10-01..2026-10-07`) go to GitHub as written and also filter locally; any other value goes to GitHub as written |
 | words | Title |
 
 - `@`, `~`, `is:`, `status:`, `updated:` and words combine; everything must match
@@ -254,7 +254,7 @@ Reopen within a minute and the detail is still there.
 - Right-click a row, a repo header or the list → **Show Only Updated** → Today, In the Last 3 Days, In the Last Week or In the Last Month
 - A strip above the list names the start: *Updated today*, *Updated in the last week · since Oct 24*
 - Back to all: ✕ in the strip, **Show All**, or <kbd>Esc</kbd>. <kbd>Esc</kbd> clears this and Show Only *repo* together
-- Also cleared when the popover closes or the tab changes
+- Also cleared when the popover closes, or the tab or mode changes
 - Judged by last activity: when an open item last changed, or when a closed one ended
 - Counts and notifications still cover everything
 - Combines with Show Only *repo*

@@ -78,7 +78,7 @@ More in the [manual](docs/manual.md#issues).
 | `status:prog` `status:"In progress"` | Issues in that Status column on the board |
 | `#123` | That number, in every repo |
 | a GitHub link | Exactly that PR or issue |
-| `updated:today` `updated:3d` `updated:1w` `updated:1m` | Items active since 00:00 today, or 2, 6 or 29 days before |
+| `updated:today` `updated:3d` `updated:1w` `updated:1m` | Items active since 00:00 today, or 2, 6 or 29 days before; GitHub's date forms (`updated:>2026-10-01`) also filter locally |
 
 Combine `@`, `~`, `is:`, `status:`, `updated:` and words. Type `st`, `la` or `up` and press <kbd>Tab</kbd> for `status:`, `label:` or `updated:`, with suggestions. Save the searches you repeat with the bookmark icon; manage them in Settings → Search.
 
