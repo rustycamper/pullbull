@@ -553,7 +553,7 @@ struct PopoverView: View {
             // ⌘↑ / ⌘↓: the first or last row, in the list or the search results.
             if !flags.contains(.shift),
                event.keyCode == SearchKeyMonitor.upArrow || event.keyCode == SearchKeyMonitor.downArrow {
-                if searching {
+                if searching && saveName == nil {
                     model.moveSearchSelectionToEdge(last: event.keyCode == SearchKeyMonitor.downArrow)
                     return true
                 }
@@ -745,13 +745,16 @@ struct PopoverView: View {
                 // In the search field the arrows edit the text; they narrow the search to the neighbouring tab
                 // only from the caret at the far end, with no selection, completion or key repeat.
                 guard SearchArrows.movesScope(
-                    offset: offset, fieldFocused: fieldFocused, caret: FieldCaret.read(in: window),
+                    offset: offset, fieldFocused: fieldFocused,
+                    caret: FieldCaret.read(in: window, text: model.searchText),
                     length: model.searchText.utf16.count, completionOpen: completionShown,
                     isRepeat: event.isARepeat)
                 else { return false }
                 if let tab = model.moveSearchScope(by: offset) {
+                    // As the tab click says it: no count until results have arrived.
+                    let matches = model.searchResults.map { $0.orderedKeys(mode: model.mode).count }
                     AccessibilityNotification.Announcement(
-                        SearchContext.scopeAnnouncement(tab: tab.title, matches: model.searchMatchCount)
+                        SearchContext.scopeAnnouncement(tab: tab.title, matches: matches)
                     ).post()
                 }
                 return true
