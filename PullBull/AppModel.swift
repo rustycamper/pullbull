@@ -785,12 +785,12 @@ final class AppModel {
         searchField.close()
     }
 
-    /// A search hint was picked: the field holds `sigil` alone with the caret after it, so an `@`, `~` or
-    /// `is:` opens its list at once. The view puts the caret there.
-    func startToken(_ sigil: String) {
+    /// A search hint was picked: the field holds `text` alone (a sigil, or `-` and a sigil) with the caret
+    /// after it, so an `@`, `~` or `is:` opens its list at once. The view puts the caret there.
+    func startToken(_ text: String) {
         searchField.forgetCompletion()
         searchStartedOnTab = nil
-        updateSearch(sigil, caret: sigil.utf16.count)
+        updateSearch(text, caret: text.utf16.count)
     }
 
     /// Searches for everything involving `login` and puts the caret after it.

@@ -60,8 +60,12 @@ struct PopoverView: View {
     private var searchOpen: Bool { searchShown || fieldOpen }
     /// The "@user", "~label" or "is:" list is on screen (only with the search field open).
     private var completionShown: Bool { model.completion != nil && searchOpen }
-    /// The panel under the empty field takes the arrows, Return and Esc.
-    private var hintsActive: Bool { fieldOpen && !searching && model.searchText.isEmpty && !completionShown }
+    /// The panel under the empty field takes the arrows, Return and Esc; also after its `-` token, so the
+    /// keyboard can walk on to the token that joins it.
+    private var hintsActive: Bool {
+        fieldOpen && !searching && (model.searchText.isEmpty || model.searchText == SearchHint.negate.sigil)
+            && !completionShown
+    }
     /// The saved chips under the empty field.
     private var hintCloud: SavedChipCloud {
         SearchHints.cloud(saved: model.settings.savedSearches, expanded: savedExpanded)
@@ -980,10 +984,12 @@ struct PopoverView: View {
             }
         case .hint(let hint):
             pickHint(hint, in: window)
+            // From the keyboard the cursor stays on `-`, one ← or ↑ from the tokens that can follow it.
+            if fromKeyboard, hint == .negate { hintSelection = item }
         }
     }
 
-    /// A token: types its sigil into the empty field, which opens its list; `-` opens none, and the next token joins it.
+    /// A token: types its sigil into the field, which opens its list; `-` opens none, and the next token joins it.
     private func pickHint(_ hint: SearchHint, in window: NSWindow?) {
         hintSelection = nil
         model.startToken(hint.text(after: model.searchText))

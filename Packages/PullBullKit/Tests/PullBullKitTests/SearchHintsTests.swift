@@ -103,6 +103,10 @@ private func cloud(_ saved: SavedSearches, expanded: Bool = false) -> SavedChipC
     @Test func tokenAfterNegate() {
         #expect(SearchHint.person.text(after: "-") == "-@")
         #expect(SearchHint.size.text(after: "-") == "-size:")
+        #expect(SearchHint.state.text(after: "-") == "-is:")
+        #expect(SearchHint.updated.text(after: "-") == "-updated:")
+        #expect(SearchHint.person.text(after: "- ") == "@")
+        #expect(SearchHint.person.text(after: "--") == "@")
         #expect(SearchHint.number.text(after: "-") == "#")
         #expect(SearchHint.negate.text(after: "-") == "-")
         #expect(SearchHint.person.text(after: "") == "@")
