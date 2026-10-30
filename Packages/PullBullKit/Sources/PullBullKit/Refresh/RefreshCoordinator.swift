@@ -918,8 +918,11 @@ public actor RefreshCoordinator {
         let merged = current.merging(followed: followed)
         if merged != current {
             try? await store.save(merged, account: config.account, scope: config.scope)
-            // A full refresh that started during the save saves and emits its own data.
-            guard expected == generation, starts == fullStarts, inFlight == nil, let latest = self.snapshot else {
+            // A full refresh that started during the save saves and emits its own data; a stop or the
+            // toggle turned off during it drops the result too.
+            guard !Task.isCancelled, expected == generation, starts == fullStarts, inFlight == nil,
+                  self.config?.followsPendingCI == true, let latest = self.snapshot
+            else {
                 droppedFollows += 1
                 return
             }

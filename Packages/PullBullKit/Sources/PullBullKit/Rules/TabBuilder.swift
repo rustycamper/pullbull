@@ -115,11 +115,14 @@ public struct Snapshot: Codable, Sendable, Equatable {
         return snapshot
     }
 
-    /// This snapshot with each of `followed` replacing the pull request of the same key in Mine, Review
-    /// and Team. Keys it doesn't hold are ignored; `fetchedAt` and every other list are unchanged.
+    /// This snapshot with each of `followed` that is still open replacing the pull request of the same key in
+    /// Mine, Review and Team. A merged or closed one keeps its old row until the next full refresh, since Mine
+    /// lists open PRs only and the row would vanish. Keys it doesn't hold are ignored; `fetchedAt` and every
+    /// other list are unchanged.
     public func merging(followed: [PullRequest]) -> Snapshot {
-        guard !followed.isEmpty else { return self }
-        let byKey = Dictionary(followed.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
+        let open = followed.filter { $0.state == .open }
+        guard !open.isEmpty else { return self }
+        let byKey = Dictionary(open.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
         let replace = { (list: [PullRequest]) in list.map { byKey[$0.key] ?? $0 } }
         var snapshot = self
         snapshot.mine = replace(mine)

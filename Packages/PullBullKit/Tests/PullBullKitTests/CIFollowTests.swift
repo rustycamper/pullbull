@@ -119,4 +119,12 @@ private func key(_ n: Int) -> PRKey { PRKey(repo: "o/r", number: n) }
         #expect(merged.fetchedAt == s.fetchedAt)
         #expect(s.merging(followed: []) == s)
     }
+
+    @Test func mergingKeepsTheOldRowOfAClosedPR() {
+        let s = snap(mine: [pr(1), pr(2)], review: [pr(2, author: "bob")])
+        let merged = s.merging(followed: [pr(1, ci: .success, state: .merged), pr(2, ci: .success, state: .closed)])
+        #expect(merged == s)
+        let mixed = s.merging(followed: [pr(1, ci: .success, state: .merged), pr(2, ci: .failure)])
+        #expect(mixed.mine == [pr(1), pr(2, ci: .failure)])
+    }
 }
