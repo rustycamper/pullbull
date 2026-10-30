@@ -247,15 +247,20 @@ public enum TabBuilder {
             .sorted { ($0.closedAt ?? .distantPast) > ($1.closedAt ?? .distantPast) }
 
         return BuiltTabs(
-            review: contents(review), mine: contents(mine), team: contents(team),
+            review: contents(review, oldestFirst: settings.reviewOldestFirst), mine: contents(mine), team: contents(team),
             recentlyClosed: closed, hiddenApprovedCount: hiddenApproved.count
         )
     }
 
-    private static func contents(_ rows: [Row]) -> TabContents {
+    /// Rows by latest activity, or with `oldestFirst` by when the PR was opened, the oldest first.
+    private static func contents(_ rows: [Row], oldestFirst: Bool = false) -> TabContents {
         var seen = Set<PRKey>()
         let sorted = rows.sorted {
-            if $0.pr.updatedAt != $1.pr.updatedAt { return $0.pr.updatedAt > $1.pr.updatedAt }
+            if oldestFirst {
+                if $0.pr.createdAt != $1.pr.createdAt { return $0.pr.createdAt < $1.pr.createdAt }
+            } else if $0.pr.updatedAt != $1.pr.updatedAt {
+                return $0.pr.updatedAt > $1.pr.updatedAt
+            }
             if $0.id.repo != $1.id.repo { return $0.id.repo < $1.id.repo }
             return $0.id.number < $1.id.number
         }

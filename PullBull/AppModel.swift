@@ -567,11 +567,14 @@ final class AppModel {
         return listFocus.isActive ? listFocus.scope(closed) : closed
     }
 
-    /// PR tabs show repo group headers: Group by Repository is on and no focus merges them into one list.
-    var listGroupedByRepo: Bool { settings.grouping == .repository && repoFocus == nil }
+    /// How `tab` groups its rows: by repository when Group by Repository is on and no focus merges them,
+    /// and for Team by author when that is on.
+    func prGrouping(for tab: PRTab) -> PRGrouping {
+        PRGrouping.forTab(tab, settings: settings, repoFocused: repoFocus != nil)
+    }
 
     /// Rows name their repository (`repo #num`) unless a repo header or the focus already does.
-    var rowsShowRepo: Bool { settings.grouping != .repository && repoFocus == nil }
+    func rowsShowRepo(on tab: PRTab) -> Bool { prGrouping(for: tab) != .repository && repoFocus == nil }
 
     /// The focus menu's repositories; empty before the first snapshot. Kept current as the tabs and the
     /// focus change, as every row's context menu names its repository from them.
@@ -1979,7 +1982,7 @@ extension AppModel {
             let scoped = focus.isActive ? focus.scope(contents) : ScopedTab(unscoped: contents)
             let closed = tabs?.recentlyClosed ?? []
             return ListNavigation.prKeys(
-                tab: prTab, contents: scoped.contents, groupedByRepo: listGroupedByRepo,
+                tab: prTab, contents: scoped.contents, grouping: prGrouping(for: prTab),
                 recentlyClosed: focus.isActive ? focus.scope(closed) : closed, closedExpanded: closedExpanded)
         case .issues(let issueTab):
             guard let issueTabs, issueTabs.isLoaded(issueTab), let contents = contents(of: issueTab) else { return [] }

@@ -15,6 +15,7 @@ struct PRListView: View {
 
     private var contents: TabContents { scoped.contents }
     private var focus: ListFocus { model.listFocus }
+    private var grouping: PRGrouping { model.prGrouping(for: tab) }
     /// What the focus leaves listed: the rows, and on Mine the recently closed PRs.
     private var scopedTotal: Int { contents.rows.count + (tab == .mine ? recentlyClosed.count : 0) }
     /// A focus hides every open row but leaves recently closed ones: the section stands in for the empty state.
@@ -53,12 +54,21 @@ struct PRListView: View {
                     }
                 }
                 .frame(height: tab == .mine && !recentlyClosed.isEmpty ? 260 : 400)
-            } else if model.listGroupedByRepo {
+            } else if grouping == .repository {
                 ForEach(groups, id: \.repo) { group in
                     Section {
                         rows(group.rows)
                     } header: {
                         repoHeader(group.repo, count: group.rows.filter(\.counted).count)
+                            .pinnedHeaderBackground()
+                    }
+                }
+            } else if grouping == .author {
+                ForEach(ListNavigation.authorGroups(contents.rows), id: \.author) { group in
+                    Section {
+                        rows(group.rows)
+                    } header: {
+                        AuthorHeader(model: model, author: group.author, rows: group.rows)
                             .pinnedHeaderBackground()
                     }
                 }
@@ -84,7 +94,7 @@ struct PRListView: View {
                 model: model, row: row, context: .tab(tab), compact: model.settings.compact, now: now,
                 selected: model.listSelection == row.pr.key, wantedLabels: wantedLabels)
             // Ungrouped rows have no header to clear.
-            .scrollTarget(row.pr.key, clearance: model.listGroupedByRepo ? PinnedHeader.clearance : 0)
+            .scrollTarget(row.pr.key, clearance: grouping != .none ? PinnedHeader.clearance : 0)
         }
     }
 
@@ -122,6 +132,23 @@ struct PRListView: View {
             glyph: "book.closed", title: repo.split(separator: "/").last.map(String.init) ?? repo,
             count: count > 0 ? count : nil, compact: model.settings.compact)
             .focusContextMenu(FocusMenuItem(model: model, repo: repo), time: TimeFocusMenu(model: model))
+    }
+}
+
+/// An author group's header: their avatar and login, counting what the tab counts; it offers a search
+/// for them.
+private struct AuthorHeader: View {
+    @Bindable var model: AppModel
+    let author: String
+    let rows: [Row]
+
+    var body: some View {
+        let count = rows.filter(\.counted).count
+        ListSectionHeader(
+            glyph: nil, title: author, count: count > 0 ? count : nil,
+            avatar: .init(login: author, url: rows.first?.pr.authorAvatarURL), compact: model.settings.compact)
+        .focusContextMenu(
+            FocusMenuItem.person(model: model, login: author), time: TimeFocusMenu(model: model))
     }
 }
 

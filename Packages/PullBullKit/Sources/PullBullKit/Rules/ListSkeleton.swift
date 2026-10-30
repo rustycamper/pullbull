@@ -5,9 +5,10 @@ import Foundation
 public enum ListSkeleton {
     public static let rowCount = 5
 
-    /// PR lists group by repository unless the setting is off or a focus narrows them to one repo.
-    public static func prLeadsWithHeader(grouping: Grouping, focused: Bool) -> Bool {
-        grouping == .repository && !focused
+    /// PR lists group by repository unless the setting is off or a focus narrows them to one repo;
+    /// author groups stay under a focus.
+    public static func prLeadsWithHeader(grouping: PRGrouping, focused: Bool) -> Bool {
+        grouping == .author || (grouping == .repository && !focused)
     }
 
     /// Issue lists: Created follows the grouping setting; Assigned and Board group by board Status when

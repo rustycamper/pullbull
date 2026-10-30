@@ -158,7 +158,7 @@ struct PRRow: View {
     }
 
     /// `repo #num`, or `#num` under a repo header; search results have no repo headers, so they always show the repo.
-    private var showsRepo: Bool { tab == nil || model.rowsShowRepo }
+    private var showsRepo: Bool { tab == nil || tab.map { model.rowsShowRepo(on: $0) } ?? true }
 
     /// The relative age, or an ended PR's "merged Oct 12".
     private var age: String {

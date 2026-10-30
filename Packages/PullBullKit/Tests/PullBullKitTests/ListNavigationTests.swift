@@ -4,16 +4,18 @@ import Testing
 
 private func key(_ n: Int, repo: String = "o/a") -> PRKey { PRKey(repo: repo, number: n) }
 
-private func pr(_ n: Int, repo: String = "o/a", state: PRState = .open) -> PullRequest {
+private func pr(_ n: Int, repo: String = "o/a", state: PRState = .open, author: String = "alice") -> PullRequest {
     PullRequest(
         key: key(n, repo: repo), title: "t\(n)", url: URL(string: "https://x/\(n)")!,
-        author: "alice", authorAvatarURL: nil, state: state, isDraft: false,
+        author: author, authorAvatarURL: nil, state: state, isDraft: false,
         createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 0), closedAt: nil,
         headRef: "h", baseRef: "main", ci: .none, headCommitDate: nil, commentCount: 0,
         lastCommentAuthor: nil, latestReviews: [], reviewRequests: [])
 }
 
-private func row(_ n: Int, repo: String = "o/a") -> Row { Row(pr: pr(n, repo: repo), dimmed: false, counted: true) }
+private func row(_ n: Int, repo: String = "o/a", author: String = "alice") -> Row {
+    Row(pr: pr(n, repo: repo, author: author), dimmed: false, counted: true)
+}
 
 private func issue(_ n: Int) -> BoardIssue {
     BoardIssue(key: key(n), title: "i\(n)", url: URL(string: "https://x/\(n)")!, isOpen: true)
@@ -120,5 +122,65 @@ private func issue(_ n: Int) -> BoardIssue {
         let key = PRKey(repo: "initech/widgets", number: 490)
         #expect(GitHubLinks.pullRequest(key).absoluteString == "https://github.com/initech/widgets/pull/490")
         #expect(GitHubLinks.issue(key).absoluteString == "https://github.com/initech/widgets/issues/490")
+    }
+
+    // MARK: Author grouping
+
+    @Test func authorGroupsSortedByName() {
+        let groups = ListNavigation.authorGroups([
+            row(1, author: "zoe"), row(2, author: "Ann"), row(3, author: "bob"), row(4, author: "zoe"),
+            row(5, author: "Ann"),
+        ])
+        #expect(groups.map(\.author) == ["Ann", "bob", "zoe"])
+        #expect(groups.map { $0.rows.map(\.pr.key.number) } == [[2, 5], [3], [1, 4]])
+    }
+
+    @Test func prKeysByAuthorFollowTheGroups() {
+        let contents = TabContents(rows: [row(1, author: "zoe"), row(2, author: "ann"), row(3, author: "zoe")])
+        let keys = ListNavigation.prKeys(
+            tab: .team, contents: contents, grouping: .author, recentlyClosed: [], closedExpanded: false)
+        #expect(keys.map(\.number) == [2, 1, 3])
+    }
+
+    @Test func prKeysFollowRepositoryAndNoneGrouping() {
+        let contents = TabContents(rows: [row(1, repo: "o/b"), row(2), row(3, repo: "o/b")])
+        func numbers(_ g: PRGrouping) -> [Int] {
+            ListNavigation.prKeys(tab: .review, contents: contents, grouping: g, recentlyClosed: [], closedExpanded: false)
+                .map(\.number)
+        }
+        #expect(numbers(.repository) == [1, 3, 2])
+        #expect(numbers(.none) == [1, 2, 3])
+    }
+
+    @Test func recentlyClosedComesLastOnMine() {
+        let contents = TabContents(rows: [row(1)])
+        let groups = ListNavigation.prGroups(
+            tab: .mine, contents: contents, grouping: .repository, recentlyClosed: [pr(9, state: .merged)],
+            closedExpanded: true)
+        #expect(groups.map { $0.map(\.number) } == [[1], [9]])
+    }
+
+    // MARK: PRGrouping
+
+    @Test func teamByAuthorWinsOverEverything() {
+        var s = AppSettings()
+        s.groupTeamByAuthor = true
+        for g in [Grouping.repository, .none] {
+            s.grouping = g
+            #expect(PRGrouping.forTab(.team, settings: s, repoFocused: false) == .author)
+            #expect(PRGrouping.forTab(.team, settings: s, repoFocused: true) == .author)
+        }
+        s.grouping = .repository
+        #expect(PRGrouping.forTab(.review, settings: s, repoFocused: false) == .repository)
+        #expect(PRGrouping.forTab(.mine, settings: s, repoFocused: false) == .repository)
+    }
+
+    @Test func teamWithoutAuthorGroupingFollowsTheRepoRule() {
+        var s = AppSettings()
+        #expect(PRGrouping.forTab(.team, settings: s, repoFocused: false) == .repository)
+        #expect(PRGrouping.forTab(.team, settings: s, repoFocused: true) == .none)
+        s.grouping = .none
+        #expect(PRGrouping.forTab(.team, settings: s, repoFocused: false) == .none)
+        #expect(PRGrouping.forTab(.review, settings: s, repoFocused: false) == .none)
     }
 }

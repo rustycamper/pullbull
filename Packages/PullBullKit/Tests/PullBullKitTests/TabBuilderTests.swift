@@ -182,4 +182,23 @@ private func snap(
                                requests: [])
         #expect(TabBuilder.build(snap(review: [draftApproved]), settings: noDrafts, now: now).hiddenApprovedCount == 0)
     }
+
+    @Test func reviewOldestFirstSortsByCreatedAscending() {
+        var s = AppSettings()
+        s.reviewOldestFirst = true
+        let prs = [
+            pr(1, created: 2, updated: 1), pr(2, created: 9, updated: 5), pr(3, created: 9, updated: 3),
+            pr(4, created: 4, updated: 2),
+        ]
+        let built = TabBuilder.build(snap(review: prs, mine: prs.map { pr($0.key.number, author: "me", created: Double($0.key.number)) }, team: prs), settings: s, now: now)
+        #expect(built.review.rows.map(\.id.number) == [2, 3, 4, 1])
+        #expect(built.mine.rows.map(\.id.number) == [1, 2, 3, 4])
+        #expect(built.team.rows.map(\.id.number) == [1, 4, 3, 2])
+    }
+
+    @Test func reviewKeepsRecentActivityFirstByDefault() {
+        let prs = [pr(1, created: 2, updated: 1), pr(2, created: 9, updated: 5)]
+        let built = TabBuilder.build(snap(review: prs), settings: AppSettings(), now: now)
+        #expect(built.review.rows.map(\.id.number) == [1, 2])
+    }
 }

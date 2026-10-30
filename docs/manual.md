@@ -70,9 +70,9 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 
 | Tab | Shows |
 |---|---|
-| Review | PRs waiting on you or your team. Icon says why: requested, team, re-requested, new commits. Lines added and removed (`+120 −30`), not in compact cards |
+| Review | PRs waiting on you or your team. Icon says why: requested, team, re-requested, new commits. Lines added and removed (`+120 −30`), not in compact cards. Oldest first: Settings → General (by when the PR was opened) |
 | Mine | Your PRs, review pills, checks, **Ready to merge**. Folded "Recently closed": yours closed or merged in the last 7 days |
-| Team | Other open PRs in the org |
+| Team | Other open PRs in the org. Group by author: Settings → General |
 
 A PR with merge conflicts shows a **Conflicts** note on every tab.
 
@@ -279,7 +279,7 @@ Reopen within a minute and the detail is still there.
 
 | Tab | |
 |---|---|
-| General | Grouping, compact cards, background, filters (Review and Team), menu bar count, refresh interval, shortcut, launch at login, updates |
+| General | Grouping, Team by author, oldest review first, compact cards, background, filters (Review and Team), menu bar count, refresh interval, shortcut, launch at login, updates |
 | Account | Account, org, board, access notices |
 | Notifications | One toggle per event, grouped: my pull requests · pull requests I review · issues assigned to me · issues I created |
 | Search | Saved searches: rename, edit the query, drag to reorder, **+** and **−**. Apply one from the empty search field |

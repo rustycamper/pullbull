@@ -15,16 +15,50 @@ public enum ListNavigation {
         return order.map { ($0, byRepo[$0] ?? []) }
     }
 
-    /// The PR list's rows as shown: by repository when grouped, then Mine's "Recently closed" when
-    /// expanded.
+    /// PR rows grouped by author, the groups by name (case-insensitive); rows keep their order in a group.
+    public static func authorGroups(_ rows: [Row]) -> [(author: String, rows: [Row])] {
+        var byAuthor: [String: (author: String, rows: [Row])] = [:]
+        for row in rows {
+            let id = row.pr.author.lowercased()
+            byAuthor[id, default: (row.pr.author, [])].rows.append(row)
+        }
+        return byAuthor.keys.sorted().compactMap { byAuthor[$0] }
+    }
+
+    /// The PR list's shown groups of rows, in display order: by `grouping`, then Mine's "Recently closed"
+    /// last when expanded. An ungrouped list is one group.
+    public static func prGroups(
+        tab: PRTab, contents: TabContents, grouping: PRGrouping, recentlyClosed: [PullRequest],
+        closedExpanded: Bool
+    ) -> [[PRKey]] {
+        var groups: [[PRKey]]
+        switch grouping {
+        case .repository: groups = repoGroups(contents.rows).map { $0.rows.map(\.pr.key) }
+        case .author: groups = authorGroups(contents.rows).map { $0.rows.map(\.pr.key) }
+        case .none: groups = [contents.rows.map(\.pr.key)]
+        }
+        if tab == .mine && closedExpanded { groups.append(recentlyClosed.map(\.key)) }
+        return groups
+    }
+
+    /// The PR list's rows as shown, `prGroups` flattened.
+    public static func prKeys(
+        tab: PRTab, contents: TabContents, grouping: PRGrouping, recentlyClosed: [PullRequest],
+        closedExpanded: Bool
+    ) -> [PRKey] {
+        prGroups(
+            tab: tab, contents: contents, grouping: grouping, recentlyClosed: recentlyClosed,
+            closedExpanded: closedExpanded
+        ).flatMap { $0 }
+    }
+
     public static func prKeys(
         tab: PRTab, contents: TabContents, groupedByRepo: Bool, recentlyClosed: [PullRequest],
         closedExpanded: Bool
     ) -> [PRKey] {
-        let rows = groupedByRepo ? repoGroups(contents.rows).flatMap(\.rows) : contents.rows
-        var keys = rows.map(\.pr.key)
-        if tab == .mine && closedExpanded { keys += recentlyClosed.map(\.key) }
-        return keys
+        prKeys(
+            tab: tab, contents: contents, grouping: groupedByRepo ? .repository : .none,
+            recentlyClosed: recentlyClosed, closedExpanded: closedExpanded)
     }
 
     /// An Issues list's rows as shown: every group but Done and the `folded` lanes, then Done when

@@ -53,7 +53,7 @@ Keyboard-first · Native SwiftUI · Read-only
 |:-:|---|---|---|
 | <kbd>⌘</kbd><kbd>1</kbd> | **Pull Requests** | Review | PRs requesting your or your team's review, re-requests, new commits since your review, with lines changed |
 | | | Mine | Your open PRs, review pills, checks, *Ready to merge*. Folded *Recently closed*: last 7 days |
-| | | Team | Other open PRs in the org |
+| | | Team | Other open PRs in the org, by repo or by author |
 | <kbd>⌘</kbd><kbd>2</kbd> | **Issues** | Assigned | Your issues, grouped by board Status (by repo without a board). Folded *Done*: done on the board, still open |
 | | | Created | Issues you opened |
 | | | Board | All open issues on the board, by Status. Folded *Done*: last 14 days |
@@ -112,7 +112,7 @@ Full list in the [manual](docs/manual.md#keyboard).
 
 | Tab | |
 |---|---|
-| General | Grouping, compact cards, filters, menu bar count, refresh interval, shortcut, launch at login, updates |
+| General | Grouping, Team by author, compact cards, filters, menu bar count, refresh interval, shortcut, launch at login, updates |
 | Account | Account, org, board |
 | Notifications | A separate toggle for each event on your PRs, PRs you review, issues assigned to you and issues you created: reviews, CI, comments, ready to merge, merged, assigned, status changes, closed or reopened |
 | Search | Saved searches: rename, edit, reorder, delete |

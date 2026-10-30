@@ -6,6 +6,19 @@ public enum BadgeSource: String, Codable, CaseIterable, Sendable { case review, 
 
 public enum Grouping: String, Codable, Sendable { case repository, none }
 
+/// How a PR tab's rows are grouped on screen: the setting, narrowed by the repo focus, and for Team the
+/// author option.
+public enum PRGrouping: Equatable, Sendable {
+    case repository, author, none
+
+    /// Team by author whatever the setting and a repo focus; otherwise by repository unless the setting
+    /// is off or a repo focus merges the repositories.
+    public static func forTab(_ tab: PRTab, settings: AppSettings, repoFocused: Bool) -> PRGrouping {
+        if tab == .team && settings.groupTeamByAuthor { return .author }
+        return settings.grouping == .repository && !repoFocused ? .repository : .none
+    }
+}
+
 public enum PopoverMode: String, Codable, CaseIterable, Sendable { case pullRequests, issues }
 
 public enum IssueTab: String, Codable, CaseIterable, Sendable { case assigned, created, board }
@@ -116,6 +129,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// The board last chosen for each owner (`BoardOwner.key`), restored when its scope comes back.
     public var boardByOwner: [String: Int] = [:]
     public var grouping: Grouping = .repository
+    /// Team lists its pull requests under their authors, whatever `grouping` is and also under a repo focus.
+    public var groupTeamByAuthor = false
+    /// Review lists the oldest pull requests first (by when each was opened) instead of the latest activity.
+    public var reviewOldestFirst = false
     public var compact = false
     public var hideOlderThanTwoMonths = true
     public var hideApprovedByMe = true
@@ -156,7 +173,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var askExcludedRepos: [String] = []
 
     private enum CodingKeys: String, CodingKey {
-        case account, org, projectNumber, projectOwner, projectOrg, orgByAccount, boardByOwner, grouping, compact,
+        case account, org, projectNumber, projectOwner, projectOrg, orgByAccount, boardByOwner, grouping, groupTeamByAuthor, reviewOldestFirst, compact,
             hideOlderThanTwoMonths, hideApprovedByMe, hideDrafts, badge, notify, refreshMinutes, lastTab, toggleHotkey, mode, lastIssueTab,
             countAssignedIssues, solidBackground, accountSource, appAccounts, signedOutByUser, laneFolds,
             askEnabled, askModel, askModelChoices, askExcludedRepos
@@ -187,6 +204,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         d.orgByAccount = c.readableValues(String.self, forKey: .orgByAccount) ?? d.orgByAccount
         d.boardByOwner = c.readableValues(Int.self, forKey: .boardByOwner) ?? d.boardByOwner
         d.grouping = c.readable(Grouping.self, forKey: .grouping) ?? d.grouping
+        d.groupTeamByAuthor = c.readable(Bool.self, forKey: .groupTeamByAuthor) ?? d.groupTeamByAuthor
+        d.reviewOldestFirst = c.readable(Bool.self, forKey: .reviewOldestFirst) ?? d.reviewOldestFirst
         d.compact = c.readable(Bool.self, forKey: .compact) ?? d.compact
         d.hideOlderThanTwoMonths =
             c.readable(Bool.self, forKey: .hideOlderThanTwoMonths) ?? d.hideOlderThanTwoMonths
@@ -229,6 +248,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         try c.encode(orgByAccount, forKey: .orgByAccount)
         try c.encode(boardByOwner, forKey: .boardByOwner)
         try c.encode(grouping, forKey: .grouping)
+        try c.encode(groupTeamByAuthor, forKey: .groupTeamByAuthor)
+        try c.encode(reviewOldestFirst, forKey: .reviewOldestFirst)
         try c.encode(compact, forKey: .compact)
         try c.encode(hideOlderThanTwoMonths, forKey: .hideOlderThanTwoMonths)
         try c.encode(hideApprovedByMe, forKey: .hideApprovedByMe)
