@@ -1,7 +1,6 @@
-// Demo data for search: Pull Requests mode, "test @al" typed with the caret at the end. The "@al" token is
-// being picked, so it is left out of the query (SearchFieldState): the results behind are for "test", laid out
-// like the Team tab, and the people list for "al" covers their top. Tab counts are each tab's matches; no tab
-// is selected (search spans all tabs).
+// Demo data for search: Pull Requests mode, "test" typed with the caret at the end. The results are laid out
+// like the Team tab. Tab counts are each tab's matches; no tab is selected (search spans all tabs). The footer
+// is SearchFooter: the coverage and match count, then Open and Clear. Ask AI is left out: with it the line is wider than the popover, so SearchFooter drops it.
 window.SCENES = window.SCENES || {};
 window.SCENES.search = {
   view: "search",
@@ -14,18 +13,11 @@ window.SCENES.search = {
     { id: "team", title: "Team", count: 3 },
   ],
   selectedTab: null,
-  search: { text: "test @al", focused: true },
+  search: { text: "test", focused: true },
   filter: { repoTitle: "All repos" },
-  completion: {
-    selection: 0,
-    candidates: [
-      { login: "alice", isMember: true, openCount: 5 },
-      { login: "alan-k", isMember: true, openCount: 1 },
-      { login: "dalton", isMember: false, openCount: 1 },
-    ],
-  },
   searchResults: {
     words: ["test"],
+    coverage: "Titles in all of initech",
     count: 5,
     // Laid out as the Team tab is, grouped by repo (newest group first) with Team's rows; no context line.
     groups: [

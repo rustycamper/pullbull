@@ -399,11 +399,9 @@
     const P = window.PullBull;
     const searching = d.view === "search";
     const body = searching ? P.searchBody(d) : d.mode === "issues" ? issueList(d, scheme) : list(d);
-    const foot = d.completion ? P.completionFooter() : searching ? P.searchFooter(d.searchResults.count) : footer(d.viewer);
-    // The completion list overlays the top of the filter row and everything under it (PopoverView.tabsAndSearch).
-    const overlay = d.completion ? `<div class="completion-overlay">${P.completionList(d.completion)}</div>` : "";
+    const foot = searching ? P.searchFooter(d.searchResults) : footer(d.viewer);
     return `<div class="panel">${header(d)}${d.filter ? "" : '<div class="hairline"></div>'}` +
-      `<div class="below-header">${d.filter ? filterBar(d.filter) : ""}${body}${overlay}</div>${foot}</div>`;
+      `<div class="below-header">${d.filter ? filterBar(d.filter) : ""}${body}</div>${foot}</div>`;
   }
 
   function menuBarItem(count, open) {
