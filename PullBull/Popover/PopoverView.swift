@@ -524,9 +524,8 @@ struct PopoverView: View {
             // ⇧⌘↩ and ⌃⌘C: the selected result's or highlighted row's files and checkout command. Neither
             // edits text, so they work with the search field focused too.
             if Self.isShiftCommandReturn(event, flags: flags) {
-                guard let key = model.selectedPRKey(in: listKeys), let files = model.filesLink(for: key)
-                else { return false }
-                NSWorkspace.shared.open(files.url)
+                guard let key = model.selectedPRKey(in: listKeys) else { return false }
+                NSWorkspace.shared.open(model.filesLink(for: key).url)
                 return true
             }
             if Self.isControlCommandC(event, flags: flags) {
@@ -759,8 +758,8 @@ struct PopoverView: View {
         if Self.isOptionCommandC(event, flags: flags) { return model.copyShownDetailMarkdownLink() }
         // ⇧⌘↩ and ⌃⌘C act on a PR detail only.
         if Self.isShiftCommandReturn(event, flags: flags) {
-            guard case .detail(let key) = model.route, let files = model.filesLink(for: key) else { return false }
-            NSWorkspace.shared.open(files.url)
+            guard case .detail(let key) = model.route else { return false }
+            NSWorkspace.shared.open(model.filesLink(for: key).url)
             return true
         }
         if Self.isControlCommandC(event, flags: flags) {

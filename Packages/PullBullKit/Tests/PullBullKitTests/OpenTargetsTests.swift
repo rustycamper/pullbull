@@ -5,13 +5,15 @@ import Testing
 private let t0 = Date(timeIntervalSince1970: 1_700_000_000)
 private let key = PRKey(repo: "acme/web", number: 412)
 
-private func pr(head: String?, reviews: [Review], author: String = "alice") -> PullRequest {
+private func pr(
+    head: String?, reviews: [Review], author: String = "alice", requests: [Reviewer] = []
+) -> PullRequest {
     PullRequest(
         key: key, title: "t", url: URL(string: "https://github.com/acme/web/pull/412")!,
         author: author, authorAvatarURL: nil, state: .open, isDraft: false,
         createdAt: t0, updatedAt: t0, closedAt: nil, headRef: "h", baseRef: "main",
         ci: .none, headCommitDate: t0.addingTimeInterval(3600), commentCount: 0, lastCommentAuthor: nil,
-        latestReviews: reviews, reviewRequests: [], headCommitOid: head)
+        latestReviews: reviews, reviewRequests: requests, headCommitOid: head)
 }
 
 private func review(_ oid: String?, by author: String = "me", state: ReviewState = .approved) -> Review {
@@ -60,6 +62,20 @@ private func target(_ pr: PullRequest) -> FilesLink {
     @Test func myReviewMatchesCaseInsensitively() {
         let link = FilesLink.target(for: pr(head: "bbb", reviews: [review("aaa", by: "Me")]), me: "me", myTeams: [])
         #expect(link.sinceReview)
+    }
+
+    @Test func reRequestedWithNewCommitsIsPlain() {
+        let link = target(pr(head: "bbb", reviews: [review("aaa")], requests: [.user("me")]))
+        #expect(link.url == Self.files)
+        #expect(!link.sinceReview)
+        #expect(link.menuTitle == "Open Files Changed")
+    }
+
+    @Test func plainForBareKey() {
+        let link = FilesLink.plain(key)
+        #expect(link.url == Self.files)
+        #expect(!link.sinceReview)
+        #expect(link.menuTitle == "Open Files Changed")
     }
 
     @Test func checkout() {

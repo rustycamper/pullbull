@@ -10,10 +10,15 @@ public struct FilesLink: Equatable, Sendable {
 
     public var menuTitle: String { sinceReview ? "Open Changes Since My Review" : "Open Files Changed" }
 
+    /// `…/pull/N/files`, for a PR whose list data (and review) is not at hand.
+    public static func plain(_ key: PRKey) -> FilesLink {
+        FilesLink(url: OpenTargets.pullPage(key, "files"), sinceReview: false)
+    }
+
     /// `…/pull/N/files/<reviewed>..<head>` when the PR needs my review for new commits and both oids are
     /// known; `…/pull/N/files` otherwise.
     public static func target(for pr: PullRequest, me: String, myTeams: Set<String>) -> FilesLink {
-        let files = OpenTargets.pullPage(pr.key, "files")
+        let files = plain(pr.key).url
         guard ReviewRules.status(of: pr, me: me, myTeams: myTeams).reviewReason == .newCommitsSinceReview,
               let head = pr.headCommitOid, let reviewed = ReviewRules.myReview(pr, me: me)?.commitOid,
               head != reviewed

@@ -2054,9 +2054,9 @@ extension AppModel {
         FilesLink.target(for: pr, me: snapshot?.org.viewer ?? "", myTeams: snapshot?.org.myTeams ?? [])
     }
 
-    /// Nil while the PR's list data isn't at hand.
-    func filesLink(for key: PRKey) -> FilesLink? {
-        pullRequest(for: key).map(filesLink(for:))
+    /// The plain Files changed page while the PR's list data isn't at hand.
+    func filesLink(for key: PRKey) -> FilesLink {
+        pullRequest(for: key).map(filesLink(for:)) ?? .plain(key)
     }
 
     /// Open Failing Check: the first failed check's page, from the detail when it still matches the row,
