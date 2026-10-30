@@ -31,6 +31,13 @@ extension SearchScope {
     }
 }
 
+/// Whether the shown tab's Recently closed (PRs) and Done (issues) groups are expanded; the popover keeps
+/// it in step with what it shows.
+struct ListExpansion: Equatable {
+    var closed = false
+    var done = false
+}
+
 @Observable @MainActor
 final class AppModel {
     var settings: AppSettings {
@@ -83,6 +90,7 @@ final class AppModel {
             if settings.mode != mode { settings.mode = mode }
             guard mode != oldValue else { return }
             timeFocus = nil
+            detailWalk = nil
             modeNews.show(mode)
             // The other mode's tabs don't narrow this mode's search.
             let wasNarrowed = searchScope.isNarrowed
@@ -306,6 +314,11 @@ final class AppModel {
     private(set) var detailFetch: DetailFetch?
     /// Where Back returns to from the detail view.
     private(set) var detailReturnRoute: Route = .list
+    /// ⌥↓ / ⌥↑ through the list or search results the detail on screen was opened from; nil for a
+    /// detail opened from a notification, Ask or a link. An issue walk lasts through a linked PR's detail.
+    private(set) var detailWalk: DetailWalk?
+    /// Recently closed and Done as the popover shows them, so a walk's order is the one on screen.
+    @ObservationIgnored var listExpansion = ListExpansion()
     /// A notification opened a detail while the popover was closed; the next open shows it as it is.
     @ObservationIgnored var detailOpenedWhileClosed = false
     @ObservationIgnored private var detailTask: Task<Void, Never>?
@@ -1752,14 +1765,71 @@ extension AppModel {
         return openedPR?.key == key ? openedPR : nil
     }
 
-    /// A PR row chosen in a list or search: the row flashes, then its detail opens.
+    /// A PR row chosen in a list or search: the row flashes, then its detail opens, with ⌥↓ / ⌥↑ walking
+    /// the rows in the order on screen now.
     func openRowDetail(_ key: PRKey) {
-        flashRow(key) { $0.openDetail(key) }
+        let walk = DetailWalk(keys: walkKeys, opening: key, kind: .pullRequest)
+        flashRow(key) { model in
+            model.openDetail(key)
+            model.detailWalk = walk
+        }
     }
 
-    /// An issue row chosen in a list or search: the row flashes, then its detail opens.
+    /// An issue row chosen in a list or search: the row flashes, then its detail opens, with ⌥↓ / ⌥↑
+    /// walking the rows in the order on screen now.
     func openRowIssueDetail(_ key: PRKey) {
-        flashRow(key) { $0.openIssueDetail(key) }
+        let walk = DetailWalk(keys: walkKeys, opening: key, kind: .issue)
+        flashRow(key) { model in
+            model.openIssueDetail(key)
+            model.detailWalk = walk
+        }
+    }
+
+    /// The rows a walk steps through: the search results while searching, else the tab's list as shown.
+    private var walkKeys: [PRKey] {
+        route == .search
+            ? searchItemKeys : listKeys(closedExpanded: listExpansion.closed, doneExpanded: listExpansion.done)
+    }
+
+    /// "2 of 6" for the detail on screen; nil when it has no walk.
+    var detailPosition: String? {
+        switch route {
+        case .detail(let key): detailWalk?.position(showing: key, kind: .pullRequest)
+        case .issueDetail(let key): detailWalk?.position(showing: key, kind: .issue)
+        case .list, .search, .ask: nil
+        }
+    }
+
+    /// ⌥↓ / ⌥↑ in a detail: the next or previous item of its walk, with the list or search selection
+    /// following, so Back lands on it. An item that has left the data, with no detail cached, is skipped.
+    /// False when the detail has no walk (the key passes on); true at either end, where nothing happens.
+    func stepDetail(by offset: Int) -> Bool {
+        guard detailPosition != nil, let walk = detailWalk else { return false }
+        let next = walk.stepped(by: offset) { key in
+            switch walk.kind {
+            case .pullRequest: pullRequest(for: key) == nil && details[key] == nil
+            case .issue: issue(for: key) == nil && issueDetails[key] == nil
+            }
+        }
+        guard let next else { return true }
+        detailWalk = next
+        let key = next.current
+        let fromSearch = switch walk.kind {
+        case .pullRequest: detailReturnRoute == .search
+        case .issue: issueDetailReturnRoute == .search
+        }
+        if fromSearch {
+            keptSearchSelection = nil
+            searchSelection = key
+        } else {
+            listSelection = key
+        }
+        // The route is already this kind of detail, so where Back returns to stays.
+        switch walk.kind {
+        case .pullRequest: openDetail(key)
+        case .issue: openIssueDetail(key)
+        }
+        return true
     }
 
     /// Highlights the row for `RowFlash.duration`, then runs `open`. A choice during the flash is
@@ -1781,6 +1851,11 @@ extension AppModel {
 
     /// Shows the detail view for `key` with the cached detail at once, then refreshes it in place.
     func openDetail(_ key: PRKey) {
+        // A step keeps the walk; so does a linked PR, whose issue walk resumes on Back. Any other open
+        // (a notification, Ask) has none; a row's walk is set once the detail is open.
+        if case .issueDetail = route {} else if detailWalk?.position(showing: key, kind: .pullRequest) == nil {
+            detailWalk = nil
+        }
         switch route {
         case .ask: askReturn.open(from: .ask)
         case .issueDetail: if !askReturn.isEmpty { askReturn.open(from: .issueDetail) }
@@ -1804,12 +1879,15 @@ extension AppModel {
         if !askReturn.isEmpty, askReturn.close() == .ask {
             route = .ask
         } else if case .issueDetail(let issue) = detailReturnRoute {
+            // The issue's walk, if any, goes on from there.
             route = detailReturnRoute
             loadIssueDetail(issue)
+            return
         } else {
             route = detailReturnRoute == .search && !searchText.isEmpty ? .search : .list
             searchAgainIfStale()
         }
+        detailWalk = nil
     }
 
     /// Whether Back from the detail on screen (through an issue detail, for a linked PR) ends in the
@@ -1953,6 +2031,7 @@ extension AppModel {
         openedPR = nil
         refreshSeenSincePrefetch = false
         detailReturnRoute = .list
+        detailWalk = nil
         issueDetailTask?.cancel()
         issueDetailTask = nil
         issueDetails = [:]
@@ -2158,6 +2237,7 @@ extension AppModel {
         issueDetailFetch = nil
         detailReturnRoute = .list
         issueDetailReturnRoute = .list
+        detailWalk = nil
     }
 
     /// ⌘R in a detail: fetches it again unless a fetch is already running.
@@ -2370,6 +2450,9 @@ extension AppModel {
 
     /// Shows the issue detail for `key` with the cached detail at once, then refreshes it in place.
     func openIssueDetail(_ key: PRKey) {
+        // A step keeps the walk; any other open (a notification, Ask) has none, and a row's walk is set
+        // once the detail is open.
+        if detailWalk?.position(showing: key, kind: .issue) == nil { detailWalk = nil }
         switch route {
         case .list, .search:
             leaveAsk()
@@ -2399,6 +2482,7 @@ extension AppModel {
         issueDetailTask?.cancel()
         issueDetailTask = nil
         issueDetailFetch = nil
+        detailWalk = nil
         if !askReturn.isEmpty, askReturn.close() == .ask {
             route = .ask
             return

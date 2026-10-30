@@ -98,6 +98,7 @@ struct PopoverView: View {
     }
     /// The Done group of the Issues tab on screen is unfolded.
     private var doneExpanded: Bool { doneExpandedTabs.contains(model.selectedIssueTab) }
+    private var listExpansion: ListExpansion { ListExpansion(closed: closedExpanded, done: doneExpanded) }
 
     private func doneExpanded(_ tab: IssueTab) -> Binding<Bool> {
         Binding {
@@ -195,6 +196,8 @@ struct PopoverView: View {
         // Folding a group drops a highlight on one of its rows, so it doesn't come back on the next unfold.
         .onChange(of: closedExpanded) { _, expanded in if !expanded { dropHiddenListSelection() } }
         .onChange(of: doneExpandedTabs) { old, new in if !old.isSubset(of: new) { dropHiddenListSelection() } }
+        // A detail's walk snapshots the rows as shown, Recently closed and Done included when expanded.
+        .onChange(of: listExpansion, initial: true) { _, new in model.listExpansion = new }
         .onChange(of: fieldFocused) { _, focused in
             // Back in the search field (a click, ⌘F): its hints show, and the save row gives way.
             if focused {
@@ -756,11 +759,22 @@ struct PopoverView: View {
         return true
     }
 
-    /// The detail views have no search: Esc, ← and ⌘[ go back, ⌘↩ opens the page on GitHub, ⌘C copies its
-    /// link (unless text is selected), ⌘⇧C its reference, ⌥⌘C its Markdown link, ⌘R fetches it again.
-    /// Every other key passes through.
+    /// The detail views have no search: Esc, ← and ⌘[ go back, ⌥↓ / ⌥↑ step through the list it came
+    /// from, ⌘↩ opens the page on GitHub, ⌘C copies its link (unless text is selected), ⌘⇧C its
+    /// reference, ⌥⌘C its Markdown link, ⌘R fetches it again. Every other key passes through.
     private func handleDetailKey(_ event: NSEvent, flags: NSEvent.ModifierFlags, in window: NSWindow) -> Bool {
         guard flags.contains(.command) else {
+            if event.keyCode == SearchKeyMonitor.upArrow || event.keyCode == SearchKeyMonitor.downArrow {
+                // ⌥ only (arrows carry .numericPad and .function); a repeat steps again. Without a walk the
+                // key passes on; at either end it's taken and nothing happens.
+                guard flags.subtracting([.capsLock, .numericPad, .function]) == .option else { return false }
+                let before = model.detailPosition
+                guard model.stepDetail(by: event.keyCode == SearchKeyMonitor.downArrow ? 1 : -1) else { return false }
+                if let position = model.detailPosition, position != before {
+                    AccessibilityNotification.Announcement(position).post()
+                }
+                return true
+            }
             if event.keyCode == SearchKeyMonitor.leftArrow {
                 // Arrows carry .numericPad and .function; ⌥ and ⇧ arrows are left alone. SwiftUI's selectable
                 // text doesn't report a selection, so ← goes back even with text selected.
