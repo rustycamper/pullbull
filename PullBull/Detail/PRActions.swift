@@ -91,6 +91,41 @@ extension FocusMenuItem {
     }
 }
 
+/// "Open All N on GitHub" on a group header; nil unless the group holds two or more pages.
+struct BulkOpenItem {
+    let title: String
+    let action: () -> Void
+
+    @MainActor init?(urls: [URL]) {
+        let urls = BulkOpen.urls(urls)
+        guard BulkOpen.offers(count: urls.count) else { return nil }
+        title = BulkOpen.menuTitle(count: urls.count)
+        action = { BulkOpenItem.open(urls) }
+    }
+
+    /// Above the threshold, asks first: as a sheet on the popover's panel when it is key, so the panel
+    /// stays open (and keeps its state) behind the question; otherwise as an app-modal alert.
+    @MainActor private static func open(_ urls: [URL]) {
+        guard BulkOpen.needsConfirmation(count: urls.count) else {
+            urls.forEach { NSWorkspace.shared.open($0) }
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = BulkOpen.prompt(count: urls.count)
+        alert.addButton(withTitle: "Open")
+        alert.addButton(withTitle: "Cancel")
+        let confirmed = { urls.forEach { NSWorkspace.shared.open($0) } }
+        if let window = NSApp.keyWindow {
+            alert.beginSheetModal(for: window) { response in
+                if response == .alertFirstButtonReturn { confirmed() }
+            }
+        } else {
+            NSApp.activate()
+            if alert.runModal() == .alertFirstButtonReturn { confirmed() }
+        }
+    }
+}
+
 extension View {
     /// Right-click: the repo focus and person search items (list and search rows), Copy Branch Name, Copy
     /// Checkout Command, Copy Link, Copy as Markdown Link, Open on GitHub, the files item (`files.menuTitle`)
@@ -143,13 +178,19 @@ extension View {
         .accessibilityAction(named: "Copy as Markdown Link") { PRActions.copyMarkdownLink(issue) }
     }
 
-    /// Right-click on a repo group header or a list's background: the repo focus and Show Only Updated
-    /// items; no menu without either.
-    @ViewBuilder func focusContextMenu(_ focus: FocusMenuItem? = nil, time: TimeFocusMenu? = nil) -> some View {
-        if focus != nil || time != nil {
+    /// Right-click on a group header or a list's background: the repo focus, Show Only Updated and, on a
+    /// header, Open All; no menu without any.
+    @ViewBuilder func focusContextMenu(
+        _ focus: FocusMenuItem? = nil, time: TimeFocusMenu? = nil, openAll: BulkOpenItem? = nil
+    ) -> some View {
+        if focus != nil || time != nil || openAll != nil {
             contextMenu {
                 if let focus { FocusMenuButton(item: focus) }
                 if let time { time }
+                if let openAll {
+                    if focus != nil || time != nil { Divider() }
+                    Button(openAll.title, systemImage: "arrow.up.right.square", action: openAll.action)
+                }
             }
         } else {
             self

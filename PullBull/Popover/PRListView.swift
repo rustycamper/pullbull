@@ -59,7 +59,7 @@ struct PRListView: View {
                     Section {
                         rows(group.rows)
                     } header: {
-                        repoHeader(group.repo, count: group.rows.filter(\.counted).count)
+                        repoHeader(group.repo, rows: group.rows)
                             .pinnedHeaderBackground()
                     }
                 }
@@ -127,11 +127,14 @@ struct PRListView: View {
     }
 
     /// A repo group's header, counting what the tab counts; it offers the repo focus.
-    private func repoHeader(_ repo: String, count: Int) -> some View {
-        ListSectionHeader(
+    private func repoHeader(_ repo: String, rows: [Row]) -> some View {
+        let count = rows.filter(\.counted).count
+        return ListSectionHeader(
             glyph: "book.closed", title: repo.split(separator: "/").last.map(String.init) ?? repo,
             count: count > 0 ? count : nil, compact: model.settings.compact)
-            .focusContextMenu(FocusMenuItem(model: model, repo: repo), time: TimeFocusMenu(model: model))
+            .focusContextMenu(
+                FocusMenuItem(model: model, repo: repo), time: TimeFocusMenu(model: model),
+                openAll: BulkOpenItem(urls: rows.map(\.pr.url)))
     }
 }
 
@@ -148,7 +151,8 @@ private struct AuthorHeader: View {
             glyph: nil, title: author, count: count > 0 ? count : nil,
             avatar: .init(login: author, url: rows.first?.pr.authorAvatarURL), compact: model.settings.compact)
         .focusContextMenu(
-            FocusMenuItem.person(model: model, login: author), time: TimeFocusMenu(model: model))
+            FocusMenuItem.person(model: model, login: author), time: TimeFocusMenu(model: model),
+            openAll: BulkOpenItem(urls: rows.map(\.pr.url)))
     }
 }
 

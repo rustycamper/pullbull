@@ -82,6 +82,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - **Detail:** labels, reviewers, checks, description, conversation, files. Markdown incl. `<details>`. **Open Failing Check** beside failed checks
 - **Labels:** up to two chips per row (none in compact cards), each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail lists them all
 - **Right-click a row:** copy branch, link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · show only updated · search author
+- **Right-click a group header** (repo, author): **Open All *N* on GitHub**, from two PRs up; above 8 it asks first. An author header's menu also offers **Search @*login*** and **Show Only Updated**
 - **Footer:** account · refresh · open on GitHub · settings. Turns amber with **Retry** when a refresh fails
 - **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Lists your signed-in accounts, then GitHub CLI logins, each with the org it opens in; then Add Account… and Account Settings…. Each account comes back with its last org, and each org with its last board
 
@@ -103,6 +104,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - **Labels:** chips as on [pull requests](#pull-requests). The board card lists them all
 - **Switch board:** on the Board tab, click its name in the filter row, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd>
 - **Right-click a row:** copy link or Markdown link · open on GitHub · show only this repo · show only updated · search author
+- **Right-click a group header** (a Status lane, No status, Not on board or a repo): **Open All *N* on GitHub**, from two issues up; above 8 it asks first. Done has none
 - **Detail:** board card (incl. labels) · linked PRs (<kbd>Esc</kbd> returns) · description · last two comments
 
 ## Search
@@ -263,7 +265,7 @@ Reopen within a minute and the detail is still there.
 
 ## Recent activity
 
-- Right-click a row, a repo header or the list → **Show Only Updated** → Today, In the Last 3 Days, In the Last Week or In the Last Month
+- Right-click a row, a repo header, an author header or the list → **Show Only Updated** → Today, In the Last 3 Days, In the Last Week or In the Last Month
 - A strip above the list names the step: *Today*, *Last 3 days*, *Last week*, *Last month*; hover for the full line and start date
 - On Mine, the Recently closed header names the step too; under the month it stays *Last 7 days*
 - Back to all: ✕ in the strip, **Show All**, or <kbd>Esc</kbd>. <kbd>Esc</kbd> clears this and Show Only *repo* together

@@ -142,7 +142,12 @@ private struct IssueGroupHeader: View {
         ListSectionHeader(
             glyph: symbol, glyphColor: symbolColor, title: group.title,
             count: group.counted ? group.issues.count : nil, fold: fold, compact: model.settings.compact)
-            .focusContextMenu(focusItem, time: TimeFocusMenu(model: model))
+            .focusContextMenu(focusItem, time: TimeFocusMenu(model: model), openAll: openAll)
+    }
+
+    /// Every lane and repo group offers it; the merged untitled group has no header.
+    private var openAll: BulkOpenItem? {
+        BulkOpenItem(urls: group.issues.map(\.url))
     }
 
     /// Status lanes take the owner's Status colour; the colour is decorative, the title names the status.
