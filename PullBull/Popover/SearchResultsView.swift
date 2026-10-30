@@ -123,14 +123,11 @@ struct SearchResultsView: View {
         } else if let message = results?.emptyMessage(
             org: focusName ?? org, query: model.searchQuery, scope: model.snapshot?.scope, mode: model.mode) {
             // With a key saved, Ask may find it from a looser description.
+            // A name or label nothing has loaded says so in the detail, in place of the hint.
             ListStateView(
                 symbol: "magnifyingglass", title: message,
-                detail: model.offersAsk ? "Try other words, or ⌥⌘↩ to Ask AI." : "Try other words."
-            ) {
-                if let unknown = unknownToken {
-                    footerLine("\(unknown) isn't on anything PullBull has loaded")
-                }
-            }
+                detail: unknownToken.map { "\($0) isn't on anything PullBull has loaded." }
+                    ?? (model.offersAsk ? "Try other words, or ⌥⌘↩ to Ask AI." : "Try other words."))
         } else {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
@@ -145,14 +142,12 @@ struct SearchResultsView: View {
     private func narrowedEmpty(_ tab: String) -> some View {
         ListStateView(
             symbol: "magnifyingglass", title: SearchContext.noMatches(inTab: tab),
-            detail: "Search everything to look in every tab."
-        ) {
-            Button("Search everything") { model.searchEverything() }
-                .buttonStyle(.link)
-                .font(.system(size: 11))
-                .help(model.mode == .issues
-                    ? "Search every issue for this query" : "Search every pull request for this query")
-        }
+            detail: "Search everything to look in every tab.",
+            detailLink: .init(
+                phrase: "Search everything",
+                help: model.mode == .issues
+                    ? "Search every issue for this query" : "Search every pull request for this query",
+                perform: { model.searchEverything() }))
     }
 
     /// Only the other mode's kind matches: one quiet line in the empty message's place, which switches
@@ -184,16 +179,9 @@ struct SearchResultsView: View {
         _ message: String, symbol: String, help: String? = nil, retry: @escaping () -> Void
     ) -> some View {
         ListStateView(
-            symbol: symbol, tone: .warning, title: message, detail: "Check your connection and retry.",
+            symbol: symbol, tone: .warning, title: message,
+            detail: symbol == "wifi.slash" ? "Check your connection and retry." : "Try again in a moment.",
             action: .init(title: "Retry", help: help, disabled: model.status.isRefreshing, perform: retry))
-    }
-
-    private func footerLine(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 11))
-            .foregroundStyle(.secondary)
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: Groups
@@ -348,8 +336,10 @@ struct SearchFooter: View {
                 hints
             } else {
                 ViewThatFits(in: .horizontal) {
-                    line(withAsk: model.offersAsk)
-                    line(withAsk: false)
+                    // Fit is judged with the spinner and the match count's room held, so the hint doesn't
+                    // blink as they come and go.
+                    line(withAsk: model.offersAsk, reservesRoom: true)
+                    line(withAsk: false, reservesRoom: false)
                 }
             }
         }
@@ -361,9 +351,9 @@ struct SearchFooter: View {
         .overlay(alignment: .top) { Hairline() }
     }
 
-    private func line(withAsk: Bool) -> some View {
+    private func line(withAsk: Bool, reservesRoom: Bool) -> some View {
         HStack(spacing: 10) {
-            SearchSummary(model: model)
+            SearchSummary(model: model, reservesRoom: reservesRoom)
             Spacer()
             if withAsk {
                 // Ask is offered only once a key is saved; ⌥⌘↩ is the one way to send anything to Anthropic.
@@ -393,6 +383,9 @@ struct SearchFooter: View {
 /// started-typing, person or label glyph, and trailed by a spinner while GitHub answers.
 struct SearchSummary: View {
     let model: AppModel
+    /// Lays out for the longest the summary gets (a three-digit count, the spinner showing), so the line
+    /// around it doesn't change size as those come and go.
+    var reservesRoom = false
 
     var body: some View {
         HStack(spacing: 6) {
@@ -409,15 +402,29 @@ struct SearchSummary: View {
                     .font(.system(size: 10))
                     .accessibilityHidden(true)
             }
-            Text(contextText)
-                .monospacedDigit()
-                .lineLimit(1)
-                .layoutPriority(-1)
-                .accessibilityLabel(contextLabel)
-            if let results = model.searchResults, results.phase == .searching, !results.isEmpty(in: model.mode) {
+            ZStack(alignment: .leading) {
+                if reservesRoom {
+                    Text(widestContextText)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .hidden()
+                        .accessibilityHidden(true)
+                }
+                Text(contextText)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .accessibilityLabel(contextLabel)
+            }
+            .layoutPriority(-1)
+            if searchingGitHub {
                 ProgressView()
                     .controlSize(.mini)
                     .accessibilityLabel("Searching GitHub")
+            } else if reservesRoom {
+                ProgressView()
+                    .controlSize(.mini)
+                    .hidden()
+                    .accessibilityHidden(true)
             }
         }
     }
@@ -444,6 +451,19 @@ struct SearchSummary: View {
     private var matches: Int? {
         guard let results = model.searchResults, matchCount > 0 || results.phase != .searching else { return nil }
         return matchCount
+    }
+
+    private var searchingGitHub: Bool {
+        guard let results = model.searchResults else { return false }
+        return results.phase == .searching && !results.isEmpty(in: model.mode)
+    }
+
+    /// The summary with a count of the widest size it takes.
+    private var widestContextText: String {
+        if let scopeTitle {
+            return SearchContext.narrowedText(model.searchQuery, tab: scopeTitle, matches: 999)
+        }
+        return SearchContext.footerText(coverage, matches: 999)
     }
 
     private var contextText: String {
