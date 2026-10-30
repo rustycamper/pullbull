@@ -131,7 +131,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - Matches in the other mode show a hint: <kbd>⌘</kbd><kbd>1</kbd> / <kbd>⌘</kbd><kbd>2</kbd>
 - Empty field shows saved searches and token hints. <kbd>↓</kbd> to walk them
 - Typing `@`, `~`, `label:`, `is:`, `status:` or `updated:` opens a completion list. `status:` lists the board's Status columns with their open counts; picking one writes the full name in quotes. `updated:` lists the four steps
-- Typing the start of `status:`, `label:` or `updated:` (`st`, `la`, `up`) at the end of the field shows the rest in grey. Not `is:`, a common word; `status:` only when the board has Status columns
+- Typing the start of `status:`, `label:` or `updated:` (`st`, `la`, `up`) at the end of the field shows the rest in grey. Not `is:`, a common word; `status:` only when the board has Status columns; `updated:` only up to `upda`, so a title word like "update" is left alone
 - **Save:** bookmark icon in the field. Manage in Settings → Search
 
 | Completion list | |
