@@ -16,7 +16,7 @@ enum RowContext {
     case search(PRTab, SearchMarks)
 }
 
-/// One PR in a list. Review and Team rows lead with the author's avatar, Mine rows with a state glyph.
+/// One open PR in a list (merged and closed ones draw as `ClosedRow`). Review and Team rows lead with the author's avatar, Mine rows with a state glyph.
 /// Review state sits in the meta line (`RowChips`). Compact rows fit on one line. A search result draws
 /// as a row of the tab it is laid out for, with its marks.
 struct PRRow: View {
@@ -128,13 +128,7 @@ struct PRRow: View {
         }
     }
 
-    @ViewBuilder private var trailing: some View {
-        switch pr.state {
-        case .merged: EndedPill(merged: true)
-        case .closed: EndedPill(merged: false)
-        case .open: CIGlyph(state: pr.ci)
-        }
-    }
+    private var trailing: some View { CIGlyph(state: pr.ci) }
 
     /// The title, a search's words in bold.
     private var title: AttributedString {
@@ -143,7 +137,7 @@ struct PRRow: View {
     }
 
     private var titleStyle: AnyShapeStyle {
-        if row.dimmed || pr.isDraft || pr.state != .open { return AnyShapeStyle(.secondary) }
+        if row.dimmed || pr.isDraft { return AnyShapeStyle(.secondary) }
         return AnyShapeStyle(.primary)
     }
 
@@ -158,11 +152,7 @@ struct PRRow: View {
             pr.key, underRepoHeader: model.prGrouping(for: layoutTab) == .repository, focus: model.repoFocus)
     }
 
-    /// The relative age, or an ended PR's "merged Oct 12".
-    private var age: String {
-        EndedAge.text(state: pr.state, closedAt: pr.closedAt, now: now)
-            ?? RelativeAge.short(from: pr.updatedAt, to: now)
-    }
+    private var age: String { RelativeAge.short(from: pr.updatedAt, to: now) }
 
     /// One line at a fixed height, so a row is as tall with a capsule as without one. Under pressure the
     /// label chips drop off the end into "+N" first, then (on Review and Team) the author goes (its avatar
@@ -171,7 +161,7 @@ struct PRRow: View {
     private var meta: some View {
         let chips = chips
         let labels = LabelChipSet(pr, first: wantedLabels)
-        return ChipsThatFit(set: labels, canLean: chipTab != .mine) { fitting in
+        return ChipsThatFit(set: labels, canLean: layoutTab != .mine) { fitting in
             metaLine(chips: chips, labels: labels, fitting: fitting)
         }
         .metaLineStyle()
@@ -232,7 +222,7 @@ struct PRRow: View {
     private var compactBody: some View {
         CompactRowLayout(
             repoNumber: RepoNumber(key: pr.key, showsRepo: showsRepo, compact: true),
-            age: age, ageWidth: pr.state == .open ? 24 : nil
+            age: age, ageWidth: 24
         ) {
             switch layoutTab {
             case .mine:
@@ -256,7 +246,7 @@ struct PRRow: View {
                 chips: chips,
                 reason: layoutTab == .review && !row.dimmed ? chips.info.first(where: { $0 != .conflicts }) : nil)
         } trailing: {
-            if pr.state == .open { CIGlyph(state: pr.ci) }
+            CIGlyph(state: pr.ci)
         }
     }
 }

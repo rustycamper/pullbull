@@ -85,7 +85,7 @@ public struct RowChips: Equatable, Sendable {
 
         switch tab {
         case .mine:
-            let action = Self.action(for: pr, readyToMerge: true, changesRequestedBy: changesRequestedBy)
+            let action = Self.action(for: pr, changesRequestedBy: changesRequestedBy)
             var info: [Info] = []
             if approvals > 0 { info.append(.approvals(approvals)) }
             if approvals == 0 && changesRequestedBy.isEmpty { info.append(.noReviews) }
@@ -114,9 +114,9 @@ public struct RowChips: Equatable, Sendable {
         }
     }
 
-    /// The capsule for a PR's author: ready to merge (where `readyToMerge` allows it), else changes requested.
-    private static func action(for pr: PullRequest, readyToMerge: Bool, changesRequestedBy: [String]) -> Action? {
-        if readyToMerge && ReviewRules.isReadyToMerge(pr) { .readyToMerge }
+    /// The capsule for a PR's author: ready to merge, else changes requested.
+    private static func action(for pr: PullRequest, changesRequestedBy: [String]) -> Action? {
+        if ReviewRules.isReadyToMerge(pr) { .readyToMerge }
         else if !changesRequestedBy.isEmpty { .changesRequested(by: changesRequestedBy) }
         else { nil }
     }
