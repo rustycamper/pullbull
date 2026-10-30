@@ -400,7 +400,7 @@ struct SearchSummary: View {
         ZStack(alignment: .leading) {
             if reservesRoom {
                 HStack(spacing: 6) {
-                    leading
+                    leading(reserve: true)
                     Text(widestContextText)
                         .monospacedDigit()
                         .lineLimit(1)
@@ -412,7 +412,7 @@ struct SearchSummary: View {
                 .accessibilityHidden(true)
             }
             HStack(spacing: 6) {
-                leading
+                leading(reserve: false)
                 Text(contextText)
                     .monospacedDigit()
                     .lineLimit(1)
@@ -427,16 +427,21 @@ struct SearchSummary: View {
         }
     }
 
-    /// The started-typing glyph, then the person's avatar or the label tag.
-    @ViewBuilder private var leading: some View {
+    /// The started-typing glyph, then the person's avatar or the label tag. The hidden reserve holds the
+    /// avatar's room only, so the picture isn't loaded a second time.
+    @ViewBuilder private func leading(reserve: Bool) -> some View {
         if model.searchStartedOnTab != nil, scopeTitle == nil {
             Image(systemName: "keyboard")
                 .font(.system(size: 10))
                 .accessibilityHidden(true)
         }
         if let login = logins.first {
-            AvatarView(login: model.people.display(login), url: model.people.avatarURL(login), size: 14)
-                .accessibilityHidden(true)
+            if reserve {
+                Color.clear.frame(width: 14, height: 14)
+            } else {
+                AvatarView(login: model.people.display(login), url: model.people.avatarURL(login), size: 14)
+                    .accessibilityHidden(true)
+            }
         } else if !labels.isEmpty {
             Image(systemName: "tag")
                 .font(.system(size: 10))
