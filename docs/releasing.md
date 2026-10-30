@@ -22,7 +22,8 @@ Then [bump the Homebrew cask](#homebrew-cask).
 
 - Output: `build/release/`
 - Commits, pushes and publishes nothing
-- The printed `gh release create` attaches the zip, `appcast.xml` and the dSYM zip (for symbolicating crash reports), with the notes file as the release's description
+- The printed `gh release create` attaches the zip, its `-brew.zip` copy, `appcast.xml` and the dSYM zip (for symbolicating crash reports), with the notes file as the release's description
+- `PullBull-<version>-brew.zip` is the same bytes as the zip, for the Homebrew cask only. Sparkle and manual downloads use the plain zip, so the `-brew.zip` download count is Homebrew's alone: mostly new installs, since Sparkle updates installed copies and only `brew upgrade --greedy` downloads again
 - The feed is `releases/latest/download/appcast.xml`, so every release must be marked latest, not pre-release
 
 ## Release notes
@@ -51,12 +52,14 @@ The app offers the newest Sonnet and Haiku that the user's key lists (`GET /v1/m
 After the release is published, in [rustycamper/homebrew-tap](https://github.com/rustycamper/homebrew-tap):
 
 ```bash
-shasum -a 256 build/release/PullBull-1.0.0.zip   # in this repo
-# Casks/pullbull.rb: set version and sha256
+shasum -a 256 build/release/PullBull-1.0.0-brew.zip   # in this repo
+# Casks/pullbull.rb: set version and sha256; its url names the -brew.zip
 brew audit --cask --online --strict rustycamper/tap/pullbull
 git commit -am "pullbull 1.0.0" && git push
 ```
 
+- The first release with a `-brew.zip` (the one after 1.5.1) also changes the cask's `url` to `…/v#{version}/PullBull-#{version}-brew.zip`. Published releases are immutable, so 1.5.1 and older have no copy
+- Brew downloads per release: `gh release view v1.0.0 --json assets --jq '.assets[] | select(.name|endswith("-brew.zip")) | .downloadCount'`
 - Installed copies update through Sparkle (`auto_updates true`); the cask only matters for new installs
 - Don't test with `brew uninstall` on a Mac running PullBull: the cask's `uninstall quit:` quits it
 

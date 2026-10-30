@@ -158,8 +158,10 @@ archive=$OUT/PullBull.xcarchive
 export_dir=$OUT/export
 app=$export_dir/PullBull.app
 zip=$OUT/PullBull-$version.zip
+# The same bytes under a second name, for the Homebrew cask only, so its download count is brew's alone.
+brew_zip=$OUT/PullBull-$version-brew.zip
 dsym_zip=$OUT/PullBull-$version.dSYM.zip
-rm -rf "$archive" "$export_dir" "$zip" "$dsym_zip" "$OUT/notarize.zip" "$OUT/appcast.xml"
+rm -rf "$archive" "$export_dir" "$zip" "$brew_zip" "$dsym_zip" "$OUT/notarize.zip" "$OUT/appcast.xml"
 mkdir -p "$OUT"
 
 step "Generating the project"
@@ -224,6 +226,7 @@ spctl --assess --type execute "$app" || fail "Gatekeeper rejects the stapled app
 step "Zipping and signing for Sparkle"
 ditto -c -k --keepParent "$app" "$zip"
 enclosure_signature=$("$SPARKLE_BIN/sign_update" "$zip") || fail "sign_update failed."
+cp "$zip" "$brew_zip"
 
 step "Writing appcast.xml"
 pub_date=$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')
@@ -272,10 +275,13 @@ PullBull $version ($build) is notarised, stapled and signed for Sparkle:
   $zip
   $OUT/appcast.xml
 
+The Homebrew cask's copy of the zip (same bytes, its own download count):
+  $brew_zip
+
 Its dSYM, for symbolicating crash reports (keep it with the release):
   $dsym_zip
 
 Publish it with:
   git push origin $tag
-  gh release create $tag "$zip" "$dsym_zip" "$OUT/appcast.xml" --title "PullBull $version" --notes-file "$NOTES"
+  gh release create $tag "$zip" "$brew_zip" "$dsym_zip" "$OUT/appcast.xml" --title "PullBull $version" --notes-file "$NOTES"
 DONE
