@@ -40,7 +40,7 @@ struct IssueRow: View {
         .onHover { hovering = $0 }
         .accessibilityAddTraits(selected ? [.isSelected] : [])
         .issueContextMenu(
-            issue, focus: FocusMenuItem(model: model, repo: issue.key.repo),
+            issue, focus: FocusMenuItem(model: model, repo: issue.key.repo), time: TimeFocusMenu(model: model),
             person: .person(model: model, login: issue.author))
     }
 

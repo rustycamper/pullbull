@@ -293,7 +293,7 @@ private func filter(_ name: String, exact: Bool = false) -> BoardStatusFilter {
     }
 
     @Test func hint() {
-        #expect(SearchHint.all.last == .status)
+        #expect(SearchHint.all.contains(.status))
         #expect(SearchHint.status.sigil == "status:")
         #expect(SearchHint.status.opensList)
         #expect(!SearchHint.status.showsWord && SearchHint.state.showsWord)

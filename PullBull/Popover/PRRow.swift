@@ -44,7 +44,7 @@ struct PRRow: View {
         .accessibilityAddTraits(selected ? [.isSelected] : [])
         .prContextMenu(
             pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
-            person: .person(model: model, login: pr.author))
+            time: tab == nil ? nil : TimeFocusMenu(model: model), person: .person(model: model, login: pr.author))
     }
 
     /// A search result moves `searchSelection`, a tab row `listSelection`.
@@ -285,8 +285,12 @@ struct ClosedRow: View {
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
-                    Text(meta(merged: merged))
-                        .metaLineStyle()
+                    HStack(spacing: 5) {
+                        RepoNumber(key: pr.key)
+                        MetaDot()
+                        Text(ended(merged: merged)).fixedSize()
+                    }
+                    .metaLineStyle()
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 EndedPill(merged: merged)
@@ -302,14 +306,12 @@ struct ClosedRow: View {
         .accessibilityAddTraits(selected ? [.isSelected] : [])
         .help(pr.title)
         .prContextMenu(
-            pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
+            pr, focus: FocusMenuItem(model: model, repo: pr.key.repo), time: TimeFocusMenu(model: model),
             person: .person(model: model, login: pr.author))
     }
 
-    private func meta(merged: Bool) -> String {
-        let repo = pr.key.repo.split(separator: "/").last.map(String.init) ?? pr.key.repo
-        let ended = EndedAge.text(state: pr.state, closedAt: pr.closedAt, now: now) ?? (merged ? "merged" : "closed")
-        return "\(repo) #\(pr.key.number) · \(ended)"
+    private func ended(merged: Bool) -> String {
+        EndedAge.text(state: pr.state, closedAt: pr.closedAt, now: now) ?? (merged ? "merged" : "closed")
     }
 }
 
@@ -330,7 +332,7 @@ struct CIGlyph: View {
 }
 
 /// A row's `repo #num` in the meta style, or `#num` where a repo header already names the repo. A long
-/// repo name truncates before the number does.
+/// repo name truncates; the number never does, and stands out in medium weight.
 struct RepoNumber: View {
     let key: PRKey
     var showsRepo = true
@@ -346,6 +348,8 @@ struct RepoNumber: View {
                     .layoutPriority(-1)
             }
             Text("#\(String(key.number))")
+                .fontWeight(.medium)
+                .fixedSize()
         }
     }
 }

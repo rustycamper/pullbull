@@ -61,6 +61,7 @@ Keyboard-first · Native SwiftUI · Read-only
 - **Fold a lane:** click a Status header on Board or Assigned. Folds are kept per tab and board
 - **Labels:** chips with the label's colour dot on each row (not in compact cards), all of them in the detail
 - **One repo:** right-click a repo header or row → **Show Only *repo***, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd>
+- **Recent activity:** right-click a row, a repo header or the list → **Show Only Updated**: today, 3 days, a week or a month
 - **Right-click a row:** copy branch (PRs), link or Markdown link · open on GitHub · search the author
 - **Switch board:** <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> on the Board tab
 - **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Each account keeps its org and board
@@ -77,8 +78,9 @@ More in the [manual](docs/manual.md#issues).
 | `status:prog` `status:"In progress"` | Issues in that Status column on the board |
 | `#123` | That number, in every repo |
 | a GitHub link | Exactly that PR or issue |
+| `updated:today` `updated:3d` `updated:1w` `updated:1m` | Items active since 00:00 today, or 2, 6 or 29 days before; GitHub's date forms (`updated:>2026-10-01`) also filter locally |
 
-Combine `@`, `~`, `is:`, `status:` and words. Type `st` or `la` and press <kbd>Tab</kbd> for `status:` or `label:`, with suggestions. Save the searches you repeat with the bookmark icon; manage them in Settings → Search.
+Combine `@`, `~`, `is:`, `status:`, `updated:` and words. Type `st`, `la` or `up` and press <kbd>Tab</kbd> for `status:`, `label:` or `updated:`, with suggestions. Save the searches you repeat with the bookmark icon; manage them in Settings → Search.
 
 > [!TIP]
 > **Can't remember the words?** [Ask AI](docs/manual.md#ask-ai) finds the item from a description (<kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd>). Off by default; turn it on in Settings → Ask AI.

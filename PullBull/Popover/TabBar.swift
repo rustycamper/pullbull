@@ -154,13 +154,22 @@ struct TabBar: View {
         .layoutValue(key: SegmentSelected.self, value: selected)
         .help(Self.help(tab, count: count))
         .accessibilityAddTraits(selected ? [.isSelected] : [])
-        .accessibilityLabel((count.map { "\(title), \(spoken($0))" } ?? title) + filteredSuffix)
+        .accessibilityLabel((count.map { "\(title), \(spoken($0))" } ?? title) + filteredSuffix(for: tab))
     }
 
-    /// The list counts ignore the repo focus; the label says the list doesn't, so the count isn't misread.
-    /// Match counts follow the focus, as the results do.
-    private var filteredSuffix: String {
-        model.repoFocus.map { ", \(searching ? "in" : "filtered to") \(model.displayName(of: $0.repo))" } ?? ""
+    /// The list counts ignore the repo focus and the time focus; the label says the list doesn't, so the count
+    /// isn't misread. The time focus names only the tab on screen, which it applies to. Match counts follow
+    /// the repo focus, as the results do, and ignore the time focus.
+    private func filteredSuffix(for tab: ShownTab) -> String {
+        if searching {
+            return model.repoFocus.map { ", in \(model.displayName(of: $0.repo))" } ?? ""
+        }
+        var parts: [String] = []
+        if let repo = model.repoFocus { parts.append(model.displayName(of: repo.repo)) }
+        if let time = model.timeFocus, model.shownTab == tab {
+            parts.append("updated \(time.step.title)")
+        }
+        return parts.isEmpty ? "" : ", filtered to " + parts.joined(separator: ", ")
     }
 
     private func spoken(_ count: IssueTabCount) -> String {

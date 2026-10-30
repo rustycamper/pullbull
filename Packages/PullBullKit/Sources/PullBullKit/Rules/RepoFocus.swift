@@ -14,11 +14,7 @@ public struct RepoFocus: Equatable, Sendable {
     public func matches(_ key: PRKey) -> Bool { matches(repo: key.repo) }
 
     public func scope(_ contents: TabContents) -> ScopedTab {
-        let focused = contents.rows.filter { matches($0.pr.key) }
-        let others = contents.rows.filter { !matches($0.pr.key) }
-        return ScopedTab(
-            contents: TabContents(rows: focused), otherCount: others.filter(\.counted).count,
-            hiddenCount: others.count)
+        Self.scopeRows(contents, keeping: { matches($0.key) })
     }
 
     public func scope(_ closed: [PullRequest]) -> [PullRequest] {
@@ -28,15 +24,29 @@ public struct RepoFocus: Equatable, Sendable {
     /// Each group filtered to the focus with empty groups dropped. Repository groups merge into one
     /// ungrouped list where the first of them was.
     public func scope(_ contents: IssueTabContents) -> ScopedIssueTab {
+        Self.scopeIssues(contents, keeping: { matches($0.key) }, mergeRepoGroups: true)
+    }
+
+    static func scopeRows(_ contents: TabContents, keeping: (PullRequest) -> Bool) -> ScopedTab {
+        let focused = contents.rows.filter { keeping($0.pr) }
+        let others = contents.rows.filter { !keeping($0.pr) }
+        return ScopedTab(
+            contents: TabContents(rows: focused), otherCount: others.filter(\.counted).count,
+            hiddenCount: others.count)
+    }
+
+    static func scopeIssues(
+        _ contents: IssueTabContents, keeping: (BoardIssue) -> Bool, mergeRepoGroups: Bool
+    ) -> ScopedIssueTab {
         var groups: [IssueGroup] = []
         var mergedIndex: Int?
         var other = 0
         var hidden = 0
         for group in contents.groups {
-            let focused = group.issues.filter { matches($0.key) }
+            let focused = group.issues.filter(keeping)
             hidden += group.issues.count - focused.count
             if group.counted { other += group.issues.count - focused.count }
-            if case .repo = group.kind {
+            if mergeRepoGroups, case .repo = group.kind {
                 if let index = mergedIndex {
                     groups[index] = IssueGroup(kind: .all, issues: groups[index].issues + focused, counted: true)
                 } else if !focused.isEmpty {

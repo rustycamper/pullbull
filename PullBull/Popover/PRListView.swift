@@ -14,15 +14,26 @@ struct PRListView: View {
     @Binding var closedExpanded: Bool
 
     private var contents: TabContents { scoped.contents }
-    private var focus: RepoFocus? { model.repoFocus }
+    private var focus: ListFocus { model.listFocus }
     /// What the focus leaves listed: the rows, and on Mine the recently closed PRs.
     private var scopedTotal: Int { contents.rows.count + (tab == .mine ? recentlyClosed.count : 0) }
+    /// A focus hides every open row but leaves recently closed ones: the section stands in for the empty state.
+    /// With no open PRs at all nothing is hidden, so the empty state stays, as it does without a focus.
+    private var closedOnly: Bool {
+        contents.rows.isEmpty && focus.isActive && tab == .mine && !recentlyClosed.isEmpty && scoped.hiddenCount > 0
+    }
+    /// The section holds the last 7×24 hours; a step that starts later, the week included, says so.
+    private var closedWindow: String {
+        guard let step = focus.time?.step, step.daysBack <= 6 else { return "Last 7 days" }
+        return step.stripTitle
+    }
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 list
             }
+            .focusContextMenu(time: TimeFocusMenu(model: model))
             .scrollIndicators(.automatic)
             .onChange(of: model.listSelection) { _, key in
                 guard let key else { return }
@@ -33,11 +44,10 @@ struct PRListView: View {
 
     private var list: some View {
         LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
-            if contents.rows.isEmpty {
+            if contents.rows.isEmpty && !closedOnly {
                 Group {
-                    if let focus, total > scopedTotal {
-                        FocusedEmptyView(
-                            model: model, repoName: model.displayName(of: focus.repo), tabTitle: tab.title, hiddenCount: scoped.hiddenCount)
+                    if focus.isActive, total > scopedTotal {
+                        FocusedEmptyView(model: model, tabTitle: tab.title, hiddenCount: scoped.hiddenCount)
                     } else {
                         EmptyTabView(model: model, tab: tab, now: now)
                     }
@@ -56,7 +66,7 @@ struct PRListView: View {
                 rows(contents.rows)
                     .padding(.top, 6)
             }
-            if !contents.rows.isEmpty && scoped.hiddenCount > 0 {
+            if (!contents.rows.isEmpty || closedOnly) && scoped.hiddenCount > 0 {
                 OtherReposLine(model: model, count: scoped.hiddenCount)
             }
             if tab == .mine && !recentlyClosed.isEmpty {
@@ -102,7 +112,7 @@ struct PRListView: View {
 
     private var closedHeader: some View {
         ListSectionHeader(
-            glyph: nil, title: "Recently closed", count: recentlyClosed.count, trailing: "Last 7 days",
+            glyph: nil, title: "Recently closed", count: recentlyClosed.count, trailing: closedWindow,
             fold: .init(isOpen: closedExpanded) { closedExpanded.toggle() }, compact: model.settings.compact)
     }
 
@@ -111,7 +121,7 @@ struct PRListView: View {
         ListSectionHeader(
             glyph: "book.closed", title: repo.split(separator: "/").last.map(String.init) ?? repo,
             count: count > 0 ? count : nil, compact: model.settings.compact)
-            .focusContextMenu(FocusMenuItem(model: model, repo: repo))
+            .focusContextMenu(FocusMenuItem(model: model, repo: repo), time: TimeFocusMenu(model: model))
     }
 }
 

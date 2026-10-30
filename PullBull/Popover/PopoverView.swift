@@ -93,6 +93,7 @@ struct PopoverView: View {
         return FilterRow.make(
             searching: searchShown, listsBuilt: listsBuilt,
             focusName: model.repoFocus.map { model.displayName(of: $0.repo) },
+            timeTitle: model.timeFocus?.stripText(now: Date()),
             boardTitle: boardPartShown ? model.boardMenuTitle : nil)
     }
     /// The Done group of the Issues tab on screen is unfolded.
@@ -165,6 +166,12 @@ struct PopoverView: View {
             guard presence.isShown else { return }
             AccessibilityNotification.Announcement(
                 new.map { "Showing only \(model.displayName(of: $0.repo))" } ?? "Showing all repositories"
+            ).post()
+        }
+        .onChange(of: model.timeFocus?.step) { _, new in
+            guard presence.isShown else { return }
+            AccessibilityNotification.Announcement(
+                new.map { "Showing items updated \($0.title)" } ?? "Showing everything"
             ).post()
         }
         .onChange(of: model.settings.board) { _, new in
@@ -381,6 +388,8 @@ struct PopoverView: View {
     private func popoverDidHide() {
         // Searches nothing on the way out, so a lone pending token keeps no search route and is dropped below.
         model.closeCompletion()
+        // A time focus is transient: it ends with the popover, so the next open starts from a fresh "now".
+        model.focus(time: nil)
         pendingCaret = nil
         hintSelection = nil
         savedExpanded = false
@@ -661,8 +670,8 @@ struct PopoverView: View {
                 model.cancelAsk()
             } else if searchOpen {
                 cancelSearch()
-            } else if model.repoFocus != nil {
-                model.focus(on: nil)
+            } else if model.listFocus.isActive {
+                model.clearFocus()
             } else {
                 MenuBarPopover.hide()
             }
@@ -870,6 +879,7 @@ struct PopoverView: View {
         case .labels(let labels): labels.selectedCandidate.map(CompletionSpeech.completed)
         case .states(let states): states.selectedCandidate.map(CompletionSpeech.completed)
         case .statuses(let statuses): statuses.selectedCandidate.map(CompletionSpeech.completed)
+        case .updated(let steps): steps.selectedCandidate.map(CompletionSpeech.completed)
         case nil: nil
         }
         guard let caret = model.acceptCompletion() else { return }
@@ -901,7 +911,7 @@ struct PopoverView: View {
         }
     }
 
-    /// A token: types its sigil into the empty field, which opens the `@`, `~`, `is:` or `status:` list.
+    /// A token: types its sigil into the empty field, which opens the `@`, `~`, `is:`, `status:` or `updated:` list.
     private func pickHint(_ hint: SearchHint, in window: NSWindow?) {
         hintSelection = nil
         model.startToken(hint.sigil)

@@ -1,8 +1,8 @@
 import SwiftUI
 import PullBullKit
 
-/// The "@user", "~label", "is:" or "status:" completion: people, labels, states or board Status columns
-/// matching the token at the caret,
+/// The "@user", "~label", "is:", "status:" or "updated:" completion: people, labels, states, board Status
+/// columns or time steps matching the token at the caret,
 /// drawn over the top of the hints or results. Focus stays in the search field; the keys are handled in
 /// `PopoverView.handleKey`.
 struct CompletionList: View {
@@ -58,6 +58,16 @@ struct CompletionList: View {
                     } else {
                         ForEach(Array(statuses.candidates.enumerated()), id: \.element.id) { index, candidate in
                             StatusCompletionRow(candidate: candidate, selected: index == statuses.selection) {
+                                pick(index, in: completion)
+                            }
+                        }
+                    }
+                case .updated(let steps):
+                    if steps.candidates.isEmpty {
+                        message("No step called “\(steps.token.prefix)” · ↩ to search anyway")
+                    } else {
+                        ForEach(Array(steps.candidates.enumerated()), id: \.element.id) { index, candidate in
+                            TimeStepCompletionRow(candidate: candidate, selected: index == steps.selection) {
                                 pick(index, in: completion)
                             }
                         }
@@ -235,6 +245,42 @@ private struct StatusCompletionRow: View {
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
+            }
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .frame(height: 26)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(selected ? Palette.selection : hovering ? Palette.rowHover : .clear))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(CompletionSpeech.label(candidate))
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : [.isButton])
+    }
+}
+
+private struct TimeStepCompletionRow: View {
+    let candidate: TimeStepCandidate
+    let selected: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: "clock")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18, height: 18)
+                Text(candidate.insertText)
+                    .font(.system(size: 13))
+                Spacer(minLength: 8)
+                Text(candidate.step.title)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
             }
             .lineLimit(1)
             .padding(.horizontal, 8)

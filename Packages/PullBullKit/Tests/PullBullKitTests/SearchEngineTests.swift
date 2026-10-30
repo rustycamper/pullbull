@@ -164,6 +164,24 @@ private func collect(_ stream: AsyncStream<SearchResults>) async -> [SearchResul
 }
 
 @Suite struct SearchEngineTests {
+    /// An `updated:`-only query is not skipped by the empty-token guard.
+    @Test func updatedAloneAsksGitHub() async {
+        let transport = RecordingTransport(reply: searchResponse([]))
+        let e = SearchEngine(api: GitHubAPI(transport: transport, auth: StaticTokenSource("test-token")))
+        _ = await collect(e.results(.parse("updated:3d"), snap: snapshot()))
+        #expect(transport.prBodies.contains { $0.contains("updated:>=") })
+    }
+
+    /// GitHub decides a raw `updated:` value, so the rows it returns are kept.
+    @Test func rawUpdatedKeepsGitHubsRows() async throws {
+        let node = prNode(9, title: "Pool", state: "OPEN", updated: "2026-10-25T10:00:00Z", closedAt: nil)
+        let transport = RecordingTransport(reply: searchResponse([node]))
+        let e = SearchEngine(api: GitHubAPI(transport: transport, auth: StaticTokenSource("test-token")))
+        let done = try #require(await collect(e.results(.parse("updated:>2026-10-01"), snap: snapshot())).last)
+        #expect(transport.prBodies.contains { $0.contains("updated:>2026-10-01") })
+        #expect(done.openPRs.map(\.key.number) == [9])
+    }
+
     /// No org: title searches cover the user's repositories, and a number is looked up in the repos they own.
     @Test func personalScopeSearchesTheUsersRepos() async {
         var snap = snapshot()

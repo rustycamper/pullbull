@@ -1,22 +1,25 @@
 import SwiftUI
 import PullBullKit
 
-/// The empty state of a list under a repo focus that hides items of the tab in other repositories.
+/// The empty state of a list under a focus that hides items of the tab.
 struct FocusedEmptyView: View {
     let model: AppModel
-    let repoName: String
     let tabTitle: String
-    /// Every item in other repositories, counted or not.
+    /// Every item the focus hides, counted or not.
     let hiddenCount: Int
 
     var body: some View {
-        ListStateView(symbol: "line.3.horizontal.decrease", title: "Nothing in \(repoName) on \(tabTitle)") {
+        let focus = model.listFocus
+        ListStateView(
+            symbol: model.timeFocus == nil ? "line.3.horizontal.decrease" : "clock",
+            title: focus.emptyTitle(repoName: model.repoFocus.map { model.displayName(of: $0.repo) }, tabTitle: tabTitle)
+        ) {
             HStack(spacing: 4) {
                 if hiddenCount > 0 {
-                    Text("\(hiddenCount) in other repos ·")
+                    Text("\(focus.hiddenText(hiddenCount)) ·")
                         .foregroundStyle(.secondary)
                 }
-                Button("Show all") { model.focus(on: nil) }
+                Button("Show all") { model.clearFocus() }
                     .buttonStyle(.link)
             }
             .font(.system(size: 11))
@@ -24,16 +27,16 @@ struct FocusedEmptyView: View {
     }
 }
 
-/// "2 more in other repos · Show all" after the rows of a focused list.
+/// "2 more in other repos · Show all" after the rows of a focused list; "2 hidden · Show all" with a time focus.
 struct OtherReposLine: View {
     let model: AppModel
     let count: Int
 
     var body: some View {
         HStack(spacing: 4) {
-            Text("\(count) more in other repos ·")
+            Text(model.timeFocus == nil ? "\(count) more in other repos ·" : "\(model.listFocus.hiddenText(count)) ·")
                 .foregroundStyle(.secondary)
-            Button("Show all") { model.focus(on: nil) }
+            Button("Show all") { model.clearFocus() }
                 .buttonStyle(.link)
             Spacer(minLength: 0)
         }

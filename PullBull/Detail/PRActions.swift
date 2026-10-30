@@ -88,10 +88,13 @@ extension FocusMenuItem {
 extension View {
     /// Right-click: the repo focus and person search items (list and search rows), Copy Branch Name, Copy Link,
     /// Copy as Markdown Link, Open on GitHub. VoiceOver gets Copy as Markdown Link as an action too.
-    func prContextMenu(_ pr: PullRequest, focus: FocusMenuItem? = nil, person: FocusMenuItem? = nil) -> some View {
+    func prContextMenu(
+        _ pr: PullRequest, focus: FocusMenuItem? = nil, time: TimeFocusMenu? = nil, person: FocusMenuItem? = nil
+    ) -> some View {
         contextMenu {
-            if focus != nil || person != nil {
+            if focus != nil || time != nil || person != nil {
                 if let focus { FocusMenuButton(item: focus) }
+                if let time { time }
                 if let person { PersonMenuButton(item: person) }
                 Divider()
             }
@@ -106,10 +109,13 @@ extension View {
 
     /// Right-click on an issue: the repo focus and person search items (list and search rows), Copy Link,
     /// Copy as Markdown Link, Open on GitHub. VoiceOver gets Copy as Markdown Link as an action too.
-    func issueContextMenu(_ issue: BoardIssue, focus: FocusMenuItem? = nil, person: FocusMenuItem? = nil) -> some View {
+    func issueContextMenu(
+        _ issue: BoardIssue, focus: FocusMenuItem? = nil, time: TimeFocusMenu? = nil, person: FocusMenuItem? = nil
+    ) -> some View {
         contextMenu {
-            if focus != nil || person != nil {
+            if focus != nil || time != nil || person != nil {
                 if let focus { FocusMenuButton(item: focus) }
+                if let time { time }
                 if let person { PersonMenuButton(item: person) }
                 Divider()
             }
@@ -121,12 +127,36 @@ extension View {
         .accessibilityAction(named: "Copy as Markdown Link") { PRActions.copyMarkdownLink(issue) }
     }
 
-    /// Right-click on a repo group header: the repo focus item alone; no menu without one.
-    @ViewBuilder func focusContextMenu(_ focus: FocusMenuItem?) -> some View {
-        if let focus {
-            contextMenu { FocusMenuButton(item: focus) }
+    /// Right-click on a repo group header or a list's background: the repo focus and Show Only Updated
+    /// items; no menu without either.
+    @ViewBuilder func focusContextMenu(_ focus: FocusMenuItem? = nil, time: TimeFocusMenu? = nil) -> some View {
+        if focus != nil || time != nil {
+            contextMenu {
+                if let focus { FocusMenuButton(item: focus) }
+                if let time { time }
+            }
         } else {
             self
+        }
+    }
+}
+
+/// "Show Only Updated" on a list's context menus: the four steps with a checkmark on the active one,
+/// and Show All while a time focus is on. Search rows don't offer it.
+struct TimeFocusMenu: View {
+    let model: AppModel
+
+    var body: some View {
+        Menu("Show Only Updated", systemImage: "clock") {
+            ForEach(TimeStep.allCases, id: \.self) { step in
+                Toggle(step.menuTitle, isOn: Binding(
+                    get: { model.timeFocus?.step == step },
+                    set: { _ in model.focus(time: step) }))
+            }
+            if model.timeFocus != nil {
+                Divider()
+                Button("Show All") { model.focus(time: nil) }
+            }
         }
     }
 }

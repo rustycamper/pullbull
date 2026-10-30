@@ -49,6 +49,12 @@ public struct SearchFieldState: Equatable, Sendable {
         return nil
     }
 
+    /// The open "updated:" list; nil when none is open or the list is of another kind.
+    public var updatedCompletion: UpdatedCompletion? {
+        if case .updated(let completion) = searchCompletion { return completion }
+        return nil
+    }
+
     /// Whether the text, read without an open completion, asks for a different query than the last one.
     public var isStale: Bool { pendingQuery != query }
 

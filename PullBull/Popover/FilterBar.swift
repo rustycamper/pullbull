@@ -2,8 +2,8 @@ import SwiftUI
 import PullBullKit
 
 /// The slim row at the top of every list: "▦ Roadmap ▾ · ▤ All repos ▾" on the Board tab, "▤ All repos ▾"
-/// elsewhere, "▤ widgets ▾ ✕" with a repo focus. The board name opens the board menu (⌘⇧B), the repo
-/// name the repository menu (⌘⇧F); ✕ clears the focus.
+/// elsewhere, "▤ widgets ▾ ✕" with a repo focus, plus "◷ Last 3 days" with a time focus. The board name opens
+/// the board menu (⌘⇧B), the repo name the repository menu (⌘⇧F); ✕ clears both focuses.
 struct FilterBar: View {
     let model: AppModel
     let row: FilterRow
@@ -21,16 +21,19 @@ struct FilterBar: View {
             }
             // When tight, the board name truncates first.
             repoPart.layoutPriority(1)
+            if let time = row.timeTitle, let step = model.timeFocus?.step {
+                timePart(step.stripTitle, help: time).layoutPriority(-1)
+            }
             if row.isFocused {
-                Button { model.focus(on: nil) } label: {
+                Button { clear() } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .medium))
                         .frame(width: 20, height: 20)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("Show all repos")
-                .accessibilityLabel("Clear repo filter")
+                .help("Show everything")
+                .accessibilityLabel("Clear filters")
             }
             Spacer(minLength: 8)
         }
@@ -40,6 +43,11 @@ struct FilterBar: View {
         .padding(.trailing, 8)
         .frame(height: 26)
         .overlay(alignment: .bottom) { Hairline() }
+    }
+
+    /// ✕ clears both focuses, but only the repo one while the time part is hidden (searching).
+    private func clear() {
+        if row.timeTitle == nil { model.focus(on: nil) } else { model.clearFocus() }
     }
 
     private func boardPart(_ title: String) -> some View {
@@ -62,12 +70,30 @@ struct FilterBar: View {
         .accessibilityAction(named: "Change Board") { showBoardMenu() }
     }
 
+    /// "◷ Today", "◷ Last 3 days", …: the step's short name as a plain label, cut off with an ellipsis before
+    /// the repo and board parts give way. `help` is its full line, with the start date past Today.
+    private func timePart(_ title: String, help: String) -> some View {
+        HStack(spacing: 6) {
+            Text("·")
+                .foregroundStyle(Palette.tertiary)
+            Image(systemName: "clock")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Color.accentColor)
+            Text(title)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .foregroundStyle(.primary)
+        }
+        .help(help)
+        .accessibilityHidden(true)
+    }
+
     /// The glyph in the accent colour and the name in primary while a focus narrows the list.
     private var repoPart: some View {
         HStack(spacing: 6) {
             Image(systemName: "line.3.horizontal.decrease")
                 .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(row.isFocused ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+                .foregroundStyle(row.isRepoFocused ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
                 .accessibilityHidden(true)
             Button { showRepoMenu() } label: {
                 Text("\(row.repoTitle) ▾")
@@ -79,9 +105,9 @@ struct FilterBar: View {
             .background(MenuAnchorView(anchor: repoAnchor))
             .help("Change Repository")
         }
-        .foregroundStyle(row.isFocused ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+        .foregroundStyle(row.isRepoFocused ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(row.repoSpokenLabel(tally: tally))
+        .accessibilityLabel(row.spokenLabel(tally: tally))
         .accessibilityAction(named: "Change Repository") { showRepoMenu() }
     }
 
@@ -89,7 +115,8 @@ struct FilterBar: View {
     /// the tab's own count (the stale one after a failed fetch); nil without a focus and while it reads
     /// "–" (not loaded, failed with nothing kept, Board unavailable), whose own states show instead.
     private var tally: String? {
-        guard let focus = model.repoFocus else { return nil }
+        let focus = row.timeTitle == nil ? ListFocus(repo: model.repoFocus, time: nil) : model.listFocus
+        guard focus.isActive else { return nil }
         switch model.mode {
         case .pullRequests:
             let tab = model.selectedTab

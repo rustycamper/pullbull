@@ -81,7 +81,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 
 - **Detail:** labels, reviewers, checks, description, conversation, files. Markdown incl. `<details>`
 - **Labels:** up to two chips per row (none in compact cards), each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail lists them all
-- **Right-click a row:** copy branch, link or Markdown link · open on GitHub · show only this repo · search author
+- **Right-click a row:** copy branch, link or Markdown link · open on GitHub · show only this repo · show only updated · search author
 - **Footer:** account · refresh · open on GitHub · settings. Turns amber with **Retry** when a refresh fails
 - **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Lists your signed-in accounts, then GitHub CLI logins, each with the org it opens in; then Add Account… and Account Settings…. Each account comes back with its last org, and each org with its last board
 
@@ -102,7 +102,7 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - **Done:** click its header to unfold. Never counted
 - **Labels:** chips as on [pull requests](#pull-requests). The board card lists them all
 - **Switch board:** on the Board tab, click its name in the filter row, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd>
-- **Right-click a row:** copy link or Markdown link · open on GitHub · show only this repo · search author
+- **Right-click a row:** copy link or Markdown link · open on GitHub · show only this repo · show only updated · search author
 - **Detail:** board card (incl. labels) · linked PRs (<kbd>Esc</kbd> returns) · description · last two comments
 
 ## Search
@@ -117,9 +117,10 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 | `status:prog` `status:"In progress"` | Status column on the board. Issues only |
 | `#123` | That number, every repo |
 | `owner/repo#123` or a link | Exactly that item |
+| `updated:today` `3d` `1w` `1m` | Items active since 00:00 today, or 2, 6 or 29 days before. GitHub's date forms (`updated:>2026-10-01`, `updated:2026-10-01..2026-10-07`) go to GitHub as written and also filter locally; any other value goes to GitHub as written |
 | words | Title |
 
-- `@`, `~`, `is:`, `status:` and words combine; everything must match
+- `@`, `~`, `is:`, `status:`, `updated:` and words combine; everything must match
 - `status:` uses the board shown in the Board tab. Unquoted matches part of a Status name, quoted the whole name; case is ignored. Names with spaces need quotes to match exactly
 - With `status:`, PRs and issues not on the board don't match
 - `#123` and links work only on their own
@@ -129,8 +130,8 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - Compact cards (Settings → General) apply to results too: one line each, with checks on open PRs and the Status on issues
 - Matches in the other mode show a hint: <kbd>⌘</kbd><kbd>1</kbd> / <kbd>⌘</kbd><kbd>2</kbd>
 - Empty field shows saved searches and token hints. <kbd>↓</kbd> to walk them
-- Typing `@`, `~`, `label:`, `is:` or `status:` opens a completion list. `status:` lists the board's Status columns with their open counts; picking one writes the full name in quotes
-- Typing the start of `status:` or `label:` (`st`, `la`) at the end of the field shows the rest in grey. Not `is:`, a common word; `status:` only when the board has Status columns
+- Typing `@`, `~`, `label:`, `is:`, `status:` or `updated:` opens a completion list. `status:` lists the board's Status columns with their open counts; picking one writes the full name in quotes. `updated:` lists the four steps
+- Typing the start of `status:`, `label:` or `updated:` (`st`, `la`, `up`) at the end of the field shows the rest in grey. Not `is:`, a common word; `status:` only when the board has Status columns; `updated:` only up to `upda`, so a title word like "update" is left alone
 - **Save:** bookmark icon in the field. Manage in Settings → Search
 
 | Completion list | |
@@ -247,6 +248,18 @@ Reopen within a minute and the detail is still there.
 - Applies to every tab; search stays inside it
 - Counts and notifications still cover all repos
 - Cleared on relaunch
+
+## Recent activity
+
+- Right-click a row, a repo header or the list → **Show Only Updated** → Today, In the Last 3 Days, In the Last Week or In the Last Month
+- A strip above the list names the step: *Today*, *Last 3 days*, *Last week*, *Last month*; hover for the full line and start date
+- On Mine, the Recently closed header names the step too; under the month it stays *Last 7 days*
+- Back to all: ✕ in the strip, **Show All**, or <kbd>Esc</kbd>. <kbd>Esc</kbd> clears this and Show Only *repo* together
+- Also cleared when the popover closes, or the tab or mode changes
+- Judged by last activity: when an open item last changed, or when a closed one ended
+- Counts and notifications still cover everything
+- Combines with Show Only *repo*
+- In search, type `updated:today`, `3d`, `1w` or `1m` instead
 
 ## Settings
 

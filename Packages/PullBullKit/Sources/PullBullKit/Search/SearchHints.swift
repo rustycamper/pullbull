@@ -2,7 +2,7 @@ import Foundation
 
 /// A clickable hint under the empty search field: it types its sigil into the field.
 public enum SearchHint: Equatable, Sendable {
-    case number, person, label, state, status
+    case number, person, label, state, status, updated
 
     public var sigil: String {
         switch self {
@@ -11,6 +11,7 @@ public enum SearchHint: Equatable, Sendable {
         case .label: "~"
         case .state: "is:"
         case .status: "status:"
+        case .updated: "updated:"
         }
     }
 
@@ -22,18 +23,19 @@ public enum SearchHint: Equatable, Sendable {
         case .label: "label"
         case .state: "state"
         case .status: "column"
+        case .updated: "time"
         }
     }
 
-    /// Whether the token line draws `word` after the sigil. `status:` names itself, and five tokens with
-    /// words don't fit the line; VoiceOver still reads the word.
-    public var showsWord: Bool { self != .status }
+    /// Whether the token line draws `word` after the sigil. `status:` and `updated:` name themselves, and six
+    /// tokens with words don't fit the line; VoiceOver still reads the word.
+    public var showsWord: Bool { self != .status && self != .updated }
 
     /// Typing the sigil opens a completion list.
     public var opensList: Bool { self != .number }
 
     /// The token line, in order.
-    public static let all: [SearchHint] = [.number, .person, .label, .state, .status]
+    public static let all: [SearchHint] = [.number, .person, .label, .state, .status, .updated]
 
     public var accessibilityLabel: String { "\(sigil) \(word)" }
     public var accessibilityHint: String { "Types \(sigil) in the search field" }
@@ -51,6 +53,7 @@ public enum SearchHint: Equatable, Sendable {
         case .label: "~label filters by label"
         case .state: "is:open, closed, merged or draft filters by state"
         case .status: "status:name filters issues by board Status"
+        case .updated: "updated:today, 3d, 1w or 1m filters by last activity"
         }
     }
 }
