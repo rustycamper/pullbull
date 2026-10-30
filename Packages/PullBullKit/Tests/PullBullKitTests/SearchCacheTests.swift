@@ -61,6 +61,18 @@ private extension SearchCache.Lookup {
         #expect(key("@alice") != key("alice"))
     }
 
+    @Test func updatedKeyChangesAtMidnight() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/New_York")!
+        let midnight = calendar.date(from: DateComponents(year: 2026, month: 10, day: 30))!
+        func key(at date: Date) -> SearchCache.Key {
+            SearchCache.Key(
+                account: alice, scope: org, query: SearchQuery.parse("updated:today"), now: date, calendar: calendar)
+        }
+        #expect(key(at: midnight.addingTimeInterval(-1)) != key(at: midnight.addingTimeInterval(1)))
+        #expect(key(at: midnight.addingTimeInterval(1)) == key(at: midnight.addingTimeInterval(3600)))
+    }
+
     @Test func numberLookupsShareAKey() {
         #expect(key("#412") == key("412"))
         #expect(key("# 412") == key("412"))

@@ -13,13 +13,15 @@ struct QueryTerm {
         case state
         /// Starts with "status:", any case.
         case status
+        /// Starts with "updated:", any case.
+        case updated
         case word
     }
 
     let kind: Kind
     /// The whole term, sigil and quotes included.
     let range: Range<String.Index>
-    /// After the sigil, "label:", "is:" or "status:", without quotes; the whole term for a word.
+    /// After the sigil, "label:", "is:", "status:" or "updated:", without quotes; the whole term for a word.
     let value: Substring
     /// The value opened with a quote.
     let quoted: Bool
@@ -33,11 +35,12 @@ enum QueryScanner {
     static let labelQualifier = "label:"
     static let stateQualifier = "is:"
     static let statusQualifier = "status:"
+    static let updatedQualifier = "updated:"
 
     /// The terms of `text` in order. A label's or status's value may be quoted (`~"good first issue"`,
     /// `label:"good first issue"`, `status:"In progress"`); a quote left open runs to the end of the text,
-    /// or to the whitespace before the next `@`, `~`, `#`, `label:`, `is:` or `status:` term, which then
-    /// parses as usual. An `is:` value is never quoted.
+    /// or to the whitespace before the next `@`, `~`, `#`, `label:`, `is:`, `status:` or `updated:` term, which then
+    /// parses as usual. An `is:` or `updated:` value is never quoted.
     static func terms(in text: String) -> [QueryTerm] {
         var terms: [QueryTerm] = []
         var i = text.startIndex
@@ -62,6 +65,9 @@ enum QueryScanner {
             } else if startsStatus(text[i...]) {
                 kind = .status
                 valueStart = text.index(i, offsetBy: statusQualifier.count)
+            } else if startsUpdated(text[i...]) {
+                kind = .updated
+                valueStart = nil
             } else {
                 kind = personSigils.contains(c) ? .person : .word
                 valueStart = nil
@@ -87,6 +93,7 @@ enum QueryScanner {
             case .person: value = text[text.index(after: start)..<end]
             case .label, .labelAlias, .status: value = text[(valueStart ?? end)..<end]
             case .state: value = text[text.index(start, offsetBy: stateQualifier.count)..<end]
+            case .updated: value = text[text.index(start, offsetBy: updatedQualifier.count)..<end]
             }
             terms.append(QueryTerm(kind: kind, range: start..<end, value: value, quoted: false, closed: false))
             i = end
@@ -112,6 +119,7 @@ enum QueryScanner {
         guard let first = rest.first else { return false }
         return personSigils.contains(first) || labelSigils.contains(first) || first == "#"
             || rest.prefix(labelQualifier.count).lowercased() == labelQualifier || startsState(rest) || startsStatus(rest)
+            || startsUpdated(rest)
     }
 
     /// `rest` starts with "is:", any case.
@@ -122,6 +130,11 @@ enum QueryScanner {
     /// `rest` starts with "status:", any case.
     static func startsStatus(_ rest: Substring) -> Bool {
         rest.prefix(statusQualifier.count).lowercased() == statusQualifier
+    }
+
+    /// `rest` starts with "updated:", any case.
+    static func startsUpdated(_ rest: Substring) -> Bool {
+        rest.prefix(updatedQualifier.count).lowercased() == updatedQualifier
     }
 
     /// `rest` starts with "label:", any case.

@@ -49,7 +49,7 @@ public struct PendingToken: Equatable, Sendable {
         case .state:
             guard prefix.allSatisfy(\.isLetter) else { return nil }
             return PendingToken(start: start, end: caret, prefix: prefix, kind: .state)
-        case .word:
+        case .updated, .word:
             return nil
         }
     }

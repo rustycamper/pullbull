@@ -18,21 +18,25 @@ public final class SearchCache: @unchecked Sendable {
         let focus: String?
         let query: Query
 
-        public init(account: AccountRef, scope: FetchScope, query: SearchQuery, focus: RepoFocus? = nil) {
+        /// `now` and `calendar` date an `updated:` step, so its key changes when the day does.
+        public init(
+            account: AccountRef, scope: FetchScope, query: SearchQuery, focus: RepoFocus? = nil, now: Date = Date(),
+            calendar: Calendar = .current
+        ) {
             self.account = account
             self.scope = scope
             self.focus = query.keeping(focus)?.repo.lowercased()
-            self.query = Query(query)
+            self.query = Query(query, now: now, calendar: calendar)
         }
     }
 
     enum Query: Hashable, Sendable {
         case number(Int)
         case item(repo: String, number: Int)
-        case terms(logins: [String], labels: [String], words: [String], states: [StateFilter])
+        case terms(logins: [String], labels: [String], words: [String], states: [StateFilter], updated: String?)
         case empty
 
-        init(_ query: SearchQuery) {
+        init(_ query: SearchQuery, now: Date, calendar: Calendar) {
             switch query {
             case .number(let n): self = .number(n)
             case .item(let repo, let n): self = .item(repo: repo.lowercased(), number: n)
@@ -41,7 +45,8 @@ public final class SearchCache: @unchecked Sendable {
                 self = .terms(
                     logins: Self.folded(query.logins), labels: Self.folded(query.labels),
                     words: Self.folded(query.words),
-                    states: Set(query.states).sorted { $0.rawValue < $1.rawValue })
+                    states: Set(query.states).sorted { $0.rawValue < $1.rawValue },
+                    updated: query.updated?.serverQualifier(now: now, calendar: calendar))
             }
         }
 

@@ -135,8 +135,9 @@ extension SearchContext {
         case .number(let n): what = "#\(n)"
         case .item(let repo, let n): what = "\(repo) #\(n)"
         case .text(let words): what = "“\(words.joined(separator: " "))”"
-        case .filtered(let logins, let labels, let words, let states, let statuses):
-            var tokens = SearchQuery.tokenList(logins: logins, labels: labels, states: states, statuses: statuses)
+        case .filtered(let logins, let labels, let words, let states, let statuses, let updated):
+            var tokens = SearchQuery.tokenList(
+                logins: logins, labels: labels, states: states, statuses: statuses, updated: updated)
             if !words.isEmpty { tokens += " · “\(words.joined(separator: " "))”" }
             what = tokens
         case .empty: what = ""
@@ -155,9 +156,9 @@ extension SearchContext {
         case .number(let n): label = "#\(n) in \(tab)"
         case .item(let repo, let n): label = "\(repo) #\(n) in \(tab)"
         case .text(let words): label = "Titles matching \(words.joined(separator: " ")) in \(tab)"
-        case .filtered(let logins, let labels, let words, let states, let statuses):
+        case .filtered(let logins, let labels, let words, let states, let statuses, let updated):
             label = filterDescription(
-                logins: logins, labels: labels, states: states, statuses: statuses, words: words) + ", in \(tab)"
+                logins: logins, labels: labels, states: states, statuses: statuses, updated: updated, words: words) + ", in \(tab)"
         case .empty: label = "In \(tab)"
         }
         // An item names its own repository.
