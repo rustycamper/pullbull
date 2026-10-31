@@ -158,16 +158,22 @@ extension View {
         .accessibilityAction(named: "Copy as Markdown Link") { PRActions.copyMarkdownLink(pr) }
     }
 
-    /// Right-click on an issue: the repo focus and person search items (list and search rows), Copy Link,
-    /// Copy as Markdown Link, Open on GitHub. VoiceOver gets Copy as Markdown Link as an action too.
+    /// Right-click on an issue: the repo focus and person search items (list and search rows), Status
+    /// where it's offered, Copy Link, Copy as Markdown Link, Open on GitHub. VoiceOver gets Copy as
+    /// Markdown Link as an action too.
     func issueContextMenu(
-        _ issue: BoardIssue, focus: FocusMenuItem? = nil, time: TimeFocusMenu? = nil, person: FocusMenuItem? = nil
+        _ issue: BoardIssue, focus: FocusMenuItem? = nil, time: TimeFocusMenu? = nil, person: FocusMenuItem? = nil,
+        status: StatusMenu? = nil
     ) -> some View {
         contextMenu {
             if focus != nil || time != nil || person != nil {
                 if let focus { FocusMenuButton(item: focus) }
                 if let time { time }
                 if let person { PersonMenuButton(item: person) }
+                Divider()
+            }
+            if let status {
+                status
                 Divider()
             }
             Button("Copy Link", systemImage: "link") { PRActions.copyLink(issue) }
@@ -195,6 +201,38 @@ extension View {
         } else {
             self
         }
+    }
+}
+
+/// "Status" on an issue's context menu: the board's options with the current one checked, then Clear
+/// Status when it has one. Choosing one sets it at once.
+struct StatusMenu: View {
+    let model: AppModel
+    let key: PRKey
+
+    /// Nil where Status isn't offered on the issue.
+    static func make(model: AppModel, key: PRKey) -> StatusMenu? {
+        model.isStatusOffered(for: key) ? StatusMenu(model: model, key: key) : nil
+    }
+
+    var body: some View {
+        let current = model.boardStatus(for: key)
+        Menu("Status", systemImage: "circle.dashed") {
+            ForEach(options, id: \.id) { option in
+                Toggle(option.name, isOn: Binding(
+                    get: { current?.optionId == option.id },
+                    set: { _ in model.setStatus(BoardStatusValue(optionId: option.id, name: option.name), for: key) }))
+            }
+            if current != nil {
+                Divider()
+                Button("Clear Status") { model.setStatus(nil, for: key) }
+            }
+        }
+    }
+
+    private var options: [StatusOption] {
+        var seen = Set<String>()
+        return (model.shownSnapshot?.boardStatusOptions ?? []).filter { seen.insert($0.id).inserted }
     }
 }
 

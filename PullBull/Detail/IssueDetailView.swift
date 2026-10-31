@@ -179,8 +179,9 @@ struct IssueDetailView: View {
         }
     }
 
-    private func statusRow(symbol: String, name: String) -> some View {
-        CardRow(name: "Status") {
+    /// Clickable where Status is offered: it opens the Status picker here.
+    @ViewBuilder private func statusRow(symbol: String, name: String) -> some View {
+        let row = CardRow(name: "Status") {
             HStack(spacing: 6) {
                 Image(systemName: symbol)
                     .font(.system(size: 11))
@@ -189,6 +190,17 @@ struct IssueDetailView: View {
                 Text(name)
                     .lineLimit(1)
             }
+        }
+        if model.isStatusOffered(for: key) {
+            Button { model.openStatusPicker(for: key) } label: {
+                row.contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Set Status (⌥⌘S)")
+            .accessibilityHint("Opens the Status picker")
+            .statusPickerAnchor(for: key, model: model)
+        } else {
+            row
         }
     }
 

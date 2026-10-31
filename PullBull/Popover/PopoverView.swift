@@ -156,6 +156,11 @@ struct PopoverView: View {
         // Skeletons shimmer only while the panel is open.
         .environment(\.skeletonAnimates, shown)
         .frame(width: Self.size.width, height: Self.size.height)
+        // An edit that didn't stick says why, above the footer or the detail's bottom bar.
+        .overlay(alignment: .bottom) {
+            EditFailureLine(model: model)
+                .padding(.bottom, Self.isDetail(model.route) ? 45 : 34)
+        }
         // The Status picker opens at its row, or the detail's Status row, over every layer.
         .overlayPreferenceValue(StatusPickerAnchorKey.self) { anchor in
             StatusPickerLayer(model: model, anchor: anchor)
