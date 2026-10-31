@@ -565,11 +565,12 @@ private struct KeyHint: View {
 
 /// A key drawn as a small outlined keycap.
 struct Keycap<Content: View>: View {
+    var size: CGFloat = 10
     @ViewBuilder let content: () -> Content
 
     var body: some View {
         content()
-            .font(.system(size: 10, weight: .semibold))
+            .font(.system(size: size, weight: .semibold))
             .foregroundStyle(Palette.secondaryText)
             .padding(.horizontal, 6)
             .frame(minWidth: 18, minHeight: 16)
