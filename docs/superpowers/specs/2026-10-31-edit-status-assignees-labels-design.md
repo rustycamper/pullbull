@@ -91,7 +91,13 @@ The picker reuses the search completion list's look and keys: a small popup anch
 ### Failure
 
 - When an edit's request partly succeeds (one aliased mutation applied, another refused), only the refused part is rolled back; the error message says what didn't apply. Undo then reverses only what applied.
-- The change shown on screen is rolled back, and an error message appears at the bottom of the popover, above the footer, until dismissed or the next edit. It says what failed and why, in GitHub's terms, with **Open on GitHub**. Examples: "Couldn't set Status on #412: you need write access to the acme board". "Couldn't add label: acme/widgets has no label 'bug' any more".
+- The change shown on screen is rolled back, and an error message appears at the bottom of the popover, above the footer, until dismissed or the next edit. It says what failed and why, in GitHub's terms, with **Open on GitHub**. The reason is GitHub's own message when it refused the write, otherwise the wording the refresh already uses (offline, rate limited, …). The messages:
+  - "Couldn't set Status on #412: you need write access to the acme board"
+  - "Couldn't clear Status on #412: …"
+  - "Couldn't add #412 to the board: …"
+  - "Couldn't remove #412 from the board: …" (undoing an add)
+  - "Couldn't change labels on #412: …", "Couldn't change assignees on #412: …"
+- A partial failure names both halves, labels by name and people by login, comma-joined: "Added bug to #412, but couldn't remove triage: …" or "Removed triage from #412, but couldn't add bug: …". When neither half applied, it reads as the plain failure above. When GitHub gives no reason, the reason reads "GitHub didn't apply it".
 - Offline or rate-limited: the picker opens (from cached candidates where there are any), but applying fails at once with the existing offline or rate-limit wording. No queueing for later.
 
 ## Data and GitHub API
@@ -130,10 +136,13 @@ Search-backed lists (Assigned, Created, PR tabs, search) can return the old valu
 
 - Each applied edit records an override: the item's `PRKey` (repo and number, the key every list and the detail already share), the field, the intended value, and when it was made. It lives in PullBullKit, beside the snapshot, in memory only. Node IDs are not part of the key, so overrides work on cached items without them.
 - An override is stored as a change, not as a whole item: the Status option ID (or none), and the labels and assignees added and removed. Applying it to any model of the item (a PR row, a `BoardIssue`, a detail) changes only those fields.
-- Agreement means: the same Status option ID (not its name, so a renamed option still agrees), and every added label or assignee present and every removed one absent. If the board no longer has the overriding option (it was deleted), the override is dropped at once.
-- Self-assigning puts the issue on Assigned from the `BoardIssue` PullBull holds, from the board or from search results. Both carry `issueRowFields`, which is all an Assigned row shows. A PR has no Assigned list, so nothing is inserted for PRs.
+- Agreement means: the same Status option ID (not its name, so a renamed option still agrees), and every added label or assignee present and every removed one absent, compared case-insensitively, on the first copy of the item found (board, then Assigned, Created, Closed, then PR lists). A removal from the board agrees once the card is gone. If the board no longer has the overriding option (it was deleted), the override is dropped at once.
+- Assigning or unassigning yourself on an open issue agrees only once Assigned agrees too (when Assigned was fetched). The board copy shows the new assignee at once, but Assigned comes from search and lags; dropping the override on the board copy alone would make the row flicker on Assigned.
+- Self-assigning puts the open issue on Assigned from the `BoardIssue` PullBull holds, from the board or Created copy. Both carry `issueRowFields`, which is all an Assigned row shows. An issue found only through search shows on Assigned once search lists it. Assigning someone else inserts nothing. A PR has no Assigned list, so nothing is inserted for PRs; on a PR an override shows labels only.
 - Tabs, search results and the detail read the snapshot through the overrides. The stored snapshot stays as GitHub returned it. Notification change detection compares raw snapshots, so an override never fakes an event.
 - An override is dropped when a fetched snapshot agrees with it, or when 5 minutes pass, or when it is undone or fails. After 5 minutes GitHub's answer wins, even if it differs: someone else changed it, or the write didn't stick.
+- Overrides apply oldest first, so several edits to one item before a refresh show their net result. When a fetch agrees with an edit, the older edits to the same item that it replaced are dropped with it: any older Status edit, or an older label or assignee edit that touched one of the same labels or people. Todo → Doing → Done followed by a fetch showing Done leaves nothing behind, and neither does adding to the board and undoing it. An older edit to a different label still waits for GitHub to show it. Each override is checked against fetches independently, so a fetch that agrees with an earlier edit doesn't drop a later one.
+- The copies search results and the detail use keep the issue's node ID and its board item's node ID, so editing from them needs no lookup.
 - Own edits don't notify: `ChangeDetector` already skips Status moves and assignments whose actor is the viewer (`Notify/ChangeDetector.swift`, `statusEvents` and `assignedEvents`). Label changes don't notify today. Keep it that way, and cover it with a test.
 
 ## Permissions
