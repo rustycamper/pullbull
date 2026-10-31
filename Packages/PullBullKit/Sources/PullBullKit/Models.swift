@@ -87,11 +87,11 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
     public let reviewRequests: [Reviewer]
     /// The head commit's oid; nil in snapshots cached before it was stored.
     public let headCommitOid: String?
-    /// Label names; empty in snapshots cached before they were stored.
-    public let labels: [String]
+    /// Label names; empty in snapshots cached before they were stored. Set by edit overrides too.
+    public internal(set) var labels: [String]
     /// GitHub's 6-hex colour for each of `labels`, by position; nil where it's missing, and empty in
     /// snapshots cached before it was stored. Read it through `labelColor(at:)`.
-    public let labelColors: [String?]
+    public internal(set) var labelColors: [String?]
     /// Who merged it; nil while unmerged, for a deleted account, and in snapshots cached before it was stored.
     public let mergedBy: String?
     /// Nil when GitHub sent none or a value this build doesn't know, and in snapshots cached before it was stored.
@@ -313,13 +313,14 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
     public let lastCommentAuthor: String?
     /// Whether the newest comment's author is a bot; set with `lastCommentAuthor`, nil otherwise.
     public let lastCommentByBot: Bool?
-    public let labels: [String]
+    /// Labels, assignees and Status are set by edit overrides too.
+    public internal(set) var labels: [String]
     /// GitHub's 6-hex colour for each of `labels`, by position; nil where it's missing, and empty in
     /// issues cached before it was stored. Read it through `labelColor(at:)`.
-    public let labelColors: [String?]
-    public let assignees: [Assignee]
+    public internal(set) var labelColors: [String?]
+    public internal(set) var assignees: [Assignee]
     /// The board item's Status; set only on board items.
-    public let status: BoardStatusValue?
+    public internal(set) var status: BoardStatusValue?
     /// `ProjectV2Item.databaseId`, for "View on board"; set only on board items.
     public let boardItemId: Int?
     /// Set only on Assigned search results.
