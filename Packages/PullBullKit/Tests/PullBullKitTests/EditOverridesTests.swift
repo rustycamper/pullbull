@@ -232,4 +232,88 @@ private func card(_ snapshot: Snapshot, _ key: PRKey) -> BoardIssue? {
         #expect(shown.fetchedAt == snap.fetchedAt)
         #expect(shown.boardIssues[0].title == snap.boardIssues[0].title)
     }
+
+    // MARK: Several edits on one item
+
+    /// A fetch that agrees with the last edit retires the edits it replaced.
+    @Test func threeStatusesThenAFetchAfterAllLanded() {
+        var o = EditOverrides()
+        o.record(.status(from: todo, to: doing, placement: .already), on: k412, at: t0)
+        o.record(.status(from: doing, to: review, placement: .already), on: k412, at: t0 + 2)
+        let fetched = editSnapshot(board: [editIssue(412, status: review)], options: options)
+        o.reconcile(with: fetched, now: t0 + 30)
+        #expect(card(o.apply(to: fetched), k412)?.status == review)
+        #expect(o.isEmpty)
+    }
+
+    @Test func statusThereAndBack() {
+        var o = EditOverrides()
+        o.record(.status(from: todo, to: doing, placement: .already), on: k412, at: t0)
+        o.record(.status(from: doing, to: todo, placement: .already), on: k412, at: t0 + 2)
+        let fetched = editSnapshot(board: [editIssue(412, status: todo)], options: options)
+        o.reconcile(with: fetched, now: t0 + 30)
+        #expect(card(o.apply(to: fetched), k412)?.status == todo)
+    }
+
+    @Test func labelAddedThenRemoved() {
+        var o = EditOverrides()
+        o.record(.labels(added: [bug], removed: []), on: k412, at: t0)
+        o.record(.labels(added: [], removed: [bug]), on: k412, at: t0 + 2)
+        let fetched = editSnapshot(board: [editIssue(412)])
+        o.reconcile(with: fetched, now: t0 + 30)
+        #expect(card(o.apply(to: fetched), k412)?.labels.isEmpty == true)
+    }
+
+    /// Retiring is by label: an older edit to another label stays until GitHub shows it.
+    @Test func agreementLeavesOlderEditsToOtherLabels() {
+        var o = EditOverrides()
+        o.record(.labels(added: [triage], removed: []), on: k412, at: t0)
+        o.record(.labels(added: [bug], removed: []), on: k412, at: t0 + 2)
+        let fetched = editSnapshot(board: [editIssue(412, labels: ["bug"])])
+        o.reconcile(with: fetched, now: t0 + 30)
+        #expect(card(o.apply(to: fetched), k412)?.labels == ["bug", "triage"])
+    }
+
+    /// Adding to the board and undoing it, then a fetch from before the add: the card stays off.
+    @Test func addToBoardThenUndo() {
+        var o = EditOverrides()
+        o.record(.status(from: nil, to: todo, placement: .added), on: k500, at: t0)
+        o.record(.status(from: todo, to: nil, placement: .removed), on: k500, at: t0 + 3)
+        let fetched = editSnapshot(board: [], created: [editIssue(500)], options: options)
+        o.reconcile(with: fetched, now: t0 + 30)
+        #expect(card(o.apply(to: fetched), k500) == nil)
+    }
+
+    // MARK: Assigned lags
+
+    /// The board shows the new assignee at once; Assigned waits for search. The override holds until both do.
+    @Test func selfAssignHoldsUntilAssignedCatchesUp() {
+        var o = EditOverrides()
+        o.record(.assignees(added: [me], removed: []), on: k500, at: t0)
+        let lagging = editSnapshot(board: [editIssue(500, assignees: ["me"])], assigned: [])
+        o.reconcile(with: lagging, now: t0 + 30)
+        #expect(o.apply(to: lagging).assignedIssues?.map(\.key) == [k500])
+        let caughtUp = editSnapshot(
+            board: [editIssue(500, assignees: ["me"])], assigned: [editIssue(500, assignees: ["me"])])
+        o.reconcile(with: caughtUp, now: t0 + 60)
+        #expect(o.isEmpty)
+    }
+
+    @Test func selfUnassignHoldsUntilAssignedCatchesUp() {
+        var o = EditOverrides()
+        o.record(.assignees(added: [], removed: [me]), on: k412, at: t0)
+        let lagging = editSnapshot(board: [editIssue(412)], assigned: [editIssue(412)])
+        o.reconcile(with: lagging, now: t0 + 30)
+        #expect(o.apply(to: lagging).assignedIssues?.isEmpty == true)
+        o.reconcile(with: editSnapshot(board: [editIssue(412)], assigned: []), now: t0 + 60)
+        #expect(o.isEmpty)
+    }
+
+    /// A closed issue never shows on Assigned, so the board copy alone settles it.
+    @Test func selfAssignOnAClosedIssueAgreesWithoutAssigned() {
+        var o = EditOverrides()
+        o.record(.assignees(added: [me], removed: []), on: k500, at: t0)
+        o.reconcile(with: editSnapshot(board: [editIssue(500, assignees: ["me"], isOpen: false)], assigned: []), now: t0 + 30)
+        #expect(o.isEmpty)
+    }
 }

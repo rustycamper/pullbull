@@ -33,15 +33,24 @@ public struct EditOverrides: Equatable, Sendable {
         entries.removeAll { $0.id == id }
     }
 
-    /// Drops each edit `fetched` agrees with, each older than `lifetime`, and each Status edit to an
-    /// option the board no longer has.
+    /// Drops each edit `fetched` agrees with, along with the older edits to the same item it replaced;
+    /// each older than `lifetime`; and each Status edit to an option the board no longer has.
     public mutating func reconcile(with fetched: Snapshot, now: Date) {
         let options = fetched.boardStatusOptions.flatMap { $0.isEmpty ? nil : Set($0.map(\.id)) }
-        entries.removeAll { entry in
-            if now.timeIntervalSince(entry.madeAt) >= Self.lifetime { return true }
-            if case .status(_, let to?, _) = entry.change, let options, !options.contains(to.optionId) { return true }
-            return Self.agrees(entry, with: fetched)
+        var retired = Set<UUID>()
+        for (index, entry) in entries.enumerated() {
+            if now.timeIntervalSince(entry.madeAt) >= Self.lifetime {
+                retired.insert(entry.id)
+            } else if case .status(_, let to?, _) = entry.change, let options, !options.contains(to.optionId) {
+                retired.insert(entry.id)
+            } else if Self.agrees(entry, with: fetched) {
+                retired.insert(entry.id)
+                for older in entries[..<index] where older.key == entry.key && Self.overlaps(older.change, entry.change) {
+                    retired.insert(older.id)
+                }
+            }
         }
+        entries.removeAll { retired.contains($0.id) }
     }
 
     // MARK: Applying
@@ -178,7 +187,33 @@ public struct EditOverrides: Equatable, Sendable {
             return holds(names, added: added.map(\.name), removed: removed.map(\.name))
         case .assignees(let added, let removed):
             guard let issue = issues(in: fetched).first(where: { $0.key == entry.key }) else { return false }
-            return holds(issue.assignees.map(\.login), added: added.map(\.login), removed: removed.map(\.login))
+            guard holds(issue.assignees.map(\.login), added: added.map(\.login), removed: removed.map(\.login)) else {
+                return false
+            }
+            // Assigned comes from search, which lags the board: wait for it too, or the row flickers.
+            let viewer = fetched.org.viewer
+            guard issue.isOpen, let assigned = fetched.assignedIssues else { return true }
+            let listed = assigned.contains { $0.key == entry.key }
+            if added.contains(where: { same($0.login, viewer) }) { return listed }
+            if removed.contains(where: { same($0.login, viewer) }) { return !listed }
+            return true
+        }
+    }
+
+    /// Whether `newer` sets something `older` set: the Status, or one of the same labels or people.
+    private static func overlaps(_ older: EditChange, _ newer: EditChange) -> Bool {
+        func shared(_ a: [String], _ b: [String]) -> Bool {
+            a.contains { name in b.contains { same($0, name) } }
+        }
+        switch (older, newer) {
+        case (.status, .status):
+            return true
+        case (.labels(let a1, let r1), .labels(let a2, let r2)):
+            return shared((a1 + r1).map(\.name), (a2 + r2).map(\.name))
+        case (.assignees(let a1, let r1), .assignees(let a2, let r2)):
+            return shared((a1 + r1).map(\.login), (a2 + r2).map(\.login))
+        default:
+            return false
         }
     }
 
