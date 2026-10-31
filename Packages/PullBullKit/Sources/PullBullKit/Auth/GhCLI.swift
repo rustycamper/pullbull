@@ -130,6 +130,8 @@ public struct GhAccount: Hashable, Codable, Sendable {
 
 public extension GhAccount {
     var canReadProjects: Bool { scopes.contains("project") || scopes.contains("read:project") }
+    /// Changing a board item's Status needs `project`; `read:project` only reads.
+    var canWriteProjects: Bool { scopes.contains("project") }
 }
 
 public extension Array where Element == GhAccount {
@@ -138,6 +140,12 @@ public extension Array where Element == GhAccount {
     func canReadProjects(for login: String?) -> Bool {
         guard let login else { return false }
         return first { $0.login == login }?.canReadProjects ?? true
+    }
+
+    /// As `canReadProjects(for:)`, for changing a board item's Status.
+    func canWriteProjects(for login: String?) -> Bool {
+        guard let login else { return false }
+        return first { $0.login == login }?.canWriteProjects ?? true
     }
 }
 
