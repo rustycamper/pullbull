@@ -13,14 +13,14 @@ struct IssueDetailView: View {
     /// The list copy: on the board it carries the Status and the board item.
     private var listIssue: BoardIssue? { model.issue(for: key) }
     private var detail: IssueDetail? { model.issueDetails[key] }
-    /// The freshest row fields: the detail's, else the list's.
-    private var issue: BoardIssue? { detail?.issue ?? listIssue }
+    /// The freshest row fields: the detail's, else the list's, with pending edits laid over them.
+    private var issue: BoardIssue? { (detail?.issue).map(model.edits.overrides.apply(to:)) ?? listIssue }
     private var fetch: DetailFetch? { model.issueDetailFetch?.key == key ? model.issueDetailFetch : nil }
     private var webURL: URL { issue?.url ?? GitHubLinks.issue(key) }
-    private var isOnBoard: Bool { model.snapshot?.boardIssues.contains { $0.key == key } == true }
+    private var isOnBoard: Bool { model.shownSnapshot?.boardIssues.contains { $0.key == key } == true }
     /// Only for an issue on the board; another issue would land on the board with no item open.
     private var boardURL: URL? {
-        guard let snapshot = model.snapshot, let board = snapshot.board,
+        guard let snapshot = model.shownSnapshot, let board = snapshot.board,
               let item = snapshot.boardIssues.first(where: { $0.key == key })
         else { return nil }
         return GitHubLinks.boardItem(board, itemId: item.boardItemId)

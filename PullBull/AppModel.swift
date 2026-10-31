@@ -70,7 +70,19 @@ final class AppModel {
         }
     }
 
-    private(set) var snapshot: Snapshot?
+    /// As GitHub returned it; notifications compare these. The lists and the detail show `shownSnapshot`.
+    private(set) var snapshot: Snapshot? {
+        didSet { shownSnapshot = snapshot.map(edits.overrides.apply(to:)) }
+    }
+    /// `snapshot` with the edits GitHub hasn't shown yet laid over it.
+    private(set) var shownSnapshot: Snapshot?
+    /// Edits shown before GitHub agrees, the one ⌘Z can take back, and the last failure
+    /// (see AppModel+Edit.swift).
+    var edits = EditSession()
+    /// The Status picker on screen, or nil.
+    var statusPicker: StatusPicker?
+    /// Bumped when an edited row stays selected, so its list scrolls to it in its new lane.
+    var editScrollRequest = 0
     private(set) var tabs: BuiltTabs? {
         didSet { refreshRepoChoices() }
     }
@@ -180,7 +192,12 @@ final class AppModel {
     /// Bumped to ask the search field to take focus.
     private(set) var searchFieldFocusRequest = 0
     /// Results for `searchText`; nil when the text is empty or there is no snapshot to search yet.
+    /// The search's answer with the pending edits laid over it; set through `rawSearchResults`.
     private(set) var searchResults: SearchResults?
+    /// The search's answer as it came.
+    private var rawSearchResults: SearchResults? {
+        didSet { searchResults = rawSearchResults.map(edits.overrides.apply(to:)) }
+    }
     /// The tab that was showing when typing anywhere opened the search; nil when opened another way.
     private(set) var searchStartedOnTab: ShownTab?
     /// The tab a search is narrowed to by clicking it; `.everything` until then, and again once the field
@@ -377,6 +394,17 @@ final class AppModel {
         let login: String
         var failure: String?
     }
+
+    /// The current app account's installation on `owner`'s account, for edit permissions; nil for `gh`
+    /// and until the installations load.
+    func installation(owning owner: BoardOwner) -> Installation? {
+        guard let account = running?.ref, case .loaded(let list) = installations[account] else { return nil }
+        if owner.isUser { return AccessChecker.personalInstallation(of: owner.login, in: list) }
+        return list.first { $0.isOrganization && $0.org.caseInsensitiveCompare(owner.login) == .orderedSame }
+    }
+
+    /// The account the lists were fetched with; edits go through it too.
+    var runningAccount: AccountRef? { running?.ref }
 
     private enum InstallationsState: Equatable {
         case loaded([Installation])
@@ -872,15 +900,15 @@ final class AppModel {
         searchedFor = key
         refreshSearchMatchCounts(for: query)
         guard query != .empty else {
-            searchResults = nil
+            rawSearchResults = nil
             searchSelection = nil
             searchExpansion = ListExpansion(closed: true, done: true)
             if route == .search { route = .list }
             return
         }
         route = .search
-        guard let snapshot else {
-            searchResults = nil
+        guard let snapshot = shownSnapshot else {
+            rawSearchResults = nil
             return
         }
         if let narrowed = SearchNarrowing.results(
@@ -1129,7 +1157,7 @@ final class AppModel {
     }
 
     private func setSearchResults(_ results: SearchResults) {
-        searchResults = results
+        rawSearchResults = results
         let keys = searchItemKeys
         if let kept = keptSearchSelection, keys.contains(kept) {
             searchSelection = kept
@@ -1745,8 +1773,10 @@ final class AppModel {
     private func clearAccountData() {
         searchTask?.cancel()
         searchTask = nil
-        searchResults = nil
+        rawSearchResults = nil
         searchCache.removeAll()
+        edits = EditSession()
+        statusPicker = nil
         snapshot = nil
         people = .empty
         labels = .empty
@@ -1774,6 +1804,7 @@ final class AppModel {
         }
         if status.activity == .unsupported, let account = running?.ref { activityUnsupported.insert(account) }
         notifyChanges(snapshot, status)
+        if let snapshot { edits.reconcile(with: snapshot, now: Date()) }
         self.snapshot = snapshot
         var status = status
         if status.lastSuccess == nil, let current = self.snapshot { status.lastSuccess = current.fetchedAt }
@@ -1787,8 +1818,15 @@ final class AppModel {
         if snapshot?.boardError == RefreshError(APIError.insufficientScopes).message { reloadAccounts() }
     }
 
+    /// Lays the pending edits over the fetched snapshot and search results again, and rebuilds the tabs.
+    func refreshShown() {
+        shownSnapshot = snapshot.map(edits.overrides.apply(to:))
+        searchResults = rawSearchResults.map(edits.overrides.apply(to:))
+        rebuildTabs()
+    }
+
     private func rebuildTabs() {
-        guard let snapshot else {
+        guard let snapshot = shownSnapshot else {
             tabs = nil
             issueTabs = nil
             hiddenApprovedCount = 0
@@ -2550,9 +2588,9 @@ extension AppModel {
     /// Assigned, Created, search results, then the issue as opened.
     func issue(for key: PRKey) -> BoardIssue? {
         // The copy search shows: the newest of board, Assigned and Created, with the board's Status.
-        if let snapshot, let issue = SearchEngine.cachedIssue(key, in: snapshot) { return issue }
+        if let snapshot = shownSnapshot, let issue = SearchEngine.cachedIssue(key, in: snapshot) { return issue }
         if let issue = searchResults?.issues.first(where: { $0.key == key }) { return issue }
-        return openedIssue?.key == key ? openedIssue : nil
+        return openedIssue?.key == key ? openedIssue.map(edits.overrides.apply(to:)) : nil
     }
 
     /// A pull request linked from a loaded issue detail, for a PR detail opened from it whose PR is in
@@ -2568,7 +2606,7 @@ extension AppModel {
     /// The issue's Status on the board, as the lists show it; nil when it is not on the board, has no
     /// Status, the board can't be read, or its option no longer exists.
     func boardStatus(for key: PRKey) -> BoardStatusValue? {
-        guard let snapshot else { return nil }
+        guard let snapshot = shownSnapshot else { return nil }
         return IssueTabBuilder.shownStatus(snapshot.boardIssues.first(where: { $0.key == key })?.status, in: snapshot)
     }
 
