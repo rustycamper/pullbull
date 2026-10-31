@@ -1447,4 +1447,14 @@ private func offset(_ iso: String) -> TimeInterval {
         _ = await consumer.value
         #expect(transport.requests == 0)
     }
+
+    /// Search results and the issue detail edit from this copy, so it keeps the board copy's node IDs.
+    @Test func cachedIssueKeepsNodeIds() {
+        let card = BoardIssue(
+            key: editKey(412), title: "t", url: URL(string: "https://github.com/o/r/issues/412")!, isOpen: true,
+            boardItemId: 7, nodeId: "I_1", boardItemNodeId: "PVTI_1")
+        let cached = SearchEngine.cachedIssue(editKey(412), in: editSnapshot(board: [card]))
+        #expect(cached?.nodeId == "I_1")
+        #expect(cached?.boardItemNodeId == "PVTI_1")
+    }
 }

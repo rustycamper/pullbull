@@ -679,6 +679,19 @@ private struct SignedOutOnRejection: TokenSource {
         #expect(snap.fetchedAt == noon)
     }
 
+    @Test func failedBoardFetchKeepsPreviousBoardIds() async throws {
+        let transport = RoutingTransport(members: ["alice"], boardFails: true)
+        let ids = BoardIds(projectId: "PVT_p3", statusFieldId: "PVTSSF_f3")
+        let previous = Snapshot(
+            fetchedAt: noon.addingTimeInterval(-120),
+            org: OrgContext(org: "o", viewer: "devon", members: [], myTeams: [], repos: []),
+            reviewCandidates: [], mine: [], team: [], recentlyClosed: [], boardIssues: [],
+            boardProject: 3, boardTitle: "Team Board", boardIds: ids)
+        let snap = try await fetcher(transport, Clockwork(noon)).fetch(
+            account: "devon", scope: .org("o"), board: .org("o", 3), canReadProjects: true, previous: previous)
+        #expect(snap.boardIds == ids)
+    }
+
     @Test func boardFailureDropsAnotherProjectsIssues() async throws {
         let transport = RoutingTransport(members: ["alice"], boardFails: true)
         let old = BoardIssue(key: PRKey(repo: "o/r", number: 5), title: "Old", url: URL(string: "https://x/5")!, isOpen: true)

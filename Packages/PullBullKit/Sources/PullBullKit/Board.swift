@@ -70,6 +70,18 @@ public struct BoardRef: Codable, Hashable, Sendable {
     }
 }
 
+/// The node IDs board mutations take: the project's, and its single-select Status field's (nil when the
+/// board has none).
+public struct BoardIds: Codable, Sendable, Equatable {
+    public let projectId: String
+    public let statusFieldId: String?
+
+    public init(projectId: String, statusFieldId: String?) {
+        self.projectId = projectId
+        self.statusFieldId = statusFieldId
+    }
+}
+
 /// One board a picker offers.
 public struct BoardSummary: Hashable, Sendable {
     public let board: BoardRef

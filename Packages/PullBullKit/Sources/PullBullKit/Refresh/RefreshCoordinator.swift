@@ -28,7 +28,7 @@ public enum RefreshError: Equatable, Sendable {
             case .unauthorized: self = .unauthorized
             case .rateLimited(let resetAt): self = .rateLimited(resetAt)
             case .server(let status): self = .other("GitHub server error \(status)")
-            case .graphQL(let message), .notFound(let message): self = .other(message)
+            case .graphQL(let message), .notFound(let message), .writeRefused(let message): self = .other(message)
             case .insufficientScopes: self = .other("Token is missing a required scope")
             case .ssoRequired(let url): self = .ssoRequired(url)
             case .boardForbidden: self = .other("GitHub won't let this sign-in read the board")
@@ -247,7 +247,8 @@ public struct LiveSnapshotFetcher: SnapshotFetching {
                 parts.created, started: started, previous: previous, previousAt: previous?.createdIssuesFetchedAt),
             boardOwner: boardRef?.owner,
             closedIssues: closed?.found,
-            pendingClosedLookups: closed.flatMap { $0.pending.isEmpty ? nil : $0.pending }
+            pendingClosedLookups: closed.flatMap { $0.pending.isEmpty ? nil : $0.pending },
+            boardIds: parts.board.ids
         ).limited(to: scope)
     }
 
@@ -365,19 +366,19 @@ public struct LiveSnapshotFetcher: SnapshotFetching {
     /// board (owner and number). Without a board, or when it failed with no previous fetch of it, the
     /// options are nil (never fetched).
     private func board(_ board: BoardRef?, previous: Snapshot?) async throws -> BoardResult {
-        guard let board else { return (nil, nil, [], nil) }
+        guard let board else { return (nil, nil, [], nil, nil) }
         do {
             let fetched = try await api.board(board)
-            return (fetched.title, fetched.statusOptions, fetched.issues, nil)
+            return (fetched.title, fetched.statusOptions, fetched.issues, nil, fetched.ids)
         } catch is CancellationError {
             throw CancellationError()
         } catch let error where Self.isAuthFailure(error) {
             throw error
         } catch {
             let message = RefreshError(error).message
-            guard let previous, board.matches(previous.board) else { return (nil, nil, [], message) }
+            guard let previous, board.matches(previous.board) else { return (nil, nil, [], message, nil) }
             // No title while the board can't be read: search may list issues that aren't on it.
-            return (nil, previous.boardStatusOptions, previous.boardIssues, message)
+            return (nil, previous.boardStatusOptions, previous.boardIssues, message, previous.boardIds)
         }
     }
 
@@ -410,7 +411,9 @@ private enum FetchPart: Sendable {
 }
 
 private typealias IssueList = (issues: [BoardIssue]?, error: String?)
-private typealias BoardResult = (title: String?, statusOptions: [StatusOption]?, issues: [BoardIssue], error: String?)
+private typealias BoardResult = (
+    title: String?, statusOptions: [StatusOption]?, issues: [BoardIssue], error: String?, ids: BoardIds?
+)
 
 /// The parts of a fetch as they finish; every field is set once the group finishes without throwing.
 private struct FetchParts {
@@ -422,7 +425,7 @@ private struct FetchParts {
     var closed: [PullRequest] = []
     var assigned: IssueList = (nil, nil)
     var created: IssueList = (nil, nil)
-    var board: BoardResult = (nil, nil, [], nil)
+    var board: BoardResult = (nil, nil, [], nil, nil)
 
     mutating func add(_ part: FetchPart) {
         switch part {
@@ -444,7 +447,8 @@ private extension APIError {
     var failsThePoll: Bool {
         switch self {
         case .rateLimited, .unauthorized, .ssoRequired: true
-        case .network, .unreachable, .server, .forbidden, .graphQL, .insufficientScopes, .boardForbidden, .notFound: false
+        case .network, .unreachable, .server, .forbidden, .graphQL, .insufficientScopes, .boardForbidden, .notFound,
+             .writeRefused: false
         }
     }
 }

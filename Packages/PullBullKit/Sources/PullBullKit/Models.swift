@@ -87,11 +87,11 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
     public let reviewRequests: [Reviewer]
     /// The head commit's oid; nil in snapshots cached before it was stored.
     public let headCommitOid: String?
-    /// Label names; empty in snapshots cached before they were stored.
-    public let labels: [String]
+    /// Label names; empty in snapshots cached before they were stored. Set by edit overrides too.
+    public internal(set) var labels: [String]
     /// GitHub's 6-hex colour for each of `labels`, by position; nil where it's missing, and empty in
     /// snapshots cached before it was stored. Read it through `labelColor(at:)`.
-    public let labelColors: [String?]
+    public internal(set) var labelColors: [String?]
     /// Who merged it; nil while unmerged, for a deleted account, and in snapshots cached before it was stored.
     public let mergedBy: String?
     /// Nil when GitHub sent none or a value this build doesn't know, and in snapshots cached before it was stored.
@@ -99,6 +99,8 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
     /// Lines added and removed; nil when GitHub sent none, and in snapshots cached before they were stored.
     public let additions: Int?
     public let deletions: Int?
+    /// GitHub's node ID, which mutations take; nil in snapshots cached before it was stored.
+    public let nodeId: String?
 
     public var glyph: PRGlyph { PRGlyph(state: state, isDraft: isDraft) }
     /// The colour of the label at `index`, nil when GitHub gave none or the cache predates it.
@@ -115,7 +117,7 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         commentCount: Int, lastCommentAuthor: String?,
         latestReviews: [Review], reviewRequests: [Reviewer], headCommitOid: String? = nil, labels: [String] = [],
         labelColors: [String?] = [], mergedBy: String? = nil, mergeable: Mergeable? = nil,
-        lastCommentByBot: Bool? = nil, additions: Int? = nil, deletions: Int? = nil
+        lastCommentByBot: Bool? = nil, additions: Int? = nil, deletions: Int? = nil, nodeId: String? = nil
     ) {
         self.key = key
         self.title = title
@@ -143,6 +145,7 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         self.mergeable = mergeable
         self.additions = additions
         self.deletions = deletions
+        self.nodeId = nodeId
     }
 
     /// Pull requests cached before labels were stored have none.
@@ -174,6 +177,7 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         mergeable = try c.decodeIfPresent(String.self, forKey: .mergeable).flatMap(Mergeable.init(rawValue:))
         additions = try c.decodeIfPresent(Int.self, forKey: .additions)
         deletions = try c.decodeIfPresent(Int.self, forKey: .deletions)
+        nodeId = try c.decodeIfPresent(String.self, forKey: .nodeId)
     }
 }
 
@@ -309,13 +313,14 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
     public let lastCommentAuthor: String?
     /// Whether the newest comment's author is a bot; set with `lastCommentAuthor`, nil otherwise.
     public let lastCommentByBot: Bool?
-    public let labels: [String]
+    /// Labels, assignees and Status are set by edit overrides too.
+    public internal(set) var labels: [String]
     /// GitHub's 6-hex colour for each of `labels`, by position; nil where it's missing, and empty in
     /// issues cached before it was stored. Read it through `labelColor(at:)`.
-    public let labelColors: [String?]
-    public let assignees: [Assignee]
+    public internal(set) var labelColors: [String?]
+    public internal(set) var assignees: [Assignee]
     /// The board item's Status; set only on board items.
-    public let status: BoardStatusValue?
+    public internal(set) var status: BoardStatusValue?
     /// `ProjectV2Item.databaseId`, for "View on board"; set only on board items.
     public let boardItemId: Int?
     /// Set only on Assigned search results.
@@ -327,6 +332,11 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
     public let lastReopen: IssueStateChange?
     /// The latest closing; set only on issues looked up after they left Assigned or Created.
     public let lastClose: IssueStateChange?
+    /// GitHub's node ID, which mutations take; nil in issues cached before it was stored.
+    public let nodeId: String?
+    /// The board item's node ID, which board mutations take; set only on board items fetched since it
+    /// was stored.
+    public let boardItemNodeId: String?
 
     /// The colour of the label at `index`, nil when GitHub gave none or the cache predates it.
     public func labelColor(at index: Int) -> String? {
@@ -348,7 +358,7 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
         commentCount: Int = 0, lastCommentAuthor: String? = nil, lastCommentByBot: Bool? = nil, labels: [String] = [], labelColors: [String?] = [],
         assignees: [Assignee] = [], status: BoardStatusValue? = nil, boardItemId: Int? = nil,
         myAssignment: Assignment? = nil, statusMoves: [StatusMove] = [], lastReopen: IssueStateChange? = nil,
-        lastClose: IssueStateChange? = nil
+        lastClose: IssueStateChange? = nil, nodeId: String? = nil, boardItemNodeId: String? = nil
     ) {
         self.key = key
         self.title = title
@@ -371,6 +381,8 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
         self.statusMoves = statusMoves
         self.lastReopen = lastReopen
         self.lastClose = lastClose
+        self.nodeId = nodeId
+        self.boardItemNodeId = boardItemNodeId
     }
 
     /// Issues cached before the Issues mode hold only key, title, url and isOpen.
@@ -397,5 +409,7 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
         statusMoves = try c.decodeIfPresent([StatusMove].self, forKey: .statusMoves) ?? []
         lastReopen = try c.decodeIfPresent(IssueStateChange.self, forKey: .lastReopen)
         lastClose = try c.decodeIfPresent(IssueStateChange.self, forKey: .lastClose)
+        nodeId = try c.decodeIfPresent(String.self, forKey: .nodeId)
+        boardItemNodeId = try c.decodeIfPresent(String.self, forKey: .boardItemNodeId)
     }
 }

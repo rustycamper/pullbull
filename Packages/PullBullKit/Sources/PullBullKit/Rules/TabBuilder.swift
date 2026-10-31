@@ -41,6 +41,9 @@ public struct Snapshot: Codable, Sendable, Equatable {
     /// Issues that left Assigned or Created whose lookup failed or didn't fit this poll, as last
     /// listed; the next poll looks them up again. Nil when there are none.
     public var pendingClosedLookups: [BoardIssue]?
+    /// The node IDs board mutations take for `boardProject`; nil without a board, when the board query
+    /// returned none, and in caches from before they were stored.
+    public var boardIds: BoardIds?
 
     public init(
         fetchedAt: Date, org: OrgContext, reviewCandidates: [PullRequest], mine: [PullRequest],
@@ -50,7 +53,7 @@ public struct Snapshot: Codable, Sendable, Equatable {
         boardStatusOptions: [StatusOption]? = nil, assignedIssuesError: String? = nil,
         createdIssuesError: String? = nil, assignedIssuesFetchedAt: Date? = nil,
         createdIssuesFetchedAt: Date? = nil, boardOwner: BoardOwner? = nil, closedIssues: [BoardIssue]? = nil,
-        pendingClosedLookups: [BoardIssue]? = nil
+        pendingClosedLookups: [BoardIssue]? = nil, boardIds: BoardIds? = nil
     ) {
         self.fetchedAt = fetchedAt
         self.org = org
@@ -72,6 +75,7 @@ public struct Snapshot: Codable, Sendable, Equatable {
         self.createdIssuesFetchedAt = createdIssuesFetchedAt
         self.closedIssues = closedIssues
         self.pendingClosedLookups = pendingClosedLookups
+        self.boardIds = boardIds
     }
 
     /// Why the Assigned or Created list on screen did not update; nil for Board, which has `boardError`.

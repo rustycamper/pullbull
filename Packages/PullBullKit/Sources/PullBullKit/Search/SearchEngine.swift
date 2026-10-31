@@ -798,6 +798,7 @@ private extension BoardIssue {
             lastCommentAuthor: byOther?.lastCommentAuthor ?? lastCommentAuthor,
             lastCommentByBot: byOther?.lastCommentByBot ?? lastCommentByBot,
             labels: labels, labelColors: labelColors, assignees: assignees, status: IssueTabBuilder.shownStatus(board?.status, in: snap),
-            boardItemId: board?.boardItemId, myAssignment: myAssignment)
+            boardItemId: board?.boardItemId, myAssignment: myAssignment, nodeId: nodeId,
+            boardItemNodeId: board?.boardItemNodeId)
     }
 }

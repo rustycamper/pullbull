@@ -9,6 +9,9 @@ struct GhCommandsTests {
     }
 
     @Test func projectScopeForTheActiveLoginNeedsNoSwitch() {
+        #expect(GhCommands.addProjectScope(login: "me", activeLogin: "me", scope: "project") == "gh auth refresh -s project")
+        #expect(GhCommands.addProjectScope(login: "me", activeLogin: "work", scope: "project")
+            == "gh auth switch --user me && gh auth refresh -s project && gh auth switch --user work")
         #expect(GhCommands.addProjectScope(login: "devon", activeLogin: "devon")
             == "gh auth refresh -s read:project")
     }

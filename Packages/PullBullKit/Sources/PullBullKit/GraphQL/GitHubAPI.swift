@@ -25,6 +25,22 @@ public enum APIError: Error, Equatable {
     /// The PR or issue a detail fetch asked for doesn't exist (deleted or transferred); the message
     /// is the one shown.
     case notFound(String)
+    /// GitHub refused a write (`FORBIDDEN`): this token or user may not change it. The message is GitHub's.
+    case writeRefused(String)
+}
+
+/// Which parts of a label or assignee change GitHub applied. A part with nothing to send counts as
+/// applied. `refusal` is GitHub's reason when a part wasn't.
+public struct SetChangeResult: Equatable, Sendable {
+    public let addApplied: Bool
+    public let removeApplied: Bool
+    public let refusal: String?
+
+    public init(addApplied: Bool, removeApplied: Bool, refusal: String?) {
+        self.addApplied = addApplied
+        self.removeApplied = removeApplied
+        self.refusal = refusal
+    }
 }
 
 public struct OrgContext: Codable, Sendable, Equatable {
@@ -568,17 +584,19 @@ public struct GitHubAPI: Sendable {
         try await self.board(board).issues
     }
 
-    /// The board's title, its Status options (empty when it has no single-select Status field) and
-    /// its issue items with their Status (draft items and pull requests are left out). A board with
-    /// more than `maxPages` pages of items throws rather than passing a partial list for the whole.
-    /// A board GitHub won't let this token read throws `boardForbidden`, one that isn't there "not found".
+    /// The board's title, its Status options (empty when it has no single-select Status field), its
+    /// issue items with their Status (draft items and pull requests are left out), and the node IDs
+    /// board mutations take. A board with more than `maxPages` pages of items throws rather than
+    /// passing a partial list for the whole. A board GitHub won't let this token read throws
+    /// `boardForbidden`, one that isn't there "not found".
     public func board(
         _ board: BoardRef
-    ) async throws -> (title: String?, statusOptions: [StatusOption], issues: [BoardIssue]) {
+    ) async throws -> (title: String?, statusOptions: [StatusOption], issues: [BoardIssue], ids: BoardIds?) {
         let projectNumber = board.number
         var result: [BoardIssue] = []
         var title: String?
         var options: [StatusOption]?
+        var ids: BoardIds?
         var after: String?
         for _ in 0..<Self.maxPages {
             var variables: [String: Any] = ["login": board.owner.login, "n": projectNumber]
@@ -591,6 +609,9 @@ public struct GitHubAPI: Sendable {
                 throw APIError.graphQL("project \(projectNumber) not found")
             }
             title = title ?? project?["title"] as? String
+            if ids == nil, let projectId = project?["id"] as? String {
+                ids = BoardIds(projectId: projectId, statusFieldId: (project?["field"] as? [String: Any])?["id"] as? String)
+            }
             if options == nil {
                 let nodes = (project?["field"] as? [String: Any])?["options"] as? [[String: Any]] ?? []
                 options = nodes.compactMap { node in
@@ -604,13 +625,13 @@ public struct GitHubAPI: Sendable {
                       content["__typename"] as? String == "Issue",
                       let issue = Decoding.issue(
                         from: content, status: Decoding.statusValue(node["fieldValueByName"]),
-                        boardItemId: node["databaseId"] as? Int)
+                        boardItemId: node["databaseId"] as? Int, boardItemNodeId: node["id"] as? String)
                 else { continue }
                 result.append(issue)
             }
             let info = items["pageInfo"] as? [String: Any]
             guard info?["hasNextPage"] as? Bool == true, let cursor = info?["endCursor"] as? String else {
-                return (title, options ?? [], result)
+                return (title, options ?? [], result, ids)
             }
             after = cursor
         }
@@ -752,6 +773,84 @@ public struct GitHubAPI: Sendable {
         }
     }
 
+    // MARK: Writes
+
+    /// Sets the board item's Status to `option`, or clears it when `option` is nil.
+    public func setStatus(project: String, item: String, field: String, option: String?) async throws {
+        var variables = ["project": project, "item": item, "field": field]
+        if let option {
+            variables["option"] = option
+            _ = try await mutate(Mutations.setStatus, variables, payload: "updateProjectV2ItemFieldValue")
+        } else {
+            _ = try await mutate(Mutations.clearStatus, variables, payload: "clearProjectV2ItemFieldValue")
+        }
+    }
+
+    /// Adds the issue (`content`, its node ID) to the board; returns the new item's node ID. GitHub
+    /// returns the existing item when the issue is already on the board.
+    public func addToProject(project: String, content: String) async throws -> String {
+        let payload = try await mutate(
+            Mutations.addToProject, ["project": project, "content": content], payload: "addProjectV2ItemById")
+        guard let id = (payload["item"] as? [String: Any])?["id"] as? String else {
+            throw APIError.graphQL("missing addProjectV2ItemById.item.id")
+        }
+        return id
+    }
+
+    public func deleteProjectItem(project: String, item: String) async throws {
+        _ = try await mutate(Mutations.deleteProjectItem, ["project": project, "item": item], payload: "deleteProjectV2Item")
+    }
+
+    /// Adds and removes labels (node IDs) on the issue or PR `subject`, in one request.
+    public func changeLabels(of subject: String, adding: [String], removing: [String]) async throws -> SetChangeResult {
+        try await changeSet(
+            Mutations.labels(adding: !adding.isEmpty, removing: !removing.isEmpty), subject, adding, removing)
+    }
+
+    /// Adds and removes assignees (user node IDs) on the issue or PR `subject`, in one request.
+    public func changeAssignees(of subject: String, adding: [String], removing: [String]) async throws -> SetChangeResult {
+        try await changeSet(
+            Mutations.assignees(adding: !adding.isEmpty, removing: !removing.isEmpty), subject, adding, removing)
+    }
+
+    /// The node ID of the issue or PR `key`, for items cached before node IDs were stored.
+    public func nodeId(of key: PRKey) async throws -> String {
+        let parts = key.repo.split(separator: "/", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { throw APIError.notFound("\(key.repo)#\(key.number) not found") }
+        let data = try await execute(Mutations.nodeId, ["owner": parts[0], "name": parts[1], "n": key.number])
+        let node = (data["repository"] as? [String: Any])?["issueOrPullRequest"] as? [String: Any]
+        guard let id = node?["id"] as? String else { throw APIError.notFound("\(key.repo)#\(key.number) not found") }
+        return id
+    }
+
+    /// Sends a mutation and returns its `payload` field. A null payload throws `writeRefused` for a
+    /// FORBIDDEN error, else `graphQL`.
+    private func mutate(_ mutation: String, _ variables: [String: Any], payload: String) async throws -> [String: Any] {
+        let (data, errors) = try await executeReportingErrors(mutation, variables)
+        if let result = data[payload] as? [String: Any] { return result }
+        throw Self.refusal(errors)
+    }
+
+    private func changeSet(
+        _ mutation: String?, _ subject: String, _ adding: [String], _ removing: [String]
+    ) async throws -> SetChangeResult {
+        guard let mutation else { return SetChangeResult(addApplied: true, removeApplied: true, refusal: nil) }
+        var variables: [String: Any] = ["subject": subject]
+        if !adding.isEmpty { variables["add"] = adding }
+        if !removing.isEmpty { variables["remove"] = removing }
+        let (data, errors) = try await executeReportingErrors(mutation, variables)
+        let addApplied = adding.isEmpty || data["add"] is [String: Any]
+        let removeApplied = removing.isEmpty || data["remove"] is [String: Any]
+        if !addApplied, !removeApplied { throw Self.refusal(errors) }
+        let refusal = addApplied && removeApplied ? nil : errors.first?["message"] as? String
+        return SetChangeResult(addApplied: addApplied, removeApplied: removeApplied, refusal: refusal)
+    }
+
+    private static func refusal(_ errors: [[String: Any]]) -> APIError {
+        let message = errors.first?["message"] as? String ?? "GitHub didn't apply the change"
+        return isForbidden(errors) ? .writeRefused(message) : .graphQL(message)
+    }
+
     // MARK: Transport
 
     /// Sends one query and returns `data`. Partial results (errors alongside data) are returned as data.
@@ -813,6 +912,8 @@ public struct GitHubAPI: Sendable {
         if errors.contains(where: { $0["type"] as? String == "RATE_LIMITED" }) {
             throw APIError.rateLimited(resetAt: APIError.rateLimitEnd(response, now: now()))
         }
+        // A refused mutation may come back without a data object at all.
+        if query.hasPrefix("mutation"), Self.isForbidden(errors) { throw Self.refusal(errors) }
         throw APIError.graphQL(errors.first?["message"] as? String ?? "empty response")
     }
 }

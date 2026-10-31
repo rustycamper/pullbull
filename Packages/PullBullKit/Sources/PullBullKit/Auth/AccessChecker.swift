@@ -25,6 +25,12 @@ public struct Installation: Sendable, Equatable {
     public var canReadProjects: Bool {
         ["read", "write", "admin"].contains(permissions["organization_projects"] ?? "")
     }
+
+    /// Labels and assignees, on issues and pull requests.
+    public var canWriteIssues: Bool { ["write", "admin"].contains(permissions["issues"] ?? "") }
+
+    /// A board item's Status, and adding an issue to the board.
+    public var canWriteProjects: Bool { ["write", "admin"].contains(permissions["organization_projects"] ?? "") }
 }
 
 /// The repositories no-org mode covers for an app account's own-account installation.
@@ -195,6 +201,17 @@ public struct AccessChecker: Sendable {
     /// Where the user changes which of their repositories an installation on their own account covers.
     public static func installationSettingsURL(id: Int64) -> URL {
         URL(string: "https://github.com/settings/installations/")!.appending(component: String(id))
+    }
+
+    /// Where the installation's new permissions are accepted: the org's installation settings (by an
+    /// owner), or the user's own. Nil without an installation ID.
+    public static func permissionsReviewURL(for installation: Installation) -> URL? {
+        guard let id = installation.id else { return nil }
+        guard installation.isOrganization else { return installationSettingsURL(id: id) }
+        return URL(string: "https://github.com/organizations/")!
+            .appending(component: installation.org)
+            .appending(path: "settings/installations")
+            .appending(component: String(id))
     }
 
     private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {

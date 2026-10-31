@@ -67,7 +67,8 @@ public enum Decoding {
             mergedBy: (node["mergedBy"] as? [String: Any])?["login"] as? String,
             mergeable: (node["mergeable"] as? String).flatMap(Mergeable.init(rawValue:)),
             lastCommentByBot: lastCommenter.map { $0["__typename"] as? String == "Bot" },
-            additions: node["additions"] as? Int, deletions: node["deletions"] as? Int
+            additions: node["additions"] as? Int, deletions: node["deletions"] as? Int,
+            nodeId: node["id"] as? String
         )
     }
 
@@ -76,7 +77,7 @@ public enum Decoding {
     /// latest AssignedEvent in the node's `timelineItems` that added that login.
     public static func issue(
         from node: [String: Any], status: BoardStatusValue? = nil, boardItemId: Int? = nil,
-        assignmentFor viewer: String? = nil
+        boardItemNodeId: String? = nil, assignmentFor viewer: String? = nil
     ) -> BoardIssue? {
         guard let number = node["number"] as? Int,
               let title = node["title"] as? String,
@@ -109,7 +110,9 @@ public enum Decoding {
             myAssignment: viewer.flatMap { assignment(node, viewer: $0) },
             statusMoves: timeline(node, "statusMoves").compactMap(statusMove),
             lastReopen: timeline(node, "lastReopen").last.flatMap(stateChange),
-            lastClose: timeline(node, "lastClose").last.flatMap(stateChange)
+            lastClose: timeline(node, "lastClose").last.flatMap(stateChange),
+            nodeId: node["id"] as? String,
+            boardItemNodeId: boardItemNodeId
         )
     }
 
