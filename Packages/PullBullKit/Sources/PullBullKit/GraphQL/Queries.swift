@@ -7,7 +7,7 @@ enum Queries {
 
     static let prFields = """
     fragment prFields on PullRequest {
-      number title url isDraft state mergeable additions deletions createdAt updatedAt closedAt headRefName baseRefName
+      id number title url isDraft state mergeable additions deletions createdAt updatedAt closedAt headRefName baseRefName
       repository{nameWithOwner}
       author{login avatarUrl}
       comments(last:1){totalCount nodes{author{__typename login}}}
@@ -21,7 +21,7 @@ enum Queries {
 
     static let issueRowFields = """
     fragment issueRowFields on Issue {
-      number title url state stateReason createdAt updatedAt closedAt
+      id number title url state stateReason createdAt updatedAt closedAt
       repository{nameWithOwner} author{login} comments{totalCount}
       labels(first:20){nodes{name color}} assignees(first:10){nodes{login avatarUrl}}
     }
@@ -168,12 +168,12 @@ enum Queries {
         query($login:String!,$n:Int!,$after:String){
           \(root(owner))(login:$login){
             projectV2(number:$n){
-              title
-              field(name:"Status"){... on ProjectV2SingleSelectField{options{id name color}}}
+              id title
+              field(name:"Status"){... on ProjectV2SingleSelectField{id options{id name color}}}
               items(first:100, after:$after){
                 pageInfo{endCursor hasNextPage}
                 nodes{
-                  databaseId
+                  id databaseId
                   fieldValueByName(name:"Status"){... on ProjectV2ItemFieldSingleSelectValue{name optionId}}
                   content{__typename ... on Issue{...issueRowFields}}
                 }

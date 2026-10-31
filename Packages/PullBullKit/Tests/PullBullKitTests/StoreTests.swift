@@ -129,6 +129,28 @@ private func sample() -> Snapshot {
         #expect(loaded.boardError == nil)
     }
 
+    /// Items and snapshots cached before node IDs were stored decode without them.
+    @Test func cachedItemsWithoutNodeIdsDecode() async throws {
+        let dir = tempDir()
+        let store = SnapshotStore(directory: dir)
+        try await store.save(sample(), account: "a", scope: .org("o"))
+        let url = dir.appendingPathComponent("a@o.json")
+        var object = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        #expect(object["boardIds"] == nil)
+        var prs = try #require(object["reviewCandidates"] as? [[String: Any]])
+        prs[0]["nodeId"] = nil
+        object["reviewCandidates"] = prs
+        object["boardIssues"] = [[
+            "key": ["repo": "o/r", "number": 9], "title": "i", "url": "https://x/9", "isOpen": true,
+        ]]
+        try JSONSerialization.data(withJSONObject: object).write(to: url)
+        let loaded = try #require(await store.load(account: "a", scope: .org("o")))
+        #expect(loaded.boardIds == nil)
+        #expect(loaded.reviewCandidates.first?.nodeId == nil)
+        #expect(loaded.boardIssues.first?.nodeId == nil)
+        #expect(loaded.boardIssues.first?.boardItemNodeId == nil)
+    }
+
     @Test func legacySnapshotDecodes() async throws {
         let dir = tempDir()
         let store = SnapshotStore(directory: dir)

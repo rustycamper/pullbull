@@ -53,6 +53,15 @@ private func issueJSON(state: String = "OPEN", stateReason: String = "null", ext
 }
 
 @Suite struct IssueDecodingTests {
+    @Test func issueReadsNodeIdAndBoardItemNodeId() throws {
+        let issue = Decoding.issue(
+            from: try node(issueJSON(extra: #","id":"I_kwDOB2""#)), boardItemId: 7, boardItemNodeId: "PVTI_x")
+        #expect(issue?.nodeId == "I_kwDOB2")
+        #expect(issue?.boardItemNodeId == "PVTI_x")
+        #expect(issue?.boardItemId == 7)
+        #expect(Queries.issueRowFields.contains("fragment issueRowFields on Issue {\n  id "))
+    }
+
     @Test func decodesIssueSearchPage() async throws {
         let page = try await api(StubTransport([(try fixture("issue_search_page"), response(200))]))
             .searchIssues("q", assignmentFor: "devon")

@@ -568,17 +568,19 @@ public struct GitHubAPI: Sendable {
         try await self.board(board).issues
     }
 
-    /// The board's title, its Status options (empty when it has no single-select Status field) and
-    /// its issue items with their Status (draft items and pull requests are left out). A board with
-    /// more than `maxPages` pages of items throws rather than passing a partial list for the whole.
-    /// A board GitHub won't let this token read throws `boardForbidden`, one that isn't there "not found".
+    /// The board's title, its Status options (empty when it has no single-select Status field), its
+    /// issue items with their Status (draft items and pull requests are left out), and the node IDs
+    /// board mutations take. A board with more than `maxPages` pages of items throws rather than
+    /// passing a partial list for the whole. A board GitHub won't let this token read throws
+    /// `boardForbidden`, one that isn't there "not found".
     public func board(
         _ board: BoardRef
-    ) async throws -> (title: String?, statusOptions: [StatusOption], issues: [BoardIssue]) {
+    ) async throws -> (title: String?, statusOptions: [StatusOption], issues: [BoardIssue], ids: BoardIds?) {
         let projectNumber = board.number
         var result: [BoardIssue] = []
         var title: String?
         var options: [StatusOption]?
+        var ids: BoardIds?
         var after: String?
         for _ in 0..<Self.maxPages {
             var variables: [String: Any] = ["login": board.owner.login, "n": projectNumber]
@@ -591,6 +593,9 @@ public struct GitHubAPI: Sendable {
                 throw APIError.graphQL("project \(projectNumber) not found")
             }
             title = title ?? project?["title"] as? String
+            if ids == nil, let projectId = project?["id"] as? String {
+                ids = BoardIds(projectId: projectId, statusFieldId: (project?["field"] as? [String: Any])?["id"] as? String)
+            }
             if options == nil {
                 let nodes = (project?["field"] as? [String: Any])?["options"] as? [[String: Any]] ?? []
                 options = nodes.compactMap { node in
@@ -604,13 +609,13 @@ public struct GitHubAPI: Sendable {
                       content["__typename"] as? String == "Issue",
                       let issue = Decoding.issue(
                         from: content, status: Decoding.statusValue(node["fieldValueByName"]),
-                        boardItemId: node["databaseId"] as? Int)
+                        boardItemId: node["databaseId"] as? Int, boardItemNodeId: node["id"] as? String)
                 else { continue }
                 result.append(issue)
             }
             let info = items["pageInfo"] as? [String: Any]
             guard info?["hasNextPage"] as? Bool == true, let cursor = info?["endCursor"] as? String else {
-                return (title, options ?? [], result)
+                return (title, options ?? [], result, ids)
             }
             after = cursor
         }

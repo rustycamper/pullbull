@@ -53,6 +53,17 @@ private func node(_ name: String) throws -> [String: Any] {
         #expect(Queries.prFields.contains("submittedAt commit{oid}"))
     }
 
+    @Test func pullRequestReadsNodeId() throws {
+        let json = """
+        {"id":"PR_kwDOA1","number":5,"title":"t","url":"https://github.com/o/r/pull/5","isDraft":false,"state":"OPEN",\
+        "createdAt":"2026-10-20T09:00:00Z","updatedAt":"2026-10-25T14:03:11Z","closedAt":null,\
+        "headRefName":"a","baseRefName":"main","repository":{"nameWithOwner":"o/r"},"author":{"login":"al"}}
+        """
+        let node = try #require(try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+        #expect(try Decoding.pullRequest(from: node).nodeId == "PR_kwDOA1")
+        #expect(Queries.prFields.contains("fragment prFields on PullRequest {\n  id "))
+    }
+
     @Test func decodesPRLabels() throws {
         let json = """
         {"number":5,"title":"t","url":"https://github.com/o/r/pull/5","isDraft":false,"state":"OPEN",\

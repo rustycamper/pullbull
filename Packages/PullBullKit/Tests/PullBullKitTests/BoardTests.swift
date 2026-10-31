@@ -151,6 +151,32 @@ private let forbiddenError = """
         #expect(variables?["n"] as? Int == 3)
     }
 
+    @Test func boardReadsProjectAndStatusFieldIds() async throws {
+        let transport = QueueTransport(["""
+        {"data":{"organization":{"projectV2":{"id":"PVT_p1","title":"B",\
+        "field":{"id":"PVTSSF_f1","options":[{"id":"o1","name":"Todo"}]},\
+        "items":{"pageInfo":{"endCursor":null,"hasNextPage":false},"nodes":[{"id":"PVTI_i1","databaseId":5,\
+        "fieldValueByName":{"name":"Todo","optionId":"o1"},"content":{"__typename":"Issue","id":"I_1","number":1,\
+        "title":"t","url":"https://github.com/acme/w/issues/1","state":"OPEN","repository":{"nameWithOwner":"acme/w"}}}]}}}}}
+        """])
+        let board = try await api(transport).board(.org("acme", 1))
+        #expect(board.ids == BoardIds(projectId: "PVT_p1", statusFieldId: "PVTSSF_f1"))
+        #expect(board.issues.first?.boardItemNodeId == "PVTI_i1")
+        #expect(board.issues.first?.nodeId == "I_1")
+        let query = try #require(transport.bodies.first?["query"] as? String)
+        #expect(query.contains("projectV2(number:$n){\n      id title"))
+        #expect(query.contains("ProjectV2SingleSelectField{id options"))
+        #expect(query.contains("nodes{\n          id databaseId"))
+    }
+
+    @Test func boardWithoutStatusFieldHasNoFieldId() async throws {
+        let transport = QueueTransport(["""
+        {"data":{"organization":{"projectV2":{"id":"PVT_p1","title":"B","field":null,\
+        "items":{"pageInfo":{"endCursor":null,"hasNextPage":false},"nodes":[]}}}}}
+        """])
+        #expect(try await api(transport).board(.org("acme", 1)).ids == BoardIds(projectId: "PVT_p1", statusFieldId: nil))
+    }
+
     @Test func userProjectsList() async throws {
         let json = """
         {"data":{"user":{"projectsV2":{"nodes":[{"number":1,"title":"@rustycamper's QC App"},\
