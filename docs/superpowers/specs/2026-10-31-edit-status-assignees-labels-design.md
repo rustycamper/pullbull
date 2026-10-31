@@ -40,9 +40,10 @@ PullBull writes exactly three things to GitHub, each only when the user picks a 
 
 ## Which board, which account
 
-- PullBull shows one board per account and scope: the snapshot's `boardProject` and `boardOwner`. Status edits always target that board. Its `projectId` and Status `fieldId` come from the board fetch, and the item's `itemId` comes from the `BoardIssue` the board fetch produced. Each item carries one `itemId`, for the shown board. Switching boards rebuilds the snapshot, so another board's item ID is never held.
-- Status is offered on an issue when a board is shown and has a Status field. The issue may already be on the board, or not yet on it while its repo's owner is the board's owner (an org board takes that org's issues; a personal board takes the user's own). For any other issue, the Status key and submenu are absent.
-- The board fetch stops at 20 pages (`GitHubAPI.maxPages`), so on a very large board "not on the board" can be wrong. The add path doesn't trust it. `addProjectV2ItemById` returns the existing item when the issue is already on the project. Status is then set on whatever item comes back. The builder confirms that behaviour against GitHub. If it doesn't hold, the add path first reads the issue's `projectItems` for this project.
+- PullBull shows one board per account and scope: the snapshot's `boardProject` and `boardOwner`. Status edits always target that board. Its `projectId` and Status `fieldId` come from the board fetch, and the item's `itemId` comes from the `BoardIssue` the board fetch produced. Each item carries one `itemId`, for the shown board. Switching boards rebuilds the snapshot, so another board's item ID is never held. The first fetch of another board also drops the edits still waiting for GitHub and the undo, so ⌘Z never writes to a board other than the one the edit was made on.
+- Status is offered on an issue when a board is shown and has a Status field. The issue may already be on the board, or not yet on it while its repo's owner is the board's owner (an org board takes that org's issues; a personal board takes the user's own). The owner is the shown board's own (`snapshot.board`), which snapshots cached before personal boards also carry. For any other issue, the Status key and submenu are absent.
+- The board fetch stops at 20 pages (`GitHubAPI.maxPages`), and a snapshot can be stale, so "not on the board" can be wrong. The add path doesn't trust it: before adding, it reads the issue's `projectItems` (archived ones too) for this board. A card already there gets the Status and isn't reported as added, so neither a failure nor ⌘Z removes a card PullBull didn't add. `addProjectV2ItemById` would return that existing card too, which is why the read comes first: rolling back or undoing "the added card" would otherwise delete it.
+- A card cached without its item ID (an old cache) is found by `addProjectV2ItemById`, which returns the card already on the board; Status is then set on it.
 - Edits use the account the popover is showing, with the same token and `GitHubAPI` as its reads. There is no choosing between accounts.
 
 ## Interaction
@@ -56,20 +57,21 @@ Bare letters start a search ("just type"), so edits need a modifier. Builder's c
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd> | Status picker | Issue row or issue detail, when a board is shown |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>A</kbd> | Assignees picker | Any issue or PR row, or detail |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>L</kbd> | Labels picker | Any issue or PR row, or detail |
-| <kbd>⌘</kbd><kbd>Z</kbd> | Undo the last edit | For 10 seconds after it, unless the search field has text to undo |
+| <kbd>⌘</kbd><kbd>Z</kbd> | Undo the last edit | For 10 seconds after it, until you type in the search field |
 
-These keys work in search results too, where the search field keeps focus while arrows walk the rows.
+These keys work in search results too, where the search field keeps focus while arrows walk the rows. When the picker closes during a search, focus returns to the search field.
 
 ### Mouse
 
 - **Right-click a row:** a **Status** submenu listing the board's options (current one checked, then **Clear Status**), **Assignees…** and **Labels…** (open the picker on the row). Placed above the copy items, after a separator.
-- **Detail:** the board card's Status, the assignees and the label chips are clickable and open the same picker.
+- **Detail:** the board card's Status, the assignees and the label chips are clickable and open the same picker. The Status row shows the Status, "No status" for a card without one, or "Not on board"; it is clickable wherever Status is offered, with the help tag "Set Status (⌥⌘S)".
 
 ### The picker
 
 The picker reuses the search completion list's look and keys: a small popup anchored to the row (or the detail field), with a filter field on top and a list below.
 
-- **Status (single choice):** the board's Status options in board order, each with its colour dot and its open count (as `status:` shows them), then **Clear Status** when the item has one. The current Status is checked. <kbd>↑</kbd><kbd>↓</kbd> choose, <kbd>Return</kbd> applies and closes, <kbd>Esc</kbd> closes without change. Typing filters by part of the name, case ignored.
+- **Placement:** 300 pt wide, below its row, or above it when there's no room below, placed from its measured height and always wholly inside the popover. Opened from the detail, it anchors to the detail's Status row, not the list row under the detail. With its row scrolled out of view, it opens near the top. The filter has focus when it opens. A click outside closes it, and so does the popover hiding.
+- **Status (single choice):** the board's Status options in board order, each with the lane's Status glyph in the option's colour (the glyph the list's lane headers use) and its open count (as `status:` shows them), then **Clear Status** when the item has one. The current Status is checked. <kbd>↑</kbd><kbd>↓</kbd> choose, <kbd>Return</kbd> applies and closes, <kbd>Esc</kbd> closes without change. Typing filters by part of the name, case ignored; with no match it says "No Status called “…”". The Keyboard Shortcuts window lists these keys in an Editing section ("Choose a Status", "Apply", "Close without change").
 - **Assignees and labels (several):** the current ones checked and listed first, then the rest. <kbd>Return</kbd> (or a click) toggles the highlighted entry and keeps the picker open. Closing applies all the toggles as one edit: <kbd>Esc</kbd>, a click outside, or the picker's key again. Closing with nothing toggled sends nothing. This matches GitHub's own sidebar pickers, which apply when they close. The edit's undo covers a mistake. <kbd>⌘</kbd><kbd>Return</kbd> applies and closes too.
   - Assignees: the viewer first, then people assignable in the item's repo, with avatars. GitHub allows at most 10 assignees; at 10, unchecked entries are dimmed.
   - Labels: the repo's labels with their colour dots and descriptions.
@@ -77,21 +79,22 @@ The picker reuses the search completion list's look and keys: a small popup anch
 
 ### After an edit
 
-- The row updates at once in every list and in the detail. On Board and Assigned the row moves to its new Status lane. Unassigning yourself takes it off Assigned. Assigning yourself puts it on Assigned (built from the item PullBull already holds).
+- The row updates at once in every list, in search results and in the detail. On Board and Assigned, and in search results laid out by lane, the row moves to its new Status lane. Unassigning yourself takes it off Assigned. Assigning yourself puts it on Assigned (built from the item PullBull already holds).
 - No message on success. The updated row is the feedback.
-- The selection follows the row. It stays selected in its new lane, and the list scrolls to keep it in view. When the edit takes the row off the list (unassigning yourself on Assigned), the selection moves to the next row. In the detail, the edited field shows the new value.
+- The selection follows the row. It stays selected in its new lane, and the list scrolls to keep it in view. When the edit takes the row off the list (unassigning yourself on Assigned, or into a folded lane), the selection moves to the next row. In the detail, the edited field shows the new value.
 - **Undo:** ⌘Z within 10 seconds of an edit sends the inverse change: the previous Status or clearing it, the removed labels and assignees back, the added ones off. Only the last edit can be undone.
+  - The window opens when GitHub confirms the edit. Only the last edit's confirmation opens it: an older edit whose answer lands after a newer edit began stays not undoable.
   - An edit that added the issue to the board is undone by removing the item from the board.
   - Undo sends the inverse without first checking whether someone else changed the field in between. The window is 10 seconds, and a check would cost a round trip.
-  - Undo is not itself undoable. After an undo, the selection follows the row back.
-  - When focus is in the search field and the field has text changes to undo, ⌘Z keeps its text meaning there.
-  - Nothing on screen shows that undo exists; the manual's key tables document it.
+  - Undo is not itself undoable. After an undo, and after a failure takes an edit back, the row is selected again when it returns to the list, unless the selection moved meanwhile.
+  - ⌘Z takes back the edit even with focus in the search field. Typing in the search field after an edit hands ⌘Z back to the text: the edit can no longer be undone, also when its answer lands after the typing. So an edit made from search results is undone with ⌘Z, not the query typed before it.
+  - Nothing on screen shows that undo exists; the manual's key tables and the Keyboard Shortcuts window document it.
 - No confirmation dialogs.
 
 ### Failure
 
 - When an edit's request partly succeeds (one aliased mutation applied, another refused), only the refused part is rolled back; the error message says what didn't apply. Undo then reverses only what applied.
-- The change shown on screen is rolled back, and an error message appears at the bottom of the popover, above the footer, until dismissed or the next edit. It says what failed and why, in GitHub's terms, with **Open on GitHub**. The reason is GitHub's own message when it refused the write, otherwise the wording the refresh already uses (offline, rate limited, …). The messages:
+- The change shown on screen is rolled back, and an error message appears at the bottom of the popover until dismissed (its ✕) or the next edit. It floats over the content in every route: just above the footer on the lists and search, above the bottom bar on the detail. An amber warning glyph, the message (two lines at most), **Open on GitHub** and ✕; VoiceOver announces it. It says what failed and why, in GitHub's terms, with **Open on GitHub**. The reason is GitHub's own message when it refused the write, otherwise the wording the refresh already uses (offline, rate limited, …). The messages:
   - "Couldn't set Status on #412: you need write access to the acme board"
   - "Couldn't clear Status on #412: …"
   - "Couldn't add #412 to the board: …"
@@ -99,6 +102,7 @@ The picker reuses the search completion list's look and keys: a small popup anch
   - "Couldn't change labels on #412: …", "Couldn't change assignees on #412: …"
 - A partial failure names both halves, labels by name and people by login, comma-joined: "Added bug to #412, but couldn't remove triage: …" or "Removed triage from #412, but couldn't add bug: …". When neither half applied, it reads as the plain failure above. When GitHub gives no reason, the reason reads "GitHub didn't apply it".
 - Offline or rate-limited: the picker opens (from cached candidates where there are any), but applying fails at once with the existing offline or rate-limit wording. No queueing for later.
+- A snapshot cached before the board's project and Status field IDs were stored can't be written to until the board's next fetch: the edit fails with "…: the board hasn't finished loading. Try again in a moment".
 
 ## Data and GitHub API
 
@@ -114,7 +118,7 @@ The picker reuses the search completion list's look and keys: a small popup anch
 |---|---|
 | Set Status | `updateProjectV2ItemFieldValue(projectId, itemId, fieldId, value: {singleSelectOptionId})` |
 | Clear Status | `clearProjectV2ItemFieldValue(projectId, itemId, fieldId)` |
-| Issue not on the board | `addProjectV2ItemById(projectId, contentId)`, then set Status on the returned item |
+| Issue not on the board | Read the issue's `projectItems` for this board; when there's none, `addProjectV2ItemById(projectId, contentId)`, then set Status on the returned item, in sequential requests. A set that fails removes the new card again (`deleteProjectV2Item`), so no card is left in No status |
 | Undo an add to the board | `deleteProjectV2Item(projectId, itemId)` |
 | Labels | `addLabelsToLabelable` / `removeLabelsFromLabelable`, label node IDs |
 | Assignees | `addAssigneesToAssignable` / `removeAssigneesFromAssignable`, user node IDs |
@@ -158,6 +162,7 @@ Search-backed lists (Assigned, Created, PR tabs, search) can return the old valu
 - Existing installations keep their old, read-only permissions until an owner accepts the new ones. `AccessChecker` already reads each installation's `permissions`; the edit controls use them:
   - The installation grants write: the keys, menu items and clickable fields work.
   - It doesn't: the keys and the menu items still show. Choosing one shows a one-line note in place of the picker: "Editing needs PullBull's new permissions for acme. An org owner accepts them on GitHub." It links to the installation's permissions page (`AccessChecker` already builds `installations/new/permissions`). Lists and details look as today. No banners, no badges.
+  - Not known yet (the account's installations haven't loaded): the edit goes, and GitHub's answer decides. A refusal shows the failure line.
 - A GitHub App user token can do only what the user can do. A user with read-only access to a repo gets refused. If GraphQL exposes it, use the item's `viewerCanUpdate` (and `viewerCanLabel`, if it exists) to show the same one-line note in place of the picker instead of failing after the fact. Otherwise rely on the failure path.
 - Personal boards: GitHub Apps can't reach them at all. Nothing changes: those boards are read through a `gh` login, as today.
 - Update `docs/github-app-setup.md`: the permission table and the app's description text.
@@ -169,10 +174,10 @@ Search-backed lists (Assigned, Created, PR tabs, search) can return the old valu
 
 ## Docs and copy
 
-- README tagline: replace "Read-only" with a short claim that is true. Builder's call; for example "Keyboard-first · Native SwiftUI · Edits only what you pick".
-- README Privacy row: "Writes to GitHub: board Status, assignees and labels, only when you pick them. Never merges, comments, approves or closes."
+- README tagline: "Keyboard-first · Native SwiftUI · Edits only what you pick".
+- README Privacy row: "Writes to GitHub: board Status, assignees and labels, only when you pick them. Never merges, comments, approves or closes." While only Status ships, it reads "An issue's board Status, only when you pick it. Never merges, comments, approves or closes". The row keeps its eye icon.
 - CONTRIBUTING out-of-scope: "Writing to GitHub beyond Status, assignees and labels (merge, comment, approve, close)". Reason: "PullBull triages; GitHub is where work is written".
-- Manual: a new **Editing** section (keys, picker, undo, overrides in one sentence, permissions); the Keyboard tables (list and detail); right-click lists in Pull Requests and Issues; Sign in table (token is no longer "Read-only"; `gh` scope `project` for Status).
+- Manual: a new **Editing** section (keys, picker, undo, overrides in one sentence, permissions); the Keyboard tables (list and detail); right-click lists in Pull Requests and Issues; Sign in table (the token row reads "Writes only what you pick, renews itself"; both board rows add "`project` to set Status").
 - GitHub App description (`docs/github-app-setup.md`): the same sentence as Privacy.
 - Release notes: say plainly that PullBull now writes these three fields, and that org owners will be asked to accept new permissions.
 
@@ -182,7 +187,7 @@ Search-backed lists (Assigned, Created, PR tabs, search) can return the old valu
 2. **Status:** picker, keys, right-click submenu, detail click, add-to-board, clear, undo.
 3. **Assignees and labels:** the multi-select picker, candidate fetching, the diff mutations, for issues and PRs.
 
-Each step ships as its own PR. The README and manual change with the step that makes them true.
+Each step ships as its own PR. The README and manual change with the step that makes them true. Release notes are written at release time from the merged PRs.
 
 ## Testing
 
@@ -193,8 +198,10 @@ Per CONTRIBUTING, logic lives in PullBullKit with tests; views stay thin. Tests 
 - Override reconciliation: applied to tabs and search, dropped on agreement, on timeout and on failure; not visible to change detection.
 - Lane moves: Status change moves the row on Board and Assigned; self-unassign removes from Assigned; self-assign inserts.
 - Permission gating: installation permissions, `gh` scopes, `viewerCanUpdate`.
-- Undo: the inverse of each edit, including delete-from-board for an add; ⌘Z expires after 10 seconds and yields to the search field's text undo.
-- Selection: follows the row to its new lane, and moves to the next row when the row leaves the list.
+- Undo: the inverse of each edit, including delete-from-board for an add; ⌘Z expires after 10 seconds, only the last edit's answer arms it, typing in the search field ends it, and another board's fetch drops it.
+- Add to the board: a card already there (a stale snapshot) gets the Status and is neither rolled back nor undone by deletion.
+- Selection: follows the row to its new lane, moves to the next row when the row leaves the list, and returns to the row when an undo or failure brings it back.
+- Picker placement: below, above, clamped on screen, capped to the popover.
 - No notification for the viewer's own Status, assignment or label changes.
 - Old cached snapshots without node IDs decode and still allow an edit.
 
@@ -210,8 +217,5 @@ Manual check against real GitHub, on a test org with a board and a test repo, be
 
 ## Left to the builder
 
-- Exact key bindings, if the ones above clash with existing handling.
-- The error message's look, and where it sits relative to the footer's refresh-error state.
-- How the picker anchors to a row in a scrolled list, and in compact cards.
 - Paging limits for labels on unusually large repos.
-- Whether one combined request or sequential requests best fit add-to-board followed by set Status.
+- The assignees and labels picker's anchoring in compact cards.
