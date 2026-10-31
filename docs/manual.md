@@ -244,6 +244,7 @@ Settings → Ask AI.
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd> | Account menu |
 | <kbd>⌘</kbd><kbd>R</kbd> | Refresh |
 | <kbd>⌘</kbd><kbd>,</kbd> | Settings |
+| <kbd>⌘</kbd><kbd>/</kbd> | Keyboard Shortcuts window: every shortcut by section, with a filter. <kbd>Esc</kbd> clears the filter, then closes; <kbd>⌘</kbd><kbd>W</kbd> or <kbd>⌘</kbd><kbd>/</kbd> closes. Also Settings → General → Keyboard shortcuts |
 | <kbd>Esc</kbd> | Clear search → clear repo → close |
 | <kbd>⌘</kbd><kbd>W</kbd> | Close |
 
@@ -256,6 +257,7 @@ Settings → Ask AI.
 | <kbd>⇧</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Files changed; on a PR with new commits since your review, just those changes |
 | <kbd>⌃</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy Checkout Command: `gh pr checkout 412 -R owner/repo` |
 | <kbd>⌘</kbd><kbd>R</kbd> | Refresh |
+| <kbd>⌘</kbd><kbd>/</kbd> | Keyboard Shortcuts window |
 
 The order is the one on screen when you opened the first item; a refresh doesn't reshuffle it. An item that has left the lists since is skipped, unless its detail was already loaded.
 
@@ -289,7 +291,7 @@ Reopen within a minute and the detail is still there.
 
 | Tab | |
 |---|---|
-| General | Grouping, Team by author, oldest review first, compact cards, background, filters (Review and Team), menu bar count, refresh interval, pending CI checks, shortcut, launch at login, updates |
+| General | Grouping, Team by author, oldest review first, compact cards, background, filters (Review and Team), menu bar count, refresh interval, pending CI checks, shortcut, Keyboard Shortcuts window, launch at login, updates |
 | Account | Account, org, board, access notices |
 | Notifications | One toggle per event, grouped: my pull requests · pull requests I review · issues assigned to me · issues I created |
 | Search | Saved searches: rename, edit the query, drag to reorder, **+** and **−**. Apply one from the empty search field; the first nine have ⌃1–⌃9 |

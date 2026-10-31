@@ -16,6 +16,14 @@ import Testing
         #expect(KeyCombo(keyCode: 126, modifiers: [.control]).displayString == "⌃↑")
     }
 
+    /// The same names as `displayString`, one keycap each.
+    @Test func keycapsSplitTheDisplay() {
+        let combo = KeyCombo(keyCode: 49, modifiers: [.command, .shift, .option, .control])
+        #expect(combo.keycaps(layoutCharacter: nil) == ["⌃", "⌥", "⇧", "⌘", "Space"])
+        #expect(KeyCombo.togglePopoverDefault.keycaps(layoutCharacter: "l") == ["⌃", "⌥", "L"])
+        #expect(KeyCombo(keyCode: 122, modifiers: [.command]).keycaps(layoutCharacter: nil) == ["⌘", "F1"])
+    }
+
     @Test func layoutCharacterNamesCharacterKeys() {
         let p = KeyCombo.togglePopoverDefault
         // Dvorak types "l" on the ANSI P key; AZERTY types "a" on the ANSI Q key.

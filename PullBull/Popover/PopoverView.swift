@@ -509,6 +509,11 @@ struct PopoverView: View {
             MenuBarPopover.hide()
             return true
         }
+        // ⌘/ opens the Keyboard Shortcuts window from every route, first-run included.
+        if ShortcutsWindowController.isOpenKey(event) {
+            ShortcutsWindowController.shared.show(app: model)
+            return true
+        }
         if model.showsFirstRun {
             // Nothing to search or switch yet: Esc closes, every other key passes through.
             guard event.keyCode == SearchKeyMonitor.escape, flags.isDisjoint(with: [.command, .control, .option])

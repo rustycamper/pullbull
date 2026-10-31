@@ -60,6 +60,16 @@ public struct KeyCombo: Codable, Hashable, Sendable {
         return text + keyName(layoutCharacter: layoutCharacter)
     }
 
+    /// As `displayString`, one keycap per modifier and one for the key: `["⌃", "⌥", "P"]`.
+    public func keycaps(layoutCharacter: String?) -> [String] {
+        var caps: [String] = []
+        if modifiers.contains(.control) { caps.append("⌃") }
+        if modifiers.contains(.option) { caps.append("⌥") }
+        if modifiers.contains(.shift) { caps.append("⇧") }
+        if modifiers.contains(.command) { caps.append("⌘") }
+        return caps + [keyName(layoutCharacter: layoutCharacter)]
+    }
+
     func keyName(layoutCharacter: String?) -> String {
         let fixed = Self.keyNames[keyCode] ?? "?"
         guard Self.characterKeys.contains(keyCode), let character = layoutCharacter?.uppercased(),

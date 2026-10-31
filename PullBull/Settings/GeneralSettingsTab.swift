@@ -113,6 +113,11 @@ struct GeneralSettingsTab: View {
                 RowLabel("Toggle PullBull", note: warning ?? "Shows or hides PullBull from any app",
                          isWarning: warning != nil)
             }
+            LabeledContent {
+                Button("Show All") { ShortcutsWindowController.shared.show(app: model) }
+            } label: {
+                RowLabel("Keyboard shortcuts", note: "Also ⌘/ in PullBull")
+            }
             if LaunchAtLogin.isInstalled {
                 Toggle(isOn: launchAtLoginBinding) {
                     RowLabel("Launch at login", note: loginItemNote, isWarning: LaunchAtLogin.lastError != nil)

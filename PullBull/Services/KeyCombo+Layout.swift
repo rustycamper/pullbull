@@ -8,6 +8,11 @@ extension KeyCombo {
         displayString(layoutCharacter: Self.layoutCharacter(for: keyCode))
     }
 
+    /// As `localizedDisplayString`, one keycap per modifier and one for the key.
+    @MainActor var localizedKeycaps: [String] {
+        keycaps(layoutCharacter: Self.layoutCharacter(for: keyCode))
+    }
+
     /// The character the current keyboard layout types for `keyCode` with no modifiers, or nil.
     /// Text Input Sources must be read on the main thread.
     @MainActor private static func layoutCharacter(for keyCode: UInt16) -> String? {

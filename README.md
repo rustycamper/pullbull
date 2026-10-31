@@ -107,6 +107,7 @@ Combine `@`, `~`, `is:`, `status:`, `updated:`, `review:`, `repo:`, `size:` and 
 | <kbd>⌃</kbd><kbd>1</kbd>…<kbd>⌃</kbd><kbd>9</kbd> | Saved searches |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd> | Repo menu · board menu · account menu |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Ask (once turned on) |
+| <kbd>⌘</kbd><kbd>/</kbd> | Every shortcut, by section, with a filter. Also Settings → General |
 | <kbd>Esc</kbd> | Back, clear, close |
 
 Full list in the [manual](docs/manual.md#keyboard).
@@ -117,7 +118,7 @@ Full list in the [manual](docs/manual.md#keyboard).
 
 | Tab | |
 |---|---|
-| General | Grouping, Team by author, compact cards, filters, menu bar count, refresh interval, shortcut, launch at login, updates |
+| General | Grouping, Team by author, compact cards, filters, menu bar count, refresh interval, shortcut, all keyboard shortcuts, launch at login, updates |
 | Account | Account, org, board |
 | Notifications | A separate toggle for each event on your PRs, PRs you review, issues assigned to you and issues you created: reviews, CI, comments, ready to merge, merged, assigned, status changes, closed or reopened |
 | Search | Saved searches: rename, edit, reorder, delete |
