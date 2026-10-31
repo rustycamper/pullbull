@@ -17,7 +17,7 @@ private final class QueueTransport: GraphQLTransport, @unchecked Sendable {
     /// The first mutation or query field each request named, in order.
     var operations: [String] {
         let names = ["updateProjectV2ItemFieldValue", "clearProjectV2ItemFieldValue", "addProjectV2ItemById",
-                     "deleteProjectV2Item", "issueOrPullRequest"]
+                     "deleteProjectV2Item", "issueOrPullRequest", "projectItems"]
         return bodies.compactMap { body in
             let query = body["query"] as? String ?? ""
             return names.first { query.contains($0) }
@@ -50,6 +50,8 @@ private let addedNew = #"{"data":{"addProjectV2ItemById":{"item":{"id":"PVTI_new
 private let addedExisting = #"{"data":{"addProjectV2ItemById":{"item":{"id":"PVTI_1"}}}}"#
 private let deleted = #"{"data":{"deleteProjectV2Item":{"deletedItemId":"PVTI_new"}}}"#
 private let found = #"{"data":{"repository":{"issueOrPullRequest":{"id":"I_1"}}}}"#
+private let notOnBoard = #"{"data":{"node":{"projectItems":{"nodes":[{"id":"PVTI_9","project":{"id":"PVT_other"}}]}}}}"#
+private let onBoard = #"{"data":{"node":{"projectItems":{"nodes":[{"id":"PVTI_9","project":{"id":"PVT_other"}},{"id":"PVTI_1","project":{"id":"PVT_1"}}]}}}}"#
 private let refused = #"{"data":null,"errors":[{"type":"FORBIDDEN","message":"nope"}]}"#
 
 private func editor(_ t: QueueTransport) -> StatusEditor {
@@ -85,31 +87,54 @@ private func editor(_ t: QueueTransport) -> StatusEditor {
     }
 
     @Test func addThenSet() async throws {
-        let t = QueueTransport([addedNew, updated])
+        let t = QueueTransport([notOnBoard, addedNew, updated])
         let added = try await editor(t).apply(
             .status(from: nil, to: todo, placement: .added), on: k412, itemId: nil, contentId: "I_1", board: board)
         #expect(added == "PVTI_new")
-        #expect(t.operations == ["addProjectV2ItemById", "updateProjectV2ItemFieldValue"])
-        #expect(t.variables(1)?["item"] == "PVTI_new")
-        #expect(t.variables(1)?["option"] == "o1")
+        #expect(t.operations == ["projectItems", "addProjectV2ItemById", "updateProjectV2ItemFieldValue"])
+        #expect(t.variables(0) == ["content": "I_1"])
+        #expect(t.variables(2)?["item"] == "PVTI_new")
+        #expect(t.variables(2)?["option"] == "o1")
     }
 
     @Test func contentLookedUpWhenMissing() async throws {
-        let t = QueueTransport([found, addedNew, updated])
+        let t = QueueTransport([found, notOnBoard, addedNew, updated])
         _ = try await editor(t).apply(
             .status(from: nil, to: todo, placement: .added), on: k412, itemId: nil, contentId: nil, board: board)
-        #expect(t.operations == ["issueOrPullRequest", "addProjectV2ItemById", "updateProjectV2ItemFieldValue"])
-        #expect(t.variables(1)?["content"] == "I_1")
+        #expect(t.operations == [
+            "issueOrPullRequest", "projectItems", "addProjectV2ItemById", "updateProjectV2ItemFieldValue"])
+        #expect(t.variables(2)?["content"] == "I_1")
     }
 
     @Test func addThenSetFailsDeletesTheItem() async throws {
-        let t = QueueTransport([addedNew, refused, deleted])
+        let t = QueueTransport([notOnBoard, addedNew, refused, deleted])
         await #expect(throws: APIError.writeRefused("nope")) {
             _ = try await editor(t).apply(
                 .status(from: nil, to: todo, placement: .added), on: k412, itemId: nil, contentId: "I_1", board: board)
         }
-        #expect(t.operations == ["addProjectV2ItemById", "updateProjectV2ItemFieldValue", "deleteProjectV2Item"])
-        #expect(t.variables(2) == ["project": "PVT_1", "item": "PVTI_new"])
+        #expect(t.operations == [
+            "projectItems", "addProjectV2ItemById", "updateProjectV2ItemFieldValue", "deleteProjectV2Item"])
+        #expect(t.variables(3) == ["project": "PVT_1", "item": "PVTI_new"])
+    }
+
+    /// A stale snapshot says the issue isn't on the board, but it is: its card gets the Status and
+    /// isn't reported as added, so neither a failure nor ⌘Z deletes it.
+    @Test func staleAddSetsTheExistingCard() async throws {
+        let t = QueueTransport([onBoard, updated])
+        let added = try await editor(t).apply(
+            .status(from: nil, to: todo, placement: .added), on: k412, itemId: nil, contentId: "I_1", board: board)
+        #expect(added == nil)
+        #expect(t.operations == ["projectItems", "updateProjectV2ItemFieldValue"])
+        #expect(t.variables(1)?["item"] == "PVTI_1")
+    }
+
+    @Test func staleAddFailureKeepsTheExistingCard() async throws {
+        let t = QueueTransport([onBoard, refused])
+        await #expect(throws: APIError.writeRefused("nope")) {
+            _ = try await editor(t).apply(
+                .status(from: nil, to: todo, placement: .added), on: k412, itemId: nil, contentId: "I_1", board: board)
+        }
+        #expect(t.operations == ["projectItems", "updateProjectV2ItemFieldValue"])
     }
 
     @Test func undoOfAnAddDeletes() async throws {

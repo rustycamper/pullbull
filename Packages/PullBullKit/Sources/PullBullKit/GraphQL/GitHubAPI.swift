@@ -813,6 +813,15 @@ public struct GitHubAPI: Sendable {
             Mutations.assignees(adding: !adding.isEmpty, removing: !removing.isEmpty), subject, adding, removing)
     }
 
+    /// The issue's (`content`, its node ID) item on the board `project`, archived or not; nil when it
+    /// isn't on that board.
+    public func projectItem(of content: String, in project: String) async throws -> String? {
+        let data = try await execute(Mutations.projectItems, ["content": content])
+        let items = ((data["node"] as? [String: Any])?["projectItems"] as? [String: Any])?["nodes"] as? [[String: Any]]
+        let item = items?.first { ($0["project"] as? [String: Any])?["id"] as? String == project }
+        return item?["id"] as? String
+    }
+
     /// The node ID of the issue or PR `key`, for items cached before node IDs were stored.
     public func nodeId(of key: PRKey) async throws -> String {
         let parts = key.repo.split(separator: "/", maxSplits: 1).map(String.init)

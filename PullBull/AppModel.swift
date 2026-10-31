@@ -83,6 +83,8 @@ final class AppModel {
     var statusPicker: StatusPicker?
     /// Bumped when an edited row stays selected, so its list scrolls to it in its new lane.
     var editScrollRequest = 0
+    /// Where the selection went when an edit moved its row out of the list.
+    var editSelection = EditSelection()
     private(set) var tabs: BuiltTabs? {
         didSet { refreshRepoChoices() }
     }
@@ -757,7 +759,11 @@ final class AppModel {
         // Opening a detail unfocuses the field, which pushes its unchanged text back; that must not close the detail.
         if text == searchText, route != .list, route != .search { return }
         // Editing or emptying the field cancels a running Ask and drops its line: back to normal search.
-        if text != searchText { clearAsk() }
+        if text != searchText {
+            clearAsk()
+            // ⌘Z undoes this typing now, not an edit made before it.
+            edits.typed()
+        }
         if let startedOnTab, route != .search { searchStartedOnTab = startedOnTab }
         // Whitespace-only text clears the origin; a bare "#" keeps it for the number that follows.
         if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { searchStartedOnTab = nil }
@@ -972,7 +978,7 @@ final class AppModel {
     private func refreshSearchMatchCounts(for query: SearchQuery) {
         searchMatchCounts = SearchNarrowing.counts(
             query, prTabs: prTabs, tabs: tabs, issueTabs: issueTabs, focus: repoFocus,
-            viewer: snapshot?.org.viewer ?? "", snap: snapshot)
+            viewer: snapshot?.org.viewer ?? "", snap: shownSnapshot)
     }
 
     /// Esc / Cancel: clears the query and returns to the tabs.
@@ -998,9 +1004,10 @@ final class AppModel {
             results, on: tab, grouping: prGrouping(for: tab), settings: settings, org: snapshot.org)
     }
 
-    /// The issue results in the reference tab's layout; nil in PR mode and without results or a snapshot.
+    /// The issue results in the reference tab's layout, with edits shown; nil in PR mode and without
+    /// results or a snapshot.
     var searchIssueLayout: SearchIssueLayout? {
-        guard mode == .issues, let results = searchResults, let snapshot,
+        guard mode == .issues, let results = searchResults, let snapshot = shownSnapshot,
               case .issues(let tab) = searchReferenceTab
         else { return nil }
         return SearchLayout.issues(results, on: tab, settings: settings, focus: repoFocus, snap: snapshot)
@@ -1776,6 +1783,7 @@ final class AppModel {
         rawSearchResults = nil
         searchCache.removeAll()
         edits = EditSession()
+        editSelection = EditSelection()
         statusPicker = nil
         snapshot = nil
         people = .empty

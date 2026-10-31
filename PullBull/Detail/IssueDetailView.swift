@@ -148,6 +148,10 @@ struct IssueDetailView: View {
                 } else if !isOnBoard, model.snapshot?.boardStatus == .available {
                     statusRow(symbol: BoardStatusGlyph.notOnBoard, name: "Not on board")
                     CardDivider()
+                } else if model.isStatusOffered(for: key) {
+                    // On the board without a Status: still the place to set one.
+                    statusRow(symbol: BoardStatusGlyph.symbol(forStatusNamed: ""), name: "No status")
+                    CardDivider()
                 }
                 CardRow(name: "Assignees") {
                     if issue.assignees.isEmpty {

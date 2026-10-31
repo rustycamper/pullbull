@@ -409,6 +409,7 @@ struct PopoverView: View {
     private func popoverDidHide() {
         // Searches nothing on the way out, so a lone pending token keeps no search route and is dropped below.
         model.closeCompletion()
+        model.closeStatusPicker()
         // A time focus is transient: it ends with the popover, so the next open starts from a fresh "now".
         model.focus(time: nil)
         pendingCaret = nil
@@ -548,9 +549,8 @@ struct PopoverView: View {
                 model.openStatusPicker(for: key)
                 return true
             }
-            // ⌘Z: takes back the last edit, unless the focused field has its own text to undo.
+            // ⌘Z: takes back the last edit while it can be; typing since hands ⌘Z back to the field.
             if Self.isCommandZ(event, flags: flags) {
-                if (window.firstResponder as? NSTextView)?.undoManager?.canUndo == true { return false }
                 return model.undoLastEdit()
             }
             // ⌥⌘C: the selected result, or the highlighted row, as a Markdown link. It edits no text, so

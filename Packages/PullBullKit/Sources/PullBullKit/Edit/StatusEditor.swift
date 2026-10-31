@@ -22,8 +22,8 @@ public struct StatusEditor: Sendable {
 
     /// Sends `change` for the issue `key`. `itemId` is its board item's node ID, `contentId` the issue's;
     /// either may be missing from an old cache and is then found on GitHub. Returns the board item an
-    /// `.added` change created, which its undo deletes; nil otherwise. Label and assignee changes send
-    /// nothing here.
+    /// `.added` change created, which its undo deletes; nil otherwise, including when the issue turns out
+    /// to be on the board already (a stale snapshot). Label and assignee changes send nothing here.
     public func apply(
         _ change: EditChange, on key: PRKey, itemId: String?, contentId: String?, board: BoardIds?
     ) async throws -> String? {
@@ -43,7 +43,13 @@ public struct StatusEditor: Sendable {
             try await api.setStatus(project: project, item: item, field: field, option: to?.optionId)
             return nil
         case .added:
-            let item = try await api.addToProject(project: project, content: content(contentId, key))
+            let content = try await content(contentId, key)
+            // Adding returns a card that's already there, which a failure or ⌘Z mustn't delete.
+            if let existing = try await api.projectItem(of: content, in: project) {
+                try await api.setStatus(project: project, item: existing, field: field, option: to?.optionId)
+                return nil
+            }
+            let item = try await api.addToProject(project: project, content: content)
             guard let to else { return item }
             do {
                 try await api.setStatus(project: project, item: item, field: field, option: to.optionId)

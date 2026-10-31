@@ -6,8 +6,9 @@ import SwiftUI
 struct StatusPickerAnchorKey: PreferenceKey {
     static let defaultValue: Anchor<CGRect>? = nil
 
+    /// The topmost wins: a detail opened over the list, not the row hidden under it.
     static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
-        value = value ?? nextValue()
+        value = nextValue() ?? value
     }
 }
 
@@ -25,27 +26,23 @@ extension View {
 struct StatusPickerLayer: View {
     let model: AppModel
     let anchor: Anchor<CGRect>?
-
-    private static let width: CGFloat = 300
-    private static let estimatedHeight: CGFloat = 260
+    /// The picker's height as last laid out; placed from it so a short list stays by its row.
+    @State private var height: CGFloat = 260
 
     var body: some View {
         if model.statusPicker != nil {
             GeometryReader { proxy in
-                let frame = anchor.map { proxy[$0] } ?? CGRect(x: 0, y: 40, width: proxy.size.width, height: 0)
-                let width = min(Self.width, proxy.size.width - 20)
-                let x = min(max(frame.minX + 12, 10), proxy.size.width - width - 10)
-                let below = frame.maxY + 4
-                let fitsBelow = below + Self.estimatedHeight <= proxy.size.height
-                let y = fitsBelow ? below : max(frame.minY - Self.estimatedHeight - 4, 4)
+                let frame = StatusPickerPlacement.frame(
+                    anchor: anchor.map { proxy[$0] }, height: height, in: proxy.size)
                 ZStack(alignment: .topLeading) {
                     Color.black.opacity(0.001)
                         .contentShape(Rectangle())
                         .onTapGesture { model.closeStatusPicker() }
                     StatusPickerView(model: model)
-                        .frame(width: width)
-                        .frame(maxHeight: Self.estimatedHeight, alignment: fitsBelow ? .top : .bottom)
-                        .offset(x: x, y: y)
+                        .frame(width: frame.width)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+                        .frame(maxHeight: proxy.size.height - 8, alignment: .top)
+                        .offset(x: frame.minX, y: frame.minY)
                 }
             }
         }
@@ -58,6 +55,8 @@ struct StatusPickerView: View {
     let model: AppModel
     @State private var filter = ""
     @FocusState private var filterFocused: Bool
+    /// The options' full height; the list scrolls only beyond what the popover fits.
+    @State private var rowsHeight: CGFloat?
 
     var body: some View {
         if let picker = model.statusPicker {
@@ -97,7 +96,9 @@ struct StatusPickerView: View {
                                 }
                             }
                         }
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { rowsHeight = $0 }
                     }
+                    .frame(maxHeight: rowsHeight)
                     .scrollBounceBehavior(.basedOnSize)
                 }
             }

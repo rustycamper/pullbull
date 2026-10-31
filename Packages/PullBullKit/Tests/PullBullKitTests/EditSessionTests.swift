@@ -29,9 +29,9 @@ private func status(_ key: PRKey, _ session: EditSession, in snapshot: Snapshot 
 
     @Test func appliedEditCanBeUndoneOnce() {
         var s = EditSession()
-        _ = s.begin(move, on: k412, at: t0)
+        let id = s.begin(move, on: k412, at: t0)
         let record = EditRecord(key: k412, change: move, madeAt: t0, addedItemId: nil)
-        s.applied(record)
+        s.applied(id, record)
         #expect(s.canUndo(now: t0 + 9))
         #expect(s.takeUndo(now: t0 + 9) == record)
         #expect(s.takeUndo(now: t0 + 9) == nil)
@@ -39,10 +39,56 @@ private func status(_ key: PRKey, _ session: EditSession, in snapshot: Snapshot 
 
     @Test func aNewEditClearsTheOldUndo() {
         var s = EditSession()
-        _ = s.begin(move, on: k412, at: t0)
-        s.applied(EditRecord(key: k412, change: move, madeAt: t0, addedItemId: nil))
+        let id = s.begin(move, on: k412, at: t0)
+        s.applied(id, EditRecord(key: k412, change: move, madeAt: t0, addedItemId: nil))
         _ = s.begin(move, on: k413, at: t0 + 1)
         #expect(!s.canUndo(now: t0 + 2))
+    }
+
+    /// Edit A, then edit B before A's answer: A landing late doesn't make ⌘Z take back A.
+    @Test func aLateAnswerToAnOlderEditIsNotUndoable() {
+        var s = EditSession()
+        let a = s.begin(move, on: k412, at: t0)
+        _ = s.begin(move, on: k413, at: t0 + 0.2)
+        s.applied(a, EditRecord(key: k412, change: move, madeAt: t0 + 0.5, addedItemId: nil))
+        #expect(!s.canUndo(now: t0 + 1))
+    }
+
+    /// Typing in the search field after an edit hands ⌘Z to the text, also when the edit's answer
+    /// lands after the typing.
+    @Test func typingAfterAnEditHandsUndoToTheText() {
+        var s = EditSession()
+        let a = s.begin(move, on: k412, at: t0)
+        s.applied(a, EditRecord(key: k412, change: move, madeAt: t0, addedItemId: nil))
+        s.typed()
+        #expect(!s.canUndo(now: t0 + 1))
+        let b = s.begin(move, on: k413, at: t0 + 2)
+        s.typed()
+        s.applied(b, EditRecord(key: k413, change: move, madeAt: t0 + 2, addedItemId: nil))
+        #expect(!s.canUndo(now: t0 + 3))
+        #expect(status(k413, s) == doing)
+    }
+
+    /// Another board's fetch drops the edits shown and the undo, so ⌘Z can't write to the new board.
+    @Test func switchingBoardsForgetsTheEdits() {
+        var s = EditSession()
+        s.reconcile(with: snap, now: t0)
+        let id = s.begin(move, on: k412, at: t0)
+        s.applied(id, EditRecord(key: k412, change: move, madeAt: t0, addedItemId: nil))
+        let other = editSnapshot(
+            board: [editIssue(412, status: todo), editIssue(413, status: todo)], options: options, boardProject: 2)
+        s.reconcile(with: other, now: t0 + 1)
+        #expect(s.overrides.isEmpty)
+        #expect(!s.canUndo(now: t0 + 2))
+    }
+
+    @Test func theSameBoardKeepsTheUndo() {
+        var s = EditSession()
+        s.reconcile(with: snap, now: t0)
+        let id = s.begin(move, on: k412, at: t0)
+        s.applied(id, EditRecord(key: k412, change: move, madeAt: t0, addedItemId: nil))
+        s.reconcile(with: snap, now: t0 + 1)
+        #expect(s.canUndo(now: t0 + 2))
     }
 
     @Test func failedDropsOnlyItsOverrideAndSaysWhy() {

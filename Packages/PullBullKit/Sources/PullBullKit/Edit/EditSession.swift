@@ -18,6 +18,10 @@ public struct EditSession: Equatable, Sendable {
     /// Shown until dismissed or the next edit.
     public private(set) var failure: EditFailure?
     private var undo = EditUndo()
+    /// The edit `begin` returned last; only its answer can arm ⌘Z.
+    private var last: UUID?
+    /// The board the edits were made on, from the last fetch.
+    private var board: BoardRef?
 
     public init() {}
 
@@ -25,11 +29,15 @@ public struct EditSession: Equatable, Sendable {
     public mutating func begin(_ change: EditChange, on key: PRKey, at now: Date) -> UUID {
         failure = nil
         undo = EditUndo()
-        return overrides.record(change, on: key, at: now)
+        let id = overrides.record(change, on: key, at: now)
+        last = id
+        return id
     }
 
-    /// GitHub applied the last edit; ⌘Z can now take it back. Not called for an undo, which isn't undoable.
-    public mutating func applied(_ record: EditRecord) {
+    /// GitHub applied the edit `id`; ⌘Z can now take it back when it's still the last edit. Not called
+    /// for an undo, which isn't undoable.
+    public mutating func applied(_ id: UUID, _ record: EditRecord) {
+        guard id == last else { return }
         undo.remember(record)
     }
 
@@ -37,6 +45,12 @@ public struct EditSession: Equatable, Sendable {
     public mutating func failed(_ id: UUID, change: EditChange, on key: PRKey, url: URL, error: any Error) {
         overrides.drop(id)
         failure = EditFailure(text: EditMessage.failure(change, on: key, error: error), url: url)
+    }
+
+    /// The search text changed: ⌘Z undoes typing from now on, not the edit before it.
+    public mutating func typed() {
+        undo = EditUndo()
+        last = nil
     }
 
     public func canUndo(now: Date) -> Bool {
@@ -51,7 +65,14 @@ public struct EditSession: Equatable, Sendable {
         failure = nil
     }
 
+    /// Ends the edits `fetched` agrees with. A fetch of another board drops them all, and the undo.
     public mutating func reconcile(with fetched: Snapshot, now: Date) {
+        if let board, fetched.board != board {
+            self = EditSession()
+            self.board = fetched.board
+            return
+        }
+        board = fetched.board
         overrides.reconcile(with: fetched, now: now)
     }
 }

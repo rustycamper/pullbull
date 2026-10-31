@@ -103,7 +103,7 @@ extension AppModel {
             do {
                 let added = try await editor.apply(change, on: key, itemId: itemId, contentId: contentId, board: board)
                 guard let self, !isUndo else { return }
-                self.edits.applied(EditRecord(key: key, change: change, madeAt: Date(), addedItemId: added))
+                self.edits.applied(id, EditRecord(key: key, change: change, madeAt: Date(), addedItemId: added))
             } catch {
                 guard let self else { return }
                 let before = self.shownListKeys()
@@ -115,14 +115,12 @@ extension AppModel {
     }
 
     /// Keeps the edited row selected in its new lane and scrolls to it; when it left the list, selects
-    /// the row after it.
+    /// the row after it, and the row again when an undo or failure brings it back.
     private func followEditedRow(_ key: PRKey, from before: [PRKey]) {
-        guard listSelection == key else { return }
-        let after = shownListKeys()
-        if after.contains(key) {
-            editScrollRequest += 1
-        } else {
-            listSelection = ListNavigation.selection(key, from: before, to: after)
+        switch editSelection.follow(key, selection: listSelection, from: before, to: shownListKeys()) {
+        case .none: break
+        case .scroll: editScrollRequest += 1
+        case .select(let next): listSelection = next
         }
     }
 

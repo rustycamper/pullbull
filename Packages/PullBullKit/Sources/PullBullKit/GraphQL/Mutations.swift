@@ -59,6 +59,13 @@ enum Mutations {
         return "mutation(\(variables.joined(separator: ","))){\n\(fields.joined(separator: "\n"))\n}"
     }
 
+    /// The board items of an issue (`content`, its node ID), archived ones too, with their boards.
+    static let projectItems = """
+    query($content:ID!){
+      node(id:$content){... on Issue{projectItems(first:100, includeArchived:true){nodes{id project{id}}}}}
+    }
+    """
+
     /// The node ID of an issue or pull request, by owner, name and number.
     static let nodeId = """
     query($owner:String!,$name:String!,$n:Int!){
