@@ -156,6 +156,10 @@ struct PopoverView: View {
         // Skeletons shimmer only while the panel is open.
         .environment(\.skeletonAnimates, shown)
         .frame(width: Self.size.width, height: Self.size.height)
+        // The Status picker opens at its row, or the detail's Status row, over every layer.
+        .overlayPreferenceValue(StatusPickerAnchorKey.self) { anchor in
+            StatusPickerLayer(model: model, anchor: anchor)
+        }
         // Sliding layers stay inside the rounded panel.
         .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius))
         .onAppear {
@@ -183,6 +187,10 @@ struct PopoverView: View {
             // A board chosen from the menu (or Settings) while the popover shows.
             guard presence.isShown, new != nil else { return }
             AccessibilityNotification.Announcement("Showing \(model.boardMenuTitle)").post()
+        }
+        .onChange(of: model.statusPicker == nil) { _, closed in
+            // The picker had the focus; a search keeps its caret in the field.
+            if closed, searching { DispatchQueue.main.async { fieldFocused = true } }
         }
         .onChange(of: model.route) { old, new in
             // The hidden list keeps no focus, so typing in the detail never lands in the search field.
@@ -521,6 +529,7 @@ struct PopoverView: View {
             MenuBarPopover.hide()
             return true
         }
+        if model.statusPicker != nil { return handleStatusPickerKey(event, flags: flags) }
         if Self.isDetail(model.route) { return handleDetailKey(event, flags: flags, in: window) }
         if model.route == .ask { return handleAskKey(event, flags: flags) }
         // The list's own keys work while no search is open and no text field has focus.
@@ -528,6 +537,17 @@ struct PopoverView: View {
             ? model.listKeys(closedExpanded: closedExpanded, doneExpanded: doneExpanded) : nil
         // ⌘-chords are commands and never reach type-anywhere.
         if flags.contains(.command) {
+            // ⌥⌘S: the Status picker on the selected issue result or the highlighted issue row.
+            if Self.isOptionCommandS(event, flags: flags) {
+                guard let key = model.selectedIssueKey(in: listKeys), model.isStatusOffered(for: key) else { return false }
+                model.openStatusPicker(for: key)
+                return true
+            }
+            // ⌘Z: takes back the last edit, unless the focused field has its own text to undo.
+            if Self.isCommandZ(event, flags: flags) {
+                if (window.firstResponder as? NSTextView)?.undoManager?.canUndo == true { return false }
+                return model.undoLastEdit()
+            }
             // ⌥⌘C: the selected result, or the highlighted row, as a Markdown link. It edits no text, so
             // it works with the search field focused too.
             if Self.isOptionCommandC(event, flags: flags) {
@@ -831,6 +851,12 @@ struct PopoverView: View {
             return true
         }
         if Self.isOptionCommandC(event, flags: flags) { return model.copyShownDetailMarkdownLink() }
+        if Self.isOptionCommandS(event, flags: flags) {
+            guard case .issueDetail(let key) = model.route, model.isStatusOffered(for: key) else { return false }
+            model.openStatusPicker(for: key)
+            return true
+        }
+        if Self.isCommandZ(event, flags: flags) { return model.undoLastEdit() }
         // ⇧⌘↩ and ⌃⌘C act on a PR detail only.
         if Self.isShiftCommandReturn(event, flags: flags) {
             guard case .detail(let key) = model.route else { return false }
@@ -940,6 +966,40 @@ struct PopoverView: View {
         flags.subtracting([.capsLock, .numericPad, .function]) == [.control, .command] && commandKey(event) == "c"
     }
 
+    /// The open Status picker: ↑/↓ choose, ↩ applies, Esc and ⌥⌘S close it; every other key reaches its
+    /// filter field.
+    private func handleStatusPickerKey(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
+        if Self.isOptionCommandS(event, flags: flags) {
+            model.closeStatusPicker()
+            return true
+        }
+        let plain = flags.subtracting([.capsLock, .numericPad, .function]).isEmpty
+        switch event.keyCode {
+        case SearchKeyMonitor.upArrow, SearchKeyMonitor.downArrow:
+            guard plain else { return false }
+            model.moveStatusPicker(by: event.keyCode == SearchKeyMonitor.downArrow ? 1 : -1)
+            return true
+        case SearchKeyMonitor.return, SearchKeyMonitor.enter:
+            model.applyStatusPicker()
+            return true
+        case SearchKeyMonitor.escape:
+            model.closeStatusPicker()
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// ⌥⌘S exactly: no ⇧ or ⌃.
+    private static func isOptionCommandS(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
+        flags.subtracting([.capsLock, .numericPad, .function]) == [.command, .option] && commandKey(event) == "s"
+    }
+
+    /// ⌘Z exactly.
+    private static func isCommandZ(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
+        flags.subtracting([.capsLock, .numericPad, .function]) == .command && commandKey(event) == "z"
+    }
+
     /// ⌥⌘C exactly: no ⇧ or ⌃.
     private static func isOptionCommandC(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
         flags.subtracting([.capsLock, .numericPad, .function]) == [.command, .option] && commandKey(event) == "c"
@@ -957,6 +1017,8 @@ struct PopoverView: View {
         case SearchKeyMonitor.leftBracket: return "["
         case SearchKeyMonitor.letterW: return "w"
         case SearchKeyMonitor.letterB: return "b"
+        case SearchKeyMonitor.letterS: return "s"
+        case SearchKeyMonitor.letterZ: return "z"
         default: return typed
         }
     }

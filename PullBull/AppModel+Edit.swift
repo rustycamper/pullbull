@@ -19,6 +19,18 @@ extension AppModel {
             ghAccounts: accounts)
     }
 
+    /// The issue ⌥⌘S acts on: the selected result while searching, else the highlighted row in Issues
+    /// mode; nil when neither is an issue.
+    func selectedIssueKey(in listKeys: [PRKey]?) -> PRKey? {
+        if route == .search {
+            guard let key = searchSelection, searchResults?.issues.contains(where: { $0.key == key }) == true
+            else { return nil }
+            return key
+        }
+        guard mode == .issues, let listKeys else { return nil }
+        return ListNavigation.shown(listSelection, in: listKeys)
+    }
+
     // MARK: Picker
 
     func openStatusPicker(for key: PRKey) {
