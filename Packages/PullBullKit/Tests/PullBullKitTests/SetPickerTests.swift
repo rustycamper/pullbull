@@ -284,6 +284,18 @@ import Testing
         #expect(names(picker).last == "Ops")
     }
 
+    @Test func reviewStaysOnlyOnAnUntickedRequest() {
+        var picker = reviewersPicker()
+        picker.load(reviewerAnswer)
+        func stays(_ name: String) -> Bool? { picker.rows.first { $0.candidate.name == name }?.reviewStays }
+        #expect(stays("carol") == false)
+        #expect(stays("bob") == false)
+        picker.toggleSelected()
+        #expect(stays("carol") == true)
+        picker.toggleSelected()
+        #expect(stays("carol") == false)
+    }
+
     @Test func tickingPastReviewerAdds() {
         var picker = reviewersPicker()
         picker.load(reviewerAnswer)

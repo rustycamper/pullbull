@@ -86,7 +86,7 @@ The same multi-select picker as assignees: the same placement, filter, keys and 
 - **Bots** (Copilot's reviewer and other apps) are never listed, even when they have reviewed: a review can't be requested from them by login. The candidate query reads the review author's `__typename` and keeps only `User`s; `prFields` and `Review` are unchanged. A bot's review still shows in the detail's Reviewers card as today.
 - **Verdicts:** a person who has reviewed shows their latest verdict beside their name, in the same pills the detail's Reviewers card uses (approved, changes requested, commented). A person whose review is pending again after a re-request shows ticked with the verdict.
 - **Ticking a past reviewer asks them again.** This is GitHub's re-request, sent as the same `POST …/requested_reviewers` as a first request. Ticking someone who has never reviewed requests them. Whether that POST re-notifies a past reviewer as GitHub's own re-request button does has not been checked against real GitHub yet; if it doesn't, past reviewers go through the re-request endpoint instead.
-- **Unticking removes the request.** For someone who has reviewed, the row reads "Their review stays" while unticked, so it is clear their approval isn't deleted.
+- **Unticking removes the request.** When someone who was requested as the picker opened and has reviewed is unticked, the row reads "Their review stays", so it is clear their approval isn't deleted. A past reviewer who wasn't requested and hasn't been touched shows no such line.
 - **Teams:**
   - Listed by name, with the team glyph the detail uses (`person.2.fill` in a circle).
   - Offered only on repos owned by an organisation, and only when the team list could be read.

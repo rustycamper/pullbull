@@ -7,6 +7,9 @@ public struct SetPickerRow: Equatable, Sendable, Identifiable {
     /// False for an unticked person at the 10-assignee limit, and for a ticked label or assignee with no
     /// candidate (a requested reviewer without one can still be unticked).
     public let isEnabled: Bool
+    /// A reviewer who was requested when the picker opened, has reviewed, and is now unticked: unticking
+    /// takes back the request, never the review.
+    public let reviewStays: Bool
 
     public var id: String { candidate.id }
 }
@@ -216,7 +219,8 @@ public struct SetPicker: Equatable, Sendable {
             .map { SetPickerRow(
                 candidate: $0.candidate,
                 isChecked: $0.isChecked,
-                isEnabled: (!$0.isPlaceholder || field == .reviewers) && ($0.isChecked || !atLimit)) }
+                isEnabled: (!$0.isPlaceholder || field == .reviewers) && ($0.isChecked || !atLimit),
+                reviewStays: $0.wasChecked && !$0.isChecked && $0.candidate.verdict != nil) }
         if let id, let index = rows.firstIndex(where: { $0.id == id }) {
             selection = index
         } else {

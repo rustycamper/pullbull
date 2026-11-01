@@ -138,8 +138,7 @@ private struct SetPickerRowView: View {
                     Text(row.candidate.name)
                         .font(.system(size: 13))
                         .lineLimit(1)
-                    // Unticking takes back the request, never the review.
-                    if row.candidate.verdict != nil && !row.isChecked {
+                    if row.reviewStays {
                         Text("Their review stays")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
