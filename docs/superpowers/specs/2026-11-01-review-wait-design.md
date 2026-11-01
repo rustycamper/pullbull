@@ -42,6 +42,8 @@ Only open, non-draft PRs. Closed, merged and draft PRs show none.
 | No pending requests, and at least one submitted review | nothing | – |
 
 - "Pending request" means an entry in `reviewRequests`. When a reviewer submits, GitHub drops their request, so their clock stops and the row moves to the oldest of those still pending.
+- A request GitHub returns with no reviewer (a team the viewer can't see, a bot such as Copilot) isn't a pending request here: `reviewRequests` already drops it, so it neither names nor ages the row.
+- Two requests made at the same moment: the first in GitHub's order counts as the oldest.
 - "Submitted review" means a `latestReviews` entry that isn't pending and has a submission date, any state (approved, changes requested, commented, dismissed).
 - After "changes requested", the ball stays with the author until they re-request the review. Pushes don't move it. Since the reviewer's request is gone until then, the row shows nothing for them; the existing Changes-requested capsule and counts already say where it stands.
 - Failing or running CI doesn't hide the wait. The row already shows CI; the clock is about the request.
@@ -61,21 +63,23 @@ Only open, non-draft PRs. Closed, merged and draft PRs show none.
 
 - SF Symbol `clock`, the glyph "No reviews" uses today. No new icon.
 - A text info item in the meta line (after the age, after `·`), gray like the other info items, not a warning.
-- When the meta line is too narrow, the name shortens first; the age never truncates. Compact rows: how much fits is the builder's call, as long as the age survives.
+- When the meta line is too narrow, the name shortens first; the age never truncates.
+- Compact rows, on every tab: the clock and the age only, after the Review reason glyph and before Conflicts, with the full wording on hover. With no known age, nothing; the reason glyph stays the reason.
 
 ### Hover and VoiceOver
 
-The full wording lists every pending reviewer with their own wait, oldest first, for example "Waiting on review: @acme/ios 4 days, @dana 1 day". "No reviewer" reads "No reviewer requested, ready for 5 days". The Review tab's reads "Requested from you 2 days ago" (or "from @org/slug").
+The full wording lists every pending reviewer with their own wait, oldest first, for example "Waiting on review: @acme/ios 4 days, @dana 1 day" (the viewer reads "You"). When a time is unknown it lists the names alone, in GitHub's order: "Waiting on review: @georgi, @dana". "No reviewer" reads "No reviewer requested, ready for 5 days". The Review tab's reads "Requested from you 2 days ago" (or "from @org/slug"). Ages are spelled out: "under a minute", "1 minute", "3 hours", "4 days", "2 months", "1 year".
 
 ### Unknown times
 
 - A request older than the timeline events fetched (below), or a snapshot cached before the times were stored: the request's time is unknown.
-- If **any** pending request's time is unknown, "oldest" can't be known, so the row shows no age: the first pending request in GitHub's order, `+N`, no age. Showing the oldest *known* one could name the wrong person with the wrong age. On the Review tab, with nothing else to show, an unknown time shows nothing.
+- If **any** pending request's time is unknown, "oldest" can't be known, so the row shows no age: the first pending request in GitHub's order, `+N`, no age. Showing the oldest *known* one could name the wrong person with the wrong age. On the Review tab, with nothing else to show, an unknown time shows nothing: the viewer's own request when there is one, else any of the viewer's team requests.
+- A PR converted from draft, read from a snapshot cached before the ready time was stored, counts "No reviewer" from when it was opened until the first refresh brings the ready time. It is brief and self-correcting, so it isn't special-cased.
 - The ready-for-review time has its own one-event query (below), so it is never crowded out. No `ReadyForReviewEvent` means the PR was never converted from draft, and the opened time is correct.
 
 ### Edits from PullBull
 
-When the viewer requests a reviewer with ⌥⌘R, the override that adds the request also gives it a request time of now, so the row shows "@dana 0m"-style ages at once and stays consistent until the refresh brings GitHub's own time. A request removed through the picker disappears from the wait like any other.
+When the viewer requests a reviewer with ⌥⌘R, the override that adds the request also gives it a request time of now (the edit's time); a reviewer who was already pending keeps GitHub's time, so the row shows "@dana 0m"-style ages at once and stays consistent until the refresh brings GitHub's own time. A request removed through the picker disappears from the wait like any other.
 
 ## Data
 
@@ -102,7 +106,7 @@ The wait is a pure function in PullBullKit, next to `ReviewRules` and `RowChips`
 ## Docs
 
 - `docs/manual.md`, Pull Requests section: one line on the wait, its two forms, and the Review tab's short form.
-- `docs/media/src`: the screenshot data and the `noReviews` component change to the wait, so the popover screenshots match.
+- `docs/media/src`: the screenshot data and the `noReviews` component change to the wait, so the popover and search screenshots match. The mock gives way the way the app does: other info text ellipsizes and the wait stays whole.
 
 ## Decisions
 
@@ -116,4 +120,7 @@ The wait is a pure function in PullBullKit, next to `ReviewRules` and `RowChips`
 - **Missing time → no age, never a guessed one.** One unknown pending time hides the age for the row, since "oldest" can't be known.
 - **Ready-for-review time has its own one-event query**, so request history can't crowd it out and the opened-time fallback is only used when it's correct.
 - **The Review tab's short form needs a pending request to the viewer or their teams**, not just the Review layout: search results on that tab include PRs that don't wait on the viewer.
+- **Unseen and bot requests don't count.** GitHub returns them with no reviewer; naming or ageing a row by something nobody can see or nudge would be noise.
+- **Missing beats wrong, in the hover too.** With an unknown time the hover lists names only, not ages for the known ones, so it can't contradict the row.
+- **The old-cache ready time isn't special-cased.** Showing "No reviewer" from the opened time until the first refresh is a short, self-healing exception to "missing beats wrong"; handling it would mean a cache version flag for one refresh.
 - **Existing icons.** SF Symbol `clock` in the meta line, the app's own glyphs only where SF Symbols has none.
