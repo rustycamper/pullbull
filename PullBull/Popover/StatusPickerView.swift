@@ -106,7 +106,8 @@ struct StatusPickerView: View {
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 7))
             .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Palette.separator, lineWidth: 0.5))
             .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
-            .onAppear { filterFocused = true }
+            // Once the filter is in the window: asked for sooner, the focus lands on the search field.
+            .onAppear { DispatchQueue.main.async { filterFocused = true } }
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Status for \(picker.title)")
         }
@@ -122,11 +123,17 @@ private struct StatusPickerRowView: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                Image(systemName: symbol)
-                    .font(.system(size: 11))
-                    .foregroundStyle(color)
-                    .frame(width: 18, height: 18)
-                    .accessibilityHidden(true)
+                Group {
+                    if let option = row.option {
+                        StatusDot(color: option.color)
+                    } else {
+                        Image(systemName: "xmark.circle")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .frame(width: 18, height: 18)
                 Text(row.name)
                     .font(.system(size: 13))
                 Spacer(minLength: 8)
@@ -154,17 +161,6 @@ private struct StatusPickerRowView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(row.isCurrent ? "\(row.name), current" : row.name)
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : [.isButton])
-    }
-
-    private var symbol: String {
-        guard let option = row.option else { return "xmark.circle" }
-        return BoardStatusGlyph.symbol(forStatusNamed: option.name)
-    }
-
-    /// The owner's Status colour, as the board's lane headers show it.
-    private var color: Color {
-        guard let color = row.option?.color else { return .secondary }
-        return Palette.statusOptionColor(color)
     }
 }
 

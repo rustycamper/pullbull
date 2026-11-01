@@ -143,14 +143,15 @@ struct IssueDetailView: View {
         return DetailSection(title: (isOnBoard ? model.snapshot?.boardTitle : nil) ?? "Details") {
             DetailCard {
                 if let status {
-                    statusRow(symbol: BoardStatusGlyph.symbol(forStatusNamed: status.name), name: status.name)
+                    let color = model.shownSnapshot?.boardStatusOptions?.first { $0.id == status.optionId }?.color
+                    statusRow(name: status.name) { StatusDot(color: color) }
                     CardDivider()
                 } else if !isOnBoard, model.snapshot?.boardStatus == .available {
-                    statusRow(symbol: BoardStatusGlyph.notOnBoard, name: "Not on board")
+                    statusRow(name: "Not on board") { statusGlyph(BoardStatusGlyph.notOnBoard) }
                     CardDivider()
                 } else if model.isStatusOffered(for: key) {
                     // On the board without a Status: still the place to set one.
-                    statusRow(symbol: BoardStatusGlyph.symbol(forStatusNamed: ""), name: "No status")
+                    statusRow(name: "No status") { statusGlyph("circle.dotted") }
                     CardDivider()
                 }
                 CardRow(name: "Assignees") {
@@ -184,13 +185,11 @@ struct IssueDetailView: View {
     }
 
     /// Clickable where Status is offered: it opens the Status picker here.
-    @ViewBuilder private func statusRow(symbol: String, name: String) -> some View {
+    @ViewBuilder private func statusRow(name: String, @ViewBuilder mark: () -> some View) -> some View {
+        let mark = mark()
         let row = CardRow(name: "Status") {
             HStack(spacing: 6) {
-                Image(systemName: symbol)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
+                mark
                 Text(name)
                     .lineLimit(1)
             }
@@ -206,6 +205,13 @@ struct IssueDetailView: View {
         } else {
             row
         }
+    }
+
+    private func statusGlyph(_ symbol: String) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+            .accessibilityHidden(true)
     }
 
     // MARK: Sections

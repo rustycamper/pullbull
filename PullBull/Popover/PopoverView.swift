@@ -216,6 +216,11 @@ struct PopoverView: View {
         // A detail's walk snapshots the rows as shown, Recently closed and Done included when expanded.
         .onChange(of: listExpansion, initial: true) { _, new in model.listExpansion = new }
         .onChange(of: fieldFocused) { _, focused in
+            // The picker opened from the list keeps the focus; the search field doesn't open under it.
+            if focused, model.statusPicker != nil, !searching {
+                fieldFocused = false
+                return
+            }
             // Back in the search field (a click, ⌘F): its hints show, and the save row gives way.
             if focused {
                 fieldOpen = true
