@@ -26,8 +26,15 @@ public enum EndedAge {
         return "\(word) \(closedAt.formatted(style))"
     }
 
+    /// What an ended item's row and page say: `text`, or the bare "merged" / "closed" without a close date.
+    /// nil for an open item.
+    public static func label(state: PRState, closedAt: Date?, now: Date) -> String? {
+        guard state != .open else { return nil }
+        return text(state: state, closedAt: closedAt, now: now) ?? (state == .merged ? "merged" : "closed")
+    }
+
     /// The app's relative ages ("just now", "12m ago", "3d ago") for the span a week allows. The formats must
-    /// match `RelativeAge` in PullBull/Style/Palette.swift, which the app target owns.
+    /// match `RelativeAge.ago`.
     private static func relative(_ seconds: TimeInterval) -> String {
         switch seconds {
         case ..<60: return "just now"

@@ -15,6 +15,14 @@ import Testing
             locale: locale, timeZone: utc)
     }
 
+    /// What a row and its page say for an ended item: the age, or the bare word without a close date.
+    @Test func labelFallsBackToTheWord() {
+        #expect(EndedAge.label(state: .merged, closedAt: nil, now: Self.now) == "merged")
+        #expect(EndedAge.label(state: .closed, closedAt: nil, now: Self.now) == "closed")
+        #expect(EndedAge.label(state: .closed, closedAt: Self.now - 3 * Self.day, now: Self.now) == "closed 3d ago")
+        #expect(EndedAge.label(state: .open, closedAt: Self.now, now: Self.now) == nil)
+    }
+
     @Test func recentIsRelative() {
         #expect(Self.text(.merged, closedAgo: 10) == "merged just now")
         #expect(Self.text(.merged, closedAgo: 12 * 60) == "merged 12m ago")

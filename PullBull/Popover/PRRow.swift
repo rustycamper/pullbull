@@ -299,7 +299,8 @@ struct ClosedRow: View {
             sets: SetEditMenu.make(model: model, key: pr.key))
     }
 
-    /// One line in compact mode, like every other compact row: glyph, title, `repo #num`, when it ended, the pill.
+    /// One line in compact mode, like every other compact row: glyph, title, `repo #num`, when it ended. No pill:
+    /// the glyph and "merged 3d ago" already say it, and the line has no room to spare.
     private func compactBody(merged: Bool) -> some View {
         CompactRowLayout(
             repoNumber: RepoNumber(key: pr.key, compact: true), age: ended(merged: merged), ageWidth: nil
@@ -314,7 +315,7 @@ struct ClosedRow: View {
         } badges: {
             EmptyView()
         } trailing: {
-            EndedPill(merged: merged)
+            EmptyView()
         }
     }
 
@@ -364,7 +365,7 @@ struct ClosedRow: View {
     }
 
     private func ended(merged: Bool) -> String {
-        EndedAge.text(state: pr.state, closedAt: pr.closedAt, now: now) ?? (merged ? "merged" : "closed")
+        EndedAge.label(state: pr.state, closedAt: pr.closedAt, now: now) ?? (merged ? "merged" : "closed")
     }
 }
 

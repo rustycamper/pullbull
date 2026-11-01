@@ -120,9 +120,12 @@ struct IssueDetailView: View {
                     if let author = issue.author ?? (issue.createdAt != nil ? "ghost" : nil) {
                         HStack(spacing: 6) {
                             AvatarView(login: author, url: URL(string: "https://github.com/\(author).png"), size: 20)
-                            // Two lines beside a wide pill, so "updated" is never cut off, as on a PR page.
+                            // Two lines beside a wide pill, so "updated" or "closed" is never cut off, as on a PR page.
                             Text(OpenedLine.text(
-                                author: author, opened: issue.createdAt, updated: issue.updatedAt, now: now))
+                                author: author, opened: issue.createdAt, updated: issue.updatedAt,
+                                ended: issue.isOpen
+                                    ? nil : EndedAge.label(state: .closed, closedAt: issue.closedAt, now: now),
+                                now: now))
                                 .lineLimit(2)
                                 .fixedSize(horizontal: false, vertical: true)
                         }

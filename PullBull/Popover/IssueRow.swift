@@ -127,8 +127,8 @@ struct IssueRow: View {
         } badges: {
             EmptyView()
         } trailing: {
+            // No ended pill, as on a compact PR row: the glyph and "closed 3d ago" already say it.
             AssigneeStack(assignees: avatars, showUnassigned: tab == .board, size: 16)
-            if !issue.isOpen { IssueEndedPill(glyph: issue.glyph).accessibilityHidden(true) }
         }
     }
 }
@@ -156,7 +156,7 @@ struct IssueMetaLine: View {
     /// "closed 3d ago" for a closed issue, or just "closed" without a date, as a closed PR row says;
     /// otherwise the time since its last update.
     static func age(of issue: BoardIssue, now: Date) -> String? {
-        if !issue.isOpen { return EndedAge.text(state: .closed, closedAt: issue.closedAt, now: now) ?? "closed" }
+        if !issue.isOpen { return EndedAge.label(state: .closed, closedAt: issue.closedAt, now: now) }
         return issue.updatedAt.map { RelativeAge.short(from: $0, to: now) }
     }
 
