@@ -319,32 +319,32 @@ struct ClosedRow: View {
     }
 
     private func fullBody(merged: Bool) -> some View {
-            HStack(spacing: 10) {
-                Image(symbol: Palette.prGlyph(pr.glyph))
+        HStack(spacing: 10) {
+            Image(symbol: Palette.prGlyph(pr.glyph))
+                .font(.system(size: 12))
+                .foregroundStyle(Palette.prGlyphColor(pr.glyph))
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
                     .font(.system(size: 12))
-                    .foregroundStyle(Palette.prGlyphColor(pr.glyph))
-                    .frame(width: 20)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    HStack(spacing: 5) {
-                        RepoNumber(key: pr.key)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    RepoNumber(key: pr.key)
+                    MetaDot()
+                    Text(ended(merged: merged)).fixedSize()
+                    if let role = search?.role {
                         MetaDot()
-                        Text(ended(merged: merged)).fixedSize()
-                        if let role = search?.role {
-                            MetaDot()
-                            Text(role)
-                        }
+                        Text(role)
                     }
-                    .metaLineStyle()
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                EndedPill(merged: merged)
+                .metaLineStyle()
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            EndedPill(merged: merged)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
     }
 
     /// A search result moves `searchSelection`, a Mine row `listSelection`.
