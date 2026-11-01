@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/rustycamper/pullbull/security/advisories/new
+    about: Privately, never as a public issue.

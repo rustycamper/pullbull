@@ -1,0 +1,21 @@
+name: Feature request
+description: Suggest something PullBull could do
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the [out-of-scope list](https://github.com/rustycamper/pullbull/blob/main/CONTRIBUTING.md#out-of-scope) first.
+  - type: textarea
+    id: moment
+    attributes:
+      label: The moment you wanted it
+      description: What you were doing, and what got in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+    validations:
+      required: true

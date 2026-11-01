@@ -1,9 +1,22 @@
 name: CI
+# Docs-only changes skip the macOS job; secrets.yml still scans them.
 on:
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/pull_request_template.md'
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/pull_request_template.md'
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -15,8 +28,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: No secrets
-        run: bash scripts/check-no-secrets.sh
       - name: Xcode version
         run: xcodebuild -version
       - name: Kit tests

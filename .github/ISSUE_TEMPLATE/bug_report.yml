@@ -1,0 +1,49 @@
+name: Bug report
+description: Something in PullBull doesn't work as it should
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the popover
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: PullBull version
+      description: Settings → General, at the bottom.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "15.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: signin
+    attributes:
+      label: Signed in with
+      options:
+        - GitHub CLI (gh)
+        - Sign in with GitHub
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Screenshots, error text, or whether it happens on a personal or org account. Leave out tokens and private repo names.
