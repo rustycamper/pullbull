@@ -922,9 +922,11 @@ public struct GitHubAPI: Sendable {
         if !adding.isEmpty { variables["add"] = adding }
         if !removing.isEmpty { variables["remove"] = removing }
         let (data, errors) = try await executeReportingErrors(mutation, variables)
-        let addApplied = adding.isEmpty || data["add"] is [String: Any]
-        let removeApplied = removing.isEmpty || data["remove"] is [String: Any]
-        if !addApplied, !removeApplied { throw Self.refusal(errors) }
+        let addSent = !adding.isEmpty, removeSent = !removing.isEmpty
+        let addApplied = !addSent || data["add"] is [String: Any]
+        let removeApplied = !removeSent || data["remove"] is [String: Any]
+        let sentApplied = (addSent && addApplied) || (removeSent && removeApplied)
+        if !sentApplied { throw Self.refusal(errors) }
         let refusal = addApplied && removeApplied ? nil : errors.first?["message"] as? String
         return SetChangeResult(addApplied: addApplied, removeApplied: removeApplied, refusal: refusal)
     }
