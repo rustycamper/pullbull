@@ -63,11 +63,13 @@ struct CompactRowLayout<Leading: View, Title: View, Badges: View, Trailing: View
 }
 
 /// A compact row's review glyphs, standing in for the meta line's capsule and info: changes requested,
-/// ready to merge, a Review reason, the review wait's age, then conflicts.
+/// ready to merge, a Review reason, the review wait's age (Review only), then conflicts.
 struct CompactChipGlyphs: View {
     let chips: RowChips
     /// Review rows only: why the review is asked for.
     var reason: RowChips.Info?
+    /// Review rows only: how long the review has waited; drawn when its age is known.
+    var wait: ReviewWait?
 
     var body: some View {
         if case .changesRequested = chips.action {
@@ -90,7 +92,7 @@ struct CompactChipGlyphs: View {
                 .help(reason.label)
                 .accessibilityLabel(reason.label)
         }
-        if case .reviewWait(let wait)? = chips.info.first(where: \.isReviewWait), let age = wait.age {
+        if let wait, let age = wait.age {
             Label { Text(age) } icon: { Image(systemName: "clock") }
                 .labelStyle(TightLabelStyle(spacing: 2))
                 .font(.system(size: 11))

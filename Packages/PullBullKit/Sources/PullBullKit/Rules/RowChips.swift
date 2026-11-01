@@ -70,9 +70,11 @@ public struct RowChips: Equatable, Sendable {
             return false
         }
 
-        public var isReviewWait: Bool {
-            if case .reviewWait = self { return true }
-            return false
+        public var isReviewWait: Bool { reviewWait != nil }
+
+        public var reviewWait: ReviewWait? {
+            if case .reviewWait(let wait) = self { return wait }
+            return nil
         }
     }
 
