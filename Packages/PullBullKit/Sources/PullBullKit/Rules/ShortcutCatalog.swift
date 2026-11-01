@@ -86,9 +86,8 @@ public enum ShortcutCatalog {
                 Shortcut("Labels", [["⌥", "⌘", "L"]]),
                 Shortcut("Undo the last edit", [["⌘", "Z"]], note: "For 10 seconds after it"),
                 Shortcut("Choose", [["↑"], ["↓"]], note: "In a picker; type to filter"),
-                Shortcut("Apply", [["↩"]], note: "Status picker"),
-                Shortcut("Tick or untick", [["↩"]], note: "Assignees and labels"),
-                Shortcut("Apply and close", [["⌘", "↩"]]),
+                Shortcut("Apply, or tick", [["↩"]], note: "Status: applies. Assignees and labels: ticks or unticks"),
+                Shortcut("Apply and close", [["⌘", "↩"]], note: "Assignees and labels"),
                 Shortcut("Close", [["Esc"]], note: "Status: without change. Assignees and labels: applies"),
             ]),
             ShortcutSection("Detail", [

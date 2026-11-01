@@ -38,19 +38,26 @@ struct SetPickerView: View {
                     } else if let error = picker.loadError {
                         message(error)
                     }
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            ForEach(Array(picker.rows.enumerated()), id: \.element.id) { index, row in
-                                SetPickerRowView(row: row, labels: labels, selected: index == picker.selection) {
-                                    model.moveSetPicker(by: index - picker.selection)
-                                    model.toggleSetPicker()
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(spacing: 0) {
+                                ForEach(Array(picker.rows.enumerated()), id: \.element.id) { index, row in
+                                    SetPickerRowView(row: row, labels: labels, selected: index == picker.selection) {
+                                        model.moveSetPicker(by: index - picker.selection)
+                                        model.toggleSetPicker()
+                                    }
                                 }
                             }
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { rowsHeight = $0 }
                         }
-                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { rowsHeight = $0 }
+                        .frame(maxHeight: rowsHeight)
+                        .scrollBounceBehavior(.basedOnSize)
+                        // ↑/↓ keep the highlighted row in view.
+                        .onChange(of: picker.selection) { _, selection in
+                            guard picker.rows.indices.contains(selection) else { return }
+                            proxy.scrollTo(picker.rows[selection].id)
+                        }
                     }
-                    .frame(maxHeight: rowsHeight)
-                    .scrollBounceBehavior(.basedOnSize)
                 }
             }
             .padding(4)

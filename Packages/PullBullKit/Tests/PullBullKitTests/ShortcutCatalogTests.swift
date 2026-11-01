@@ -20,9 +20,8 @@ private let modifierOrder = ["⌃", "⌥", "⇧", "⌘"]
             Shortcut("Labels", [["⌥", "⌘", "L"]]),
             Shortcut("Undo the last edit", [["⌘", "Z"]], note: "For 10 seconds after it"),
             Shortcut("Choose", [["↑"], ["↓"]], note: "In a picker; type to filter"),
-            Shortcut("Apply", [["↩"]], note: "Status picker"),
-            Shortcut("Tick or untick", [["↩"]], note: "Assignees and labels"),
-            Shortcut("Apply and close", [["⌘", "↩"]]),
+            Shortcut("Apply, or tick", [["↩"]], note: "Status: applies. Assignees and labels: ticks or unticks"),
+            Shortcut("Apply and close", [["⌘", "↩"]], note: "Assignees and labels"),
             Shortcut("Close", [["Esc"]], note: "Status: without change. Assignees and labels: applies"),
         ])
     }
@@ -49,10 +48,10 @@ private let modifierOrder = ["⌃", "⌥", "⇧", "⌘"]
         }
     }
 
-    /// Within a section a combo does one thing, or one thing per context its note names (↩ in each picker).
+    /// Within a section a combo does one thing.
     @Test func noComboTwiceInASection() {
         for section in ShortcutCatalog.sections(toggle: nil) {
-            let combos = section.shortcuts.flatMap { shortcut in shortcut.keys.map { [$0, [shortcut.note ?? ""]] } }
+            let combos = section.shortcuts.flatMap(\.keys)
             #expect(Set(combos).count == combos.count, "\(section.title)")
         }
     }
