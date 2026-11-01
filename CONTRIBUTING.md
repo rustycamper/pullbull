@@ -35,4 +35,4 @@ CI on PRs from forks waits for a maintainer's approval.
 
 ## Security
 
-Don't open an issue. Use **Security → Report a vulnerability** on this repo.
+See [SECURITY.md](SECURITY.md). Don't open an issue.
