@@ -81,7 +81,7 @@ final class AppModel {
     var edits = EditSession()
     /// The Status picker on screen, or nil.
     var statusPicker: StatusPicker?
-    /// The assignee or label picker on screen, or nil.
+    /// The reviewer, assignee or label picker on screen, or nil.
     var setPicker: SetPicker?
     /// Per field and repo ("labels|acme/widgets"): the last `all` and `complete` read. Not stored on disk.
     var setCandidates: [String: SetCandidates] = [:]
