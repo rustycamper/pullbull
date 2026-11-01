@@ -252,9 +252,7 @@ struct PRRow: View {
             CompactChipGlyphs(
                 chips: chips,
                 reason: layoutTab == .review && !row.dimmed
-                    ? chips.info.first(where: { $0 != .conflicts && !$0.isReviewWait }) : nil,
-                // Review only: elsewhere a second bare age beside the updated one reads as noise.
-                wait: layoutTab == .review ? chips.info.lazy.compactMap(\.reviewWait).first : nil)
+                    ? chips.info.first(where: { $0 != .conflicts && !$0.isReviewWait }) : nil)
         } trailing: {
             CIGlyph(state: pr.ci)
         }

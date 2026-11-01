@@ -64,7 +64,7 @@ Only open, non-draft PRs. Closed, merged and draft PRs show none.
 - SF Symbol `clock`, the glyph "No reviews" uses today. No new icon.
 - A text info item in the meta line (after the age, after `·`), gray like the other info items, not a warning.
 - When the meta line is too narrow, the name shortens first; the age never truncates.
-- Compact rows, on Review only: the clock and the age, after the reason glyph and before Conflicts, with the full wording on hover. With no known age, nothing; the reason glyph stays the reason. Mine and Team compact rows show no wait: beside the updated age every row would carry two bare ages (`🕒 4d … 1h`), which reads as noise; the full rows carry it there.
+- Compact rows show no wait, on any tab. Their one age stays the updated age, the same number the full row and the PR show; a second bare age beside it (`🕒 4d … 1h`) reads as noise, and a wait in its place would show a number that changes on opening the PR. The Review reason glyph stays the reason.
 
 ### Hover and VoiceOver
 
@@ -122,7 +122,7 @@ The wait is a pure function in PullBullKit, next to `ReviewRules` and `RowChips`
 - **The Review tab's short form needs a pending request to the viewer or their teams**, not just the Review layout: search results on that tab include PRs that don't wait on the viewer.
 - **Bot reviews don't count as reviewed.** Found in the final review: Copilot posts a COMMENTED review on nearly every PR in repos that use it, which would have hidden "No reviewer" there and dropped Mine's old "No reviews" signal.
 - **The short form needs a counted Review row.** Found in the final review: a dimmed or uncounted row with the viewer's team still pending isn't waiting on the viewer.
-- **Compact rows show the wait on Review only.** The owner saw the real Team list in compact mode, nearly every row with two bare ages, and chose Review only, where the wait answers "how long have I kept them waiting".
+- **Compact rows show no wait.** The owner saw the real list in compact mode, nearly every row with two bare ages, and found it confusing; replacing the updated age with the wait would make the number change when the PR is opened. The wait belongs to full rows.
 - **Unseen and bot requests don't count.** GitHub returns them with no reviewer; naming or ageing a row by something nobody can see or nudge would be noise.
 - **Missing beats wrong, in the hover too.** With an unknown time the hover lists names only, not ages for the known ones, so it can't contradict the row.
 - **The old-cache ready time isn't special-cased.** Showing "No reviewer" from the opened time until the first refresh is a short, self-healing exception to "missing beats wrong"; handling it would mean a cache version flag for one refresh.
