@@ -23,11 +23,19 @@ public struct NotificationChanges: Equatable, Sendable {
 /// A fast CI follow (`isCIFollow`) counts as a live fetch merged into the baseline: it is diffed
 /// against the baseline when it carries the baseline's `fetchedAt`, and then becomes the baseline,
 /// so the next full refresh never posts its changes again.
+/// A review request the viewer made themselves (`ownReviewRequest`) posts nothing: its pull request's
+/// "review requested" is held back on every live fetch up to and including the first whose Review list
+/// asks the viewer, and for at most `selfRequestWindow`.
 public struct NotificationGate: Sendable {
+    /// The override's five minutes and a poll's slack.
+    public static let selfRequestWindow: TimeInterval = 360
+
     private let launchedAt: Date
     private var baseline: Snapshot?
     /// Set by a refresh marker: the snapshot held when the attempt started (`.some(nil)` when none).
     private var marker: Snapshot??
+    /// Pull requests the viewer asked themselves (or one of their teams) to review, until when.
+    private var ownRequests: [PRKey: Date] = [:]
 
     public init(launchedAt: Date) {
         self.launchedAt = launchedAt
@@ -36,6 +44,11 @@ public struct NotificationGate: Sendable {
     /// Forgets the baseline and any pending refresh marker (account or org changed).
     public mutating func reset() {
         self = NotificationGate(launchedAt: launchedAt)
+    }
+
+    /// The viewer asked themselves, or one of their teams, to review `key` at `date`.
+    public mutating func ownReviewRequest(on key: PRKey, at date: Date) {
+        ownRequests[key] = date.addingTimeInterval(Self.selfRequestWindow)
     }
 
     /// The PR events of `changes(...)`.
@@ -59,7 +72,7 @@ public struct NotificationGate: Sendable {
                   fresh.fetchedAt == old.fetchedAt
             else { return NotificationChanges() }
             baseline = fresh
-            return diff(old, fresh, toggles: toggles, filters: filters, now: now)
+            return settle(diff(old, fresh, toggles: toggles, filters: filters, now: now), fresh, now: now)
         }
         guard let started = marker else { return NotificationChanges() }
         marker = nil
@@ -74,9 +87,23 @@ public struct NotificationGate: Sendable {
 
         defer { baseline = fresh }
         guard let old = baseline, Self.sameContext(old, fresh), fresh.fetchedAt > old.fetchedAt else {
-            return NotificationChanges()
+            return settle(NotificationChanges(), fresh, now: now)
         }
-        return diff(old, fresh, toggles: toggles, filters: filters, now: now)
+        return settle(diff(old, fresh, toggles: toggles, filters: filters, now: now), fresh, now: now)
+    }
+
+    /// Holds back the viewer's own review requests in `changes` from the live fetch `fresh`, and ends
+    /// the hold for each pull request `fresh` lists on Review as asking the viewer.
+    private mutating func settle(_ changes: NotificationChanges, _ fresh: Snapshot, now: Date) -> NotificationChanges {
+        ownRequests = ownRequests.filter { $0.value > now }
+        guard !ownRequests.isEmpty else { return changes }
+        var changes = changes
+        changes.prs.removeAll { $0.kind == .reviewRequested && ownRequests[$0.pr.key] != nil }
+        for pr in fresh.reviewCandidates where ownRequests[pr.key] != nil
+            && ReviewRules.status(of: pr, me: fresh.org.viewer, myTeams: fresh.org.myTeams).reviewReason != nil {
+            ownRequests[pr.key] = nil
+        }
+        return changes
     }
 
     private func diff(

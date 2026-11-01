@@ -298,3 +298,83 @@ extension NotificationGateTests {
         #expect(feed.gate.events(snapshot: ciSnap(140, ci: .pending), status: failed, toggles: feed.toggles).isEmpty)
     }
 }
+
+// MARK: - The viewer's own review requests
+
+/// PRs by alice on Review, each asking `requests` of the viewer "me" (in team "core").
+private func reviewSnap(_ offset: TimeInterval, _ listed: [(Int, [Reviewer])]) -> Snapshot {
+    Snapshot(
+        fetchedAt: launch.addingTimeInterval(offset),
+        org: OrgContext(org: "o", viewer: "me", members: [], myTeams: ["core"], repos: []),
+        reviewCandidates: listed.map { n, requests in
+            PullRequest(
+                key: PRKey(repo: "initech/api", number: n), title: "Fix", url: URL(string: "https://x/\(n)")!,
+                author: "alice", authorAvatarURL: nil, state: .open, isDraft: false,
+                createdAt: launch, updatedAt: launch, closedAt: nil, headRef: "h", baseRef: "main", ci: .none,
+                headCommitDate: nil, commentCount: 0, lastCommentAuthor: nil,
+                latestReviews: [], reviewRequests: requests)
+        },
+        mine: [], team: [], recentlyClosed: [], boardIssues: [])
+}
+
+/// A refresh marker then the live fetch `after`, at `after`'s time; the kinds posted.
+private func poll(_ gate: inout NotificationGate, _ before: Snapshot?, _ after: Snapshot) -> [PREventKind] {
+    _ = gate.events(snapshot: before, status: busy, toggles: NotificationToggles(), now: after.fetchedAt)
+    return gate.events(snapshot: after, status: idle, toggles: NotificationToggles(), now: after.fetchedAt).map(\.kind)
+}
+
+private let pr2 = PRKey(repo: "initech/api", number: 2)
+
+@Suite struct OwnReviewRequestTests {
+    let none = reviewSnap(10, [])
+
+    @Test func ownRequestDoesNotNotify() {
+        var gate = NotificationGate(launchedAt: launch)
+        #expect(poll(&gate, nil, none).isEmpty)
+        gate.ownReviewRequest(on: pr2, at: launch.addingTimeInterval(20))
+        #expect(poll(&gate, none, reviewSnap(80, [(2, [.user("me")])])).isEmpty)
+    }
+
+    @Test func ownTeamRequestDoesNotNotify() {
+        var gate = NotificationGate(launchedAt: launch)
+        #expect(poll(&gate, nil, none).isEmpty)
+        gate.ownReviewRequest(on: pr2, at: launch.addingTimeInterval(20))
+        #expect(poll(&gate, none, reviewSnap(80, [(2, [.team(slug: "core", name: "Core")])])).isEmpty)
+    }
+
+    @Test func suppressionEndsAtFirstListingPoll() {
+        var gate = NotificationGate(launchedAt: launch)
+        #expect(poll(&gate, nil, none).isEmpty)
+        gate.ownReviewRequest(on: pr2, at: launch.addingTimeInterval(20))
+        let listed = reviewSnap(80, [(2, [.user("me")])])
+        #expect(poll(&gate, none, listed).isEmpty)
+        let removed = reviewSnap(140, [])
+        #expect(poll(&gate, listed, removed).isEmpty)
+        #expect(poll(&gate, removed, reviewSnap(200, [(2, [.user("me")])])) == [.reviewRequested])
+    }
+
+    @Test func suppressionExpiresAfterSixMinutes() {
+        var gate = NotificationGate(launchedAt: launch)
+        #expect(poll(&gate, nil, none).isEmpty)
+        gate.ownReviewRequest(on: pr2, at: launch.addingTimeInterval(20))
+        let quiet = reviewSnap(200, [])
+        #expect(poll(&gate, none, quiet).isEmpty)
+        #expect(poll(&gate, quiet, reviewSnap(400, [(2, [.user("me")])])) == [.reviewRequested])
+    }
+
+    @Test func cachedSnapshotDoesNotEndSuppression() {
+        var gate = NotificationGate(launchedAt: launch)
+        #expect(poll(&gate, nil, none).isEmpty)
+        gate.ownReviewRequest(on: pr2, at: launch.addingTimeInterval(20))
+        let cached = reviewSnap(30, [(2, [.user("me")])])
+        #expect(gate.events(snapshot: cached, status: idle, toggles: NotificationToggles(), now: cached.fetchedAt).isEmpty)
+        #expect(poll(&gate, none, reviewSnap(80, [(2, [.user("me")])])).isEmpty)
+    }
+
+    @Test func otherPRsStillNotify() {
+        var gate = NotificationGate(launchedAt: launch)
+        #expect(poll(&gate, nil, none).isEmpty)
+        gate.ownReviewRequest(on: pr2, at: launch.addingTimeInterval(20))
+        #expect(poll(&gate, none, reviewSnap(80, [(2, [.user("me")]), (3, [.user("me")])])) == [.reviewRequested])
+    }
+}
