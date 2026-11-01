@@ -243,6 +243,20 @@ private var issuesOn: NotificationToggles {
     return t
 }
 
+/// Editing labels in PullBull, or on GitHub, is not news.
+@Suite struct LabelChangeDetectorTests {
+    @Test func labelChangesDoNotNotify() {
+        let before = editSnapshot(board: [editIssue(412)], assigned: [editIssue(412)], mine: [editPR(77)])
+        let after = editSnapshot(
+            board: [editIssue(412, labels: ["bug"])], assigned: [editIssue(412, labels: ["bug"])],
+            mine: [editPR(77, labels: ["docs"])])
+        var toggles = NotificationToggles()
+        toggles.issueAssigned = true
+        #expect(ChangeDetector.events(old: before, new: after, me: "me", myTeams: [], toggles: toggles).isEmpty)
+        #expect(ChangeDetector.issueEvents(old: before, new: after, me: "me", toggles: toggles).isEmpty)
+    }
+}
+
 @Suite struct IssueChangeDetectorTests {
     private let old = issueSnap(0, assigned: [issue(100, assignment: Assignment(actor: "dev-a", at: t0))])
     private func new(_ extra: BoardIssue...) -> Snapshot {

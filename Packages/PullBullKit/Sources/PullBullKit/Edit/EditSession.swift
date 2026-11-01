@@ -47,6 +47,21 @@ public struct EditSession: Equatable, Sendable {
         failure = EditFailure(text: EditMessage.failure(change, on: key, error: error), url: url)
     }
 
+    /// GitHub applied part of edit `id`: the refused half leaves the screen, the failure line says
+    /// which half, and ⌘Z (when `id` is still the last edit, and it isn't an undo) takes back only the
+    /// applied half.
+    public mutating func partlyApplied(
+        _ id: UUID, change: EditChange, result: SetChangeResult, on key: PRKey, url: URL, isUndo: Bool,
+        at now: Date
+    ) {
+        let applied = change.keeping(result)
+        overrides.replace(id, with: applied)
+        failure = EditMessage.partial(change, on: key, result: result).map { EditFailure(text: $0, url: url) }
+        if !isUndo, id == last, !applied.isEmpty {
+            undo.remember(EditRecord(key: key, change: applied, madeAt: now, addedItemId: nil))
+        }
+    }
+
     /// The search text changed: ⌘Z undoes typing from now on, not the edit before it.
     public mutating func typed() {
         undo = EditUndo()

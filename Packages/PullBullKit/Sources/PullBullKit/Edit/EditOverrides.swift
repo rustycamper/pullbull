@@ -33,6 +33,18 @@ public struct EditOverrides: Equatable, Sendable {
         entries.removeAll { $0.id == id }
     }
 
+    /// Replaces edit `id`'s change in place, keeping its date and its position in the order; drops it
+    /// when `change` is empty.
+    public mutating func replace(_ id: UUID, with change: EditChange) {
+        guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
+        if change.isEmpty {
+            entries.remove(at: index)
+        } else {
+            let old = entries[index]
+            entries[index] = Entry(id: old.id, key: old.key, change: change, madeAt: old.madeAt)
+        }
+    }
+
     /// Drops each edit `fetched` agrees with, along with the older edits to the same item it replaced;
     /// each older than `lifetime`; and each Status edit to an option the board no longer has.
     public mutating func reconcile(with fetched: Snapshot, now: Date) {

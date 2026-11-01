@@ -70,4 +70,7 @@ final class SearchKeyMonitor {
     /// kVK_ANSI_S and kVK_ANSI_Z: used for ⌥⌘S and ⌘Z only when the layout types no Latin character there.
     static let letterS: UInt16 = 1
     static let letterZ: UInt16 = 6
+    /// kVK_ANSI_A and kVK_ANSI_L: used for ⌥⌘A and ⌥⌘L only when the layout types no Latin character there.
+    static let letterA: UInt16 = 0
+    static let letterL: UInt16 = 37
 }

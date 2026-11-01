@@ -163,7 +163,8 @@ extension View {
     /// Markdown Link as an action too.
     func issueContextMenu(
         _ issue: BoardIssue, focus: FocusMenuItem? = nil, time: TimeFocusMenu? = nil, person: FocusMenuItem? = nil,
-        status: StatusMenu? = nil
+        status: StatusMenu? = nil,
+        sets: SetEditMenu? = nil
     ) -> some View {
         contextMenu {
             if focus != nil || time != nil || person != nil {
@@ -172,8 +173,9 @@ extension View {
                 if let person { PersonMenuButton(item: person) }
                 Divider()
             }
-            if let status {
-                status
+            if status != nil || sets != nil {
+                if let status { status }
+                if let sets { sets }
                 Divider()
             }
             Button("Copy Link", systemImage: "link") { PRActions.copyLink(issue) }
@@ -233,6 +235,22 @@ struct StatusMenu: View {
     private var options: [StatusOption] {
         var seen = Set<String>()
         return (model.shownSnapshot?.boardStatusOptions ?? []).filter { seen.insert($0.id).inserted }
+    }
+}
+
+/// "Assignees…" and "Labels…" on an issue's context menu: each opens its picker on the row.
+struct SetEditMenu: View {
+    let model: AppModel
+    let key: PRKey
+
+    /// Nil where the sets aren't offered on the issue.
+    static func make(model: AppModel, key: PRKey) -> SetEditMenu? {
+        model.isSetEditOffered(for: key) ? SetEditMenu(model: model, key: key) : nil
+    }
+
+    var body: some View {
+        Button("Assignees…", systemImage: "person.badge.plus") { model.openSetPicker(.assignees, for: key) }
+        Button("Labels…", systemImage: "tag") { model.openSetPicker(.labels, for: key) }
     }
 }
 

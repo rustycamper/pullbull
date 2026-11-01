@@ -120,7 +120,7 @@ public enum OrgAccessNotice: Equatable, Sendable {
             "An owner of \(org) needs to install PullBull for the organization. You can send them a request now; GitHub emails them."
         case .personalInstall(let login, let url, _):
             "PullBull didn't find an organization for \(login), so it shows your own repositories. On GitHub, "
-                + "install PullBull on your account and choose all repositories or only some. PullBull only reads them."
+                + "install PullBull on your account and choose all repositories or only some. PullBull edits only what you pick."
                 + (url.query?.contains("target_id=") == true
                     ? "" : " On GitHub, choose your account (\(login)), not an organization.")
         case .ssoRequired, .selectedRepositoriesOnly, .personalSelectedRepositories:

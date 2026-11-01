@@ -8,6 +8,8 @@ private let doing = BoardStatusValue(optionId: "o2", name: "Doing")
 private let options = [StatusOption(id: "o1", name: "Todo"), StatusOption(id: "o2", name: "Doing")]
 private let k412 = editKey(412)
 private let k413 = editKey(413)
+private let bug = LabelRef(id: "LA_bug", name: "bug", color: nil)
+private let docs = LabelRef(id: "LA_docs", name: "docs", color: nil)
 private let url412 = URL(string: "https://github.com/o/r/issues/412")!
 private let move = EditChange.status(from: todo, to: doing, placement: .already)
 private let snap = editSnapshot(board: [editIssue(412, status: todo), editIssue(413, status: todo)], options: options)
@@ -122,5 +124,51 @@ private func status(_ key: PRKey, _ session: EditSession, in snapshot: Snapshot 
         s.failed(a, change: move, on: k412, url: url412, error: APIError.writeRefused("nope"))
         s.dismissFailure()
         #expect(s.failure == nil)
+    }
+
+    // MARK: Partly applied
+
+    private let swap = EditChange.labels(added: [docs], removed: [bug])
+    private let addedOnly = SetChangeResult(addApplied: true, removeApplied: false, refusal: "nope")
+
+    private func labels(_ session: EditSession) -> [String] {
+        session.overrides.apply(to: editIssue(412, labels: ["bug"])).labels
+    }
+
+    @Test func partlyAppliedKeepsTheAppliedHalfAndArmsUndoForIt() {
+        var s = EditSession()
+        let id = s.begin(swap, on: k412, at: t0)
+        #expect(labels(s) == ["docs"])
+        s.partlyApplied(id, change: swap, result: addedOnly, on: k412, url: url412, isUndo: false, at: t0 + 1)
+        #expect(labels(s) == ["bug", "docs"])
+        #expect(s.failure?.text == "Added docs to #412, but couldn't remove bug: nope")
+        #expect(s.failure?.url == url412)
+        #expect(s.takeUndo(now: t0 + 2)?.change == .labels(added: [docs], removed: []))
+    }
+
+    @Test func partlyAppliedToAnOlderEditDoesNotArmUndo() {
+        var s = EditSession()
+        let id = s.begin(swap, on: k412, at: t0)
+        _ = s.begin(move, on: k413, at: t0 + 0.2)
+        s.partlyApplied(id, change: swap, result: addedOnly, on: k412, url: url412, isUndo: false, at: t0 + 1)
+        #expect(labels(s) == ["bug", "docs"])
+        #expect(!s.canUndo(now: t0 + 2))
+    }
+
+    @Test func aPartlyAppliedUndoDoesNotArmUndo() {
+        var s = EditSession()
+        let id = s.begin(swap, on: k412, at: t0)
+        s.partlyApplied(id, change: swap, result: addedOnly, on: k412, url: url412, isUndo: true, at: t0 + 1)
+        #expect(s.failure != nil)
+        #expect(!s.canUndo(now: t0 + 2))
+    }
+
+    @Test func keepingDropsTheRefusedHalf() {
+        #expect(swap.keeping(addedOnly) == .labels(added: [docs], removed: []))
+        let removedOnly = SetChangeResult(addApplied: false, removeApplied: true, refusal: "nope")
+        #expect(swap.keeping(removedOnly) == .labels(added: [], removed: [bug]))
+        let alice = PersonRef(id: "U_a", login: "alice", avatarURL: nil)
+        #expect(EditChange.assignees(added: [alice], removed: []).keeping(removedOnly) == .assignees(added: [], removed: []))
+        #expect(move.keeping(addedOnly) == move)
     }
 }

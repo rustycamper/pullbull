@@ -133,6 +133,33 @@ private let applied = #"{"clientMutationId":null}"#
         }
     }
 
+    @Test func aRefusedOneSidedAddThrows() async {
+        let t = QueueTransport([#"""
+        {"data":{"add":null},"errors":[{"type":"FORBIDDEN","message":"nope"}]}
+        """#])
+        await #expect(throws: APIError.writeRefused("nope")) {
+            try await api(t).changeLabels(of: "I_1", adding: ["LA_bug"], removing: [])
+        }
+    }
+
+    @Test func aRefusedOneSidedRemoveThrows() async {
+        let t = QueueTransport([#"""
+        {"data":{"remove":null},"errors":[{"type":"FORBIDDEN","message":"nope"}]}
+        """#])
+        await #expect(throws: APIError.writeRefused("nope")) {
+            try await api(t).changeAssignees(of: "I_1", adding: [], removing: ["U_bob"])
+        }
+    }
+
+    @Test func aPartialWhereTheAddWasRefusedStillReturns() async throws {
+        let t = QueueTransport([#"""
+        {"data":{"add":null,"remove":\#(applied)},\#
+        "errors":[{"type":"FORBIDDEN","path":["add"],"message":"nope"}]}
+        """#])
+        let result = try await api(t).changeLabels(of: "I_1", adding: ["LA_bug"], removing: ["LA_triage"])
+        #expect(result == SetChangeResult(addApplied: false, removeApplied: true, refusal: "nope"))
+    }
+
     @Test func onlyAddSendsNoRemoveAlias() async throws {
         let t = QueueTransport([#"{"data":{"add":\#(applied)}}"#])
         let result = try await api(t).changeLabels(of: "I_1", adding: ["LA_bug"], removing: [])

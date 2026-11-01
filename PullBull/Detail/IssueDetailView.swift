@@ -2,13 +2,14 @@ import AppKit
 import SwiftUI
 import PullBullKit
 
-/// The read-only detail of one issue inside the popover: state and author, a board card (Status,
-/// Assignees, Labels), the pull requests that close it, the description and the last two comments, with
-/// View on board and Open on GitHub pinned at the bottom. It shows the list data and the cached detail
-/// at once; `AppModel` refreshes the detail in place.
+/// The detail of one issue inside the popover: state and author, a board card (Status, Assignees, Labels,
+/// each changeable where offered), the pull requests that close it, the description and the last two
+/// comments, with View on board and Open on GitHub pinned at the bottom. It shows the list data and the
+/// cached detail at once; `AppModel` refreshes the detail in place.
 struct IssueDetailView: View {
     let model: AppModel
     let key: PRKey
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// The list copy: on the board it carries the Status and the board item.
     private var listIssue: BoardIssue? { model.issue(for: key) }
@@ -48,6 +49,9 @@ struct IssueDetailView: View {
                     }
                     .padding(.bottom, 14)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    // An edit of the sets grows or shrinks the card; what's below it slides, not jumps.
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: issue?.assignees)
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: issue?.labels)
                 }
             }
             .frame(maxHeight: .infinity)
@@ -154,7 +158,7 @@ struct IssueDetailView: View {
                     statusRow(name: "No status") { statusGlyph("circle.dotted") }
                     CardDivider()
                 }
-                CardRow(name: "Assignees") {
+                setRow(.assignees) {
                     if issue.assignees.isEmpty {
                         Text("No one").foregroundStyle(.secondary)
                     } else {
@@ -173,7 +177,7 @@ struct IssueDetailView: View {
                     }
                 }
                 CardDivider()
-                CardRow(name: "Labels") {
+                setRow(.labels) {
                     if issue.labels.isEmpty {
                         Text("None").foregroundStyle(.secondary)
                     } else {
@@ -201,7 +205,24 @@ struct IssueDetailView: View {
             .buttonStyle(.plain)
             .help("Set Status (⌥⌘S)")
             .accessibilityHint("Opens the Status picker")
-            .statusPickerAnchor(for: key, model: model)
+            .editPickerAnchor(for: key, field: .status, model: model)
+        } else {
+            row
+        }
+    }
+
+    /// The Assignees or Labels row: clickable where the sets are offered, with the picker anchored on the row.
+    @ViewBuilder private func setRow(_ field: EditField, @ViewBuilder value: @escaping () -> some View) -> some View {
+        let isAssignees = field == .assignees
+        let row = CardRow(name: isAssignees ? "Assignees" : "Labels", value: value)
+        if model.isSetEditOffered(for: key) {
+            Button { model.openSetPicker(field, for: key) } label: {
+                row.contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(isAssignees ? "Change assignees (⌥⌘A)" : "Change labels (⌥⌘L)")
+            .accessibilityHint(isAssignees ? "Opens the assignee picker" : "Opens the label picker")
+            .editPickerAnchor(for: key, field: field, model: model)
         } else {
             row
         }

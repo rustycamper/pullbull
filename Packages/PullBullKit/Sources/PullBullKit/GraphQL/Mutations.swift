@@ -66,6 +66,29 @@ enum Mutations {
     }
     """
 
+    /// A page of the repo's labels by name, and on the first page (`withIssue`) the issue's own.
+    static let labelCandidates = """
+    query($owner:String!,$name:String!,$n:Int!,$after:String,$withIssue:Boolean!){
+      repository(owner:$owner, name:$name){
+        issue(number:$n) @include(if:$withIssue){labels(first:100){nodes{id name color description}}}
+        labels(first:100, after:$after, orderBy:{field:NAME,direction:ASC}){
+          nodes{id name color description}
+          pageInfo{hasNextPage endCursor}
+        }
+      }
+    }
+    """
+
+    /// The first hundred people assignable in the repo (matching `$q` when given) and the issue's assignees.
+    static let assigneeCandidates = """
+    query($owner:String!,$name:String!,$n:Int!,$q:String){
+      repository(owner:$owner, name:$name){
+        issue(number:$n){assignees(first:10){nodes{id login avatarUrl}}}
+        assignableUsers(first:100, query:$q){nodes{id login avatarUrl} pageInfo{hasNextPage}}
+      }
+    }
+    """
+
     /// The node ID of an issue or pull request, by owner, name and number.
     static let nodeId = """
     query($owner:String!,$name:String!,$n:Int!){

@@ -41,7 +41,7 @@ struct GeneralSettingsTab: View {
                 Text("Repository").tag(Grouping.repository)
                 Text("None").tag(Grouping.none)
             } label: {
-                RowLabel("Group pull requests and created issues by", note: "Assigned and Board group by board Status")
+                RowLabel("Group pull requests and created issues by", note: "Board, and issues on Mine, group by board Status")
             }
             .pickerStyle(.segmented)
             Toggle(isOn: $model.settings.groupTeamByAuthor) {

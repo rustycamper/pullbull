@@ -10,6 +10,7 @@ private let options = [
     StatusOption(id: "o1", name: "Todo"), StatusOption(id: "o2", name: "Doing"), StatusOption(id: "o3", name: "Review"),
 ]
 private let bug = LabelRef(id: "LA_bug", name: "bug", color: "d73a4a")
+private let docs = LabelRef(id: "LA_docs", name: "docs", color: nil)
 private let triage = LabelRef(id: "LA_triage", name: "triage", color: nil)
 private let me = PersonRef(id: "U_me", login: "me", avatarURL: nil)
 private let alice = PersonRef(id: "U_alice", login: "alice", avatarURL: nil)
@@ -59,6 +60,29 @@ private func card(_ snapshot: Snapshot, _ key: PRKey) -> BoardIssue? {
         let shown = o.apply(to: editIssue(412, labels: ["triage"]))
         #expect(shown.labels == ["bug"])
         #expect(shown.labelColor(at: 0) == "d73a4a")
+    }
+
+    @Test func replaceKeepsOnlyTheAppliedHalf() {
+        var o = EditOverrides()
+        let id = o.record(.labels(added: [docs], removed: [bug]), on: k412, at: t0)
+        o.replace(id, with: .labels(added: [docs], removed: []))
+        #expect(o.apply(to: editIssue(412, labels: ["bug"])).labels == ["bug", "docs"])
+    }
+
+    @Test func replaceWithNothingDrops() {
+        var o = EditOverrides()
+        let id = o.record(.labels(added: [docs], removed: []), on: k412, at: t0)
+        o.replace(id, with: .labels(added: [], removed: []))
+        #expect(o.isEmpty)
+    }
+
+    /// The newer edit still applies last: the older one, replaced, stays ahead of it.
+    @Test func replaceKeepsTheOrder() {
+        var o = EditOverrides()
+        let older = o.record(.labels(added: [bug], removed: [docs]), on: k412, at: t0)
+        o.record(.labels(added: [], removed: [bug]), on: k412, at: t0 + 1)
+        o.replace(older, with: .labels(added: [bug], removed: []))
+        #expect(o.apply(to: editIssue(412)).labels.isEmpty)
     }
 
     @Test func addingAPresentLabelDoesNotDuplicate() {

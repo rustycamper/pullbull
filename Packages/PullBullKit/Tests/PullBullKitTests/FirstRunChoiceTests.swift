@@ -115,7 +115,7 @@ import Testing
         #expect(FirstRunChoice.failure("devon", message: "Offline")
             == "Couldn't use devon: Offline")
         #expect(FirstRunChoice.ghLine == "Works right away with every repo, org and board you can see.")
-        #expect(FirstRunChoice.signInLine == "Read-only, limited to repos you choose. Your org may need to approve PullBull.")
+        #expect(FirstRunChoice.signInLine == "Edits only what you pick, limited to repos you choose. Your org may need to approve PullBull.")
     }
 }
 

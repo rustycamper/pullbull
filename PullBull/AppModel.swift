@@ -81,6 +81,14 @@ final class AppModel {
     var edits = EditSession()
     /// The Status picker on screen, or nil.
     var statusPicker: StatusPicker?
+    /// The assignee or label picker on screen, or nil.
+    var setPicker: SetPicker?
+    /// Per field and repo ("labels|acme/widgets"): the last `all` and `complete` read. Not stored on disk.
+    var setCandidates: [String: SetCandidates] = [:]
+    /// The candidate fetch or filter wait the open set picker is waiting on.
+    @ObservationIgnored var setPickerTask: Task<Void, Never>?
+    /// The wait before a filter asks GitHub for more people.
+    @ObservationIgnored var setFilterTask: Task<Void, Never>?
     /// Bumped when an edited row stays selected, so its list scrolls to it in its new lane.
     var editScrollRequest = 0
     /// Where the selection went when an edit moved its row out of the list.
@@ -395,6 +403,12 @@ final class AppModel {
     struct GhUse: Equatable {
         let login: String
         var failure: String?
+    }
+
+    /// The loaded installation of the running account whose org is `login`, case ignored.
+    func installation(named login: String) -> Installation? {
+        guard let account = running?.ref, case .loaded(let list) = installations[account] else { return nil }
+        return list.first { $0.org.caseInsensitiveCompare(login) == .orderedSame }
     }
 
     /// The current app account's installation on `owner`'s account, for edit permissions; nil for `gh`
@@ -1785,6 +1799,12 @@ final class AppModel {
         edits = EditSession()
         editSelection = EditSelection()
         statusPicker = nil
+        setPicker = nil
+        setPickerTask?.cancel()
+        setPickerTask = nil
+        setFilterTask?.cancel()
+        setFilterTask = nil
+        setCandidates.removeAll()
         snapshot = nil
         people = .empty
         labels = .empty

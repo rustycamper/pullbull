@@ -52,7 +52,7 @@ public struct FirstRunChoice: Equatable, Sendable {
     public let note: String?
 
     public static let ghLine = "Works right away with every repo, org and board you can see."
-    public static let signInLine = "Read-only, limited to repos you choose. Your org may need to approve PullBull."
+    public static let signInLine = "Edits only what you pick, limited to repos you choose. Your org may need to approve PullBull."
 
     public static func useTitle(_ login: String) -> String { "Use \(login) from GitHub CLI" }
     public static func usingTitle(_ login: String) -> String { "Using \(login)…" }

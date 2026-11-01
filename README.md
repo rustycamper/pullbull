@@ -31,7 +31,7 @@ Keyboard-first · Native SwiftUI · Edits only what you pick
 | <img src="docs/media/icons/text-magnifyingglass.png" width="22" height="22" alt=""> | You remember what a PR or issue was about, not its title or number; a chat mentions one loosely | **Ask AI**: describe it in your own words (<kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd>), answered by Anthropic with your own API key. Off by default |
 | <img src="docs/media/icons/sparkles.png" width="22" height="22" alt=""> | Agents open PRs faster than you can track them | **Mine** tab: review state, checks, *Ready to merge* when approved and green |
 | <img src="docs/media/icons/arrow-triangle-2-circlepath.png" width="22" height="22" alt=""> | Re-requests and new commits after your review go unnoticed | Both land back in **Review**, marked with why |
-| <img src="docs/media/icons/rectangle-split-3x1.png" width="22" height="22" alt=""> | The Projects board is slow for a quick look | **Assigned** and **Board** tabs, grouped by board Status |
+| <img src="docs/media/icons/rectangle-split-3x1.png" width="22" height="22" alt=""> | The Projects board is slow for a quick look | **Mine** and **Board** issue tabs, grouped by board Status |
 | <img src="docs/media/icons/link.png" width="22" height="22" alt=""> | Finding the PR that closes an issue takes clicks | Issue detail lists its linked PRs. Open one, <kbd>Esc</kbd> returns |
 | <img src="docs/media/icons/bolt.png" width="22" height="22" alt=""> | "Where is #123?" means opening a browser | <kbd>⌃</kbd><kbd>⌥</kbd><kbd>P</kbd>, type `#123` or paste the link, <kbd>Return</kbd> |
 | <img src="docs/media/icons/person-2.png" width="22" height="22" alt=""> | Work and personal GitHub accounts mean signing out and back in | Switch accounts on the fly from the footer (<kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>). Each comes back with its own org and board |
@@ -54,15 +54,15 @@ Keyboard-first · Native SwiftUI · Edits only what you pick
 | <kbd>⌘</kbd><kbd>1</kbd> | **Pull Requests** | Review | PRs requesting your or your team's review, re-requests, new commits since your review, with lines changed |
 | | | Mine | Your open PRs, review pills, checks, *Ready to merge*, checked every 30 s while CI runs. Folded *Recently closed*: last 7 days |
 | | | Team | Other open PRs in the org, by repo or by author |
-| <kbd>⌘</kbd><kbd>2</kbd> | **Issues** | Assigned | Your issues, grouped by board Status (by repo without a board). Folded *Done*: done on the board, still open |
+| <kbd>⌘</kbd><kbd>2</kbd> | **Issues** | Mine | Issues assigned to you, grouped by board Status (by repo without a board). Folded *Done*: done on the board, still open |
 | | | Created | Issues you opened |
 | | | Board | All open issues on the board, by Status. Folded *Done*: last 14 days |
 
-- **Fold a lane:** click a Status header on Board or Assigned. Folds are kept per tab and board
+- **Fold a lane:** click a Status header on Board or Mine. Folds are kept per tab and board
 - **Labels:** chips with the label's colour dot on each row (not in compact cards), all of them in the detail
 - **One repo:** right-click a repo header or row → **Show Only *repo***, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd>
 - **Recent activity:** right-click a row, a repo header or the list → **Show Only Updated**: today, 3 days, a week or a month
-- **Right-click a row:** copy branch (PRs), link or Markdown link · checkout command · open on GitHub · failing check · search the author
+- **Right-click a row:** on issues, Status · Assignees… · Labels… · copy branch (PRs), link or Markdown link · checkout command · open on GitHub · failing check · search the author
 - **Switch board:** <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> on the Board tab
 - **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Each account keeps its org and board
 
@@ -106,6 +106,7 @@ Combine `@`, `~`, `is:`, `status:`, `updated:`, `review:`, `repo:`, `size:` and 
 | <kbd>/</kbd> or just type | Search |
 | <kbd>⌃</kbd><kbd>1</kbd>…<kbd>⌃</kbd><kbd>9</kbd> | Saved searches |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd> | Repo menu · board menu · account menu |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>A</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>L</kbd> · <kbd>⌘</kbd><kbd>Z</kbd> | Issue Status · assignees · labels · undo |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Ask (once turned on) |
 | <kbd>⌘</kbd><kbd>/</kbd> | Every shortcut, by section, with a filter. Also Settings → General |
 | <kbd>Esc</kbd> | Back, clear, close |
@@ -136,7 +137,7 @@ Details in the [manual](docs/manual.md#settings).
 > [!NOTE]
 > **Orgs:** an owner has to install the GitHub App before Sign in with GitHub shows the org. PullBull detects this and gives you the link to send.
 >
-> **Boards with `gh`:** add the `read:project` scope with `gh auth refresh -s read:project`.
+> **Boards with `gh`:** add the `read:project` scope with `gh auth refresh -s read:project`. To set an issue's Status, add `project` instead.
 
 ## Install
 
@@ -153,7 +154,7 @@ Or download the zip from [Releases](https://github.com/rustycamper/pullbull/rele
 
 | &emsp;&emsp; | | |
 |:-:|---|---|
-| <img src="docs/media/icons/eye.png" width="22" height="22" alt=""> | Writes to GitHub | An issue's board Status, only when you pick it. Never merges, comments, approves or closes |
+| <img src="docs/media/icons/eye.png" width="22" height="22" alt=""> | Writes to GitHub | An issue's board Status, assignees and labels, only when you pick them. Never merges, comments, approves or closes |
 | <img src="docs/media/icons/key-horizontal.png" width="22" height="22" alt=""> | Tokens | App sign-in and Anthropic API key (Ask): Keychain, this Mac only. `gh`: memory only |
 | <img src="docs/media/icons/chart-bar-xaxis-ascending.png" width="22" height="22" alt=""> | Telemetry | None. No server |
 | <img src="docs/media/icons/network.png" width="22" height="22" alt=""> | Network | GitHub API, GitHub avatars, GitHub release feed. Anthropic API, only if you turn Ask on. Nothing else |
