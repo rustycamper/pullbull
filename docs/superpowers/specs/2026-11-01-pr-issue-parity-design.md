@@ -15,8 +15,13 @@ The two halves of the app grew separately. A side-by-side audit found the same f
   - A merged or closed PR shows its Merged or Closed pill.
   - A closed issue shows its pill in the issue page's colours, as GitHub does: purple "Closed" when completed, gray when not planned (`IssueEndedPill`).
   - VoiceOver says "Closed as completed" or "Closed as not planned", because the shared word "Closed" doesn't tell them apart.
-- **Compact rows have no ended pill**, for PRs or issues. The glyph and "merged 3d ago" already say it, and a compact line has no room to spare: on an issue row the pill crowded out the title next to the assignees.
 - **Closed PR rows follow compact mode** like every other row: glyph, title, `repo #num`, when it ended. Before this they were always drawn full.
+- **A compact ended row says it once, with the glyph,** for PRs and issues:
+  - It shows no ended pill. On an issue row the pill crowded the title next to the assignees.
+  - Its age is bare, "2d", then "Oct 12" after a week (`EndedAge.compact`), as an open compact row's age is. With "merged 2d ago" on every row of a Recently closed list, the titles were cut to two words.
+  - Neither a pill nor a word repeats the glyph. Hover and VoiceOver spell it out: "Merged 2d ago" (`EndedAge.help`).
+  - Without a close date there's no age, and the PR glyph tells VoiceOver "Merged" or "Closed" instead.
+  - A second merged glyph beside the age was considered and dropped. It would repeat the leading glyph and cost about 14pt of title.
 
 ## Pages
 

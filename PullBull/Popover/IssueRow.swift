@@ -111,8 +111,13 @@ struct IssueRow: View {
     private var compactBody: some View {
         CompactRowLayout(
             repoNumber: RepoNumber(key: issue.key, showsRepo: !inRepoGroup, compact: true),
-            age: IssueMetaLine.age(of: issue, now: now), ageWidth: issue.isOpen ? 24 : nil,
-            ageHelp: IssueMetaLine.ageHelp(of: issue, now: now)
+            // A closed issue's age is bare ("2d", "Oct 12"), as on a compact PR row: the glyph says closed.
+            age: issue.isOpen
+                ? IssueMetaLine.age(of: issue, now: now) : EndedAge.compact(closedAt: issue.closedAt, now: now),
+            ageWidth: issue.isOpen ? 24 : nil,
+            ageHelp: issue.isOpen
+                ? IssueMetaLine.ageHelp(of: issue, now: now)
+                : EndedAge.help(state: .closed, closedAt: issue.closedAt, now: now)
         ) {
             Image(symbol: glyph.symbol)
                 .font(.system(size: 11))

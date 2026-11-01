@@ -299,16 +299,22 @@ struct ClosedRow: View {
             sets: SetEditMenu.make(model: model, key: pr.key))
     }
 
-    /// One line in compact mode, like every other compact row: glyph, title, `repo #num`, when it ended. No pill:
-    /// the glyph and "merged 3d ago" already say it, and the line has no room to spare.
+    /// One line in compact mode, like every other compact row: glyph, title, `repo #num`, and the bare age it
+    /// ended ("2d", "Oct 12"). The glyph says merged or closed, so neither a pill nor the word repeats it;
+    /// hover and VoiceOver spell it out ("Merged 2d ago").
     private func compactBody(merged: Bool) -> some View {
         CompactRowLayout(
-            repoNumber: RepoNumber(key: pr.key, compact: true), age: ended(merged: merged), ageWidth: nil
+            repoNumber: RepoNumber(key: pr.key, compact: true),
+            age: EndedAge.compact(closedAt: pr.closedAt, now: now), ageWidth: nil,
+            ageHelp: EndedAge.help(state: pr.state, closedAt: pr.closedAt, now: now)
         ) {
             Image(symbol: Palette.prGlyph(pr.glyph))
                 .font(.system(size: 11))
                 .foregroundStyle(Palette.prGlyphColor(pr.glyph))
                 .frame(width: 16)
+                // The age says "Merged 2d ago" to VoiceOver; without a close date there's no age, so the glyph does.
+                .accessibilityLabel(merged ? "Merged" : "Closed")
+                .accessibilityHidden(pr.closedAt != nil)
         } title: {
             Text(title)
                 .foregroundStyle(.secondary)
