@@ -172,51 +172,61 @@ struct IssueMetaLine: View {
 }
 
 /// Overlapping assignee avatars, at most three. With `showUnassigned`, an issue with no assignees
-/// shows a dashed circle.
+/// shows a dashed circle. A change of assignees fades and scales the avatars in and out.
 private struct AssigneeStack: View {
     let assignees: [Assignee]
     let showUnassigned: Bool
     let size: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let maxShown = 3
     private static let overlap: CGFloat = 5
+    private static let change: AnyTransition = .scale(scale: 0.6).combined(with: .opacity)
 
     var body: some View {
-        if assignees.isEmpty {
-            if showUnassigned {
-                Circle()
-                    .strokeBorder(Color.secondary, style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
-                    .frame(width: size, height: size)
-                    .help("Unassigned")
-                    .accessibilityElement()
-                    .accessibilityLabel("Unassigned")
-            }
-        } else {
-            let shown = Array(assignees.prefix(Self.maxShown))
-            HStack(spacing: -Self.overlap) {
-                ForEach(Array(shown.enumerated()), id: \.element.login) { index, assignee in
-                    let avatar = AvatarView(login: assignee.login, url: assignee.avatarURL, size: size)
-                    if index < shown.count - 1 {
-                        // A gap the avatar on top of this one is cut out of, so the stack needs no ring color.
-                        avatar.mask {
-                            Circle()
-                                .overlay {
+        ZStack(alignment: .trailing) {
+            if assignees.isEmpty {
+                if showUnassigned {
+                    Circle()
+                        .strokeBorder(Color.secondary, style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
+                        .frame(width: size, height: size)
+                        .help("Unassigned")
+                        .accessibilityElement()
+                        .accessibilityLabel("Unassigned")
+                        .transition(Self.change)
+                }
+            } else {
+                let shown = Array(assignees.prefix(Self.maxShown))
+                HStack(spacing: -Self.overlap) {
+                    ForEach(Array(shown.enumerated()), id: \.element.login) { index, assignee in
+                        let avatar = AvatarView(login: assignee.login, url: assignee.avatarURL, size: size)
+                        Group {
+                            if index < shown.count - 1 {
+                                // A gap the avatar on top of this one is cut out of, so the stack needs no ring color.
+                                avatar.mask {
                                     Circle()
-                                        .padding(-1.5)
-                                        .offset(x: size - Self.overlap)
-                                        .blendMode(.destinationOut)
+                                        .overlay {
+                                            Circle()
+                                                .padding(-1.5)
+                                                .offset(x: size - Self.overlap)
+                                                .blendMode(.destinationOut)
+                                        }
+                                        .compositingGroup()
                                 }
-                                .compositingGroup()
+                            } else {
+                                avatar
+                            }
                         }
                         .help(assignee.login)
-                    } else {
-                        avatar.help(assignee.login)
+                        .transition(Self.change)
                     }
                 }
+                .accessibilityElement()
+                .accessibilityLabel(label)
+                .transition(Self.change)
             }
-            .accessibilityElement()
-            .accessibilityLabel(label)
         }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: assignees.prefix(Self.maxShown).map(\.login))
     }
 
     private var label: String {
