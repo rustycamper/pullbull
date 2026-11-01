@@ -2,8 +2,9 @@ import AppKit
 import PullBullKit
 import SwiftUI
 
-/// Where the Status picker opens: the edited issue's row, or the detail's Status row.
-struct StatusPickerAnchorKey: PreferenceKey {
+/// Where the open edit picker (Status, assignees or labels) opens: the edited issue's row, or the detail's
+/// row for the field.
+struct EditPickerAnchorKey: PreferenceKey {
     static let defaultValue: Anchor<CGRect>? = nil
 
     /// The topmost wins: a detail opened over the list, not the row hidden under it.
@@ -13,36 +14,50 @@ struct StatusPickerAnchorKey: PreferenceKey {
 }
 
 extension View {
-    /// Marks this view as where the Status picker for `key` opens.
-    func statusPickerAnchor(for key: PRKey, model: AppModel) -> some View {
-        anchorPreference(key: StatusPickerAnchorKey.self, value: .bounds) {
-            model.statusPicker?.key == key ? $0 : nil
+    /// Marks this view as where the open picker for `key` opens. `field` is nil for a list row, which
+    /// anchors any picker on its issue, or the detail row's field, which anchors only that field's picker.
+    func editPickerAnchor(for key: PRKey, field: EditField?, model: AppModel) -> some View {
+        anchorPreference(key: EditPickerAnchorKey.self, value: .bounds) {
+            let open: EditField? = model.statusPicker != nil ? .status : model.setPicker?.field
+            return model.editPickerKey == key && (field == nil || field == open) ? $0 : nil
         }
     }
 }
 
-/// The open Status picker laid over the popover, below its anchor (above it when there's no room), and a
+/// The open edit picker laid over the popover, below its anchor (above it when there's no room), and a
 /// catcher behind it that closes it on a click outside.
-struct StatusPickerLayer: View {
+struct EditPickerLayer: View {
     let model: AppModel
     let anchor: Anchor<CGRect>?
     /// The picker's height as last laid out; placed from it so a short list stays by its row.
     @State private var height: CGFloat = 260
 
     var body: some View {
-        if model.statusPicker != nil {
+        if model.editPickerKey != nil {
             GeometryReader { proxy in
                 let frame = StatusPickerPlacement.frame(
                     anchor: anchor.map { proxy[$0] }, height: height, in: proxy.size)
                 ZStack(alignment: .topLeading) {
                     Color.black.opacity(0.001)
                         .contentShape(Rectangle())
-                        .onTapGesture { model.closeStatusPicker() }
-                    StatusPickerView(model: model)
-                        .frame(width: frame.width)
-                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
-                        .frame(maxHeight: proxy.size.height - 8, alignment: .top)
-                        .offset(x: frame.minX, y: frame.minY)
+                        .onTapGesture {
+                            if model.statusPicker != nil {
+                                model.closeStatusPicker()
+                            } else {
+                                model.closeSetPicker(apply: true)
+                            }
+                        }
+                    Group {
+                        if model.statusPicker != nil {
+                            StatusPickerView(model: model)
+                        } else {
+                            SetPickerView(model: model)
+                        }
+                    }
+                    .frame(width: frame.width)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+                    .frame(maxHeight: proxy.size.height - 8, alignment: .top)
+                    .offset(x: frame.minX, y: frame.minY)
                 }
             }
         }
@@ -164,8 +179,8 @@ private struct StatusPickerRowView: View {
     }
 }
 
-/// Why the picker can't set Status here, and the one step that fixes it.
-private struct PermissionNote: View {
+/// Why the picker can't edit here, and the one step that fixes it.
+struct PermissionNote: View {
     let note: String
     let permission: EditPermission
 

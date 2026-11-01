@@ -201,7 +201,7 @@ struct IssueDetailView: View {
             .buttonStyle(.plain)
             .help("Set Status (⌥⌘S)")
             .accessibilityHint("Opens the Status picker")
-            .statusPickerAnchor(for: key, model: model)
+            .editPickerAnchor(for: key, field: .status, model: model)
         } else {
             row
         }

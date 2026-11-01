@@ -161,9 +161,9 @@ struct PopoverView: View {
             EditFailureLine(model: model)
                 .padding(.bottom, Self.isDetail(model.route) ? 45 : 34)
         }
-        // The Status picker opens at its row, or the detail's Status row, over every layer.
-        .overlayPreferenceValue(StatusPickerAnchorKey.self) { anchor in
-            StatusPickerLayer(model: model, anchor: anchor)
+        // The edit picker opens at its row, or the detail's field row, over every layer.
+        .overlayPreferenceValue(EditPickerAnchorKey.self) { anchor in
+            EditPickerLayer(model: model, anchor: anchor)
         }
         // Sliding layers stay inside the rounded panel.
         .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius))
@@ -193,7 +193,7 @@ struct PopoverView: View {
             guard presence.isShown, new != nil else { return }
             AccessibilityNotification.Announcement("Showing \(model.boardMenuTitle)").post()
         }
-        .onChange(of: model.statusPicker == nil) { _, closed in
+        .onChange(of: model.editPickerKey == nil) { _, closed in
             // The picker had the focus; a search keeps its caret in the field.
             if closed, searching { DispatchQueue.main.async { fieldFocused = true } }
         }
@@ -217,7 +217,7 @@ struct PopoverView: View {
         .onChange(of: listExpansion, initial: true) { _, new in model.listExpansion = new }
         .onChange(of: fieldFocused) { _, focused in
             // The picker opened from the list keeps the focus; the search field doesn't open under it.
-            if focused, model.statusPicker != nil, !searching {
+            if focused, model.editPickerKey != nil, !searching {
                 fieldFocused = false
                 return
             }
@@ -415,6 +415,7 @@ struct PopoverView: View {
         // Searches nothing on the way out, so a lone pending token keeps no search route and is dropped below.
         model.closeCompletion()
         model.closeStatusPicker()
+        model.closeSetPicker(apply: true)
         // A time focus is transient: it ends with the popover, so the next open starts from a fresh "now".
         model.focus(time: nil)
         pendingCaret = nil
@@ -541,6 +542,7 @@ struct PopoverView: View {
             return true
         }
         if model.statusPicker != nil { return handleStatusPickerKey(event, flags: flags) }
+        if model.setPicker != nil { return handleSetPickerKey(event, flags: flags) }
         if Self.isDetail(model.route) { return handleDetailKey(event, flags: flags, in: window) }
         if model.route == .ask { return handleAskKey(event, flags: flags) }
         // The list's own keys work while no search is open and no text field has focus.
@@ -549,9 +551,15 @@ struct PopoverView: View {
         // ⌘-chords are commands and never reach type-anywhere.
         if flags.contains(.command) {
             // ⌥⌘S: the Status picker on the selected issue result or the highlighted issue row.
-            if Self.isOptionCommandS(event, flags: flags) {
+            if Self.isOptionCommand(event, flags: flags, letter: "s") {
                 guard let key = model.selectedIssueKey(in: listKeys), model.isStatusOffered(for: key) else { return false }
                 model.openStatusPicker(for: key)
+                return true
+            }
+            // ⌥⌘A / ⌥⌘L: the assignee or label picker on the same issue.
+            if Self.isOptionCommand(event, flags: flags, letter: "a") || Self.isOptionCommand(event, flags: flags, letter: "l") {
+                guard let key = model.selectedIssueKey(in: listKeys), model.isSetEditOffered(for: key) else { return false }
+                model.openSetPicker(Self.commandKey(event) == "a" ? .assignees : .labels, for: key)
                 return true
             }
             // ⌘Z: takes back the last edit while it can be; typing since hands ⌘Z back to the field.
@@ -861,9 +869,14 @@ struct PopoverView: View {
             return true
         }
         if Self.isOptionCommandC(event, flags: flags) { return model.copyShownDetailMarkdownLink() }
-        if Self.isOptionCommandS(event, flags: flags) {
+        if Self.isOptionCommand(event, flags: flags, letter: "s") {
             guard case .issueDetail(let key) = model.route, model.isStatusOffered(for: key) else { return false }
             model.openStatusPicker(for: key)
+            return true
+        }
+        if Self.isOptionCommand(event, flags: flags, letter: "a") || Self.isOptionCommand(event, flags: flags, letter: "l") {
+            guard case .issueDetail(let key) = model.route, model.isSetEditOffered(for: key) else { return false }
+            model.openSetPicker(Self.commandKey(event) == "a" ? .assignees : .labels, for: key)
             return true
         }
         if Self.isCommandZ(event, flags: flags) { return model.undoLastEdit() }
@@ -977,10 +990,13 @@ struct PopoverView: View {
     }
 
     /// The open Status picker: ↑/↓ choose, ↩ applies, Esc and ⌥⌘S close it; every other key reaches its
-    /// filter field.
+    /// filter field. ⌥⌘A and ⌥⌘L are swallowed: another picker doesn't open over this one.
     private func handleStatusPickerKey(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
-        if Self.isOptionCommandS(event, flags: flags) {
+        if Self.isOptionCommand(event, flags: flags, letter: "s") {
             model.closeStatusPicker()
+            return true
+        }
+        if Self.isOptionCommand(event, flags: flags, letter: "a") || Self.isOptionCommand(event, flags: flags, letter: "l") {
             return true
         }
         let plain = flags.subtracting([.capsLock, .numericPad, .function]).isEmpty
@@ -1000,9 +1016,42 @@ struct PopoverView: View {
         }
     }
 
-    /// ⌥⌘S exactly: no ⇧ or ⌃.
-    private static func isOptionCommandS(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
-        flags.subtracting([.capsLock, .numericPad, .function]) == [.command, .option] && commandKey(event) == "s"
+    /// The open assignee or label picker: ↑/↓ move, ↩ ticks or unticks, ⌘↩, Esc and its own ⌥⌘ key apply
+    /// and close it; every other key reaches its filter field. The other pickers' keys are swallowed.
+    private func handleSetPickerKey(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
+        if Self.isOptionCommand(event, flags: flags, letter: "s") { return true }
+        if Self.isOptionCommand(event, flags: flags, letter: "a") || Self.isOptionCommand(event, flags: flags, letter: "l") {
+            let own = model.setPicker?.field == .assignees ? "a" : "l"
+            if Self.commandKey(event) == own { model.closeSetPicker(apply: true) }
+            return true
+        }
+        let modifiers = flags.subtracting([.capsLock, .numericPad, .function])
+        let isReturn = event.keyCode == SearchKeyMonitor.return || event.keyCode == SearchKeyMonitor.enter
+        switch event.keyCode {
+        case SearchKeyMonitor.upArrow, SearchKeyMonitor.downArrow:
+            guard modifiers.isEmpty else { return false }
+            model.moveSetPicker(by: event.keyCode == SearchKeyMonitor.downArrow ? 1 : -1)
+            return true
+        case _ where isReturn:
+            if modifiers == .command {
+                model.closeSetPicker(apply: true)
+            } else if modifiers.isEmpty {
+                model.toggleSetPicker()
+            } else {
+                return false
+            }
+            return true
+        case SearchKeyMonitor.escape:
+            model.closeSetPicker(apply: true)
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// ⌥⌘ and the letter exactly: no ⇧ or ⌃.
+    private static func isOptionCommand(_ event: NSEvent, flags: NSEvent.ModifierFlags, letter: String) -> Bool {
+        flags.subtracting([.capsLock, .numericPad, .function]) == [.command, .option] && commandKey(event) == letter
     }
 
     /// ⌘Z exactly.
@@ -1029,6 +1078,8 @@ struct PopoverView: View {
         case SearchKeyMonitor.letterB: return "b"
         case SearchKeyMonitor.letterS: return "s"
         case SearchKeyMonitor.letterZ: return "z"
+        case SearchKeyMonitor.letterA: return "a"
+        case SearchKeyMonitor.letterL: return "l"
         default: return typed
         }
     }

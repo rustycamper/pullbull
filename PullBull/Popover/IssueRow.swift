@@ -41,7 +41,7 @@ struct IssueRow: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .accessibilityAddTraits(selected ? [.isSelected] : [])
-        .statusPickerAnchor(for: issue.key, model: model)
+        .editPickerAnchor(for: issue.key, field: nil, model: model)
         .issueContextMenu(
             issue, focus: FocusMenuItem(model: model, repo: issue.key.repo),
             time: search == nil ? TimeFocusMenu(model: model) : nil,
