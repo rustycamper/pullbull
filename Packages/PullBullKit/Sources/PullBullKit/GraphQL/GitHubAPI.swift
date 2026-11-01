@@ -2,6 +2,15 @@ import Foundation
 
 public protocol GraphQLTransport: Sendable {
     func send(_ body: Data, token: String) async throws -> (Data, HTTPURLResponse)
+    /// A REST request to `https://api.github.com` + `path` with a JSON body.
+    func send(_ method: String, path: String, body: Data, token: String) async throws -> (Data, HTTPURLResponse)
+}
+
+extension GraphQLTransport {
+    /// Transports that never send REST (most test doubles) refuse it.
+    public func send(_ method: String, path: String, body: Data, token: String) async throws -> (Data, HTTPURLResponse) {
+        throw APIError.server(501)
+    }
 }
 
 public enum APIError: Error, Equatable {
@@ -335,6 +344,25 @@ public struct URLSessionTransport: GraphQLTransport {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
         return (data, http)
+    }
+
+    public func send(_ method: String, path: String, body: Data, token: String) async throws -> (Data, HTTPURLResponse) {
+        let request = Self.restRequest(method, path: path, body: body, token: token)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+        return (data, http)
+    }
+
+    static func restRequest(_ method: String, path: String, body: Data, token: String) -> URLRequest {
+        var request = URLRequest(url: URL(string: "https://api.github.com\(path)")!)
+        request.httpMethod = method
+        request.timeoutInterval = 20
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        return request
     }
 }
 
@@ -819,6 +847,59 @@ public struct GitHubAPI: Sendable {
             Mutations.assignees(adding: !adding.isEmpty, removing: !removing.isEmpty), subject, adding, removing)
     }
 
+    /// Requests reviews from `adding` and removes the requests of `removing` on PR `key`, over REST, which
+    /// takes logins and team slugs and changes only what it names. The add goes first. Once one half has
+    /// applied, the other's failure is a partial result; a failure with nothing applied throws.
+    public func changeReviewers(of key: PRKey, adding: [Reviewer], removing: [Reviewer]) async throws -> SetChangeResult {
+        let path = "/repos/\(key.repo)/pulls/\(key.number)/requested_reviewers"
+        var addError: APIError?
+        if !adding.isEmpty {
+            do {
+                try await rest("POST", path, Self.reviewersBody(adding, alwaysPeople: false))
+            } catch let error as APIError {
+                guard case .writeRefused = error, !removing.isEmpty else { throw error }
+                addError = error
+            }
+        }
+        guard !removing.isEmpty else { return SetChangeResult(addApplied: true, removeApplied: true, refusal: nil) }
+        do {
+            // GitHub requires `reviewers` on a removal, even when only teams go.
+            try await rest("DELETE", path, Self.reviewersBody(removing, alwaysPeople: true))
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            if let addError { throw addError }
+            guard !adding.isEmpty else { throw error }
+            return SetChangeResult(addApplied: true, removeApplied: false, refusal: Self.reason(error))
+        }
+        if let addError {
+            return SetChangeResult(addApplied: false, removeApplied: true, refusal: Self.reason(addError))
+        }
+        return SetChangeResult(addApplied: true, removeApplied: true, refusal: nil)
+    }
+
+    /// `reviewers` (logins) and `team_reviewers` (slugs), each only when it has any, unless `alwaysPeople`.
+    private static func reviewersBody(_ reviewers: [Reviewer], alwaysPeople: Bool) -> [String: Any] {
+        var body: [String: Any] = [:]
+        let people = reviewers.compactMap { reviewer -> String? in
+            if case .user(let login) = reviewer { return login }
+            return nil
+        }
+        let teams = reviewers.compactMap { reviewer -> String? in
+            if case .team(let slug, _) = reviewer { return slug }
+            return nil
+        }
+        if alwaysPeople || !people.isEmpty { body["reviewers"] = people }
+        if !teams.isEmpty { body["team_reviewers"] = teams }
+        return body
+    }
+
+    /// The words of a refused write; the refresh wording for anything else.
+    private static func reason(_ error: any Error) -> String {
+        if case APIError.writeRefused(let message) = error { return message }
+        return RefreshError(error).message
+    }
+
     /// The issue's (`content`, its node ID) item on the board `project`, archived or not; nil when it
     /// isn't on that board.
     public func projectItem(of content: String, in project: String) async throws -> String? {
@@ -964,6 +1045,31 @@ public struct GitHubAPI: Sendable {
         errors.contains { $0["type"] as? String == "FORBIDDEN" }
     }
 
+    /// The error a non-2xx status means; nil for 2xx. `refusing`: a REST write, where a 403 that isn't a
+    /// rate limit, a 404 or a 422 is the write refused, in the body's `message`.
+    private func httpError(_ data: Data, _ response: HTTPURLResponse, refusing: Bool = false) -> APIError? {
+        if let sso = APIError.ssoRequired(in: response) { return sso }
+        let status = response.statusCode
+        if (200..<300).contains(status) { return nil }
+        if status == 401 { return .unauthorized }
+        if let limited = APIError.rateLimited(in: response, body: data, now: now()) { return limited }
+        if refusing, [403, 404, 422].contains(status) {
+            let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            return .writeRefused(body?["message"] as? String ?? "GitHub didn't apply the change")
+        }
+        return status == 403 ? .forbidden : .server(status)
+    }
+
+    /// Sends one REST write with a JSON body; throws unless the answer is 2xx.
+    private func rest(_ method: String, _ path: String, _ body: [String: Any]) async throws {
+        try Task.checkCancellation()
+        let data = try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
+        let (answer, response) = try await sendAuthorized(with: auth) { token in
+            try await transport.send(method, path: path, body: data, token: token)
+        }
+        if let error = httpError(answer, response, refusing: true) { throw error }
+    }
+
     /// `execute`, also returning the errors that came alongside partial data, for callers that tell a
     /// null field GitHub wouldn't show from one that isn't there.
     private func executeReportingErrors(
@@ -977,20 +1083,7 @@ public struct GitHubAPI: Sendable {
             try await transport.send(body, token: token)
         }
 
-        if let sso = APIError.ssoRequired(in: response) { throw sso }
-        switch response.statusCode {
-        case 401:
-            throw APIError.unauthorized
-        case 403, 429:
-            if let limited = APIError.rateLimited(in: response, body: data, now: now()) { throw limited }
-            throw response.statusCode == 403 ? APIError.forbidden : APIError.server(response.statusCode)
-        case 500...:
-            throw APIError.server(response.statusCode)
-        case 200..<300:
-            break
-        default:
-            throw APIError.server(response.statusCode)
-        }
+        if let error = httpError(data, response) { throw error }
 
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw APIError.graphQL("malformed response")
