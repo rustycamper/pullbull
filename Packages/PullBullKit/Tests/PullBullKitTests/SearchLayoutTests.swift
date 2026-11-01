@@ -94,10 +94,10 @@ private func key(_ n: Int, _ repo: String = "o/a") -> PRKey { PRKey(repo: repo, 
         #expect(SearchLayout.chipTab(for: pr(1, author: "alice"), on: .review, viewer: "me") == .review)
         #expect(SearchLayout.chipTab(for: pr(1, author: "alice"), on: .team, viewer: "me") == .team)
         let approved = pr(1, author: "alice", reviews: [Review(author: "bob", state: .approved, submittedAt: hoursAgo(5))])
-        let chips = RowChips(row: Row(pr: approved, dimmed: false, counted: true), tab: .team)
+        let chips = RowChips(row: Row(pr: approved, dimmed: false, counted: true), tab: .team, me: "me", myTeams: [], now: .now)
         #expect(chips.action != .readyToMerge)
         let mine = pr(1, author: "me", reviews: [Review(author: "bob", state: .approved, submittedAt: hoursAgo(5))])
-        let mineChips = RowChips(row: Row(pr: mine, dimmed: false, counted: true), tab: .mine)
+        let mineChips = RowChips(row: Row(pr: mine, dimmed: false, counted: true), tab: .mine, me: "me", myTeams: [], now: .now)
         #expect(mineChips.action == .readyToMerge)
     }
 

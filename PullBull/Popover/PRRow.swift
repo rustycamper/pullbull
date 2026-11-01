@@ -145,7 +145,11 @@ struct PRRow: View {
     }
 
     /// Review state in two tiers: a capsule only when the PR needs acting on, glyph-and-text otherwise.
-    private var chips: RowChips { RowChips(row: row, tab: chipTab) }
+    private var chips: RowChips {
+        RowChips(
+            row: row, tab: chipTab, me: model.snapshot?.org.viewer ?? model.settings.account ?? "",
+            myTeams: model.snapshot?.org.myTeams ?? [], now: now)
+    }
 
     /// `repo #num`, or `#num` under a repo header or the focus. A search result outside the focus (a link)
     /// names its repo.
@@ -247,7 +251,8 @@ struct PRRow: View {
             let chips = chips
             CompactChipGlyphs(
                 chips: chips,
-                reason: layoutTab == .review && !row.dimmed ? chips.info.first(where: { $0 != .conflicts }) : nil)
+                reason: layoutTab == .review && !row.dimmed
+                    ? chips.info.first(where: { $0 != .conflicts && !$0.isReviewWait }) : nil)
         } trailing: {
             CIGlyph(state: pr.ci)
         }
@@ -393,17 +398,29 @@ struct CommentCount: View {
 }
 
 /// A `RowChips.Info` that follows the age after a `·`: glyph and text, the glyph amber for a warning.
+/// A review wait's name shortens before its age, which never truncates.
 struct MetaInfo: View {
     let info: RowChips.Info
 
     var body: some View {
-        Label { Text(info.text) } icon: {
+        Label { title } icon: {
             Image(systemName: info.symbol)
                 .foregroundStyle(info.isWarning ? AnyShapeStyle(Palette.amberGlyph) : AnyShapeStyle(.secondary))
         }
             .labelStyle(TightLabelStyle(spacing: 3))
             .help(info.label)
             .accessibilityLabel(info.label)
+    }
+
+    @ViewBuilder private var title: some View {
+        if case .reviewWait(let wait) = info {
+            HStack(spacing: 3) {
+                if let who = wait.who { Text(who).lineLimit(1).truncationMode(.tail) }
+                if let age = wait.age { Text(age).fixedSize() }
+            }
+        } else {
+            Text(info.text)
+        }
     }
 }
 
