@@ -56,12 +56,14 @@ public struct SearchIssueLayout: Sendable {
 /// Search results in the reference tab's layout (`SearchScope.reference`).
 public enum SearchLayout {
     /// The pull request results as `tab`, grouped by `grouping` (`PRGrouping.forTab`), shows them: its
-    /// row rule for each open result and its sort, Review's "Oldest review request first" included.
+    /// row rule for each open result and its sort (`settings.sort(for: tab)`). Closed results stay newest-closed first.
     public static func pullRequests(
-        _ results: SearchResults, on tab: PRTab, grouping: PRGrouping, settings: AppSettings, org: OrgContext
+        _ results: SearchResults, on tab: PRTab, grouping: PRGrouping, settings: AppSettings, org: OrgContext,
+        now: Date
     ) -> SearchPRLayout {
         let rows = results.openPRs.map { TabBuilder.row(for: $0, on: tab, me: org.viewer, myTeams: org.myTeams) }
-        let contents = TabBuilder.contents(rows, oldestFirst: tab == .review && settings.reviewOldestFirst)
+        let contents = TabBuilder.contents(
+            rows, sort: settings.sort(for: tab), on: tab, me: org.viewer, myTeams: org.myTeams, now: now)
         let ended = results.closedPRs.sorted { a, b in
             let ca = a.closedAt ?? .distantPast, cb = b.closedAt ?? .distantPast
             if ca != cb { return ca > cb }

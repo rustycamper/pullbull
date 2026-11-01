@@ -105,17 +105,30 @@ import Testing
         #expect(Self.wait(Self.pr(state: .closed)) == nil)
     }
 
+    /// What a list's Waiting longest sort orders by: the start of the wait the row shows, nil when it shows no age.
+    @Test func sinceIsWhenTheShownWaitStarted() {
+        let dana = Reviewer.user("dana"), lee = Reviewer.user("lee")
+        #expect(Self.wait(Self.pr([(dana, Self.now - 3 * Self.day), (lee, Self.now - 1 * Self.day)]))?.since
+            == Self.now - 3 * Self.day)
+        #expect(Self.wait(Self.pr(ready: Self.now - 5 * Self.day))?.since == Self.now - 5 * Self.day)
+        #expect(Self.wait(Self.pr([(dana, nil)]))?.since == nil)
+        let mineAndOlder = Self.pr([(.user("me"), Self.now - 2 * Self.day), (lee, Self.now - 9 * Self.day / 2)])
+        #expect(Self.wait(mineAndOlder, review: true)?.since == Self.now - 2 * Self.day)
+    }
+
     // MARK: Review layout
 
     @Test func reviewLayoutShortForm() {
         let w = Self.wait(Self.pr([(.user("Me"), Self.t0 + 3 * Self.day)]), review: true)
-        #expect(w == ReviewWait(who: nil, age: "2d", label: "Requested from you 2 days ago"))
+        #expect(w == ReviewWait(
+            who: nil, age: "2d", label: "Requested from you 2 days ago", since: Self.t0 + 3 * Self.day))
         #expect(w?.text == "2d")
     }
 
     @Test func reviewLayoutTeamRequest() {
         let w = Self.wait(Self.pr([(Self.ios, Self.t0 + 3 * Self.day)]), myTeams: ["ios"], review: true)
-        #expect(w == ReviewWait(who: nil, age: "2d", label: "Requested from @org/ios 2 days ago"))
+        #expect(w == ReviewWait(
+            who: nil, age: "2d", label: "Requested from @org/ios 2 days ago", since: Self.t0 + 3 * Self.day))
     }
 
     @Test func reviewLayoutOwnRequestBeatsOlderTeam() {

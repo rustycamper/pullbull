@@ -9,6 +9,9 @@ public struct ReviewWait: Equatable, Sendable {
     public let age: String?
     /// Hover and VoiceOver wording.
     public let label: String
+    /// When the wait the row shows started; nil exactly when `age` is. A list's Waiting longest sort orders
+    /// by it, so the order and the row can't disagree.
+    public var since: Date? = nil
 
     /// `who` and `age` joined by a space.
     public var text: String { [who, age].compactMap { $0 }.joined(separator: " ") }
@@ -35,7 +38,8 @@ public struct ReviewWait: Equatable, Sendable {
                 let from = own != nil ? "you" : name(oldest.reviewer)
                 return ReviewWait(
                     who: nil, age: RelativeAge.short(from: oldest.at, to: now),
-                    label: "Requested from \(from) \(RelativeAge.spoken(from: oldest.at, to: now)) ago")
+                    label: "Requested from \(from) \(RelativeAge.spoken(from: oldest.at, to: now)) ago",
+                    since: oldest.at)
             }
         }
 
@@ -50,7 +54,7 @@ public struct ReviewWait: Equatable, Sendable {
                 .map { "\(name($0.element.0)) \(RelativeAge.spoken(from: $0.element.1, to: now))" }
             return ReviewWait(
                 who: name(oldest.reviewer) + more, age: RelativeAge.short(from: oldest.at, to: now),
-                label: "Waiting on review: " + byAge.joined(separator: ", "))
+                label: "Waiting on review: " + byAge.joined(separator: ", "), since: oldest.at)
         }
 
         // A bot's review (Copilot, a review app) lands on nearly every PR; it isn't someone reviewing.
@@ -59,7 +63,13 @@ public struct ReviewWait: Equatable, Sendable {
         let since = pr.readyForReviewAt ?? pr.createdAt
         return ReviewWait(
             who: "No reviewer", age: RelativeAge.short(from: since, to: now),
-            label: "No reviewer requested, ready for \(RelativeAge.spoken(from: since, to: now))")
+            label: "No reviewer requested, ready for \(RelativeAge.spoken(from: since, to: now))", since: since)
+    }
+
+    /// The wait `row` shows on `tab`: Review's short form for a row with a reason there (it waits on the
+    /// viewer), the full form otherwise. The row's chips and the Waiting longest sort both read it.
+    public static func make(for row: Row, on tab: PRTab, me: String, myTeams: Set<String>, now: Date) -> ReviewWait? {
+        make(for: row.pr, me: me, myTeams: myTeams, reviewLayout: tab == .review && row.reviewReason != nil, now: now)
     }
 
     /// `@org/slug` for a team, or the bare slug when the repo has no owner.

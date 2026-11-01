@@ -3,8 +3,8 @@ import Foundation
 /// Keyboard selection in the popover's lists: the rows ↑/↓ visit, in display order, and where a move
 /// lands. Group headers are never rows; a folded group's rows are not visited.
 public enum ListNavigation {
-    /// PR rows grouped by repository, the groups in the order of their most recently updated PR (rows
-    /// arrive sorted).
+    /// PR rows grouped by repository, the groups in the order of their first row (rows arrive in the tab's
+    /// sort).
     public static func repoGroups(_ rows: [Row]) -> [(repo: String, rows: [Row])] {
         var order: [String] = []
         var byRepo: [String: [Row]] = [:]

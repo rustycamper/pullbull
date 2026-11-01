@@ -32,6 +32,11 @@ struct IssueListView: View {
                 guard let key else { return }
                 proxy.scrollTo(key)
             }
+            // A new sort keeps the selected row selected and in view.
+            .onChange(of: model.settings.sorts) { _, _ in
+                guard let key = model.listSelection else { return }
+                proxy.scrollTo(key)
+            }
             // An edit moved the selected row to another lane.
             .onChange(of: model.editScrollRequest) { _, _ in
                 guard let key = model.listSelection else { return }

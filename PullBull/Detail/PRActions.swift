@@ -263,7 +263,7 @@ struct SetEditMenu: View {
 }
 
 /// "Show Only Updated" on a list's context menus: the four steps with a checkmark on the active one,
-/// and Show All while a time focus is on. Search rows don't offer it.
+/// and Show All while a time focus is on; then "Sort By" (`SortByMenu`). Search rows offer neither.
 struct TimeFocusMenu: View {
     let model: AppModel
 
@@ -279,6 +279,7 @@ struct TimeFocusMenu: View {
                 Button("Show All") { model.focus(time: nil) }
             }
         }
+        SortByMenu(model: model)
     }
 }
 

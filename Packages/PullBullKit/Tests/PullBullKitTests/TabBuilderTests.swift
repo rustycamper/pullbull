@@ -7,14 +7,19 @@ private func ago(_ days: Double) -> Date { now.addingTimeInterval(-days * 86_400
 
 private func pr(
     _ n: Int, author: String = "alice", draft: Bool = false, created: Double = 5, updated: Double = 1,
-    closed: Double? = nil, reviews: [Review] = [], requests: [Reviewer] = [.user("me")], state: PRState = .open
+    closed: Double? = nil, reviews: [Review] = [], requests: [Reviewer] = [.user("me")], state: PRState = .open,
+    waits: [Double?] = [], ready: Double? = nil
 ) -> PullRequest {
-    PullRequest(
+    // `waits[i]`: days since `requests[i]` was made; nil or missing is an unknown time.
+    var times: [String: Date] = [:]
+    for (reviewer, days) in zip(requests, waits) { times[reviewer.key] = days.map(ago) }
+    return PullRequest(
         key: PRKey(repo: "r", number: n), title: "t\(n)", url: URL(string: "https://x/\(n)")!,
         author: author, authorAvatarURL: nil, state: state, isDraft: draft,
         createdAt: ago(created), updatedAt: ago(updated), closedAt: closed.map(ago),
         headRef: "h", baseRef: "main", ci: .none, headCommitDate: nil, commentCount: 0,
-        lastCommentAuthor: nil, latestReviews: reviews, reviewRequests: requests)
+        lastCommentAuthor: nil, latestReviews: reviews, reviewRequests: requests,
+        reviewRequestTimes: times, readyForReviewAt: ready.map(ago))
 }
 
 private func approvedByMe(_ n: Int) -> PullRequest {
@@ -183,17 +188,81 @@ private func snap(
         #expect(TabBuilder.build(snap(review: [draftApproved]), settings: noDrafts, now: now).hiddenApprovedCount == 0)
     }
 
-    @Test func reviewOldestFirstSortsByCreatedAscending() {
+    @Test func oldestFirstOnEveryPRTab() {
         var s = AppSettings()
-        s.reviewOldestFirst = true
+        for tab in PRTab.allCases { s.setSort(.oldestFirst, for: tab) }
         let prs = [
             pr(1, created: 2, updated: 1), pr(2, created: 9, updated: 5), pr(3, created: 9, updated: 3),
             pr(4, created: 4, updated: 2),
         ]
         let built = TabBuilder.build(snap(review: prs, mine: prs.map { pr($0.key.number, author: "me", created: Double($0.key.number)) }, team: prs), settings: s, now: now)
         #expect(built.review.rows.map(\.id.number) == [2, 3, 4, 1])
-        #expect(built.mine.rows.map(\.id.number) == [1, 2, 3, 4])
-        #expect(built.team.rows.map(\.id.number) == [1, 4, 3, 2])
+        #expect(built.mine.rows.map(\.id.number) == [4, 3, 2, 1])
+        #expect(built.team.rows.map(\.id.number) == [2, 3, 4, 1])
+    }
+
+    @Test func waitingLongestOrdersByWaitStart() {
+        var s = AppSettings()
+        s.setSort(.waitingLongest, for: PRTab.team)
+        let dana = Reviewer.user("dana")
+        let team = [
+            pr(1, updated: 2, requests: [dana], waits: [1]), pr(2, updated: 9, requests: [dana], waits: [6]),
+            pr(3, updated: 3, requests: [dana], waits: [3]), pr(4, draft: true, updated: 0.1, requests: [dana], waits: [8]),
+        ]
+        let built = TabBuilder.build(snap(team: team), settings: s, now: now)
+        #expect(built.team.rows.map(\.id.number) == [2, 3, 1, 4])
+    }
+
+    /// A wait whose start isn't known for every reviewer shows no age, so it never sorts ahead of a known one.
+    @Test func waitingLongestPutsUnknownStartLast() {
+        var s = AppSettings()
+        s.setSort(.waitingLongest, for: PRTab.team)
+        let dana = Reviewer.user("dana"), lee = Reviewer.user("lee")
+        let team = [
+            pr(1, updated: 1.0 / 24, requests: [dana, lee], waits: [10, nil]),
+            pr(2, updated: 9, requests: [dana], waits: [2]),
+            pr(3, updated: 5, reviews: [Review(author: "bob", state: .approved, submittedAt: ago(6))], requests: []),
+        ]
+        let built = TabBuilder.build(snap(team: team), settings: s, now: now)
+        #expect(built.team.rows.map(\.id.number) == [2, 1, 3])
+    }
+
+    /// On Review the short form (my own request) orders a row waiting on me; a dimmed row uses the full form.
+    @Test func waitingLongestUsesTheFormTheRowShows() {
+        var s = AppSettings()
+        s.hideApprovedByMe = false
+        s.setSort(.waitingLongest, for: PRTab.review)
+        let lee = Reviewer.user("lee"), dana = Reviewer.user("dana")
+        let review = [
+            pr(1, updated: 1.0 / 24, requests: [.user("me"), lee], waits: [1, 9]),
+            pr(2, updated: 8, reviews: [Review(author: "me", state: .approved, submittedAt: ago(5))],
+               requests: [dana], waits: [4]),
+        ]
+        let built = TabBuilder.build(snap(review: review), settings: s, now: now)
+        #expect(built.review.rows.map(\.id.number) == [2, 1])
+    }
+
+    /// Waits that started at the same moment break the tie by repo and number, as every sort does.
+    @Test func equalWaitsBreakTiesByNumber() {
+        var s = AppSettings()
+        s.setSort(.waitingLongest, for: PRTab.team)
+        let dana = Reviewer.user("dana")
+        let team = [
+            pr(2, updated: 0.5, requests: [dana], waits: [3]), pr(1, updated: 2, requests: [dana], waits: [3]),
+        ]
+        let built = TabBuilder.build(snap(team: team), settings: s, now: now)
+        #expect(built.team.rows.map(\.id.number) == [1, 2])
+    }
+
+    @Test func recentlyClosedIgnoresTheSort() {
+        var s = AppSettings()
+        s.setSort(.oldestFirst, for: PRTab.mine)
+        let closed = [
+            pr(5, author: "me", created: 9, closed: 3, state: .merged),
+            pr(6, author: "me", created: 1, closed: 1, state: .merged),
+        ]
+        let built = TabBuilder.build(snap(closed: closed), settings: s, now: now)
+        #expect(built.recentlyClosed.map(\.key.number) == [6, 5])
     }
 
     @Test func reviewKeepsRecentActivityFirstByDefault() {

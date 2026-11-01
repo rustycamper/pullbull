@@ -62,6 +62,7 @@ Keyboard-first · Native SwiftUI · Edits only what you pick
 - **Labels:** chips with the label's colour dot on each row (not in compact cards), all of them in the detail
 - **One repo:** right-click a repo header or row → **Show Only *repo***, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd>
 - **Recent activity:** right-click a row, a repo header or the list → **Show Only Updated**: today, 3 days, a week or a month
+- **Sort:** each tab by recently updated · waiting longest for review (PRs) · newest first (issues) · oldest first: ⇅ above the list
 - **Right-click a row:** Status (issues) · Reviewers… (PRs) · Assignees… · Labels… · copy branch (PRs), link or Markdown link · checkout command · open on GitHub · failing check · search the author
 - **Switch board:** <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> on the Board tab
 - **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Each account keeps its org and board

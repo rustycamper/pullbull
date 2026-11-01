@@ -131,8 +131,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var grouping: Grouping = .repository
     /// Team lists its pull requests under their authors, whatever `grouping` is and also under a repo focus.
     public var groupTeamByAuthor = false
-    /// Review lists the oldest pull requests first (by when each was opened) instead of the latest activity.
-    public var reviewOldestFirst = false
+    /// Each list tab's sort (`ListSort`), by the tab's raw value; read through `sort(for:)`. A tab with none
+    /// is Recently updated.
+    public var sorts: [String: ListSort] = [:]
     public var compact = false
     public var hideOlderThanTwoMonths = true
     public var hideApprovedByMe = true
@@ -175,7 +176,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var askExcludedRepos: [String] = []
 
     private enum CodingKeys: String, CodingKey {
-        case account, org, projectNumber, projectOwner, projectOrg, orgByAccount, boardByOwner, grouping, groupTeamByAuthor, reviewOldestFirst, compact,
+        case account, org, projectNumber, projectOwner, projectOrg, orgByAccount, boardByOwner, grouping, groupTeamByAuthor, sorts, reviewOldestFirst, compact,
             hideOlderThanTwoMonths, hideApprovedByMe, hideDrafts, badge, notify, refreshMinutes, followPendingCI, lastTab, toggleHotkey, mode, lastIssueTab,
             countAssignedIssues, solidBackground, accountSource, appAccounts, signedOutByUser, laneFolds,
             askEnabled, askModel, askModelChoices, askExcludedRepos
@@ -207,7 +208,13 @@ public struct AppSettings: Codable, Equatable, Sendable {
         d.boardByOwner = c.readableValues(Int.self, forKey: .boardByOwner) ?? d.boardByOwner
         d.grouping = c.readable(Grouping.self, forKey: .grouping) ?? d.grouping
         d.groupTeamByAuthor = c.readable(Bool.self, forKey: .groupTeamByAuthor) ?? d.groupTeamByAuthor
-        d.reviewOldestFirst = c.readable(Bool.self, forKey: .reviewOldestFirst) ?? d.reviewOldestFirst
+        // Before per-tab sorts, Review's "Oldest review request first" was a toggle; it counts only until a
+        // sort is saved, and is never written again.
+        if c.contains(.sorts) {
+            d.sorts = c.readableValues(ListSort.self, forKey: .sorts) ?? d.sorts
+        } else if c.readable(Bool.self, forKey: .reviewOldestFirst) == true {
+            d.sorts[PRTab.review.rawValue] = .oldestFirst
+        }
         d.compact = c.readable(Bool.self, forKey: .compact) ?? d.compact
         d.hideOlderThanTwoMonths =
             c.readable(Bool.self, forKey: .hideOlderThanTwoMonths) ?? d.hideOlderThanTwoMonths
@@ -252,7 +259,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         try c.encode(boardByOwner, forKey: .boardByOwner)
         try c.encode(grouping, forKey: .grouping)
         try c.encode(groupTeamByAuthor, forKey: .groupTeamByAuthor)
-        try c.encode(reviewOldestFirst, forKey: .reviewOldestFirst)
+        try c.encode(sorts, forKey: .sorts)
         try c.encode(compact, forKey: .compact)
         try c.encode(hideOlderThanTwoMonths, forKey: .hideOlderThanTwoMonths)
         try c.encode(hideApprovedByMe, forKey: .hideApprovedByMe)

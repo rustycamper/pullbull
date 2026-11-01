@@ -186,17 +186,21 @@ public enum IssueTabBuilder {
 
         let assignedIssues = unique(snap.assignedIssues ?? []).filter(\.isOpen)
         let assigned = groups(
-            of: assignedIssues, on: .assigned, onBoard: onBoard, options: options, grouping: settings.grouping)
+            of: assignedIssues, on: .assigned, onBoard: onBoard, options: options, grouping: settings.grouping,
+            sort: settings.sort(for: .assigned))
 
         let createdIssues = unique(snap.createdIssues ?? []).filter(\.isOpen)
         let created = groups(
-            of: createdIssues, on: .created, onBoard: onBoard, options: options, grouping: settings.grouping)
+            of: createdIssues, on: .created, onBoard: onBoard, options: options, grouping: settings.grouping,
+            sort: settings.sort(for: .created))
 
         var board: IssueTabContents?
         if boardAvailable {
             // Every board item is its own board copy, so it takes the lane of its own Status.
             let active = boardItems.filter { !isDone($0) }
-            let open = groups(of: active, on: .board, onBoard: onBoard, options: options, grouping: settings.grouping)
+            let open = groups(
+                of: active, on: .board, onBoard: onBoard, options: options, grouping: settings.grouping,
+                sort: settings.sort(for: .board))
             let cutoff = now.addingTimeInterval(-doneWindow)
             let done = boardItems
                 .filter { isDone($0) && (doneDate($0) ?? .distantPast) >= cutoff }
@@ -205,7 +209,7 @@ public enum IssueTabBuilder {
                     if da != db { return da > db }
                     return tieBreak(a, b)
                 }
-            board = IssueTabContents(groups: open + group(.done, done, counted: false, sort: false))
+            board = IssueTabContents(groups: open + group(.done, done, counted: false, sort: .recentlyUpdated, presorted: true))
         }
 
         return BuiltIssueTabs(
@@ -226,27 +230,29 @@ public enum IssueTabBuilder {
         let options = snap.boardStatus == .available ? snap.boardStatusOptions ?? [] : []
         return groups(
             of: unique(issues), on: tab, onBoard: byKey(unique(snap.boardIssues)), options: options,
-            grouping: settings.grouping)
+            grouping: settings.grouping, sort: settings.sort(for: tab))
     }
 
     /// `groups(of:on:in:settings:)` with the board copies by key and the Status options (empty when the
     /// board is unavailable or has none) already read.
     static func groups(
         of issues: [BoardIssue], on tab: IssueTab, onBoard: [PRKey: BoardIssue], options: [StatusOption],
-        grouping: Grouping
+        grouping: Grouping, sort: ListSort = .recentlyUpdated
     ) -> [IssueGroup] {
         if tab == .created {
-            return grouping == .repository ? repoGroups(issues) : group(.all, issues, counted: true)
+            return grouping == .repository
+                ? repoGroups(issues, sort: sort) : group(.all, issues, counted: true, sort: sort)
         }
-        guard !options.isEmpty else { return repoGroups(issues) }
+        guard !options.isEmpty else { return repoGroups(issues, sort: sort) }
         // Still open but done on the board: housekeeping, not work, so folded and not counted, as on Board.
         let doneOnBoard = { (issue: BoardIssue) in onBoard[issue.key].map(isDone) ?? false }
         let active = issues.filter { !doneOnBoard($0) }
-        return statusGroups(options: options, skippingDone: true, issues: active) { issue -> BoardStatusValue?? in
+        return statusGroups(options: options, skippingDone: true, issues: active, sort: sort) { issue -> BoardStatusValue?? in
             guard let item = onBoard[issue.key] else { return nil }
             return .some(item.status)
-        } + group(.notOnBoard, active.filter { onBoard[$0.key] == nil }, counted: true)
-            + group(.done, issues.filter(doneOnBoard), counted: false)
+        } + group(.notOnBoard, active.filter { onBoard[$0.key] == nil }, counted: true, sort: sort)
+            // Done keeps its own order whatever the tab's sort.
+            + group(.done, issues.filter(doneOnBoard), counted: false, sort: .recentlyUpdated)
     }
 
     /// The Status the lists group a board item under: its value while the board is available and the
@@ -272,7 +278,7 @@ public enum IssueTabBuilder {
     /// Groups by Status in board order, then No status. `status` returns nil for issues that do not
     /// belong in any of these groups, and `.some(nil)` for board items without a Status.
     private static func statusGroups(
-        options: [StatusOption], skippingDone: Bool, issues: [BoardIssue],
+        options: [StatusOption], skippingDone: Bool, issues: [BoardIssue], sort: ListSort,
         status: (BoardIssue) -> BoardStatusValue??
     ) -> [IssueGroup] {
         let known = Set(options.map(\.id))
@@ -287,32 +293,43 @@ public enum IssueTabBuilder {
             }
         }
         let columns = options.filter { !(skippingDone && isDoneName($0.name)) }
-        return columns.flatMap { group(.status($0), byOption[$0.id] ?? [], counted: true) }
-            + group(.noStatus, noStatus, counted: true)
+        return columns.flatMap { group(.status($0), byOption[$0.id] ?? [], counted: true, sort: sort) }
+            + group(.noStatus, noStatus, counted: true, sort: sort)
     }
 
-    /// One group per repository, the repo with the most recently updated issue first.
-    private static func repoGroups(_ issues: [BoardIssue]) -> [IssueGroup] {
-        let repos = Dictionary(grouping: issues, by: \.key.repo).map { repo, issues in
-            (repo: repo, issues: issues, newest: issues.compactMap(\.updatedAt).max() ?? .distantPast)
+    /// One group per repository, in the order of each repo's first issue under `sort` (for Recently
+    /// updated, the repo with the most recently updated issue first).
+    private static func repoGroups(_ issues: [BoardIssue], sort: ListSort) -> [IssueGroup] {
+        var order: [String] = []
+        var byRepo: [String: [BoardIssue]] = [:]
+        for issue in sorted(issues, by: sort) {
+            if byRepo[issue.key.repo] == nil { order.append(issue.key.repo) }
+            byRepo[issue.key.repo, default: []].append(issue)
         }
-        return repos
-            .sorted { $0.newest != $1.newest ? $0.newest > $1.newest : $0.repo < $1.repo }
-            .flatMap { group(.repo($0.repo), $0.issues, counted: true) }
+        return order.flatMap { group(.repo($0), byRepo[$0] ?? [], counted: true, sort: sort, presorted: true) }
     }
 
-    /// A one-element array, or empty when there are no issues.
+    /// A one-element array, or empty when there are no issues. `presorted` keeps the issues' order.
     private static func group(
-        _ kind: IssueGroupKind, _ issues: [BoardIssue], counted: Bool, sort: Bool = true
+        _ kind: IssueGroupKind, _ issues: [BoardIssue], counted: Bool, sort: ListSort, presorted: Bool = false
     ) -> [IssueGroup] {
         guard !issues.isEmpty else { return [] }
-        return [IssueGroup(kind: kind, issues: sort ? sorted(issues) : issues, counted: counted)]
+        return [IssueGroup(kind: kind, issues: presorted ? issues : sorted(issues, by: sort), counted: counted)]
     }
 
-    private static func sorted(_ issues: [BoardIssue]) -> [BoardIssue] {
-        issues.sorted { a, b in
-            switch (a.updatedAt, b.updatedAt) {
-            case let (x?, y?) where x != y: return x > y
+    /// By `sort`'s date (last update, or when opened), issues without that date after the rest, then by
+    /// repo and number. Waiting longest doesn't apply to issues and reads as Recently updated.
+    private static func sorted(_ issues: [BoardIssue], by sort: ListSort) -> [BoardIssue] {
+        let date: (BoardIssue) -> Date?
+        let newestFirst: Bool
+        switch sort {
+        case .recentlyUpdated, .waitingLongest: (date, newestFirst) = ({ $0.updatedAt }, true)
+        case .newestFirst: (date, newestFirst) = ({ $0.createdAt }, true)
+        case .oldestFirst: (date, newestFirst) = ({ $0.createdAt }, false)
+        }
+        return issues.sorted { a, b in
+            switch (date(a), date(b)) {
+            case let (x?, y?) where x != y: return newestFirst ? x > y : x < y
             case (.some, nil): return true
             case (nil, .some): return false
             default: return tieBreak(a, b)

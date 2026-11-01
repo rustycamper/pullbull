@@ -12,14 +12,18 @@ private let options = [todo, inProgress, done]
 
 private func issue(
     _ n: Int, repo: String = "o/r", open: Bool = true, status: String? = nil, updated: Date,
-    closed: Date? = nil
+    closed: Date? = nil, created: Date? = nil
 ) -> BoardIssue {
     let value = status.map { id in
         BoardStatusValue(optionId: id, name: options.first { $0.id == id }?.name ?? "Gone")
     }
     return BoardIssue(
         key: PRKey(repo: repo, number: n), title: "i\(n)", url: URL(string: "https://x/\(n)")!,
-        isOpen: open, updatedAt: updated, closedAt: closed, status: value)
+        isOpen: open, createdAt: created, updatedAt: updated, closedAt: closed, status: value)
+}
+
+private func numbers(_ groups: [IssueGroup], _ kind: IssueGroupKind) -> [Int] {
+    groups.first { $0.kind == kind }?.issues.map(\.key.number) ?? []
 }
 
 private func snap(
@@ -50,6 +54,71 @@ private func isRepo(_ group: IssueGroup) -> Bool {
 }
 
 @Suite struct IssueTabBuilderTests {
+    // MARK: Sort
+
+    @Test func newestAndOldestFirstByOpened() {
+        var s = AppSettings()
+        s.grouping = .none
+        let created = [
+            issue(1, updated: ago(2), created: ago(5)), issue(2, updated: ago(3), created: ago(1)),
+            issue(3, updated: ago(1), created: ago(3)),
+        ]
+        let order = { (sort: ListSort) -> [Int] in
+            s.setSort(sort, for: IssueTab.created)
+            return IssueTabBuilder.build(snap(created: created), settings: s, now: now)
+                .created.groups.flatMap(\.issues).map(\.key.number)
+        }
+        #expect(order(.recentlyUpdated) == [3, 1, 2])
+        #expect(order(.newestFirst) == [2, 3, 1])
+        #expect(order(.oldestFirst) == [1, 3, 2])
+    }
+
+    @Test func undatedIssuesGoLast() {
+        var s = AppSettings()
+        s.grouping = .none
+        s.setSort(.oldestFirst, for: IssueTab.created)
+        let created = [
+            issue(1, updated: ago(0.1)), issue(2, updated: ago(3), created: ago(1)),
+            issue(3, updated: ago(0.2)), issue(4, updated: ago(4), created: ago(2)),
+        ]
+        let shown = IssueTabBuilder.build(snap(created: created), settings: s, now: now)
+        #expect(shown.created.groups.flatMap(\.issues).map(\.key.number) == [4, 2, 1, 3])
+    }
+
+    @Test func repoGroupsFollowTheirFirstIssue() {
+        var s = AppSettings()
+        s.setSort(.oldestFirst, for: IssueTab.created)
+        let created = [
+            issue(1, repo: "o/a", updated: ago(0.1), created: ago(1)),
+            issue(2, repo: "o/b", updated: ago(5), created: ago(9)),
+        ]
+        let groups = IssueTabBuilder.build(snap(created: created), settings: s, now: now).created.groups
+        #expect(groups.map(\.kind) == [.repo("o/b"), .repo("o/a")])
+    }
+
+    /// Lanes keep the board's order and sort inside; both Done groups keep their own order.
+    @Test func boardLanesKeepBoardOrder() {
+        var s = AppSettings()
+        s.setSort(.oldestFirst, for: IssueTab.board)
+        s.setSort(.oldestFirst, for: IssueTab.assigned)
+        let board = [
+            issue(1, status: "opt1", updated: ago(0.1), created: ago(1)),
+            issue(2, status: "opt1", updated: ago(3), created: ago(5)),
+            issue(3, status: "opt2", updated: ago(1), created: ago(2)),
+            issue(4, open: false, status: "opt3", updated: ago(1), closed: ago(1), created: ago(10)),
+            issue(5, open: false, status: "opt3", updated: ago(2), closed: ago(2), created: ago(20)),
+            issue(6, status: "opt3", updated: ago(1.5), created: ago(30)),
+            issue(7, status: "opt3", updated: ago(2.5), created: ago(40)),
+        ]
+        let tabs = IssueTabBuilder.build(snap(assigned: board.filter(\.isOpen), board: board), settings: s, now: now)
+        let lanes = tabs.board?.groups ?? []
+        #expect(lanes.map(\.kind).prefix(2) == [.status(todo), .status(inProgress)])
+        #expect(numbers(lanes, .status(todo)) == [2, 1])
+        #expect(numbers(lanes, .done) == [4, 6, 5, 7])
+        #expect(numbers(tabs.assigned.groups, .status(todo)) == [2, 1])
+        #expect(numbers(tabs.assigned.groups, .done) == [6, 7])
+    }
+
     @Test func countEqualsCountedGroupRows() {
         let board = [
             issue(1, status: "opt1", updated: ago(1)), issue(2, status: "opt3", updated: ago(2)),

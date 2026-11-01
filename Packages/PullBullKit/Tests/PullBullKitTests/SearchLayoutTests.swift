@@ -26,14 +26,15 @@ private func pr(
 
 private func issue(
     _ n: Int, repo: String = "o/a", open: Bool = true, status: String? = nil, updated: Double = 1,
-    closed: Double? = nil
+    closed: Double? = nil, created: Double? = nil
 ) -> BoardIssue {
     let value = status.map { id in
         BoardStatusValue(optionId: id, name: options.first { $0.id == id }?.name ?? "Gone")
     }
     return BoardIssue(
         key: PRKey(repo: repo, number: n), title: "i\(n)", url: URL(string: "https://x/i\(n)")!,
-        isOpen: open, updatedAt: hoursAgo(updated), closedAt: closed.map(hoursAgo), status: value)
+        isOpen: open, createdAt: created.map(hoursAgo), updatedAt: hoursAgo(updated),
+        closedAt: closed.map(hoursAgo), status: value)
 }
 
 private func snap(board: [BoardIssue] = [], statusOptions: [StatusOption]? = options) -> Snapshot {
@@ -52,7 +53,7 @@ private func results(prs: [PullRequest] = [], issues: [BoardIssue] = []) -> Sear
 private func layout(
     _ prs: [PullRequest], on tab: PRTab, grouping: PRGrouping = .repository, settings: AppSettings = AppSettings()
 ) -> SearchPRLayout {
-    SearchLayout.pullRequests(results(prs: prs), on: tab, grouping: grouping, settings: settings, org: org)
+    SearchLayout.pullRequests(results(prs: prs), on: tab, grouping: grouping, settings: settings, org: org, now: now)
 }
 
 private func layout(
@@ -137,13 +138,48 @@ private func key(_ n: Int, _ repo: String = "o/a") -> PRKey { PRKey(repo: repo, 
 
     @Test func reviewOldestFirst() {
         var settings = AppSettings()
-        settings.reviewOldestFirst = true
+        settings.setSort(.oldestFirst, for: PRTab.review)
         let prs = [pr(1, created: 10, updated: 1), pr(2, created: 30, updated: 2), pr(3, created: 20, updated: 3)]
         let shown = layout(prs, on: .review, grouping: .none, settings: settings)
         #expect(shown.contents.rows.map(\.pr.key.number) == [2, 3, 1])
-        settings.reviewOldestFirst = false
+        settings.setSort(.recentlyUpdated, for: PRTab.review)
         #expect(layout(prs, on: .review, grouping: .none, settings: settings).contents.rows.map(\.pr.key.number)
             == [1, 2, 3])
+    }
+
+    @Test func searchFollowsTheReferenceTabsSort() {
+        var settings = AppSettings()
+        settings.setSort(.waitingLongest, for: PRTab.team)
+        let dana = Reviewer.user("dana")
+        func waiting(_ n: Int, hours: Double, updated: Double) -> PullRequest {
+            let p = pr(n, updated: updated, requests: [dana])
+            return PullRequest(
+                key: p.key, title: p.title, url: p.url, author: p.author, authorAvatarURL: nil, state: .open,
+                isDraft: false, createdAt: p.createdAt, updatedAt: p.updatedAt, closedAt: nil, headRef: "h",
+                baseRef: "main", ci: .none, headCommitDate: nil, commentCount: 0, lastCommentAuthor: nil,
+                latestReviews: [], reviewRequests: [dana], reviewRequestTimes: [dana.key: hoursAgo(hours)])
+        }
+        let prs = [
+            waiting(1, hours: 10, updated: 1), waiting(2, hours: 90, updated: 5),
+            pr(3, state: .merged, created: 200, closed: 30), pr(4, state: .merged, created: 100, closed: 60),
+        ]
+        let shown = layout(prs, on: .team, grouping: .none, settings: settings)
+        #expect(shown.contents.rows.map(\.pr.key.number) == [2, 1])
+        #expect(shown.ended.map(\.key.number) == [3, 4])
+    }
+
+    @Test func issueSearchFollowsTheTabsSort() {
+        var settings = AppSettings()
+        settings.grouping = .none
+        settings.setSort(.oldestFirst, for: IssueTab.created)
+        let issues = [
+            issue(1, updated: 1, created: 10), issue(2, updated: 5, created: 50),
+            issue(3, open: false, updated: 30, closed: 30, created: 90),
+            issue(4, open: false, updated: 5, closed: 5, created: 20),
+        ]
+        let shown = layout(issues, on: .created, settings: settings)
+        #expect(shown.contents.groups.flatMap(\.issues).map(\.key.number) == [2, 1])
+        #expect(shown.ended.map(\.key.number) == [4, 3])
     }
 
     @Test func endedGoInClosed() {
