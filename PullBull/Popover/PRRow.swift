@@ -278,6 +278,47 @@ struct ClosedRow: View {
         Button {
             open()
         } label: {
+            Group {
+                if model.settings.compact { compactBody(merged: merged) } else { fullBody(merged: merged) }
+            }
+            .contentShape(Rectangle())
+            .modifier(RowFill(
+                cornerRadius: model.settings.compact ? 6 : 7, selected: selected, hovering: hovering,
+                flashing: model.rowFlash.key == pr.key))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
+        .help(pr.title)
+        .editPickerAnchor(for: pr.key, field: nil, model: model)
+        .prContextMenu(
+            pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
+            time: search == nil ? TimeFocusMenu(model: model) : nil,
+            person: .person(model: model, login: pr.author), files: model.filesLink(for: pr),
+            failingCheck: { model.openFailingCheck(pr.key) },
+            sets: SetEditMenu.make(model: model, key: pr.key))
+    }
+
+    /// One line in compact mode, like every other compact row: glyph, title, `repo #num`, when it ended, the pill.
+    private func compactBody(merged: Bool) -> some View {
+        CompactRowLayout(
+            repoNumber: RepoNumber(key: pr.key, compact: true), age: ended(merged: merged), ageWidth: nil
+        ) {
+            Image(symbol: Palette.prGlyph(pr.glyph))
+                .font(.system(size: 11))
+                .foregroundStyle(Palette.prGlyphColor(pr.glyph))
+                .frame(width: 16)
+        } title: {
+            Text(title)
+                .foregroundStyle(.secondary)
+        } badges: {
+            EmptyView()
+        } trailing: {
+            EndedPill(merged: merged)
+        }
+    }
+
+    private func fullBody(merged: Bool) -> some View {
             HStack(spacing: 10) {
                 Image(symbol: Palette.prGlyph(pr.glyph))
                     .font(.system(size: 12))
@@ -304,21 +345,6 @@ struct ClosedRow: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
-            .contentShape(Rectangle())
-            .modifier(RowFill(
-                cornerRadius: 7, selected: selected, hovering: hovering, flashing: model.rowFlash.key == pr.key))
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .accessibilityAddTraits(selected ? [.isSelected] : [])
-        .help(pr.title)
-        .editPickerAnchor(for: pr.key, field: nil, model: model)
-        .prContextMenu(
-            pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
-            time: search == nil ? TimeFocusMenu(model: model) : nil,
-            person: .person(model: model, login: pr.author), files: model.filesLink(for: pr),
-            failingCheck: { model.openFailingCheck(pr.key) },
-            sets: SetEditMenu.make(model: model, key: pr.key))
     }
 
     /// A search result moves `searchSelection`, a Mine row `listSelection`.
@@ -503,6 +529,28 @@ struct EndedPill: View {
             Pill(symbol: nil, text: "Merged", foreground: Palette.mergedText, fill: Palette.mergedFill)
         } else {
             Pill(symbol: nil, text: "Closed", foreground: Palette.closedText, fill: Palette.closedFill)
+        }
+    }
+}
+
+/// A closed issue's pill, coloured as GitHub and the issue page colour it: purple when completed, gray when
+/// not planned. VoiceOver tells the two apart, which the shared word "Closed" doesn't.
+struct IssueEndedPill: View {
+    let glyph: IssueGlyph
+    var symbol: String?
+
+    var body: some View {
+        switch glyph {
+        case .open:
+            EmptyView()
+        case .completed:
+            Pill(symbol: symbol, text: "Closed", foreground: Palette.mergedText, fill: Palette.mergedFill)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Closed as completed")
+        case .notPlanned:
+            Pill(symbol: symbol, text: "Closed", foreground: Palette.pillText, fill: Palette.fill)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Closed as not planned")
         }
     }
 }

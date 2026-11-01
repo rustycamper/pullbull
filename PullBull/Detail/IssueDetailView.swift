@@ -312,10 +312,8 @@ private struct IssueStatePill: View {
         switch issue.glyph {
         case .open:
             Pill(symbol: Palette.issueGlyph(.open).symbol, text: "Open", foreground: Palette.pillText, fill: Palette.strongFill)
-        case .completed:
-            Pill(symbol: Palette.issueGlyph(.completed).symbol, text: "Closed", foreground: Palette.mergedText, fill: Palette.mergedFill)
-        case .notPlanned:
-            Pill(symbol: Palette.issueGlyph(.notPlanned).symbol, text: "Closed", foreground: Palette.pillText, fill: Palette.fill)
+        case .completed, .notPlanned:
+            IssueEndedPill(glyph: issue.glyph, symbol: Palette.issueGlyph(issue.glyph).symbol)
         }
     }
 }

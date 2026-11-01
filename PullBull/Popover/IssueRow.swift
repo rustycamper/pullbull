@@ -92,6 +92,11 @@ struct IssueRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             AssigneeStack(assignees: avatars, showUnassigned: tab == .board, size: 18)
                 .padding(.top, 1)
+            if !issue.isOpen {
+                // Ended items carry their pill, as a closed PR row does.
+                IssueEndedPill(glyph: issue.glyph)
+                    .padding(.top, 2)
+            }
         }
         .padding(.horizontal, 8)
         .padding(.top, 7)
@@ -120,6 +125,7 @@ struct IssueRow: View {
             EmptyView()
         } trailing: {
             AssigneeStack(assignees: avatars, showUnassigned: tab == .board, size: 16)
+            if !issue.isOpen { IssueEndedPill(glyph: issue.glyph) }
         }
     }
 }
@@ -144,11 +150,10 @@ struct IssueMetaLine: View {
 
     private var age: String? { Self.age(of: issue, now: now) }
 
-    /// "closed 3d ago" for a closed issue; otherwise the time since its last update.
+    /// "closed 3d ago" for a closed issue, or just "closed" without a date, as a closed PR row says;
+    /// otherwise the time since its last update.
     static func age(of issue: BoardIssue, now: Date) -> String? {
-        if !issue.isOpen, let ended = EndedAge.text(state: .closed, closedAt: issue.closedAt, now: now) {
-            return ended
-        }
+        if !issue.isOpen { return EndedAge.text(state: .closed, closedAt: issue.closedAt, now: now) ?? "closed" }
         return issue.updatedAt.map { RelativeAge.short(from: $0, to: now) }
     }
 
