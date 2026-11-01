@@ -218,7 +218,7 @@ Per CONTRIBUTING, logic lives in PullBullKit with tests; views stay thin. Tests 
 - Mutation documents and variables for each edit, including add-to-board followed by set.
 - Override reconciliation: applied to tabs and search, dropped on agreement, on timeout and on failure; not visible to change detection.
 - Lane moves: Status change moves the row on Board and Assigned; self-unassign removes from Assigned; self-assign inserts.
-- Permission gating: installation permissions, `gh` scopes, `viewerCanUpdate`.
+- Permission gating: installation permissions, `gh` scopes.
 - Undo: the inverse of each edit, including delete-from-board for an add; ⌘Z expires after 10 seconds, only the last edit's answer arms it, typing in the search field ends it, and another board's fetch drops it.
 - Add to the board: a card already there (a stale snapshot) gets the Status and is neither rolled back nor undone by deletion.
 - Candidate paging: labels page up to the 10-page cap; a filter query never marks the assignee list complete; a failed one changes nothing.
