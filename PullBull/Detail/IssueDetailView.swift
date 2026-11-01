@@ -13,14 +13,14 @@ struct IssueDetailView: View {
     /// The list copy: on the board it carries the Status and the board item.
     private var listIssue: BoardIssue? { model.issue(for: key) }
     private var detail: IssueDetail? { model.issueDetails[key] }
-    /// The freshest row fields: the detail's, else the list's.
-    private var issue: BoardIssue? { detail?.issue ?? listIssue }
+    /// The freshest row fields: the detail's, else the list's, with pending edits laid over them.
+    private var issue: BoardIssue? { (detail?.issue).map(model.edits.overrides.apply(to:)) ?? listIssue }
     private var fetch: DetailFetch? { model.issueDetailFetch?.key == key ? model.issueDetailFetch : nil }
     private var webURL: URL { issue?.url ?? GitHubLinks.issue(key) }
-    private var isOnBoard: Bool { model.snapshot?.boardIssues.contains { $0.key == key } == true }
+    private var isOnBoard: Bool { model.shownSnapshot?.boardIssues.contains { $0.key == key } == true }
     /// Only for an issue on the board; another issue would land on the board with no item open.
     private var boardURL: URL? {
-        guard let snapshot = model.snapshot, let board = snapshot.board,
+        guard let snapshot = model.shownSnapshot, let board = snapshot.board,
               let item = snapshot.boardIssues.first(where: { $0.key == key })
         else { return nil }
         return GitHubLinks.boardItem(board, itemId: item.boardItemId)
@@ -143,10 +143,15 @@ struct IssueDetailView: View {
         return DetailSection(title: (isOnBoard ? model.snapshot?.boardTitle : nil) ?? "Details") {
             DetailCard {
                 if let status {
-                    statusRow(symbol: BoardStatusGlyph.symbol(forStatusNamed: status.name), name: status.name)
+                    let color = model.shownSnapshot?.boardStatusOptions?.first { $0.id == status.optionId }?.color
+                    statusRow(name: status.name) { StatusDot(color: color) }
                     CardDivider()
                 } else if !isOnBoard, model.snapshot?.boardStatus == .available {
-                    statusRow(symbol: BoardStatusGlyph.notOnBoard, name: "Not on board")
+                    statusRow(name: "Not on board") { statusGlyph(BoardStatusGlyph.notOnBoard) }
+                    CardDivider()
+                } else if model.isStatusOffered(for: key) {
+                    // On the board without a Status: still the place to set one.
+                    statusRow(name: "No status") { statusGlyph("circle.dotted") }
                     CardDivider()
                 }
                 CardRow(name: "Assignees") {
@@ -179,17 +184,34 @@ struct IssueDetailView: View {
         }
     }
 
-    private func statusRow(symbol: String, name: String) -> some View {
-        CardRow(name: "Status") {
+    /// Clickable where Status is offered: it opens the Status picker here.
+    @ViewBuilder private func statusRow(name: String, @ViewBuilder mark: () -> some View) -> some View {
+        let mark = mark()
+        let row = CardRow(name: "Status") {
             HStack(spacing: 6) {
-                Image(systemName: symbol)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
+                mark
                 Text(name)
                     .lineLimit(1)
             }
         }
+        if model.isStatusOffered(for: key) {
+            Button { model.openStatusPicker(for: key) } label: {
+                row.contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Set Status (⌥⌘S)")
+            .accessibilityHint("Opens the Status picker")
+            .statusPickerAnchor(for: key, model: model)
+        } else {
+            row
+        }
+    }
+
+    private func statusGlyph(_ symbol: String) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+            .accessibilityHidden(true)
     }
 
     // MARK: Sections

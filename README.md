@@ -6,7 +6,7 @@
 
 **GitHub pull requests, issues and Projects boards in the macOS menu bar.**
 
-Keyboard-first · Native SwiftUI · Read-only
+Keyboard-first · Native SwiftUI · Edits only what you pick
 
 [![Release](https://img.shields.io/github/v/release/rustycamper/pullbull?style=flat-square&color=36d399&label=release)](https://github.com/rustycamper/pullbull/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/rustycamper/pullbull/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/rustycamper/pullbull/actions/workflows/ci.yml)
@@ -153,7 +153,7 @@ Or download the zip from [Releases](https://github.com/rustycamper/pullbull/rele
 
 | &emsp;&emsp; | | |
 |:-:|---|---|
-| <img src="docs/media/icons/eye.png" width="22" height="22" alt=""> | Read-only | Never writes to GitHub |
+| <img src="docs/media/icons/eye.png" width="22" height="22" alt=""> | Writes to GitHub | An issue's board Status, only when you pick it. Never merges, comments, approves or closes |
 | <img src="docs/media/icons/key-horizontal.png" width="22" height="22" alt=""> | Tokens | App sign-in and Anthropic API key (Ask): Keychain, this Mac only. `gh`: memory only |
 | <img src="docs/media/icons/chart-bar-xaxis-ascending.png" width="22" height="22" alt=""> | Telemetry | None. No server |
 | <img src="docs/media/icons/network.png" width="22" height="22" alt=""> | Network | GitHub API, GitHub avatars, GitHub release feed. Anthropic API, only if you turn Ask on. Nothing else |

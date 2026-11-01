@@ -80,6 +80,13 @@ public enum ShortcutCatalog {
                 Shortcut("Complete", [["↩"], ["⇥"]]),
                 Shortcut("Close", [["Esc"]]),
             ]),
+            ShortcutSection("Editing", note: "Issue rows, search results and the issue detail", [
+                Shortcut("Set Status", [["⌥", "⌘", "S"]], note: "When a board is shown"),
+                Shortcut("Undo the last edit", [["⌘", "Z"]], note: "For 10 seconds after it"),
+                Shortcut("Choose a Status", [["↑"], ["↓"]], note: "In the picker; type to filter"),
+                Shortcut("Apply", [["↩"]], note: "In the picker"),
+                Shortcut("Close without change", [["Esc"]], note: "In the picker"),
+            ]),
             ShortcutSection("Detail", [
                 Shortcut("Back", [["Esc"], ["←"], ["⌘", "["]]),
                 Shortcut("Next / previous item", [["⌥", "↓"], ["⌥", "↑"]],

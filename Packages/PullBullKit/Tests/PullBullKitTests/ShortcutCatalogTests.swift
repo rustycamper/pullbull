@@ -7,7 +7,20 @@ private let modifierOrder = ["⌃", "⌥", "⇧", "⌘"]
 @Suite struct ShortcutCatalogTests {
     @Test func sectionsInOrder() {
         #expect(ShortcutCatalog.sections(toggle: nil).map(\.title)
-            == ["PullBull", "Lists", "Copy and open", "Search", "Completion list", "Detail", "Ask AI answers"])
+            == ["PullBull", "Lists", "Copy and open", "Search", "Completion list", "Editing", "Detail",
+                "Ask AI answers"])
+    }
+
+    @Test func editingShortcuts() throws {
+        let editing = try #require(ShortcutCatalog.sections(toggle: nil).first { $0.title == "Editing" })
+        #expect(editing.note == "Issue rows, search results and the issue detail")
+        #expect(editing.shortcuts == [
+            Shortcut("Set Status", [["⌥", "⌘", "S"]], note: "When a board is shown"),
+            Shortcut("Undo the last edit", [["⌘", "Z"]], note: "For 10 seconds after it"),
+            Shortcut("Choose a Status", [["↑"], ["↓"]], note: "In the picker; type to filter"),
+            Shortcut("Apply", [["↩"]], note: "In the picker"),
+            Shortcut("Close without change", [["Esc"]], note: "In the picker"),
+        ])
     }
 
     @Test func everySectionHasShortcutsAndEveryShortcutKeys() {

@@ -22,11 +22,11 @@ Or the zip from [Releases](https://github.com/rustycamper/pullbull/releases/late
 | | Sign in with GitHub | GitHub CLI |
 |---|---|---|
 | How | Code on github.com | Uses an existing `gh` login |
-| Token | Read-only, renews itself | Fetched from `gh` each launch |
+| Token | Writes only what you pick, renews itself | Fetched from `gh` each launch |
 | Stored | Keychain | Memory only |
 | Orgs | Owner installs the app → **Request Approval** | Scopes `repo`, `read:org` |
-| Org board | App's Projects permission | Scope `read:project` |
-| Personal boards | No | `read:project` |
+| Org board | App's Projects permission | Scope `read:project`; `project` to set Status |
+| Personal boards | No | `read:project`; `project` to set Status |
 
 The first-run screen offers your `gh` logins first if there are any. PullBull never picks one by itself.
 
@@ -104,9 +104,21 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - **Done:** click its header to unfold. Never counted
 - **Labels:** chips as on [pull requests](#pull-requests). The board card lists them all
 - **Switch board:** on the Board tab, click its name in the filter row, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd>
-- **Right-click a row:** copy link or Markdown link · open on GitHub · show only this repo · show only updated · search author
+- **Right-click a row:** [Status](#editing) (when a board is shown) · copy link or Markdown link · open on GitHub · show only this repo · show only updated · search author
 - **Right-click a group header** (a Status lane, No status, Not on board or a repo): **Open All *N* on GitHub**, from two issues up; above 8 it asks first. Done has none. Headers in search results get the tab's menus, without Show Only Updated
 - **Detail:** board card (incl. labels) · linked PRs (<kbd>Esc</kbd> returns) · description · last two comments
+
+## Editing
+
+Set an issue's board Status from PullBull. It writes nothing else.
+
+- **Open the picker:** select an issue row or search result and press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd>, click Status on the issue detail's board card, or right-click a row → **Status** to pick one straight away
+- **Picker:** the board's Status options in board order, each with its open count, and **Clear Status** when the issue has one; the current one is checked. Type to filter, <kbd>↑</kbd> <kbd>↓</kbd> to choose, <kbd>Return</kbd> to apply, <kbd>Esc</kbd> to close without change
+- **Which issues:** those on the board, and those in a repo the board's owner owns (an org board takes that org's issues; a personal board, your own). Picking a Status for an issue not on the board adds it
+- **After an edit:** the row moves to its new lane at once and stays selected; nothing else is shown. PullBull keeps showing your edit until GitHub's answers catch up, for at most 5 minutes
+- **Undo:** <kbd>⌘</kbd><kbd>Z</kbd> within 10 seconds puts the previous Status back, or takes an issue the edit added off the board again. Only the last edit. Typing in the search field after it hands <kbd>⌘</kbd><kbd>Z</kbd> back to the text
+- **When it fails:** the change is taken back and a line above the footer says why, with **Open on GitHub**, until you dismiss it or edit again
+- **Permissions:** with Sign in with GitHub, an org owner accepts PullBull's new permissions on GitHub once; until then the picker says so and links there. With a `gh` login, setting Status needs the `project` scope: the picker shows the `gh auth refresh -s project` command to run
 
 ## Search
 
@@ -247,6 +259,8 @@ Settings → Ask AI.
 | <kbd>⌘</kbd><kbd>/</kbd> | Keyboard Shortcuts window: every shortcut by section, with a filter. <kbd>Esc</kbd> clears the filter, then closes; <kbd>⌘</kbd><kbd>W</kbd> or <kbd>⌘</kbd><kbd>/</kbd> closes. Also Settings → General → Keyboard shortcuts |
 | <kbd>Esc</kbd> | Clear search → clear repo → close |
 | <kbd>⌘</kbd><kbd>W</kbd> | Close |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd> | [Status picker](#editing) on the selected issue, when a board is shown. In search results too |
+| <kbd>⌘</kbd><kbd>Z</kbd> | Undo the last edit, for 10 seconds after it |
 
 | Detail | |
 |---|---|
@@ -258,6 +272,8 @@ Settings → Ask AI.
 | <kbd>⌃</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy Checkout Command: `gh pr checkout 412 -R owner/repo` |
 | <kbd>⌘</kbd><kbd>R</kbd> | Refresh |
 | <kbd>⌘</kbd><kbd>/</kbd> | Keyboard Shortcuts window |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd> | [Status picker](#editing), on an issue |
+| <kbd>⌘</kbd><kbd>Z</kbd> | Undo the last edit, for 10 seconds after it |
 
 The order is the one on screen when you opened the first item; a refresh doesn't reshuffle it. An item that has left the lists since is skipped, unless its detail was already loaded.
 

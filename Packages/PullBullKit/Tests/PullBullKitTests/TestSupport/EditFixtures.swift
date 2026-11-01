@@ -24,11 +24,13 @@ func editPR(_ number: Int, labels: [String] = []) -> PullRequest {
 
 func editSnapshot(
     board: [BoardIssue] = [], assigned: [BoardIssue]? = [], created: [BoardIssue]? = [], mine: [PullRequest] = [],
-    viewer: String = "me", options: [StatusOption]? = nil
+    viewer: String = "me", options: [StatusOption]? = nil, boardProject: Int? = 1,
+    boardOwner: BoardOwner? = .org("o"), boardIds: BoardIds? = nil
 ) -> Snapshot {
     Snapshot(
         fetchedAt: Date(timeIntervalSince1970: 1_800_000_000),
         org: OrgContext(org: "o", viewer: viewer, members: [], myTeams: [], repos: []),
-        reviewCandidates: [], mine: mine, team: [], recentlyClosed: [], boardIssues: board, boardProject: 1,
-        assignedIssues: assigned, createdIssues: created, boardStatusOptions: options)
+        reviewCandidates: [], mine: mine, team: [], recentlyClosed: [], boardIssues: board, boardProject: boardProject,
+        assignedIssues: assigned, createdIssues: created, boardStatusOptions: options, boardOwner: boardOwner,
+        boardIds: boardIds)
 }
