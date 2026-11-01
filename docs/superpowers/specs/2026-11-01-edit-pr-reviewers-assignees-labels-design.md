@@ -67,7 +67,7 @@ Nothing else, ever. This replaces the edit spec's sentence wherever the product 
 - **Right-click a PR row** (open and closed rows, and PR search results): **Reviewers…** (`person.2`), **Assignees…** and **Labels…**, above the copy items after a separator, as issue rows have **Assignees…** and **Labels…**.
 - **PR detail:**
   - The Reviewers card is clickable and opens the reviewers picker anchored to it, with the help tag "Change reviewers (⌥⌘R)". "No reviewers" stays as the empty line and is clickable too.
-  - A new card titled "Details", placed before Checks, holds Assignees and Labels rows. It uses the same rows as the issue detail's card: "No one" and "None" when empty, clickable, with help tags "Change assignees (⌥⌘A)" and "Change labels (⌥⌘L)". The labels move out of the summary into this card, so they show once, and there is a place to click when a PR has none.
+  - A new card titled "Details" holds Assignees and Labels rows. It sits right under the summary, as the issue detail's card does, so it comes before Checks, and before the description on closed and merged PRs, and it doesn't move when the detail loads. Its rows are the issue detail's own, shared between the two: "No one" and "None" when empty, clickable, with help tags "Change assignees (⌥⌘A)" and "Change labels (⌥⌘L)". The labels move out of the summary into this card, so they show once, and there is a place to click when a PR has none.
 
 ### The reviewers picker
 
@@ -95,6 +95,9 @@ The same multi-select picker as assignees: the same placement, filter, keys and 
 ### Assignees and labels on pull requests
 
 The issue pickers, unchanged, opened on a PR. Their "current" values come from the PR. A PR has no Mine list for assignees, so assigning yourself inserts nothing anywhere.
+
+- Only a PR PullBull holds can be edited: one in a tab or search results, or opened from one. A PR opened from an issue's linked PRs, Ask or a notification, and in no list, has no Details card and the keys do nothing, as for issues.
+- PRs in a cache from before assignees were read show none until the first refresh, so the card says "No one" and the picker shows real assignees unticked. Ticking one again changes nothing on GitHub.
 
 ### After an edit
 
@@ -170,7 +173,7 @@ As the edit spec, with these messages:
 ### GitHub App
 
 - **New permission:** **Pull requests: Read and write**. It gates all three PR edits (`pull_requests: write` in the installation's permissions; add `canWritePullRequests` to `Installation`).
-- The builder checks whether GitHub accepts PR label and assignee edits with only `issues: write`. If it does, labels and assignees on PRs may gate on either permission. Reviewers need `pull_requests: write` regardless.
+- Labels and assignees on PRs gate on `pull_requests: write` alone, as reviewers do: one rule for every PR edit. GitHub's permission tables accept it for PR labels and assignees, and the official app has it.
 - Existing installations behave as in the edit spec: until an owner accepts, choosing a PR edit shows the one-line note with the link to the installation's permissions page, in place of the picker. Issue edits keep working on `issues: write` alone.
 - **Members: Read** (already granted) covers reading the org's teams. Without it, the picker lists people only.
 - Update `docs/github-app-setup.md`: the permission table and the description text.
@@ -254,4 +257,3 @@ The user decided: reviewers first, then labels, assignees rarely; people as revi
 
 - Where the notification suppression sits.
 - Whether a review-request cap exists and its number.
-- The Details card's exact layout in the PR detail, within the issue detail's card style.
