@@ -118,6 +118,37 @@ private func node(_ name: String) throws -> [String: Any] {
         #expect(old.title == "t")
     }
 
+    @Test func decodesPRAssignees() throws {
+        let json = """
+        {"number":5,"title":"t","url":"https://github.com/o/r/pull/5","isDraft":false,"state":"OPEN",\
+        "createdAt":"2026-10-20T09:00:00Z","updatedAt":"2026-10-25T14:03:11Z","closedAt":null,\
+        "headRefName":"a","baseRefName":"main","repository":{"nameWithOwner":"o/r"},"author":{"login":"al"},\
+        "assignees":{"nodes":[{"login":"bo","avatarUrl":"https://a.test/b.png"},{"login":"cy"}]}}
+        """
+        let object = try #require(try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+        let pr = try Decoding.pullRequest(from: object)
+        #expect(pr.assignees == [
+            Assignee(login: "bo", avatarURL: URL(string: "https://a.test/b.png")), Assignee(login: "cy", avatarURL: nil)])
+        #expect(Queries.prFields.contains("assignees(first:10){nodes{login avatarUrl}}"))
+        #expect(try Decoding.pullRequest(from: node("pr_ghost_author")).assignees == [])
+    }
+
+    @Test func cachedPRWithoutAssigneesDecodes() throws {
+        let pr = PullRequest(
+            key: PRKey(repo: "o/r", number: 1), title: "t", url: URL(string: "https://x/1")!, author: "a",
+            authorAvatarURL: nil, state: .open, isDraft: false, createdAt: .now, updatedAt: .now, closedAt: nil,
+            headRef: "h", baseRef: "main", ci: .none, headCommitDate: nil, commentCount: 0, lastCommentAuthor: nil,
+            latestReviews: [], reviewRequests: [], assignees: [Assignee(login: "bo", avatarURL: nil)])
+        var object = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(pr)) as? [String: Any])
+        #expect(object["assignees"] != nil)
+        let current = try JSONDecoder().decode(PullRequest.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(current.assignees.map(\.login) == ["bo"])
+        object["assignees"] = nil
+        let old = try JSONDecoder().decode(PullRequest.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(old.assignees == [])
+        #expect(old.title == "t")
+    }
+
     @Test func lastCommentBot() throws {
         var n = try node("pr_ghost_author")
         n["comments"] = ["totalCount": 1, "nodes": [["author": ["__typename": "Bot", "login": "dependabot"]]]]

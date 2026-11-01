@@ -68,7 +68,8 @@ public enum Decoding {
             mergeable: (node["mergeable"] as? String).flatMap(Mergeable.init(rawValue:)),
             lastCommentByBot: lastCommenter.map { $0["__typename"] as? String == "Bot" },
             additions: node["additions"] as? Int, deletions: node["deletions"] as? Int,
-            nodeId: node["id"] as? String
+            nodeId: node["id"] as? String,
+            assignees: assignees(in: node)
         )
     }
 
@@ -88,7 +89,6 @@ public enum Decoding {
         let labels = labels(labelNodes)
         let lastComment = (((node["lastComment"] as? [String: Any])?["nodes"] as? [[String: Any]])?.last?["author"]
             as? [String: Any])
-        let assigneeNodes = (node["assignees"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
         return BoardIssue(
             key: PRKey(repo: repo, number: number), title: title, url: url,
             isOpen: node["state"] as? String == "OPEN",
@@ -101,10 +101,7 @@ public enum Decoding {
             lastCommentAuthor: lastComment?["login"] as? String,
             lastCommentByBot: lastComment.map { $0["__typename"] as? String == "Bot" },
             labels: labels.map(\.name), labelColors: labels.map(\.color),
-            assignees: assigneeNodes.compactMap { node in
-                guard let login = node["login"] as? String else { return nil }
-                return Assignee(login: login, avatarURL: (node["avatarUrl"] as? String).flatMap(URL.init(string:)))
-            },
+            assignees: assignees(in: node),
             status: status,
             boardItemId: boardItemId,
             myAssignment: viewer.flatMap { assignment(node, viewer: $0) },
@@ -141,6 +138,15 @@ public enum Decoding {
     private static func stateChange(_ node: [String: Any]) -> IssueStateChange? {
         lenientDate(node["createdAt"]).map {
             IssueStateChange(actor: (node["actor"] as? [String: Any])?["login"] as? String, at: $0)
+        }
+    }
+
+    /// The issue or PR node's assignees, in GitHub's order; a node without a login is left out.
+    private static func assignees(in node: [String: Any]) -> [Assignee] {
+        let nodes = (node["assignees"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
+        return nodes.compactMap { node in
+            guard let login = node["login"] as? String else { return nil }
+            return Assignee(login: login, avatarURL: (node["avatarUrl"] as? String).flatMap(URL.init(string:)))
         }
     }
 

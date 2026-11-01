@@ -15,6 +15,7 @@ enum Queries {
       latestReviews(first:20){nodes{author{login} state submittedAt commit{oid}}}
       reviewRequests(first:20){nodes{requestedReviewer{__typename ... on User{login} ... on Team{slug}}}}
       labels(first:20){nodes{name color}}
+      assignees(first:10){nodes{login avatarUrl}}
       mergedBy{login}
     }
     """
