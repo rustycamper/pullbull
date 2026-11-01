@@ -34,6 +34,7 @@ extension AppModel {
     // MARK: Picker
 
     func openStatusPicker(for key: PRKey) {
+        closeSetPicker(apply: true)
         guard let snapshot = shownSnapshot else { return }
         statusPicker = StatusPicker.make(for: key, in: snapshot, permission: statusEditPermission())
     }
@@ -55,6 +56,107 @@ extension AppModel {
 
     func closeStatusPicker() {
         statusPicker = nil
+    }
+
+    // MARK: Assignee and label pickers
+
+    /// The key of the open picker, Status or set; the popover's focus and key routing read it.
+    var editPickerKey: PRKey? { statusPicker?.key ?? setPicker?.key }
+
+    /// Whether the issue `key` can have its labels or assignees edited: one PullBull holds, with a running account.
+    func isSetEditOffered(for key: PRKey) -> Bool {
+        issue(for: key) != nil && runningAccount != nil
+    }
+
+    func setEditPermission(_ field: EditField, for key: PRKey) -> EditPermission {
+        guard let account = runningAccount else { return .unavailable }
+        let owner = key.repo.split(separator: "/").first.map(String.init) ?? ""
+        let installation = installation(named: owner)
+        return EditPermission.of(field, account: account, boardOwner: nil, installation: installation, ghAccounts: accounts)
+    }
+
+    /// Opens the picker for `field` (`.labels` or `.assignees`) on `key`, applying an open one first. The
+    /// cached candidates show at once; a fetch follows.
+    func openSetPicker(_ field: EditField, for key: PRKey) {
+        closeSetPicker(apply: true)
+        guard let issue = issue(for: key), let account = runningAccount else { return }
+        let current = field == .labels ? issue.labels : issue.assignees.map(\.login)
+        let permission = setEditPermission(field, for: key)
+        statusPicker = nil
+        var picker = SetPicker(
+            field: field, key: key, current: current, viewer: shownSnapshot?.org.viewer ?? settings.account ?? "",
+            permission: permission)
+        let cacheKey = Self.setCandidatesKey(field, key)
+        guard Self.allows(permission) else {
+            setPicker = picker
+            return
+        }
+        if let cached = setCandidates[cacheKey] { picker.load(cached) }
+        setPicker = picker
+        let client = api(for: account)
+        setPickerTask?.cancel()
+        setPickerTask = Task { [weak self] in
+            do {
+                let answer = field == .labels
+                    ? try await client.labelCandidates(for: key)
+                    : try await client.assigneeCandidates(for: key, query: nil)
+                guard let self, !Task.isCancelled, self.isSetPickerCurrent(key, field, account) else { return }
+                self.setCandidates[cacheKey] = SetCandidates(all: answer.all, current: [], complete: answer.complete)
+                self.setPicker?.load(answer)
+            } catch {
+                guard let self, !Task.isCancelled, self.isSetPickerCurrent(key, field, account) else { return }
+                self.setPicker?.failedToLoad(RefreshError(error).message)
+            }
+        }
+    }
+
+    /// Filters the rows; for people past the first 100, GitHub is asked after a 0.3 s pause.
+    func filterSetPicker(_ text: String) {
+        guard var picker = setPicker else { return }
+        picker.setFilter(text)
+        setPicker = picker
+        guard picker.field == .assignees, !picker.isComplete, Self.allows(picker.permission),
+              let account = runningAccount else { return }
+        setFilterTask?.cancel()
+        let query = text.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return }
+        let key = picker.key, field = picker.field
+        let client = api(for: account)
+        setFilterTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled,
+                  let answer = try? await client.assigneeCandidates(for: key, query: query),
+                  let self, !Task.isCancelled, self.isSetPickerCurrent(key, field, account) else { return }
+            self.setPicker?.load(answer, fromQuery: true)
+        }
+    }
+
+    func moveSetPicker(by offset: Int) {
+        setPicker?.move(by: offset)
+    }
+
+    func toggleSetPicker() {
+        setPicker?.toggleSelected()
+    }
+
+    /// Closes the picker; `apply` sends its change (Esc, ⌘↩, its key, a click outside, the popover hiding).
+    func closeSetPicker(apply: Bool) {
+        guard let picker = setPicker else { return }
+        setPicker = nil
+        setPickerTask?.cancel()
+        setPickerTask = nil
+        setFilterTask?.cancel()
+        setFilterTask = nil
+        guard apply, let change = picker.change, Self.allows(picker.permission) else { return }
+        run(change, on: picker.key, addedItemId: nil, isUndo: false)
+    }
+
+    private func isSetPickerCurrent(_ key: PRKey, _ field: EditField, _ account: AccountRef) -> Bool {
+        setPicker?.key == key && setPicker?.field == field && runningAccount == account
+    }
+
+    private static func setCandidatesKey(_ field: EditField, _ key: PRKey) -> String {
+        "\(field == .labels ? "labels" : "assignees")|\(key.repo)"
     }
 
     // MARK: Edits
@@ -98,10 +200,26 @@ extension AppModel {
         let id = edits.begin(change, on: key, at: Date())
         refreshShown()
         followEditedRow(key, from: before)
-        let editor = StatusEditor(api: api(for: account))
+        let client = api(for: account)
         Task { [weak self] in
             do {
-                let added = try await editor.apply(change, on: key, itemId: itemId, contentId: contentId, board: board)
+                var added: String?
+                switch change {
+                case .status:
+                    added = try await StatusEditor(api: client).apply(
+                        change, on: key, itemId: itemId, contentId: contentId, board: board)
+                case .labels, .assignees:
+                    let result = try await SetEditor(api: client).apply(change, on: key, contentId: contentId)
+                    if !(result.addApplied && result.removeApplied) {
+                        guard let self else { return }
+                        let before = self.shownListKeys()
+                        self.edits.partlyApplied(
+                            id, change: change, result: result, on: key, url: url, isUndo: isUndo, at: Date())
+                        self.refreshShown()
+                        self.followEditedRow(key, from: before)
+                        return
+                    }
+                }
                 guard let self, !isUndo else { return }
                 self.edits.applied(id, EditRecord(key: key, change: change, madeAt: Date(), addedItemId: added))
             } catch {
@@ -128,7 +246,7 @@ extension AppModel {
         listKeys(closedExpanded: listExpansion.closed, doneExpanded: listExpansion.done)
     }
 
-    private static func allows(_ permission: EditPermission) -> Bool {
+    static func allows(_ permission: EditPermission) -> Bool {
         switch permission {
         case .ready, .unavailable: true
         case .needsAppApproval, .needsGhScope: false
