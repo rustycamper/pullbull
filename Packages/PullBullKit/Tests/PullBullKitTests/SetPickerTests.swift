@@ -83,6 +83,41 @@ import Testing
         #expect(picker.change == nil)
     }
 
+    @Test func aLabelRenamedMidSessionKeepsOneRowPerID() {
+        var picker = labelPicker(current: ["defect"])
+        picker.load(SetCandidates(all: [SetCandidate(id: "LA_1", name: "bug", color: "ededed")], current: [], complete: false))
+        #expect(names(picker) == ["defect", "bug"])
+        picker.move(by: 1)
+        #expect(picker.rows[picker.selection].id == "LA_1")
+        picker.load(SetCandidates(
+            all: [SetCandidate(id: "LA_1", name: "defect", color: "ff0000"), label("docs")], current: [], complete: true))
+        #expect(Set(picker.rows.map(\.id)).count == picker.rows.count)
+        #expect(names(picker) == ["defect", "docs"])
+        #expect(ticked(picker) == ["defect"])
+        #expect(picker.rows[picker.selection].id == "LA_1")
+        #expect(picker.change == nil)
+        picker.toggleSelected()
+        #expect(ticked(picker) == [])
+        guard case .labels(let added, let removed)? = picker.change else {
+            Issue.record("expected a label change")
+            return
+        }
+        #expect(added.isEmpty)
+        #expect(removed.map(\.id) == ["LA_1"])
+    }
+
+    @Test func aLaterCandidateWithAKnownIDUpdatesItsRowInPlace() {
+        var picker = labelPicker(current: [])
+        picker.load(SetCandidates(all: [label("bug"), label("docs")], current: [], complete: false))
+        picker.move(by: 1)
+        picker.toggleSelected()
+        picker.load(SetCandidates(
+            all: [SetCandidate(id: "LA_docs", name: "documentation", color: "00ff00")], current: [], complete: true))
+        #expect(names(picker) == ["bug", "documentation"])
+        #expect(ticked(picker) == ["documentation"])
+        #expect(picker.rows[picker.selection].id == "LA_docs")
+    }
+
     @Test func aQueryAnswerLeavesIsCompleteAlone() {
         var picker = peoplePicker(current: [])
         picker.load(SetCandidates(all: [person("ann")], current: [], complete: false))

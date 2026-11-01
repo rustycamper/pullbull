@@ -55,7 +55,8 @@ public struct SetPicker: Equatable, Sendable {
     }
 
     /// The first load fixes the rows' order and ticks; later loads (more people, a filter's answer) only
-    /// append candidates not seen yet. `fromQuery`: an answer to a filter query, which leaves `isComplete` alone.
+    /// append candidates not seen yet; a candidate whose id a row already has updates that row in place.
+    /// `fromQuery`: an answer to a filter query, which leaves `isComplete` alone.
     public mutating func load(_ candidates: SetCandidates, fromQuery: Bool = false) {
         if !fromQuery { isComplete = candidates.complete }
         let highlighted = selectedRow?.id
@@ -78,6 +79,13 @@ public struct SetPicker: Equatable, Sendable {
                     replaced[entries[index].candidate.id] = candidate.id
                     entries[index].candidate = candidate
                     entries[index].isPlaceholder = false
+                    // A label renamed since it was cached: the stale row for this id folds into the placeholder.
+                    entries.removeAll { $0.candidate.id == candidate.id && !$0.isPlaceholder && $0.candidate != candidate }
+                    known.insert(name)
+                } else if let index = entries.firstIndex(where: { $0.candidate.id == candidate.id }) {
+                    known.remove(Self.fold(entries[index].candidate.name))
+                    entries[index].candidate = candidate
+                    known.insert(name)
                 } else if known.insert(name).inserted {
                     fresh.append(candidate)
                 }
