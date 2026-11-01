@@ -45,6 +45,11 @@ struct SearchResultsView: View {
                 guard let key else { return }
                 proxy.scrollTo(key)
             }
+            // A new sort keeps the selected result selected and in view.
+            .onChange(of: model.settings.sorts) { _, _ in
+                guard let key = model.searchSelection else { return }
+                proxy.scrollTo(key)
+            }
         }
     }
 

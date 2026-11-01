@@ -154,6 +154,34 @@ final class AppModel {
         }
     }
     var route: Route = .list
+
+    /// The tab whose sort the filter bar's sort button and Sort By change: the tab search results are laid
+    /// out for, else the tab on screen.
+    var sortTab: ShownTab { route == .search ? searchReferenceTab : shownTab }
+
+    /// `sortTab`'s sort.
+    var sort: ListSort {
+        switch sortTab {
+        case .pullRequests(let tab): settings.sort(for: tab)
+        case .issues(let tab): settings.sort(for: tab)
+        }
+    }
+
+    /// The sorts `sortTab` offers, its default first.
+    var sortChoices: [ListSort] {
+        switch sortTab {
+        case .pullRequests(let tab): ListSort.choices(for: tab)
+        case .issues(let tab): ListSort.choices(for: tab)
+        }
+    }
+
+    /// Sorts `sortTab` by `sort`, remembered across launches; the lists keep their selection and scroll to it.
+    func setSort(_ sort: ListSort) {
+        switch sortTab {
+        case .pullRequests(let tab): settings.setSort(sort, for: tab)
+        case .issues(let tab): settings.setSort(sort, for: tab)
+        }
+    }
     /// The repository every list and search is narrowed to; counts, the badge and notifications ignore
     /// it. Never persisted. A selection the new focus hides is dropped, and search results on screen are
     /// searched again.

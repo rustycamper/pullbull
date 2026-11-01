@@ -40,6 +40,11 @@ struct PRListView: View {
                 guard let key else { return }
                 proxy.scrollTo(key)
             }
+            // A new sort keeps the selected row selected and in view.
+            .onChange(of: model.settings.sorts) { _, _ in
+                guard let key = model.listSelection else { return }
+                proxy.scrollTo(key)
+            }
         }
     }
 

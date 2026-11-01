@@ -2,7 +2,7 @@
 
 Every tab, key and setting. Overview: [README](../README.md).
 
-[Install](#install) · [Sign in](#sign-in) · [Pull Requests](#pull-requests) · [Issues](#issues) · [Search](#search) · [Ask AI](#ask-ai) · [Keyboard](#keyboard) · [One repo](#one-repo) · [Settings](#settings) · [Data](#data) · [Build](#build-from-source)
+[Install](#install) · [Sign in](#sign-in) · [Pull Requests](#pull-requests) · [Issues](#issues) · [Search](#search) · [Ask AI](#ask-ai) · [Keyboard](#keyboard) · [One repo](#one-repo) · [Sorting](#sorting) · [Settings](#settings) · [Data](#data) · [Build](#build-from-source)
 
 ## Install
 
@@ -70,7 +70,7 @@ Without `read:project`: Board shows the command to add it, Mine groups by repo.
 
 | Tab | Shows |
 |---|---|
-| Review | PRs waiting on you or your team. Icon says why: requested, team, re-requested, new commits. Lines added and removed (`+120 −30`), not in compact cards. Oldest first: Settings → General (by when the PR was opened) |
+| Review | PRs waiting on you or your team. Icon says why: requested, team, re-requested, new commits. Lines added and removed (`+120 −30`), not in compact cards. Oldest first: [Sort](#sorting) |
 | Mine | Your PRs, review pills, checks, **Ready to merge**. Folded "Recently closed": yours closed or merged in the last 7 days |
 | Team | Other open PRs in the org. Group by author: Settings → General |
 
@@ -310,13 +310,24 @@ Reopen within a minute and the detail is still there.
 - Combines with Show Only *repo*
 - In search, type `updated:today`, `3d`, `1w` or `1m` instead
 
+## Sorting
+
+- Click ⇅ at the right of the strip above the list, or right-click a row, a header or the list → **Sort By**
+- Pull request tabs: **Recently updated** (default) · **Waiting longest** (the 🕒 review wait, longest first; PRs not waiting follow) · **Oldest first** (by when opened)
+- Issue tabs: **Recently updated** (default) · **Newest first** · **Oldest first** (by when opened)
+- Each tab keeps its own, across relaunches. Off the default, the strip names it in the accent colour
+- Repo groups follow their first row; author groups stay by name; Board lanes keep the board's order and sort inside
+- Done, Recently closed and search's Closed keep their own order (most recently ended first)
+- Search results follow the sort of the tab they're laid out like
+- The selected row stays selected and in view
+
 ## Settings
 
 <kbd>⌘</kbd><kbd>,</kbd> or the footer gear.
 
 | Tab | |
 |---|---|
-| General | Grouping, Team by author, oldest review first, compact cards, background, filters (Review and Team), menu bar count, refresh interval, pending CI checks, shortcut, Keyboard Shortcuts window, launch at login, updates |
+| General | Grouping, Team by author, compact cards, background, filters (Review and Team), menu bar count, refresh interval, pending CI checks, shortcut, Keyboard Shortcuts window, launch at login, updates |
 | Account | Account, org, board, access notices |
 | Notifications | One toggle per event, grouped: my pull requests · pull requests I review · issues assigned to me · issues I created |
 | Search | Saved searches: rename, edit the query, drag to reorder, **+** and **−**. Apply one from the empty search field; the first nine have ⌃1–⌃9 |
