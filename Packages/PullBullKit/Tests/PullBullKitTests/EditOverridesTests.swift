@@ -270,6 +270,37 @@ private func card(_ snapshot: Snapshot, _ key: PRKey) -> BoardIssue? {
         #expect(o.isEmpty)
     }
 
+    @Test func ownTeamAddInsertsCarriedCopyIntoReview() {
+        var o = EditOverrides()
+        let pr = editPR(77)
+        let core = Reviewer.team(slug: "Core", name: "Core")
+        o.record(.reviewers(added: [core], removed: []), on: editKey(77), at: t0, carrying: pr)
+        let shown = o.apply(to: editSnapshot(team: [pr], myTeams: ["core"]))
+        #expect(shown.reviewCandidates.map(\.key) == [editKey(77)])
+        #expect(ReviewRules.status(of: shown.reviewCandidates[0], me: "me", myTeams: ["core"]).reviewReason != nil)
+        #expect(o.apply(to: editSnapshot(team: [pr], myTeams: ["other"])).reviewCandidates.isEmpty)
+    }
+
+    @Test func ownTeamAddWaitsForReviewCandidates() {
+        var o = EditOverrides()
+        o.record(.reviewers(added: [.team(slug: "core", name: "Core")], removed: []), on: editKey(77), at: t0)
+        let requested = editPR(77, requests: [.team(slug: "core", name: "Core")])
+        o.reconcile(with: editSnapshot(team: [requested], myTeams: ["core"]), now: t0 + 30)
+        #expect(!o.isEmpty)
+        o.reconcile(with: editSnapshot(review: [requested], team: [requested], myTeams: ["core"]), now: t0 + 60)
+        #expect(o.isEmpty)
+    }
+
+    @Test func ownTeamRemovalWaitsForReviewCandidates() {
+        var o = EditOverrides()
+        o.record(.reviewers(added: [], removed: [.team(slug: "core", name: "Core")]), on: editKey(77), at: t0)
+        let requested = editPR(77, requests: [.team(slug: "core", name: "Core")])
+        o.reconcile(with: editSnapshot(review: [requested], team: [editPR(77)], myTeams: ["core"]), now: t0 + 30)
+        #expect(!o.isEmpty)
+        o.reconcile(with: editSnapshot(team: [editPR(77)], myTeams: ["core"]), now: t0 + 60)
+        #expect(o.isEmpty)
+    }
+
     @Test func newerReviewersEditReplacesOverlapping() {
         var o = EditOverrides()
         o.record(.reviewers(added: [.user("alice")], removed: []), on: editKey(77), at: t0)

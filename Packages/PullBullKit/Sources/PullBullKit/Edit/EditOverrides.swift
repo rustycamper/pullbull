@@ -91,7 +91,7 @@ public struct EditOverrides: Equatable, Sendable {
                 Self.followViewer(entry.key, added: added, removed: removed, in: &shown)
             }
             if case .reviewers(let added, _) = entry.change, let copy = entry.copy, copy.state == .open,
-               added.contains(Reviewer.user(shown.org.viewer).key, by: \.key),
+               !Self.viewerKeys(shown.org).isDisjoint(with: added.map(\.key)),
                !shown.reviewCandidates.contains(where: { $0.key == entry.key }) {
                 // Review lists what asks for the viewer's review; the tab's rules decide from here.
                 shown.reviewCandidates.append(apply(to: copy))
@@ -267,13 +267,17 @@ public struct EditOverrides: Equatable, Sendable {
             else { return false }
             guard pr.state == .open else { return true }
             // Review comes from search, which lags the PR's own fields: wait for it too, or the row flickers.
-            let viewer = Reviewer.user(fetched.org.viewer).key
-            let listed = fetched.reviewCandidates.first { $0.key == entry.key }
-            let asksViewer = listed?.reviewRequests.contains(viewer, by: \.key) == true
-            if added.contains(viewer, by: \.key) { return asksViewer }
-            if removed.contains(viewer, by: \.key) { return !asksViewer }
-            return true
+            // The viewer's own teams count as the viewer.
+            let mine = Self.viewerKeys(fetched.org)
+            let listed = Set(fetched.reviewCandidates.first { $0.key == entry.key }?.reviewRequests.map(\.key) ?? [])
+            return added.allSatisfy { !mine.contains($0.key) || listed.contains($0.key) }
+                && !removed.contains { mine.contains($0.key) && listed.contains($0.key) }
         }
+    }
+
+    /// The reviewer keys that ask for the viewer's own review: the viewer and the viewer's teams.
+    private static func viewerKeys(_ org: OrgContext) -> Set<String> {
+        Set([Reviewer.user(org.viewer).key] + org.myTeams.map { Reviewer.team(slug: $0, name: $0).key })
     }
 
     /// Whether `newer` sets something `older` set: the Status, or one of the same labels or people.
