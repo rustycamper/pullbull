@@ -99,7 +99,7 @@ struct AccountSettingsTab: View {
                 }
             } label: {
                 let warning = loader.boardsError ?? boardFetchError.map { "Couldn't load this board: \($0)" }
-                RowLabel("Projects board", note: warning ?? "Board tab, and Status groups on Assigned",
+                RowLabel("Projects board", note: warning ?? "Board tab, and Status groups on Mine",
                          isWarning: warning != nil)
             }
         } else {

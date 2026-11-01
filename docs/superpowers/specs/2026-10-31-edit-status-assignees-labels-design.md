@@ -83,9 +83,9 @@ The picker reuses the search completion list's look and keys: a small popup anch
 
 ### After an edit
 
-- The row updates at once in every list, in search results and in the detail. On Board and Assigned, and in search results laid out by lane, the row moves to its new Status lane. Unassigning yourself takes it off Assigned. Assigning yourself puts it on Assigned (built from the item PullBull already holds).
+- The row updates at once in every list, in search results and in the detail. On Board and Mine, and in search results laid out by lane, the row moves to its new Status lane. Unassigning yourself takes it off Mine. Assigning yourself puts it on Mine (built from the item PullBull already holds).
 - No message on success. The updated row is the feedback.
-- The selection follows the row. It stays selected in its new lane, and the list scrolls to keep it in view. When the edit takes the row off the list (unassigning yourself on Assigned, or into a folded lane), the selection moves to the next row. In the detail, the edited field shows the new value.
+- The selection follows the row. It stays selected in its new lane, and the list scrolls to keep it in view. When the edit takes the row off the list (unassigning yourself on Mine, or into a folded lane), the selection moves to the next row. In the detail, the edited field shows the new value.
 - **Undo:** ⌘Z within 10 seconds of an edit sends the inverse change: the previous Status or clearing it, the removed labels and assignees back, the added ones off. Only the last edit can be undone.
   - The window opens when GitHub confirms the edit. Only the last edit's confirmation opens it: an older edit whose answer lands after a newer edit began stays not undoable.
   - An edit that added the issue to the board is undone by removing the item from the board.
@@ -143,13 +143,13 @@ Mutations go through the existing `GitHubAPI` and transport, with the same error
 
 ### The local override until GitHub catches up
 
-Search-backed lists (Assigned, Created, PR tabs, search) can return the old value for a while after a write: GitHub's search index lags. The board query reads the project directly and lags little, but a refresh can still be in flight from before the edit. So:
+Search-backed lists (the issues tabs Mine and Created, PR tabs, search) can return the old value for a while after a write: GitHub's search index lags. The board query reads the project directly and lags little, but a refresh can still be in flight from before the edit. So:
 
 - Each applied edit records an override: the item's `PRKey` (repo and number, the key every list and the detail already share), the field, the intended value, and when it was made. It lives in PullBullKit, beside the snapshot, in memory only. Node IDs are not part of the key, so overrides work on cached items without them.
 - An override is stored as a change, not as a whole item: the Status option ID (or none), and the labels and assignees added and removed. Applying it to any model of the item (a PR row, a `BoardIssue`, a detail) changes only those fields.
-- Agreement means: the same Status option ID (not its name, so a renamed option still agrees), and every added label or assignee present and every removed one absent, compared case-insensitively, on the first copy of the item found (board, then Assigned, Created, Closed, then PR lists). A removal from the board agrees once the card is gone. If the board no longer has the overriding option (it was deleted), the override is dropped at once.
-- Assigning or unassigning yourself on an open issue agrees only once Assigned agrees too (when Assigned was fetched). The board copy shows the new assignee at once, but Assigned comes from search and lags; dropping the override on the board copy alone would make the row flicker on Assigned.
-- Self-assigning puts the open issue on Assigned from the `BoardIssue` PullBull holds, from the board or Created copy. Both carry `issueRowFields`, which is all an Assigned row shows. An issue found only through search shows on Assigned once search lists it. Assigning someone else inserts nothing. A PR has no Assigned list and takes no edits, so nothing is inserted for PRs.
+- Agreement means: the same Status option ID (not its name, so a renamed option still agrees), and every added label or assignee present and every removed one absent, compared case-insensitively, on the first copy of the item found (board, then Mine, Created, Closed, then PR lists). A removal from the board agrees once the card is gone. If the board no longer has the overriding option (it was deleted), the override is dropped at once.
+- Assigning or unassigning yourself on an open issue agrees only once Mine agrees too (when Mine was fetched). The board copy shows the new assignee at once, but Mine comes from search and lags; dropping the override on the board copy alone would make the row flicker on Mine.
+- Self-assigning puts the open issue on Mine from the `BoardIssue` PullBull holds, from the board or Created copy. Both carry `issueRowFields`, which is all an Mine row shows. An issue found only through search shows on Mine once search lists it. Assigning someone else inserts nothing. A PR has no assigned list and takes no edits, so nothing is inserted for PRs.
 - Tabs, search results and the detail read the snapshot through the overrides. The stored snapshot stays as GitHub returned it. Notification change detection compares raw snapshots, so an override never fakes an event.
 - An override is dropped when a fetched snapshot agrees with it, or when 5 minutes pass, or when it is undone or fails. After 5 minutes GitHub's answer wins, even if it differs: someone else changed it, or the write didn't stick.
 - Overrides apply oldest first, so several edits to one item before a refresh show their net result. When a fetch agrees with an edit, the older edits to the same item that it replaced are dropped with it: any older Status edit, or an older label or assignee edit that touched one of the same labels or people. Todo → Doing → Done followed by a fetch showing Done leaves nothing behind, and neither does adding to the board and undoing it. An older edit to a different label still waits for GitHub to show it. Each override is checked against fetches independently, so a fetch that agrees with an earlier edit doesn't drop a later one.
@@ -217,7 +217,7 @@ Per CONTRIBUTING, logic lives in PullBullKit with tests; views stay thin. Tests 
 - Diff building: toggles to add and remove sets, and a toggle back and forth sends nothing.
 - Mutation documents and variables for each edit, including add-to-board followed by set.
 - Override reconciliation: applied to tabs and search, dropped on agreement, on timeout and on failure; not visible to change detection.
-- Lane moves: Status change moves the row on Board and Assigned; self-unassign removes from Assigned; self-assign inserts.
+- Lane moves: Status change moves the row on Board and Mine; self-unassign removes from Mine; self-assign inserts.
 - Permission gating: installation permissions, `gh` scopes.
 - Undo: the inverse of each edit, including delete-from-board for an add; ⌘Z expires after 10 seconds, only the last edit's answer arms it, typing in the search field ends it, and another board's fetch drops it.
 - Add to the board: a card already there (a stale snapshot) gets the Status and is neither rolled back nor undone by deletion.

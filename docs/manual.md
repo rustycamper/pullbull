@@ -40,7 +40,7 @@ gh auth login --web -s read:project     # new login
 gh auth refresh -s read:project         # existing login
 ```
 
-Without `read:project`: Board shows the command to add it, Assigned groups by repo.
+Without `read:project`: Board shows the command to add it, Mine groups by repo.
 
 ### No organization
 
@@ -93,14 +93,14 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 
 | Tab | Shows | Grouped by |
 |---|---|---|
-| Assigned | Your issues | Board Status, then "Not on board". Done folded: done on the board, still open. Repo without a board |
+| Mine | Issues assigned to you | Board Status, then "Not on board". Done folded: done on the board, still open. Repo without a board |
 | Created | Issues you opened | Repo, or none (Settings → General) |
 | Board | All open issues on the board | Board Status. Done folded, last 14 days |
 
-- **Status lanes:** the glyph takes the Status colour set on the board, on Board and Assigned
+- **Status lanes:** the glyph takes the Status colour set on the board, on Board and Mine
 - **Fold a lane:** click its header. Status, "No status" and "Not on board" fold; repo groups don't. Needs a board
-- **Folds:** kept per tab and per board, across relaunches. Folding on Board leaves Assigned as it is
-- **Searching:** every lane shows open; folds come back when the search ends; open issues done on the board show under Done only when the results are laid out like Assigned or Board, not on Created; closed ones go under Closed
+- **Folds:** kept per tab and per board, across relaunches. Folding on Board leaves Mine as it is
+- **Searching:** every lane shows open; folds come back when the search ends; open issues done on the board show under Done only when the results are laid out like Mine or Board, not on Created; closed ones go under Closed
 - **Done:** click its header to unfold. Never counted
 - **Labels:** chips as on [pull requests](#pull-requests). The board card lists them all
 - **Switch board:** on the Board tab, click its name in the filter row, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd>
@@ -135,7 +135,7 @@ Set an issue's board Status, assignees and labels from PullBull. It writes nothi
 | `review:changes` `review:none` | Changes requested · no reviews yet. PRs only |
 | `size:s` `size:m` `size:l` | Lines changed: up to 50, up to 300, more. PRs only |
 | `repo:widgets` `repo:acme/widgets` | That repo. The name alone matches every owner's; several `repo:` match any of them. An exact `owner/name` goes to GitHub even for a repo PullBull hasn't seen; a name alone goes as the one known repo it names, and filters your lists only when no known repo or several have it. Saved searches keep it |
-| `is:unanswered` | Your open PRs and your Assigned or Created issues whose last comment is someone else's, not a bot's. Searches your lists only |
+| `is:unanswered` | Your open PRs and the issues on your Mine or Created tab whose last comment is someone else's, not a bot's. Searches your lists only |
 | `status:prog` `status:"In progress"` | Status column on the board. Issues only |
 | `#123` | That number, every repo |
 | `owner/repo#123` or a link | Exactly that item |

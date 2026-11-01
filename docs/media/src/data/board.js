@@ -16,7 +16,7 @@ window.SCENES.board = {
   menuBar: { count: 6, open: true },
   mode: "issues",
   tabs: [
-    { id: "assigned", title: "Assigned", count: 3 },
+    { id: "assigned", title: "Mine", count: 3 },
     { id: "created", title: "Created", count: 2 },
     { id: "board", title: "Board", count: 7 },
   ],

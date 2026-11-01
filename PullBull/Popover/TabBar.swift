@@ -231,7 +231,7 @@ private struct SegmentSelected: LayoutValueKey {
 
 /// Lays segments out at equal widths when every label fits with `padding` on each side; otherwise each
 /// gets its ideal width plus an equal share of what is left (or minus an equal share of the shortfall),
-/// so a long label like "Assigned 55" takes room from the shorter ones instead of truncating. When even
+/// so a long label like "Created 55" takes room from the shorter ones instead of truncating. When even
 /// that is too tight, only the selected segment keeps `padding` inside its thumb and the others make do
 /// with `tightPadding`; tighter still, the padding is shared out before any label is cut.
 private struct SegmentRow: Layout {
@@ -300,7 +300,7 @@ extension PRTab {
 extension IssueTab {
     var title: String {
         switch self {
-        case .assigned: "Assigned"
+        case .assigned: "Mine"
         case .created: "Created"
         case .board: "Board"
         }
