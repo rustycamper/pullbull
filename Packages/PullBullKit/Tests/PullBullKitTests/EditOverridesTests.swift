@@ -181,6 +181,118 @@ private func card(_ snapshot: Snapshot, _ key: PRKey) -> BoardIssue? {
         #expect(o.isEmpty)
     }
 
+    // MARK: Reviewers
+
+    @Test func reviewersOverlayRequestsNotReviews() {
+        var o = EditOverrides()
+        o.record(.reviewers(added: [.user("alice")], removed: [.user("Bob")]), on: editKey(77), at: t0)
+        let bobReview = Review(author: "bob", state: .approved, submittedAt: t0)
+        let pr = editPR(77, reviews: [bobReview], requests: [.user("bob"), .team(slug: "core", name: "Core")])
+        let shown = o.apply(to: editSnapshot(mine: [pr], review: [pr], team: [pr]))
+        for copy in [shown.mine[0], shown.reviewCandidates[0], shown.team[0]] {
+            #expect(copy.reviewRequests == [.team(slug: "core", name: "Core"), .user("alice")])
+            #expect(copy.latestReviews == [bobReview])
+        }
+        let results = SearchResults(openPRs: [pr], closedPRs: [], issues: [], phase: .done)
+        #expect(o.apply(to: results).openPRs[0].reviewRequests.map(\.key) == ["team:core", "alice"])
+    }
+
+    @Test func reviewersAgreeOnFirstSnapshotCopy() {
+        var o = EditOverrides()
+        o.record(.reviewers(added: [.user("alice")], removed: []), on: editKey(77), at: t0)
+        let old = editPR(77, requests: [.user("me")]), new = editPR(77, requests: [.user("me"), .user("Alice")])
+        o.reconcile(with: editSnapshot(review: [old], team: [new]), now: t0 + 30)
+        #expect(!o.isEmpty)
+        o.reconcile(with: editSnapshot(review: [new], team: [new]), now: t0 + 60)
+        #expect(o.isEmpty)
+    }
+
+    @Test func selfAddWaitsForReviewCandidates() {
+        var o = EditOverrides()
+        o.record(.reviewers(added: [.user("me")], removed: []), on: editKey(77), at: t0)
+        let requested = editPR(77, requests: [.user("me")])
+        o.reconcile(with: editSnapshot(team: [requested]), now: t0 + 30)
+        #expect(!o.isEmpty)
+        o.reconcile(with: editSnapshot(review: [requested], team: [requested]), now: t0 + 60)
+        #expect(o.isEmpty)
+    }
+
+    @Test func selfAddInsertsCarriedCopyIntoReview() {
+        var o = EditOverrides()
+        let pr = editPR(77)
+        o.record(.reviewers(added: [.user("me")], removed: []), on: editKey(77), at: t0, carrying: pr)
+        let shown = o.apply(to: editSnapshot(team: [pr]))
+        #expect(shown.reviewCandidates.map(\.key) == [editKey(77)])
+        #expect(shown.reviewCandidates[0].reviewRequests == [.user("me")])
+        #expect(ReviewRules.status(of: shown.reviewCandidates[0], me: "me", myTeams: []) == .needsReview(.requested))
+    }
+
+    @Test func selfAddDoesNotDuplicateAListedPR() {
+        var o = EditOverrides()
+        let pr = editPR(77)
+        o.record(.reviewers(added: [.user("me")], removed: []), on: editKey(77), at: t0, carrying: pr)
+        #expect(o.apply(to: editSnapshot(review: [pr])).reviewCandidates.count == 1)
+    }
+
+    @Test func closedCopyNeverEntersReview() {
+        var o = EditOverrides()
+        let pr = editPR(77, state: .closed)
+        o.record(.reviewers(added: [.user("me")], removed: []), on: editKey(77), at: t0, carrying: pr)
+        #expect(o.apply(to: editSnapshot(team: [pr])).reviewCandidates.isEmpty)
+    }
+
+    @Test func selfRemovalLeavesReviewUnlessTeamKeepsIt() {
+        var o = EditOverrides()
+        o.record(.reviewers(added: [], removed: [.user("me")]), on: editKey(77), at: t0)
+        let direct = editPR(77, requests: [.user("me")])
+        let shown = o.apply(to: editSnapshot(review: [direct]))
+        #expect(ReviewRules.status(of: shown.reviewCandidates[0], me: "me", myTeams: []) == .notRequested)
+        let viaTeam = editPR(77, requests: [.user("me"), .team(slug: "core", name: "Core")])
+        let kept = o.apply(to: editSnapshot(review: [viaTeam], myTeams: ["core"]))
+        #expect(ReviewRules.status(of: kept.reviewCandidates[0], me: "me", myTeams: ["core"])
+            == .needsReview(.teamRequested("core")))
+    }
+
+    @Test func selfRemovalAgreesWhenDirectRequestGone() {
+        var o = EditOverrides()
+        o.record(.reviewers(added: [], removed: [.user("me")]), on: editKey(77), at: t0)
+        o.reconcile(with: editSnapshot(review: [editPR(77, requests: [.user("me")])]), now: t0 + 30)
+        #expect(!o.isEmpty)
+        let viaTeam = editPR(77, requests: [.team(slug: "core", name: "Core")])
+        o.reconcile(with: editSnapshot(review: [viaTeam], myTeams: ["core"]), now: t0 + 60)
+        #expect(o.isEmpty)
+    }
+
+    @Test func selfRemovalAgreesWhenReviewDropsIt() {
+        var o = EditOverrides()
+        o.record(.reviewers(added: [], removed: [.user("me")]), on: editKey(77), at: t0)
+        o.reconcile(with: editSnapshot(team: [editPR(77)]), now: t0 + 30)
+        #expect(o.isEmpty)
+    }
+
+    @Test func newerReviewersEditReplacesOverlapping() {
+        var o = EditOverrides()
+        o.record(.reviewers(added: [.user("alice")], removed: []), on: editKey(77), at: t0)
+        o.record(.reviewers(added: [], removed: [.user("ALICE")]), on: editKey(77), at: t0 + 1)
+        o.reconcile(with: editSnapshot(review: [editPR(77)]), now: t0 + 30)
+        #expect(o.isEmpty)
+    }
+
+    @Test func detailRequestsReadThroughOverride() {
+        var o = EditOverrides()
+        o.record(.reviewers(added: [.user("alice")], removed: [.user("bob")]), on: editKey(77), at: t0)
+        #expect(o.apply(toRequests: [.user("bob")], on: editKey(77)) == [.user("alice")])
+        #expect(o.apply(toRequests: [.user("bob")], on: editKey(78)) == [.user("bob")])
+    }
+
+    @Test func replacingAReviewersEditKeepsItsCopy() {
+        var o = EditOverrides()
+        let pr = editPR(77)
+        let id = o.record(.reviewers(added: [.user("me"), .user("x")], removed: []), on: editKey(77), at: t0, carrying: pr)
+        o.replace(id, with: .reviewers(added: [.user("me")], removed: []))
+        #expect(o.apply(to: editSnapshot(team: [pr])).reviewCandidates.count == 1)
+    }
+
     @Test func editsApplyOldestFirst() {
         var o = EditOverrides()
         o.record(.labels(added: [bug], removed: []), on: k412, at: t0)

@@ -26,10 +26,10 @@ public struct EditSession: Equatable, Sendable {
     public init() {}
 
     /// Shows `change` at once. It becomes the last edit, so the one before can no longer be undone.
-    public mutating func begin(_ change: EditChange, on key: PRKey, at now: Date) -> UUID {
+    public mutating func begin(_ change: EditChange, on key: PRKey, at now: Date, carrying copy: PullRequest? = nil) -> UUID {
         failure = nil
         undo = EditUndo()
-        let id = overrides.record(change, on: key, at: now)
+        let id = overrides.record(change, on: key, at: now, carrying: copy)
         last = id
         return id
     }
