@@ -832,6 +832,80 @@ public struct GitHubAPI: Sendable {
         return id
     }
 
+    /// The most pages of labels read for one repo.
+    public static let maxLabelPages = 10
+
+    /// The repo's labels by name, and the issue's own. `complete` is false when the repo has more
+    /// than `maxLabelPages` pages. The issue's labels past the first 100 are not read.
+    public func labelCandidates(for key: PRKey) async throws -> SetCandidates {
+        let (owner, name) = try Self.ownerAndName(key)
+        var all: [SetCandidate] = []
+        var current: [SetCandidate] = []
+        var after: String?
+        for page in 0..<Self.maxLabelPages {
+            var variables: [String: Any] = ["owner": owner, "name": name, "n": key.number, "withIssue": page == 0]
+            if let after { variables["after"] = after }
+            let data = try await execute(Mutations.labelCandidates, variables)
+            guard let repository = data["repository"] as? [String: Any] else {
+                throw APIError.notFound("\(key.repo) not found")
+            }
+            if page == 0 {
+                current = Self.candidates(in: repository["issue"], field: "labels", label: true)
+            }
+            let labels = repository["labels"] as? [String: Any]
+            all += Self.candidates(in: labels, label: true)
+            let info = labels?["pageInfo"] as? [String: Any]
+            guard info?["hasNextPage"] as? Bool == true, let cursor = info?["endCursor"] as? String else {
+                return SetCandidates(all: all, current: current, complete: true)
+            }
+            after = cursor
+        }
+        return SetCandidates(all: all, current: current, complete: false)
+    }
+
+    /// The first hundred people assignable in the repo (those matching `query`, when it isn't empty),
+    /// and the issue's assignees. `complete` is false when there were more.
+    public func assigneeCandidates(for key: PRKey, query: String?) async throws -> SetCandidates {
+        let (owner, name) = try Self.ownerAndName(key)
+        var variables: [String: Any] = ["owner": owner, "name": name, "n": key.number]
+        if let query, !query.isEmpty { variables["q"] = query }
+        let data = try await execute(Mutations.assigneeCandidates, variables)
+        guard let repository = data["repository"] as? [String: Any] else {
+            throw APIError.notFound("\(key.repo) not found")
+        }
+        let users = repository["assignableUsers"] as? [String: Any]
+        let more = (users?["pageInfo"] as? [String: Any])?["hasNextPage"] as? Bool == true
+        return SetCandidates(
+            all: Self.candidates(in: users, label: false),
+            current: Self.candidates(in: repository["issue"], field: "assignees", label: false),
+            complete: !more)
+    }
+
+    private static func ownerAndName(_ key: PRKey) throws -> (String, String) {
+        let parts = key.repo.split(separator: "/", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { throw APIError.notFound("\(key.repo) not found") }
+        return (parts[0], parts[1])
+    }
+
+    /// The candidates in `connection["nodes"]`, or in `parent[field]["nodes"]` when `field` is given;
+    /// empty when the parent is null.
+    private static func candidates(in parent: Any?, field: String? = nil, label: Bool) -> [SetCandidate] {
+        var connection = parent as? [String: Any]
+        if let field { connection = connection?[field] as? [String: Any] }
+        let nodes = connection?["nodes"] as? [[String: Any]] ?? []
+        return nodes.compactMap { node in
+            guard let id = node["id"] as? String else { return nil }
+            if label {
+                guard let name = node["name"] as? String else { return nil }
+                return SetCandidate(
+                    id: id, name: name, detail: node["description"] as? String, color: node["color"] as? String)
+            }
+            guard let login = node["login"] as? String else { return nil }
+            return SetCandidate(
+                id: id, name: login, avatarURL: (node["avatarUrl"] as? String).flatMap(URL.init(string:)))
+        }
+    }
+
     /// Sends a mutation and returns its `payload` field. A null payload throws `writeRefused` for a
     /// FORBIDDEN error, else `graphQL`.
     private func mutate(_ mutation: String, _ variables: [String: Any], payload: String) async throws -> [String: Any] {

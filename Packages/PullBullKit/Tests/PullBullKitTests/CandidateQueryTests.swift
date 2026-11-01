@@ -1,0 +1,143 @@
+import Foundation
+import Testing
+@testable import PullBullKit
+
+/// Answers each request in turn and records the bodies.
+private final class QueueTransport: GraphQLTransport, @unchecked Sendable {
+    private let lock = NSLock()
+    private var queue: [Data]
+    private var sent: [Data] = []
+
+    init(_ json: [String]) { queue = json.map { Data($0.utf8) } }
+
+    var bodies: [[String: Any]] {
+        lock.withLock { sent.compactMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } }
+    }
+
+    func send(_ body: Data, token: String) async throws -> (Data, HTTPURLResponse) {
+        let data = lock.withLock {
+            sent.append(body)
+            return queue.removeFirst()
+        }
+        let response = HTTPURLResponse(
+            url: URL(string: "https://api.github.com/graphql")!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        return (data, response)
+    }
+}
+
+private func api(_ transport: QueueTransport) -> GitHubAPI {
+    GitHubAPI(transport: transport, auth: StaticTokenSource("test-token"))
+}
+
+private let key = PRKey(repo: "acme/widgets", number: 7)
+
+private func variables(_ body: [String: Any]) -> [String: Any] { body["variables"] as? [String: Any] ?? [:] }
+
+@Suite struct CandidateQueryTests {
+    @Test func labelsReadEveryPageInNameOrder() async throws {
+        let t = QueueTransport([
+            #"""
+            {"data":{"repository":{
+              "issue":{"labels":{"nodes":[{"id":"LA_bug","name":"bug","color":"d73a4a","description":"Broken"}]}},
+              "labels":{"nodes":[
+                {"id":"LA_bug","name":"bug","color":"d73a4a","description":"Broken"},
+                {"id":"LA_docs","name":"docs","color":"0075ca","description":null}],
+              "pageInfo":{"hasNextPage":true,"endCursor":"c1"}}}}}
+            """#,
+            #"""
+            {"data":{"repository":{
+              "labels":{"nodes":[{"id":"LA_triage","name":"triage","color":"ededed","description":null}],
+              "pageInfo":{"hasNextPage":false,"endCursor":null}}}}}
+            """#,
+        ])
+        let result = try await api(t).labelCandidates(for: key)
+        #expect(result.all.map(\.name) == ["bug", "docs", "triage"])
+        #expect(result.current.map(\.id) == ["LA_bug"])
+        #expect(result.complete)
+        #expect(result.all[0].color == "d73a4a")
+        #expect(result.all[0].detail == "Broken")
+        #expect(result.all[1].detail == nil)
+        #expect(t.bodies.count == 2)
+        #expect(variables(t.bodies[1])["after"] as? String == "c1")
+        let query = try #require(t.bodies[0]["query"] as? String)
+        #expect(query.contains("orderBy:{field:NAME,direction:ASC}"))
+    }
+
+    @Test func labelsStopAtTheLastPage() async throws {
+        let page = #"""
+        {"data":{"repository":{"labels":{"nodes":[{"id":"LA_a","name":"a","color":"000000","description":null}],
+        "pageInfo":{"hasNextPage":true,"endCursor":"c"}}}}}
+        """#
+        let t = QueueTransport(Array(repeating: page, count: GitHubAPI.maxLabelPages))
+        let result = try await api(t).labelCandidates(for: key)
+        #expect(t.bodies.count == GitHubAPI.maxLabelPages)
+        #expect(!result.complete)
+    }
+
+    @Test func assigneesReadTheFirstHundredAndTheIssuesOwn() async throws {
+        let t = QueueTransport([
+            #"""
+            {"data":{"repository":{
+              "issue":{"assignees":{"nodes":[{"id":"U_carol","login":"carol","avatarUrl":"https://a.test/c.png"}]}},
+              "assignableUsers":{"nodes":[
+                {"id":"U_alice","login":"alice","avatarUrl":"https://a.test/a.png"},
+                {"id":"U_bob","login":"bob","avatarUrl":"https://a.test/b.png"}],
+              "pageInfo":{"hasNextPage":true}}}}}
+            """#
+        ])
+        let result = try await api(t).assigneeCandidates(for: key, query: nil)
+        #expect(result.all.map(\.name) == ["alice", "bob"])
+        #expect(result.current.map(\.name) == ["carol"])
+        #expect(result.all[0].avatarURL == URL(string: "https://a.test/a.png"))
+        #expect(!result.complete)
+        let sent = variables(try #require(t.bodies.first))
+        #expect(sent["q"] == nil)
+        #expect(sent["first"] == nil)
+        #expect(sent["owner"] as? String == "acme")
+        #expect(sent["name"] as? String == "widgets")
+        #expect(sent["n"] as? Int == 7)
+    }
+
+    @Test func assigneeQuerySendsTheFilter() async throws {
+        let t = QueueTransport([
+            #"{"data":{"repository":{"issue":{"assignees":{"nodes":[]}},"assignableUsers":{"nodes":[],"pageInfo":{"hasNextPage":false}}}}}"#
+        ])
+        let result = try await api(t).assigneeCandidates(for: key, query: "al")
+        #expect(variables(try #require(t.bodies.first))["q"] as? String == "al")
+        #expect(result.complete)
+    }
+
+    @Test func aMissingIssueHasNoCurrentValues() async throws {
+        let t = QueueTransport([
+            #"""
+            {"data":{"repository":{"issue":null,
+              "assignableUsers":{"nodes":[{"id":"U_alice","login":"alice","avatarUrl":"https://a.test/a.png"}],
+              "pageInfo":{"hasNextPage":false}}}}}
+            """#
+        ])
+        let result = try await api(t).assigneeCandidates(for: key, query: nil)
+        #expect(result.current.isEmpty)
+        #expect(result.all.map(\.name) == ["alice"])
+        #expect(result.complete)
+    }
+
+    @Test func laterLabelPagesSkipTheIssue() async throws {
+        let t = QueueTransport([
+            #"{"data":{"repository":{"labels":{"nodes":[],"pageInfo":{"hasNextPage":true,"endCursor":"c1"}}}}}"#,
+            #"{"data":{"repository":{"labels":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}"#,
+        ])
+        _ = try await api(t).labelCandidates(for: key)
+        let first = variables(t.bodies[0])
+        let second = variables(t.bodies[1])
+        #expect(first["withIssue"] as? Bool == true)
+        #expect(first["after"] == nil)
+        #expect(second["withIssue"] as? Bool == false)
+    }
+
+    @Test func aMissingRepositoryThrowsNotFound() async throws {
+        let t = QueueTransport([#"{"data":{"repository":null}}"#])
+        await #expect(throws: APIError.notFound("acme/widgets not found")) {
+            _ = try await api(t).labelCandidates(for: key)
+        }
+    }
+}
