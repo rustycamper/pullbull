@@ -82,7 +82,7 @@ private func notice(_ source: AccountSource, org: String?, access: OrgAccess?) -
         #expect(notice == .personalInstall(login: "solo", installURL: personalInstall, ownerURL: install))
         #expect(notice?.title == "Choose the repositories PullBull can see")
         #expect(notice?.body == "PullBull didn't find an organization for solo, so it shows your own repositories. "
-            + "On GitHub, install PullBull on your account and choose all repositories or only some. PullBull only reads them.")
+            + "On GitHub, install PullBull on your account and choose all repositories or only some. PullBull edits only what you pick.")
         #expect(notice?.blocksPolling == true)
         #expect(OrgAccessNotice.personalFooter == "Using PullBull for an organization? An owner installs it there.")
     }
@@ -92,7 +92,7 @@ private func notice(_ source: AccountSource, org: String?, access: OrgAccess?) -
         let untargeted = PersonalInstallTarget(login: "solo", installURL: install, installationID: nil)
         let notice = OrgAccessNotice.notice(
             source: .gitHubApp, org: nil, access: .notInstalled(install), installURL: install, personal: untargeted)
-        #expect(notice?.body?.hasSuffix("PullBull only reads them. On GitHub, choose your account (solo), not an organization.") == true)
+        #expect(notice?.body?.hasSuffix("PullBull edits only what you pick. On GitHub, choose your account (solo), not an organization.") == true)
     }
 
     /// No org, installed on the user's own account: polling runs; selected repositories say so, with

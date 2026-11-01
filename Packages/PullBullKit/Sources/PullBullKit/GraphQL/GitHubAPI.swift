@@ -284,7 +284,7 @@ public struct LinkedPR: Codable, Sendable, Hashable {
     }
 }
 
-/// The read-only detail of one issue.
+/// The detail of one issue.
 public struct IssueDetail: Codable, Sendable, Equatable {
     public let key: PRKey
     /// The row fields, read with the same fragment as the lists; `status` and `boardItemId` are nil
