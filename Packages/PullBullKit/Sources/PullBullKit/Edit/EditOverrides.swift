@@ -118,20 +118,36 @@ public struct EditOverrides: Equatable, Sendable {
         case .labels(let added, let removed):
             (issue.labels, issue.labelColors) = changeLabels(issue.labels, issue.labelColors, added, removed)
         case .assignees(let added, let removed):
-            issue.assignees.removeAll { assignee in removed.contains { same($0.login, assignee.login) } }
-            for person in added where !issue.assignees.contains(where: { same($0.login, person.login) }) {
-                issue.assignees.append(Assignee(login: person.login, avatarURL: person.avatarURL))
-            }
+            issue.assignees = changeAssignees(issue.assignees, added, removed)
         }
         return issue
     }
 
-    /// Pull requests carry no assignees or Status here; only labels show.
+    /// Pull requests carry no Status here.
     private static func change(_ pr: PullRequest, _ entry: Entry) -> PullRequest {
-        guard pr.key == entry.key, case .labels(let added, let removed) = entry.change else { return pr }
+        guard pr.key == entry.key else { return pr }
         var pr = pr
-        (pr.labels, pr.labelColors) = changeLabels(pr.labels, pr.labelColors, added, removed)
+        switch entry.change {
+        case .status:
+            break
+        case .labels(let added, let removed):
+            (pr.labels, pr.labelColors) = changeLabels(pr.labels, pr.labelColors, added, removed)
+        case .assignees(let added, let removed):
+            pr.assignees = changeAssignees(pr.assignees, added, removed)
+        }
         return pr
+    }
+
+    /// Removes and adds people by login, case ignored; someone already assigned isn't added twice.
+    private static func changeAssignees(
+        _ assignees: [Assignee], _ added: [PersonRef], _ removed: [PersonRef]
+    ) -> [Assignee] {
+        var assignees = assignees
+        assignees.removeAll { assignee in removed.contains { same($0.login, assignee.login) } }
+        for person in added where !assignees.contains(where: { same($0.login, person.login) }) {
+            assignees.append(Assignee(login: person.login, avatarURL: person.avatarURL))
+        }
+        return assignees
     }
 
     /// Labels and their colours by position; colours missing from an old cache are padded with nil so
@@ -198,7 +214,10 @@ public struct EditOverrides: Equatable, Sendable {
             guard let names = labels(of: entry.key, in: fetched) else { return false }
             return holds(names, added: added.map(\.name), removed: removed.map(\.name))
         case .assignees(let added, let removed):
-            guard let issue = issues(in: fetched).first(where: { $0.key == entry.key }) else { return false }
+            guard let issue = issues(in: fetched).first(where: { $0.key == entry.key }) else {
+                guard let pr = prs(in: fetched).first(where: { $0.key == entry.key }) else { return false }
+                return holds(pr.assignees.map(\.login), added: added.map(\.login), removed: removed.map(\.login))
+            }
             guard holds(issue.assignees.map(\.login), added: added.map(\.login), removed: removed.map(\.login)) else {
                 return false
             }
@@ -240,8 +259,11 @@ public struct EditOverrides: Equatable, Sendable {
 
     private static func labels(of key: PRKey, in snapshot: Snapshot) -> [String]? {
         if let issue = issues(in: snapshot).first(where: { $0.key == key }) { return issue.labels }
-        let prs = snapshot.reviewCandidates + snapshot.mine + snapshot.team + snapshot.recentlyClosed
-        return prs.first { $0.key == key }?.labels
+        return prs(in: snapshot).first { $0.key == key }?.labels
+    }
+
+    private static func prs(in snapshot: Snapshot) -> [PullRequest] {
+        snapshot.reviewCandidates + snapshot.mine + snapshot.team + snapshot.recentlyClosed
     }
 
     private static func same(_ a: String, _ b: String) -> Bool {

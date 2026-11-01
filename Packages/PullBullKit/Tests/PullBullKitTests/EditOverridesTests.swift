@@ -143,14 +143,42 @@ private func card(_ snapshot: Snapshot, _ key: PRKey) -> BoardIssue? {
         #expect(o.apply(to: editSnapshot(board: [editIssue(500)], assigned: [])).assignedIssues?.isEmpty == true)
     }
 
-    @Test func prLabelsOverlayAndAssigneesIgnored() {
+    @Test func prLabelsAndAssigneesOverlay() {
         var o = EditOverrides()
         let k77 = editKey(77)
         o.record(.labels(added: [bug], removed: []), on: k77, at: t0)
         o.record(.assignees(added: [alice], removed: []), on: k77, at: t0)
-        let pr = editPR(77)
+        let pr = editPR(77, assignees: ["bo"])
         #expect(o.apply(to: pr).labels == ["bug"])
-        #expect(o.apply(to: editSnapshot(mine: [pr])).mine[0].labels == ["bug"])
+        #expect(o.apply(to: pr).assignees.map(\.login) == ["bo", "alice"])
+        #expect(o.apply(to: editSnapshot(mine: [pr])).mine[0].assignees.map(\.login) == ["bo", "alice"])
+        o.record(.assignees(added: [], removed: [PersonRef(id: "U_bo", login: "BO", avatarURL: nil)]), on: k77, at: t0 + 1)
+        #expect(o.apply(to: pr).assignees.map(\.login) == ["alice"])
+    }
+
+    @Test func prEditShowsInSearchResults() {
+        var o = EditOverrides()
+        o.record(.assignees(added: [alice], removed: []), on: editKey(77), at: t0)
+        let results = SearchResults(openPRs: [editPR(77)], closedPRs: [editPR(78)], issues: [], phase: .done)
+        #expect(o.apply(to: results).openPRs[0].assignees.map(\.login) == ["alice"])
+        #expect(o.apply(to: results).closedPRs[0].assignees.isEmpty)
+    }
+
+    @Test func selfAssignOnAPRLeavesAssignedIssuesAlone() {
+        var o = EditOverrides()
+        o.record(.assignees(added: [me], removed: []), on: editKey(77), at: t0)
+        let shown = o.apply(to: editSnapshot(assigned: [], mine: [editPR(77)]))
+        #expect(shown.assignedIssues?.isEmpty == true)
+        #expect(shown.mine[0].assignees.map(\.login) == ["me"])
+    }
+
+    @Test func prAssigneesAgreeInPRLists() {
+        var o = EditOverrides()
+        o.record(.assignees(added: [alice], removed: []), on: editKey(77), at: t0)
+        o.reconcile(with: editSnapshot(mine: [editPR(77)]), now: t0 + 30)
+        #expect(!o.isEmpty)
+        o.reconcile(with: editSnapshot(mine: [editPR(77, assignees: ["Alice"])]), now: t0 + 60)
+        #expect(o.isEmpty)
     }
 
     @Test func editsApplyOldestFirst() {
