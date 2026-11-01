@@ -26,8 +26,11 @@ public struct Installation: Sendable, Equatable {
         ["read", "write", "admin"].contains(permissions["organization_projects"] ?? "")
     }
 
-    /// Labels and assignees, on issues and pull requests.
+    /// Labels and assignees on issues.
     public var canWriteIssues: Bool { ["write", "admin"].contains(permissions["issues"] ?? "") }
+
+    /// Labels and assignees on pull requests.
+    public var canWritePullRequests: Bool { ["write", "admin"].contains(permissions["pull_requests"] ?? "") }
 
     /// A board item's Status, and adding an issue to the board.
     public var canWriteProjects: Bool { ["write", "admin"].contains(permissions["organization_projects"] ?? "") }

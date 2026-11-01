@@ -16,10 +16,11 @@ public enum EditPermission: Equatable, Sendable {
     /// This account can't make the edit at all (no installation, or a GitHub App on a personal board).
     case unavailable
 
-    /// `installation` is the GitHub App's installation on the item's owner, for an app account.
+    /// `installation` is the GitHub App's installation on the item's owner, for an app account;
+    /// `onPullRequest` says the item is a pull request, whose edits need the Pull requests permission.
     public static func of(
         _ field: EditField, account: AccountRef, boardOwner: BoardOwner?, installation: Installation?,
-        ghAccounts: [GhAccount]
+        ghAccounts: [GhAccount], onPullRequest: Bool = false
     ) -> EditPermission {
         switch account.source {
         case .gh:
@@ -31,7 +32,8 @@ public enum EditPermission: Equatable, Sendable {
             guard let installation else { return .unavailable }
             // GitHub gives apps no permission for user-owned boards.
             if field == .status, boardOwner?.isUser == true { return .unavailable }
-            let canWrite = field == .status ? installation.canWriteProjects : installation.canWriteIssues
+            let canWrite = field == .status ? installation.canWriteProjects
+                : onPullRequest ? installation.canWritePullRequests : installation.canWriteIssues
             if canWrite { return .ready }
             return .needsAppApproval(
                 owner: installation.org, isOrganization: installation.isOrganization,
