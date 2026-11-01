@@ -122,7 +122,6 @@
   const INFO = {
     reRequested: { symbol: "arrow.uturn.left", text: "Re-requested" },
     newCommits: { symbol: "arrow.triangle.2.circlepath", text: "New commits" },
-    noReviews: { symbol: "clock", text: "No reviews" },
     youApprovedNotCounted: { symbol: "checkmark", text: "You approved · not counted" },
     conflicts: { symbol: "exclamationmark.triangle", text: "Conflicts", warning: true },
   };
@@ -130,6 +129,7 @@
     if (typeof item === "string") return INFO[item];
     if (item.approvals != null) return { symbol: "checkmark", text: String(item.approvals), isCount: true };
     if (item.viaTeam) return { symbol: "person.2", text: `via @${item.viaTeam}` };
+    if (item.wait) return { symbol: "clock", text: item.wait, wait: true };
     return item;
   }
 
@@ -158,7 +158,9 @@
     meta += `<span>${esc(pr.age)}</span>`;
     for (const info of infos.filter((i) => !i.isCount)) {
       const color = info.warning ? "var(--amber-glyph)" : "var(--secondary)";
-      meta += `${dot}<span class="label">${sym(info.symbol, 9.5, "regular", { color })}<span>${esc(info.text)}</span></span>`;
+      // The text info gives way under pressure (ellipsis); a review wait stays whole, as its age never truncates.
+      const fit = info.wait ? "flex-shrink:0" : "min-width:0";
+      meta += `${dot}<span class="label" style="${fit}">${sym(info.symbol, 9.5, "regular", { color })}<span class="ellipsis">${esc(info.text)}</span></span>`;
     }
     for (const info of infos.filter((i) => i.isCount)) {
       meta += `<span class="label count">${sym(info.symbol, 9.5)}<span>${esc(info.text)}</span></span>`;

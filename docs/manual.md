@@ -76,6 +76,8 @@ Without `read:project`: Board shows the command to add it, Mine groups by repo.
 
 A PR with merge conflicts shows a **Conflicts** note on every tab.
 
+A PR waiting on review shows who it waits on and for how long (🕒 @dana 3d, "+1" when more are asked). One nobody was asked to review shows 🕒 No reviewer 5d, counted from when it was ready for review. On Review it's just 🕒 2d. Hover for every reviewer's wait.
+
 > [!NOTE]
 > Ready to merge = approved, no changes requested, checks green or none, no conflicts, not a draft. It doesn't see branch protection (required review count).
 

@@ -23,14 +23,14 @@ window.SCENES.review = {
       repo: "api",
       rows: [
         // Requested of devon directly, first time: no "why" line.
-        { title: "Add rate limiting to the public API", number: 482, author: "alice", age: "12m", ci: "pending", info: [], comments: 2 },
-        { title: "Return 404 instead of 500 for unknown webhook IDs", number: 479, author: "frank", age: "3h", ci: "failure", info: [{ viaTeam: "initech/platform" }] },
+        { title: "Add rate limiting to the public API", number: 482, author: "alice", age: "12m", ci: "pending", info: [{ wait: "1h" }], comments: 2 },
+        { title: "Return 404 instead of 500 for unknown webhook IDs", number: 479, author: "frank", age: "3h", ci: "failure", info: [{ viaTeam: "initech/platform" }, { wait: "1d" }] },
       ],
     },
     {
       repo: "widgets",
       rows: [
-        { title: "Fix flaky checkout test on CI", number: 1291, author: "bob", age: "1h", ci: "success", info: ["reRequested"], comments: 4 },
+        { title: "Fix flaky checkout test on CI", number: 1291, author: "bob", age: "1h", ci: "success", info: ["reRequested", { wait: "1h" }], comments: 4 },
         { title: "Virtualize the long widget list", number: 1287, author: "erin", age: "5h", ci: "none", draft: true, info: [] },
       ],
     },
@@ -38,7 +38,7 @@ window.SCENES.review = {
       repo: "gadgets",
       rows: [
         { title: "Migrate settings to the new store", number: 77, author: "carol", age: "4h", ci: "success", info: ["newCommits"] },
-        { title: "Bump the image library to 4.2", number: 75, author: "erin", age: "1d", ci: "skipped", info: [], comments: 1 },
+        { title: "Bump the image library to 4.2", number: 75, author: "erin", age: "1d", ci: "skipped", info: [{ wait: "2d" }], comments: 1 },
       ],
     },
   ],
