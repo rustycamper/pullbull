@@ -17,6 +17,9 @@ enum Queries {
       labels(first:20){nodes{name color}}
       assignees(first:10){nodes{login avatarUrl}}
       mergedBy{login}
+      reviewRequestEvents: timelineItems(itemTypes:[REVIEW_REQUESTED_EVENT], last:20){\
+    nodes{... on ReviewRequestedEvent{createdAt requestedReviewer{__typename ... on User{login} ... on Team{slug}}}}}
+      readyEvent: timelineItems(itemTypes:[READY_FOR_REVIEW_EVENT], last:1){nodes{... on ReadyForReviewEvent{createdAt}}}
     }
     """
 

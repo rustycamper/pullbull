@@ -53,6 +53,60 @@ private func node(_ name: String) throws -> [String: Any] {
         #expect(Queries.prFields.contains("submittedAt commit{oid}"))
     }
 
+    @Test func decodesRequestAndReadyTimes() throws {
+        let json = """
+        {"number":5,"title":"t","url":"https://github.com/o/r/pull/5","isDraft":false,"state":"OPEN",\
+        "createdAt":"2026-10-18T09:00:00Z","updatedAt":"2026-10-25T14:03:11Z","closedAt":null,\
+        "headRefName":"a","baseRefName":"main","repository":{"nameWithOwner":"o/r"},"author":{"login":"al"},\
+        "reviewRequests":{"nodes":[{"requestedReviewer":{"__typename":"User","login":"Georgi"}},\
+        {"requestedReviewer":{"__typename":"Team","slug":"ios","name":"iOS"}}]},\
+        "reviewRequestEvents":{"nodes":[\
+        {"createdAt":"2026-10-20T09:00:00Z","requestedReviewer":{"__typename":"User","login":"georgi"}},\
+        {"createdAt":"2026-10-21T09:00:00Z","requestedReviewer":{"__typename":"Team","slug":"ios"}},\
+        {"createdAt":"2026-10-22T09:00:00Z","requestedReviewer":{"__typename":"User","login":"Georgi"}},\
+        {"createdAt":"2026-10-23T09:00:00Z","requestedReviewer":{"__typename":"User","login":"gone"}},\
+        {"createdAt":"2026-10-23T10:00:00Z","requestedReviewer":null}]},\
+        "readyEvent":{"nodes":[{"createdAt":"2026-10-19T12:00:00Z"}]}}
+        """
+        let node = try #require(try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+        let pr = try Decoding.pullRequest(from: node)
+        let iso = ISO8601DateFormatter()
+        #expect(pr.reviewRequestTimes["georgi"] == iso.date(from: "2026-10-22T09:00:00Z"))
+        #expect(pr.reviewRequestTimes["team:ios"] == iso.date(from: "2026-10-21T09:00:00Z"))
+        #expect(pr.readyForReviewAt == iso.date(from: "2026-10-19T12:00:00Z"))
+    }
+
+    @Test func prWithoutTimelineAliasesHasNoTimes() throws {
+        let pr = try Decoding.pullRequests(fromSearch: fixture("search_page")).prs[0]
+        #expect(pr.reviewRequestTimes.isEmpty)
+        #expect(pr.readyForReviewAt == nil)
+    }
+
+    @Test func cachedPRWithoutTimesDecodes() throws {
+        let t = Date(timeIntervalSince1970: 1_800_000_000)
+        let pr = PullRequest(
+            key: PRKey(repo: "o/r", number: 1), title: "t", url: URL(string: "https://x/1")!, author: "a",
+            authorAvatarURL: nil, state: .open, isDraft: false, createdAt: t, updatedAt: t, closedAt: nil,
+            headRef: "h", baseRef: "main", ci: .none, headCommitDate: nil, commentCount: 0, lastCommentAuthor: nil,
+            latestReviews: [], reviewRequests: [.user("dana")], reviewRequestTimes: ["dana": t], readyForReviewAt: t)
+        var object = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(pr)) as? [String: Any])
+        let current = try JSONDecoder().decode(PullRequest.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(current.reviewRequestTimes == ["dana": t])
+        #expect(current.readyForReviewAt == t)
+        object["reviewRequestTimes"] = nil
+        object["readyForReviewAt"] = nil
+        let old = try JSONDecoder().decode(PullRequest.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(old.reviewRequestTimes.isEmpty)
+        #expect(old.readyForReviewAt == nil)
+    }
+
+    @Test func listQueryAsksForRequestAndReadyEvents() {
+        #expect(Queries.prFields.contains("reviewRequestEvents: timelineItems(itemTypes:[REVIEW_REQUESTED_EVENT], last:20)"))
+        #expect(Queries.prFields.contains("... on ReviewRequestedEvent{createdAt requestedReviewer{__typename ... on User{login} ... on Team{slug}}}"))
+        #expect(Queries.prFields.contains("readyEvent: timelineItems(itemTypes:[READY_FOR_REVIEW_EVENT], last:1)"))
+        #expect(Queries.prFields.contains("... on ReadyForReviewEvent{createdAt}"))
+    }
+
     @Test func pullRequestReadsNodeId() throws {
         let json = """
         {"id":"PR_kwDOA1","number":5,"title":"t","url":"https://github.com/o/r/pull/5","isDraft":false,"state":"OPEN",\
