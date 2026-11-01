@@ -61,6 +61,17 @@ public enum EditChange: Hashable, Sendable {
         }
     }
 
+    /// The halves `result` says GitHub applied; a Status change is returned as is.
+    public func keeping(_ result: SetChangeResult) -> EditChange {
+        switch self {
+        case .status: self
+        case .labels(let added, let removed):
+            .labels(added: result.addApplied ? added : [], removed: result.removeApplied ? removed : [])
+        case .assignees(let added, let removed):
+            .assignees(added: result.addApplied ? added : [], removed: result.removeApplied ? removed : [])
+        }
+    }
+
     /// Nothing to send: no labels or assignees toggled, or the same Status on an issue already on the board.
     public var isEmpty: Bool {
         switch self {
