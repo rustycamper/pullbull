@@ -556,9 +556,9 @@ struct PopoverView: View {
                 model.openStatusPicker(for: key)
                 return true
             }
-            // ⌥⌘A / ⌥⌘L: the assignee or label picker on the same issue.
+            // ⌥⌘A / ⌥⌘L: the assignee or label picker on the selected issue or PR.
             if Self.isOptionCommand(event, flags: flags, letter: "a") || Self.isOptionCommand(event, flags: flags, letter: "l") {
-                guard let key = model.selectedIssueKey(in: listKeys), model.isSetEditOffered(for: key) else { return false }
+                guard let key = model.selectedSetEditKey(in: listKeys), model.isSetEditOffered(for: key) else { return false }
                 model.openSetPicker(Self.commandKey(event) == "a" ? .assignees : .labels, for: key)
                 return true
             }
@@ -875,7 +875,11 @@ struct PopoverView: View {
             return true
         }
         if Self.isOptionCommand(event, flags: flags, letter: "a") || Self.isOptionCommand(event, flags: flags, letter: "l") {
-            guard case .issueDetail(let key) = model.route, model.isSetEditOffered(for: key) else { return false }
+            let key: PRKey? = switch model.route {
+            case .issueDetail(let key), .detail(let key): key
+            default: nil
+            }
+            guard let key, model.isSetEditOffered(for: key) else { return false }
             model.openSetPicker(Self.commandKey(event) == "a" ? .assignees : .labels, for: key)
             return true
         }

@@ -80,7 +80,7 @@ public enum ShortcutCatalog {
                 Shortcut("Complete", [["↩"], ["⇥"]]),
                 Shortcut("Close", [["Esc"]]),
             ]),
-            ShortcutSection("Editing", note: "Issue rows, search results and the issue detail", [
+            ShortcutSection("Editing", note: "Issue and pull request rows, search results and both details", [
                 Shortcut("Set Status", [["⌥", "⌘", "S"]], note: "When a board is shown"),
                 Shortcut("Assignees", [["⌥", "⌘", "A"]]),
                 Shortcut("Labels", [["⌥", "⌘", "L"]]),

@@ -63,24 +63,39 @@ extension AppModel {
     /// The key of the open picker, Status or set; the popover's focus and key routing read it.
     var editPickerKey: PRKey? { statusPicker?.key ?? setPicker?.key }
 
-    /// Whether the issue `key` can have its labels or assignees edited: one PullBull holds, with a running account.
+    /// Whether the issue or pull request `key` can have its labels or assignees edited: one PullBull holds,
+    /// with a running account.
     func isSetEditOffered(for key: PRKey) -> Bool {
-        issue(for: key) != nil && runningAccount != nil
+        (issue(for: key) != nil || pullRequest(for: key) != nil) && runningAccount != nil
+    }
+
+    /// The issue or PR ⌥⌘A and ⌥⌘L act on: the selected result while searching, else the highlighted row.
+    func selectedSetEditKey(in listKeys: [PRKey]?) -> PRKey? {
+        selectedIssueKey(in: listKeys) ?? selectedPRKey(in: listKeys)
     }
 
     func setEditPermission(_ field: EditField, for key: PRKey) -> EditPermission {
         guard let account = runningAccount else { return .unavailable }
         let owner = key.repo.split(separator: "/").first.map(String.init) ?? ""
         let installation = installation(named: owner)
-        return EditPermission.of(field, account: account, boardOwner: nil, installation: installation, ghAccounts: accounts)
+        return EditPermission.of(
+            field, account: account, boardOwner: nil, installation: installation, ghAccounts: accounts,
+            onPullRequest: pullRequest(for: key) != nil)
     }
 
     /// Opens the picker for `field` (`.labels` or `.assignees`) on `key`, applying an open one first. The
     /// cached candidates show at once; a fetch follows.
     func openSetPicker(_ field: EditField, for key: PRKey) {
         closeSetPicker(apply: true)
-        guard let issue = issue(for: key), let account = runningAccount else { return }
-        let current = field == .labels ? issue.labels : issue.assignees.map(\.login)
+        guard let account = runningAccount else { return }
+        let current: [String]
+        if let issue = issue(for: key) {
+            current = field == .labels ? issue.labels : issue.assignees.map(\.login)
+        } else if let pr = pullRequest(for: key) {
+            current = field == .labels ? pr.labels : pr.assignees.map(\.login)
+        } else {
+            return
+        }
         let permission = setEditPermission(field, for: key)
         statusPicker = nil
         var picker = SetPicker(
@@ -192,8 +207,10 @@ extension AppModel {
     private func run(_ change: EditChange, on key: PRKey, addedItemId: String?, isUndo: Bool) {
         guard let account = runningAccount else { return }
         let card = snapshot?.boardIssues.first { $0.key == key }
-        let url = (card ?? issue(for: key))?.url ?? GitHubLinks.issue(key)
-        let contentId = (card ?? issue(for: key))?.nodeId
+        let held = card ?? issue(for: key)
+        let pr = held == nil ? pullRequest(for: key) : nil
+        let url = held?.url ?? pr?.url ?? GitHubLinks.issue(key)
+        let contentId = held?.nodeId ?? pr?.nodeId
         let itemId = addedItemId ?? card?.boardItemNodeId
         let board = snapshot?.boardIds
         let before = shownListKeys()
