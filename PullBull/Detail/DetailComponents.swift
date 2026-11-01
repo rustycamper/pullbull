@@ -264,6 +264,74 @@ struct DetailLabels: View {
     }
 }
 
+/// "Status   In progress": a fixed-width name, then the value.
+struct CardRow<Value: View>: View {
+    let name: String
+    @ViewBuilder let value: () -> Value
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Text(name)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .frame(width: 70, alignment: .leading)
+            value()
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .font(.system(size: 12))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .frame(minHeight: 30)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// An issue's or PR's Assignees or Labels row: clickable where the sets are offered, with the picker
+/// anchored on the row.
+struct SetEditRow<Value: View>: View {
+    let model: AppModel
+    let key: PRKey
+    let field: EditField
+    @ViewBuilder let value: () -> Value
+
+    var body: some View {
+        let isAssignees = field == .assignees
+        let row = CardRow(name: isAssignees ? "Assignees" : "Labels", value: value)
+        if model.isSetEditOffered(for: key) {
+            Button { model.openSetPicker(field, for: key) } label: {
+                row.contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(isAssignees ? "Change assignees (⌥⌘A)" : "Change labels (⌥⌘L)")
+            .accessibilityHint(isAssignees ? "Opens the assignee picker" : "Opens the label picker")
+            .editPickerAnchor(for: key, field: field, model: model)
+        } else {
+            row
+        }
+    }
+}
+
+/// Assignees with their avatars, wrapping onto more lines; `me` is marked "(you)".
+struct AssigneeFlow: View {
+    let assignees: [Assignee]
+    let me: String
+
+    var body: some View {
+        FlowLayout(spacing: 10, lineSpacing: 6) {
+            ForEach(assignees, id: \.login) { assignee in
+                HStack(spacing: 5) {
+                    AvatarView(login: assignee.login, url: assignee.avatarURL, size: 20)
+                    Text(assignee.login).lineLimit(1)
+                    if assignee.login.caseInsensitiveCompare(me) == .orderedSame {
+                        Text("(you)").foregroundStyle(.secondary)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+}
+
 /// Lays children out left to right, wrapping to a new line when the width runs out.
 struct FlowLayout: Layout {
     var spacing: CGFloat

@@ -2,13 +2,14 @@ import AppKit
 import SwiftUI
 import PullBullKit
 
-/// The read-only detail of one PR inside the popover: summary, description, checks, reviewers,
-/// conversation and changed files, with Copy branch and Open on GitHub pinned at the bottom. It shows the
-/// list data and the cached detail at once; `AppModel` refreshes the detail in place.
+/// The detail of one PR inside the popover: summary, details (assignees, labels), description, checks,
+/// reviewers, conversation and changed files, with Copy branch and Open on GitHub pinned at the bottom. It
+/// shows the list data and the cached detail at once; `AppModel` refreshes the detail in place.
 struct PRDetailView: View {
     let model: AppModel
     let key: PRKey
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var checksExpanded = false
     @State private var filesExpanded = false
 
@@ -30,6 +31,7 @@ struct PRDetailView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         summary(now: context.date)
+                        if let pr { detailsCard(pr) }
                         if let detail {
                             if let error = fetch?.error { RefreshFailedNote(message: error) { model.reloadDetail() } }
                             sections(detail, now: context.date)
@@ -40,6 +42,8 @@ struct PRDetailView: View {
                     }
                     .padding(.bottom, 14)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: pr?.assignees)
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: pr?.labels)
                 }
             }
             .frame(maxHeight: .infinity)
@@ -134,12 +138,6 @@ struct PRDetailView: View {
                     BranchChip(name: pr.baseRef)
                 }
                 .padding(.top, 10)
-                if !pr.labels.isEmpty {
-                    DetailLabels(labels: pr.labels, color: pr.labelColor(at:))
-                        .padding(.top, 10)
-                        .accessibilityElement(children: .contain)
-                        .accessibilityLabel("Labels")
-                }
                 if pr.state == .open && pr.hasConflicts {
                     ConflictLine(baseRef: pr.baseRef)
                         .padding(.top, 8)
@@ -148,6 +146,32 @@ struct PRDetailView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 14)
+    }
+
+    // MARK: Details card
+
+    /// Assignees and labels, each clickable where they can be changed.
+    private func detailsCard(_ pr: PullRequest) -> some View {
+        let me = model.snapshot?.org.viewer ?? model.settings.account ?? ""
+        return DetailSection(title: "Details") {
+            DetailCard {
+                SetEditRow(model: model, key: key, field: .assignees) {
+                    if pr.assignees.isEmpty {
+                        Text("No one").foregroundStyle(.secondary)
+                    } else {
+                        AssigneeFlow(assignees: pr.assignees, me: me)
+                    }
+                }
+                CardDivider()
+                SetEditRow(model: model, key: key, field: .labels) {
+                    if pr.labels.isEmpty {
+                        Text("None").foregroundStyle(.secondary)
+                    } else {
+                        DetailLabels(labels: pr.labels, color: pr.labelColor(at:))
+                    }
+                }
+            }
+        }
     }
 
     // MARK: Sections
