@@ -52,7 +52,7 @@ private func results(prs: [PullRequest] = [], issues: [BoardIssue] = []) -> Sear
 private func layout(
     _ prs: [PullRequest], on tab: PRTab, grouping: PRGrouping = .repository, settings: AppSettings = AppSettings()
 ) -> SearchPRLayout {
-    SearchLayout.pullRequests(results(prs: prs), on: tab, grouping: grouping, settings: settings, org: org)
+    SearchLayout.pullRequests(results(prs: prs), on: tab, grouping: grouping, settings: settings, org: org, now: now)
 }
 
 private func layout(
@@ -144,6 +144,27 @@ private func key(_ n: Int, _ repo: String = "o/a") -> PRKey { PRKey(repo: repo, 
         settings.setSort(.recentlyUpdated, for: PRTab.review)
         #expect(layout(prs, on: .review, grouping: .none, settings: settings).contents.rows.map(\.pr.key.number)
             == [1, 2, 3])
+    }
+
+    @Test func searchFollowsTheReferenceTabsSort() {
+        var settings = AppSettings()
+        settings.setSort(.waitingLongest, for: PRTab.team)
+        let dana = Reviewer.user("dana")
+        func waiting(_ n: Int, hours: Double, updated: Double) -> PullRequest {
+            let p = pr(n, updated: updated, requests: [dana])
+            return PullRequest(
+                key: p.key, title: p.title, url: p.url, author: p.author, authorAvatarURL: nil, state: .open,
+                isDraft: false, createdAt: p.createdAt, updatedAt: p.updatedAt, closedAt: nil, headRef: "h",
+                baseRef: "main", ci: .none, headCommitDate: nil, commentCount: 0, lastCommentAuthor: nil,
+                latestReviews: [], reviewRequests: [dana], reviewRequestTimes: [dana.key: hoursAgo(hours)])
+        }
+        let prs = [
+            waiting(1, hours: 10, updated: 1), waiting(2, hours: 90, updated: 5),
+            pr(3, state: .merged, created: 200, closed: 30), pr(4, state: .merged, created: 100, closed: 60),
+        ]
+        let shown = layout(prs, on: .team, grouping: .none, settings: settings)
+        #expect(shown.contents.rows.map(\.pr.key.number) == [2, 1])
+        #expect(shown.ended.map(\.key.number) == [3, 4])
     }
 
     @Test func endedGoInClosed() {

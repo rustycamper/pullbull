@@ -267,7 +267,9 @@ public enum TabBuilder {
             .sorted { ($0.closedAt ?? .distantPast) > ($1.closedAt ?? .distantPast) }
 
         return BuiltTabs(
-            review: contents(review, oldestFirst: settings.sort(for: .review) == .oldestFirst), mine: contents(mine), team: contents(team),
+            review: contents(review, sort: settings.sort(for: .review), on: .review, me: me, myTeams: myTeams, now: now),
+            mine: contents(mine, sort: settings.sort(for: .mine), on: .mine, me: me, myTeams: myTeams, now: now),
+            team: contents(team, sort: settings.sort(for: .team), on: .team, me: me, myTeams: myTeams, now: now),
             recentlyClosed: closed, hiddenApprovedCount: hiddenApproved.count
         )
     }
@@ -283,17 +285,39 @@ public enum TabBuilder {
         }
     }
 
-    /// Rows by latest activity, or with `oldestFirst` by when the PR was opened, the oldest first.
-    static func contents(_ rows: [Row], oldestFirst: Bool = false) -> TabContents {
-        var seen = Set<PRKey>()
-        let sorted = rows.sorted {
-            if oldestFirst {
-                if $0.pr.createdAt != $1.pr.createdAt { return $0.pr.createdAt < $1.pr.createdAt }
-            } else if $0.pr.updatedAt != $1.pr.updatedAt {
-                return $0.pr.updatedAt > $1.pr.updatedAt
+    /// `tab`'s rows in `sort` order, then by repo and number:
+    /// - Recently updated: latest activity first.
+    /// - Oldest first: when the PR was opened, the oldest first.
+    /// - Waiting longest: the start of the review wait the row shows (`ReviewWait.since`, in the row's own
+    ///   form: Review's short form for a row counted there, the full form otherwise), the longest first; rows
+    ///   showing no wait age follow in Recently updated order.
+    static func contents(
+        _ rows: [Row], sort: ListSort = .recentlyUpdated, on tab: PRTab, me: String, myTeams: Set<String>, now: Date
+    ) -> TabContents {
+        let since: [PRKey: Date] = sort == .waitingLongest
+            ? rows.reduce(into: [:]) { starts, row in
+                let reviewLayout = tab == .review && row.reviewReason != nil
+                starts[row.id] = ReviewWait.make(
+                    for: row.pr, me: me, myTeams: myTeams, reviewLayout: reviewLayout, now: now)?.since
             }
-            if $0.id.repo != $1.id.repo { return $0.id.repo < $1.id.repo }
-            return $0.id.number < $1.id.number
+            : [:]
+        var seen = Set<PRKey>()
+        let sorted = rows.sorted { a, b in
+            switch sort {
+            case .oldestFirst:
+                if a.pr.createdAt != b.pr.createdAt { return a.pr.createdAt < b.pr.createdAt }
+            case .waitingLongest:
+                switch (since[a.id], since[b.id]) {
+                case let (x?, y?) where x != y: return x < y
+                case (.some, nil): return true
+                case (nil, .some): return false
+                default: if a.pr.updatedAt != b.pr.updatedAt { return a.pr.updatedAt > b.pr.updatedAt }
+                }
+            case .recentlyUpdated, .newestFirst:
+                if a.pr.updatedAt != b.pr.updatedAt { return a.pr.updatedAt > b.pr.updatedAt }
+            }
+            if a.id.repo != b.id.repo { return a.id.repo < b.id.repo }
+            return a.id.number < b.id.number
         }
         return TabContents(rows: sorted.filter { seen.insert($0.id).inserted })
     }

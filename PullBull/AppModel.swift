@@ -1015,7 +1015,7 @@ final class AppModel {
               case .pullRequests(let tab) = searchReferenceTab
         else { return nil }
         return SearchLayout.pullRequests(
-            results, on: tab, grouping: prGrouping(for: tab), settings: settings, org: snapshot.org)
+            results, on: tab, grouping: prGrouping(for: tab), settings: settings, org: snapshot.org, now: Date())
     }
 
     /// The issue results in the reference tab's layout, with edits shown; nil in PR mode and without
