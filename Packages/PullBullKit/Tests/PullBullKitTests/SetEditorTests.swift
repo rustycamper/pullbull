@@ -28,6 +28,16 @@ private final class QueueTransport: GraphQLTransport, @unchecked Sendable {
         bodies.indices.contains(index) ? bodies[index]["variables"] as? [String: Any] : nil
     }
 
+    /// REST requests as "METHOD path", in order; each answered 200 with an empty object.
+    private(set) var rest: [String] = []
+
+    func send(_ method: String, path: String, body: Data, token: String) async throws -> (Data, HTTPURLResponse) {
+        lock.withLock { rest.append("\(method) \(path)") }
+        let response = HTTPURLResponse(
+            url: URL(string: "https://api.github.com\(path)")!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        return (Data("{}".utf8), response)
+    }
+
     func send(_ body: Data, token: String) async throws -> (Data, HTTPURLResponse) {
         let data = lock.withLock {
             sent.append(body)
@@ -90,6 +100,15 @@ private func editor(_ t: QueueTransport) -> SetEditor {
         let result = try await editor(t).apply(change, on: k412, contentId: "I_1")
         #expect(t.bodies.isEmpty)
         #expect(result == SetChangeResult(addApplied: true, removeApplied: true, refusal: nil))
+    }
+
+    @Test func editorSendsReviewersOverREST() async throws {
+        let t = QueueTransport([])
+        let change = EditChange.reviewers(added: [.user("alice")], removed: [.team(slug: "core", name: "Core")])
+        let result = try await editor(t).apply(change, on: k412, contentId: nil)
+        #expect(result == SetChangeResult(addApplied: true, removeApplied: true, refusal: nil))
+        #expect(t.bodies.isEmpty)
+        #expect(t.rest == ["POST /repos/o/r/pulls/412/requested_reviewers", "DELETE /repos/o/r/pulls/412/requested_reviewers"])
     }
 
     @Test func bothHalvesRefusedThrowsWriteRefused() async {

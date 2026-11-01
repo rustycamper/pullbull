@@ -225,7 +225,7 @@ extension AppModel {
                 case .status:
                     added = try await StatusEditor(api: client).apply(
                         change, on: key, itemId: itemId, contentId: contentId, board: board)
-                case .labels, .assignees:
+                case .labels, .assignees, .reviewers:
                     let result = try await SetEditor(api: client).apply(change, on: key, contentId: contentId)
                     if !(result.addApplied && result.removeApplied) {
                         guard let self else { return }

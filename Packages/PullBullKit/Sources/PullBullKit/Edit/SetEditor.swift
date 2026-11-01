@@ -1,6 +1,6 @@
 import Foundation
 
-/// Sends a label or assignee change, or its undo. A Status change sends nothing here.
+/// Sends a label, assignee or reviewer change, or its undo. A Status change sends nothing here.
 public struct SetEditor: Sendable {
     private let api: GitHubAPI
 
@@ -21,6 +21,8 @@ public struct SetEditor: Sendable {
         case .assignees(let added, let removed):
             let subject = try await content(contentId, key)
             return try await api.changeAssignees(of: subject, adding: added.map(\.id), removing: removed.map(\.id))
+        case .reviewers(let added, let removed):
+            return try await api.changeReviewers(of: key, adding: added, removing: removed)
         }
     }
 

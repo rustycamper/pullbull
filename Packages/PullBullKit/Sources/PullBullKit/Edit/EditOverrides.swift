@@ -119,6 +119,8 @@ public struct EditOverrides: Equatable, Sendable {
             (issue.labels, issue.labelColors) = changeLabels(issue.labels, issue.labelColors, added, removed)
         case .assignees(let added, let removed):
             issue.assignees = changeAssignees(issue.assignees, added, removed)
+        case .reviewers:
+            break
         }
         return issue
     }
@@ -134,6 +136,8 @@ public struct EditOverrides: Equatable, Sendable {
             (pr.labels, pr.labelColors) = changeLabels(pr.labels, pr.labelColors, added, removed)
         case .assignees(let added, let removed):
             pr.assignees = changeAssignees(pr.assignees, added, removed)
+        case .reviewers:
+            break
         }
         return pr
     }
@@ -228,6 +232,8 @@ public struct EditOverrides: Equatable, Sendable {
             if added.contains(where: { same($0.login, viewer) }) { return listed }
             if removed.contains(where: { same($0.login, viewer) }) { return !listed }
             return true
+        case .reviewers:
+            return false
         }
     }
 
