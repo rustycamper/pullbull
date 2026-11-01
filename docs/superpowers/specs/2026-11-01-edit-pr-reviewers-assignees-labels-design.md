@@ -59,14 +59,16 @@ Nothing else, ever. This replaces the edit spec's sentence wherever the product 
 - The selected PR is found the way ⇧⌘↩ and ⌃⌘C already find it (`selectedPRKey`), and the PR detail route (`.detail(key)`) takes the keys as the issue detail does.
 - The open-picker rules extend to the new picker: opening one picker closes another, and while one is open the other pickers' keys do nothing. Its own key again applies and closes it.
 - Non-Latin keyboard layouts already map R by key position (`SearchKeyMonitor.letterR`, used for ⌘R), so ⌥⌘R needs no new fallback.
-- All three edits are offered on open, closed and merged PRs. A review after the merge ("have a look at what I merged") is a real use, and labelling for later search often happens after a merge. The builder checks against real GitHub whether it accepts review requests on closed and merged PRs. If it always refuses, ⌥⌘R and **Reviewers…** are hidden there and this spec records why; if it refuses only sometimes, the failure line carries GitHub's reason.
+- ⌥⌘R always belongs to the reviewers picker: with no PR selected, on an issue, or on a PR PullBull doesn't hold, it does nothing, and never refreshes or reloads.
+- All three edits are offered on open, closed and merged PRs. A review after the merge ("have a look at what I merged") is a real use, and labelling for later search often happens after a merge. When GitHub refuses a request there, the failure line carries GitHub's reason. Whether GitHub ever accepts review requests on closed and merged PRs has not been checked against real GitHub yet; if it always refuses, ⌥⌘R and **Reviewers…** are to be hidden there.
 - The Keyboard Shortcuts window's Editing section adds Reviewers <kbd>⌥⌘R</kbd>, noted "Pull requests". Its description covers issue and pull request rows, search results and both details. Set Status keeps its note.
 
 ### Mouse
 
 - **Right-click a PR row** (open and closed rows, and PR search results): **Reviewers…** (`person.2`), **Assignees…** and **Labels…**, above the copy items after a separator, as issue rows have **Assignees…** and **Labels…**.
 - **PR detail:**
-  - The Reviewers card is clickable and opens the reviewers picker anchored to it, with the help tag "Change reviewers (⌥⌘R)". "No reviewers" stays as the empty line and is clickable too.
+  - The Reviewers card is clickable and opens the reviewers picker anchored to it, with the help tag "Change reviewers (⌥⌘R)". "No reviewers" stays as the empty line and is clickable too. On a PR PullBull doesn't hold, the card is plain.
+  - The card's requests come from the detail while the detail is current for the PR (`PRDetail.isCurrent(for:)`), else from the list copy, with the edit overrides applied either way. A PR with no list copy shows the detail's requests.
   - A new card titled "Details" holds Assignees and Labels rows. It sits right under the summary, as the issue detail's card does, so it comes before Checks, and before the description on closed and merged PRs, and it doesn't move when the detail loads. Its rows are the issue detail's own, shared between the two: "No one" and "None" when empty, clickable, with help tags "Change assignees (⌥⌘A)" and "Change labels (⌥⌘L)". The labels move out of the summary into this card, so they show once, and there is a place to click when a PR has none.
 
 ### The reviewers picker
@@ -77,12 +79,13 @@ The same multi-select picker as assignees: the same placement, filter, keys and 
   1. Requested now: people and teams with a pending request. These are ticked.
   2. Past reviewers who aren't requested now. These are unticked.
   3. The viewer, unless they are the author or already listed.
-  4. Everyone else who can be requested in the repo, people first, then teams.
-  The order is fixed at the first load, and later loads append, as for assignees.
+  4. The people GitHub suggests for the PR (`suggestedReviewers`).
+  5. Everyone else who can be requested in the repo, by login, then teams.
+  The cached people show at once and the PR's own data (requests, reviews, suggestions) arrives with the fetch, so the order is rebuilt on each load until the user first ticks or unticks a row. From then on it stays put and later loads append, as for assignees.
 - **The author** is never listed: GitHub doesn't allow requesting the author.
-- **Bots** (Copilot's reviewer and other apps) are never listed, even when they have reviewed: a review can't be requested from them by login. `prFields` adds `__typename` to the review author so they can be told apart. A bot's review still shows in the detail's Reviewers card as today.
+- **Bots** (Copilot's reviewer and other apps) are never listed, even when they have reviewed: a review can't be requested from them by login. The candidate query reads the review author's `__typename` and keeps only `User`s; `prFields` and `Review` are unchanged. A bot's review still shows in the detail's Reviewers card as today.
 - **Verdicts:** a person who has reviewed shows their latest verdict beside their name, in the same pills the detail's Reviewers card uses (approved, changes requested, commented). A person whose review is pending again after a re-request shows ticked with the verdict.
-- **Ticking a past reviewer asks them again.** This is GitHub's re-request. Ticking someone who has never reviewed requests them.
+- **Ticking a past reviewer asks them again.** This is GitHub's re-request, sent as the same `POST …/requested_reviewers` as a first request. Ticking someone who has never reviewed requests them. Whether that POST re-notifies a past reviewer as GitHub's own re-request button does has not been checked against real GitHub yet; if it doesn't, past reviewers go through the re-request endpoint instead.
 - **Unticking removes the request.** For someone who has reviewed, the row reads "Their review stays" while unticked, so it is clear their approval isn't deleted.
 - **Teams:**
   - Listed by name, with the team glyph the detail uses (`person.2.fill` in a circle).
@@ -90,7 +93,8 @@ The same multi-select picker as assignees: the same placement, filter, keys and 
   - If it couldn't be read (permissions, or a `gh` login without `read:org`), the picker lists people only, with no note. Teams already requested on the PR still show ticked from the PR's own data, and can be unticked.
 - **A requested reviewer with no candidate** (outside the first 100 people, or a team whose list couldn't be read) is shown ticked. Unlike a locked label, it can be unticked, because a review request is removed by login or team slug, so no ID is missing.
 - **Copy:** loading says "Loading reviewers…". A filter with no match says "No one called “…”". An empty list says "No reviewers to ask".
-- **A cap:** if GitHub caps review requests per PR, the picker dims unticked entries at the cap, as assignees do at 10. The builder confirms whether such a cap exists.
+- **No cap:** the picker dims nothing for reviewers. The assignee limit of 10 applies to assignees only. Whether GitHub caps review requests per PR has not been checked against real GitHub yet; a cap found later dims unticked entries at it, as assignees do at 10. Until then a request past one fails with GitHub's reason.
+- **Accessibility:** the picker is labelled "Reviewers for …", and a ticked row reads "requested".
 
 ### Assignees and labels on pull requests
 
@@ -127,8 +131,8 @@ As the edit spec, with these messages:
 ### What the PR models need
 
 - **Assignees:** `PullRequest` has none. Add `assignees(first:10){nodes{login avatarUrl}}` to `prFields`. Cached snapshots decode without it (`decodeIfPresent`, empty).
-- **Review requests:** `reviewRequests` already holds people by login and teams by slug. Teams need a display name for the picker and detail: add `name` beside `slug`. `Reviewer` uses synthesised `Codable`, so the new shape needs a hand-written decoder that still reads caches holding only the slug, which then serves as the name.
-- **PR detail:** the detail query adds `reviewRequests`. Today the Reviewers card reads requests from the list copy, which can be stale or missing for a PR opened from elsewhere.
+- **Review requests:** `reviewRequests` holds `Reviewer`s: `.user(login)` and `.team(slug:name:)`. `Reviewer.key` (lowercased login, or `team:` plus the lowercased slug) is the identity everywhere: picker rows, diffs, agreement. `Reviewer` has a hand-written `Codable`: a person keeps the cached shape, and a team written before names were read decodes with its slug as the name.
+- **PR detail:** the detail query adds `reviewRequests(first:20)` as `PRDetail.requests`, nil when a detail doesn't carry them.
 
 ### Mutations
 
@@ -141,23 +145,26 @@ As the edit spec, with these messages:
 - Reviewers go as a diff, like labels and assignees. GraphQL's `requestReviews` without `union` replaces the whole set, which would drop a reviewer someone else just added.
 - The REST endpoints take logins and slugs, so no user or team node IDs are needed, and a requested reviewer without a candidate can still be removed.
 - An edit that both adds and removes sends two requests: add first, then remove. The edit spec's partial-result rules apply. Only what applied stays on screen and is undone.
-- The builder checks the REST endpoints' current behaviour against GitHub's docs. Specifically: that POST re-requests a past reviewer, and what DELETE does for a login that isn't requested. If GraphQL has diff-safe equivalents for both directions, either is acceptable; diff semantics are the requirement.
-- The REST calls use the same token and `APIError` mapping as the GraphQL writes. The transport today only sends `POST /graphql` (`GraphQLTransport.send`), so it gains a REST method (method, path, JSON body), and the test doubles gain it too. A 422 with GitHub's message (for example "Reviews may only be requested from collaborators") is a refusal, and its message is the failure line's reason.
-- GitHub's docs mark `reviewers` as the DELETE body's required field, so a team-only removal sends `reviewers: []` explicitly unless the builder finds otherwise.
+- The REST calls use the same token and `APIError` mapping as the GraphQL writes. `GraphQLTransport` has a REST method (method, path, JSON body) with a default that throws `APIError.server(501)`, so test doubles that never write reviewers need nothing. The production request carries the Bearer token, `Accept: application/vnd.github+json` and `X-GitHub-Api-Version: 2022-11-28`; a test pins it.
+- A 422, a 404 and a 403 that isn't a rate limit are refusals in GitHub's words (for example "Reviews may only be requested from collaborators"): the message is the failure line's reason.
+- Once the POST has applied, any DELETE failure is a partial result, never a thrown error, so the added requests stay on screen and are undone alone.
+- `reviewers` is the DELETE body's required field, so a team-only removal sends `reviewers: []`.
 
 ### Picker candidates
 
-- **People:** `repository.assignableUsers(first:100)` (already used for assignees) plus the PR's `suggestedReviewers`. Suggested reviewers come first among "everyone else". The filter queries `assignableUsers(query:)` past 100, as for assignees. Candidates are cached per repo for the session and shared with the assignees picker's people.
-- **Teams:** `organization.teams(first:100, query:)`, with `slug name`, for the repo's owner when it is an organisation. Paging and the filter work as for labels. Teams without access to the repo may be listed, and GitHub refuses them. The failure line says so.
-- **The PR's own values:** the candidate queries read the PR's current review requests, latest reviews, assignees and labels. This is the issue candidate queries' "current" half, generalised from `repository.issue(number:)` to `issueOrPullRequest(number:)`.
+- **People:** `repository.assignableUsers(first:100)` (already used for assignees) plus the PR's `suggestedReviewers`. The filter queries `assignableUsers(query:)` and the teams past the first 100, as for assignees. The PR's author is left out of every list.
+- **Cache:** only `assignableUsers` people, with their node IDs, are cached, under the key the assignees picker uses (`assignees|<repo>`), so the two pickers share them. Teams cache under `teams|<owner>`. Per-PR data (requests, verdicts, suggestions) is never cached, so it can't leak into the assignees picker.
+- **Teams:** `organization.teams(first:100, query:)`, with `slug name`, for the repo's owner when it is an organisation. Paging works as for labels. Any error reading them leaves teams out without a note. Teams without access to the repo may be listed, and GitHub refuses them. The failure line says so.
+- **The PR's own values:** the reviewer candidate query reads the PR's current review requests, latest reviews, author and suggested reviewers through `issueOrPullRequest(number:)`. A reviewer whose node ID isn't read keeps its key as its ID: REST takes logins, and per-PR candidates are never cached.
 - Nothing is written to disk.
 
 ### Overrides
 
-- `EditChange` gains `.reviewers(added: [ReviewerRef], removed: [ReviewerRef])`. A `ReviewerRef` is a person (login) or a team (slug, name).
+- `EditChange` gains `.reviewers(added: [Reviewer], removed: [Reviewer])`. The model's `Reviewer` is the reference; there is no separate type.
 - Applying it to a `PullRequest` adds or removes entries in `reviewRequests`. `latestReviews` is untouched, so a removed reviewer's verdict stays visible.
 - **Agreement:** every added reviewer is present in `reviewRequests` and every removed one is absent, case-insensitively, on the first copy of the PR found in the snapshot: Review candidates, Mine, Team, then closed Mine. A PR held only through search isn't in the snapshot, so its override waits out the 5 minutes; search results read through it meanwhile.
-- **Adding or removing yourself** agrees only once the Review candidates agree too, as self-assignment waits for Mine on issues. A search's node fields are live but its matching lags, so the Team copy can show the request a poll before `review-requested:@me` lists the PR. Dropping the override on the Team copy would make the row leave Review and come back. So a self-add agrees once the Review candidates list the PR with the viewer requested, and a self-removal once they no longer list it as needing the viewer's review.
+- **Adding or removing yourself** on an open PR agrees only once the Review candidates agree too, as self-assignment waits for Mine on issues. A search's node fields are live but its matching lags, so the Team copy can show the request a poll before `review-requested:@me` lists the PR. Dropping the override on the Team copy would make the row leave Review and come back. So a self-add agrees once the Review candidates list the PR with the viewer requested, and a self-removal once they no longer list it as needing the viewer's review.
+- On a closed or merged PR, a self-edit agrees on the PR copy alone: Review never lists closed PRs, so waiting for it would hold the override the full 5 minutes.
 - **Assignees on PRs:** agreement looks in the PR lists too. Today `agrees` for `.assignees` searches only issues, so a PR assignee edit would wait out the 5 minutes.
 - Lifetime, oldest-first application and dropping replaced edits work as in the edit spec. An older reviewers edit is replaced by a newer one that touches one of the same people or teams.
 
@@ -165,7 +172,8 @@ As the edit spec, with these messages:
 
 - `ChangeDetector` compares raw snapshots and doesn't know who made a request. So requesting yourself would raise "review requested" on the next poll, attributed to the PR's author.
 - The viewer's own review request must not notify them. When the viewer adds themselves to a PR's reviewers, the "review requested" event for that PR is suppressed on every poll up to and including the first one whose Review candidates list the PR as needing the viewer's review. The suppression ends there, and in any case 6 minutes after the edit (the override's 5 minutes plus a poll's slack). So a request that never shows (someone removed the viewer a minute later) can't swallow a real request hours later.
-- The builder chooses where the suppression sits: `NotificationGate`, or `ChangeDetector` given the recent own edits. A test pins it.
+- The suppression sits in `NotificationGate` (`ownReviewRequest(on:at:)`, `selfRequestWindow` = 360 s). It applies on every live fetch, including the CI follow-ups and the first fetch after launch. Tests pin it.
+- Requesting a team the viewer belongs to counts as requesting themselves: the anti-goal "notified about a review request they just made themselves" covers it.
 - Requesting someone else never notifies the viewer. That is already the case.
 
 ## Permissions
@@ -230,7 +238,7 @@ Per CONTRIBUTING, logic lives in PullBullKit with tests. Beyond the edit spec's 
 - **Permissions:** `pull_requests: write` gating; the no-teams fallback.
 - **Caches:** cached PRs without assignees or team names decode.
 
-Manual check against real GitHub, on a test repo in an org with a team, before each PR leaves draft:
+Manual check against real GitHub, on a test repo in an org with a team. For step 2 it has not been run yet; the re-request, closed and merged PR, and cap answers above depend on it:
 
 - request, remove, re-request a past reviewer, a team, undo;
 - a review request on a closed and on a merged PR;
@@ -253,7 +261,7 @@ The user decided: reviewers first, then labels, assignees rarely; people as revi
 - Self-request agreement waits for the Review candidates, and the self-notification suppression ends at the first poll that lists the request, capped at 6 minutes.
 - Delivery in two PRs: assignees and labels first (with the permission change), reviewers second.
 
-## Left to the builder
+## Settled in building
 
-- Where the notification suppression sits.
-- Whether a review-request cap exists and its number.
+- The notification suppression sits in `NotificationGate`.
+- No review-request cap in the picker, pending the manual check.

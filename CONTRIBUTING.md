@@ -28,7 +28,7 @@ CI on PRs from forks waits for a maintainer's approval. A PR that changes only d
 
 | | Why |
 |---|---|
-| Writing to GitHub beyond Status, assignees and labels (merge, comment, approve, close) | PullBull triages; GitHub is where work is written |
+| Writing to GitHub beyond Status, assignees, labels and review requests (merge, comment, approve, close) | PullBull triages; GitHub is where work is written |
 | Telemetry, analytics, crash SDKs | No data leaves the Mac except to GitHub, and to Anthropic when you use Ask AI |
 | New third-party dependencies | Sparkle is the only one |
 | Web views | Native SwiftUI and AppKit only |

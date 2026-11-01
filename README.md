@@ -62,7 +62,7 @@ Keyboard-first · Native SwiftUI · Edits only what you pick
 - **Labels:** chips with the label's colour dot on each row (not in compact cards), all of them in the detail
 - **One repo:** right-click a repo header or row → **Show Only *repo***, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd>
 - **Recent activity:** right-click a row, a repo header or the list → **Show Only Updated**: today, 3 days, a week or a month
-- **Right-click a row:** Status (issues) · Assignees… · Labels… · copy branch (PRs), link or Markdown link · checkout command · open on GitHub · failing check · search the author
+- **Right-click a row:** Status (issues) · Reviewers… (PRs) · Assignees… · Labels… · copy branch (PRs), link or Markdown link · checkout command · open on GitHub · failing check · search the author
 - **Switch board:** <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> on the Board tab
 - **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Each account keeps its org and board
 
@@ -106,7 +106,7 @@ Combine `@`, `~`, `is:`, `status:`, `updated:`, `review:`, `repo:`, `size:` and 
 | <kbd>/</kbd> or just type | Search |
 | <kbd>⌃</kbd><kbd>1</kbd>…<kbd>⌃</kbd><kbd>9</kbd> | Saved searches |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd> | Repo menu · board menu · account menu |
-| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>A</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>L</kbd> · <kbd>⌘</kbd><kbd>Z</kbd> | Status (issues) · assignees · labels · undo |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>R</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>A</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>L</kbd> · <kbd>⌘</kbd><kbd>Z</kbd> | Status (issues) · reviewers (PRs) · assignees · labels · undo |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Ask (once turned on) |
 | <kbd>⌘</kbd><kbd>/</kbd> | Every shortcut, by section, with a filter. Also Settings → General |
 | <kbd>Esc</kbd> | Back, clear, close |
@@ -154,7 +154,7 @@ Or download the zip from [Releases](https://github.com/rustycamper/pullbull/rele
 
 | &emsp;&emsp; | | |
 |:-:|---|---|
-| <img src="docs/media/icons/eye.png" width="22" height="22" alt=""> | Writes to GitHub | An issue's board Status, assignees and labels, and a pull request's assignees and labels, only when you pick them. Never merges, comments, approves or closes |
+| <img src="docs/media/icons/eye.png" width="22" height="22" alt=""> | Writes to GitHub | An issue's board Status, assignees and labels, and a pull request's reviewers, assignees and labels, only when you pick them. Never merges, comments, approves or closes |
 | <img src="docs/media/icons/key-horizontal.png" width="22" height="22" alt=""> | Tokens | App sign-in and Anthropic API key (Ask): Keychain, this Mac only. `gh`: memory only |
 | <img src="docs/media/icons/chart-bar-xaxis-ascending.png" width="22" height="22" alt=""> | Telemetry | None. No server |
 | <img src="docs/media/icons/network.png" width="22" height="22" alt=""> | Network | GitHub API, GitHub avatars, GitHub release feed. Anthropic API, only if you turn Ask on. Nothing else |
