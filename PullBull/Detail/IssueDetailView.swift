@@ -337,11 +337,11 @@ private struct IssueStatePill: View {
     var body: some View {
         switch issue.glyph {
         case .open:
-            Pill(symbol: Palette.issueGlyph(.open).symbol, text: "Open", foreground: Palette.secondaryText, fill: Palette.strongFill)
+            Pill(symbol: Palette.issueGlyph(.open).symbol, text: "Open", foreground: Palette.pillText, fill: Palette.strongFill)
         case .completed:
             Pill(symbol: Palette.issueGlyph(.completed).symbol, text: "Closed", foreground: Palette.mergedText, fill: Palette.mergedFill)
         case .notPlanned:
-            Pill(symbol: Palette.issueGlyph(.notPlanned).symbol, text: "Closed", foreground: Palette.secondaryText, fill: Palette.fill)
+            Pill(symbol: Palette.issueGlyph(.notPlanned).symbol, text: "Closed", foreground: Palette.pillText, fill: Palette.fill)
         }
     }
 }

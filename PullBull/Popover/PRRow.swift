@@ -160,6 +160,8 @@ struct PRRow: View {
     }
 
     private var age: String { RelativeAge.short(from: pr.updatedAt, to: now) }
+    /// The row's age is the last update; the PR page's byline names it too (`OpenedLine`).
+    private var updatedHelp: String { "Updated \(RelativeAge.ago(pr.updatedAt, now: now))" }
 
     /// One line at a fixed height, so a row is as tall with a capsule as without one. Under pressure the
     /// label chips drop off the end into "+N" first, then (on Review and Team) the author goes (its avatar
@@ -187,8 +189,9 @@ struct PRRow: View {
             }
             Text(age)
                 .fixedSize()
+                .help(updatedHelp)
                 // The avatar, which names a left-out author on hover, is hidden from VoiceOver.
-                .accessibilityLabel(fitting.lean ? "\(pr.author), \(age)" : age)
+                .accessibilityLabel(fitting.lean ? "\(pr.author), \(updatedHelp)" : updatedHelp)
             if let role = marks?.role {
                 MetaDot()
                 Text(role)
@@ -229,7 +232,7 @@ struct PRRow: View {
     private var compactBody: some View {
         CompactRowLayout(
             repoNumber: RepoNumber(key: pr.key, showsRepo: showsRepo, compact: true),
-            age: age, ageWidth: 24
+            age: age, ageWidth: 24, ageHelp: updatedHelp
         ) {
             switch layoutTab {
             case .mine:
@@ -485,7 +488,7 @@ struct ReadyToMergePill: View {
     var fill = Palette.fill
 
     var body: some View {
-        Pill(symbol: "arrow.triangle.merge", text: "Ready to merge", foreground: Palette.secondaryText, fill: fill)
+        Pill(symbol: "arrow.triangle.merge", text: "Ready to merge", foreground: Palette.pillText, fill: fill)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Ready to merge")
     }

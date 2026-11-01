@@ -9,7 +9,7 @@ window.SCENES["pr-detail"] = {
   pr: {
     repo: "widgets", number: 1302, state: "open", readyToMerge: true,
     title: "Add a retry budget to webhook delivery",
-    author: "devon", opened: "2d ago",
+    author: "devon", opened: "2d ago · updated 2h ago",
     headRef: "devon/webhook-retry-budget", baseRef: "main",
     checksExpanded: false,
     checks: [

@@ -9,13 +9,15 @@ struct CompactRowLayout<Leading: View, Title: View, Badges: View, Trailing: View
     let age: String?
     /// The age's column, so short ages line up down a list; nil sizes it to fit (an ended item's "merged Oct 12").
     let ageWidth: CGFloat?
+    /// What the age measures, on hover and for VoiceOver ("Updated 1h ago"); nil leaves the age bare.
+    let ageHelp: String?
     let leading: Leading
     let title: Title
     let badges: Badges
     let trailing: Trailing
 
     init(
-        repoNumber: RepoNumber, age: String?, ageWidth: CGFloat? = 24,
+        repoNumber: RepoNumber, age: String?, ageWidth: CGFloat? = 24, ageHelp: String? = nil,
         @ViewBuilder leading: () -> Leading,
         @ViewBuilder title: () -> Title,
         @ViewBuilder badges: () -> Badges,
@@ -24,6 +26,7 @@ struct CompactRowLayout<Leading: View, Title: View, Badges: View, Trailing: View
         self.repoNumber = repoNumber
         self.age = age
         self.ageWidth = ageWidth
+        self.ageHelp = ageHelp
         self.leading = leading()
         self.title = title()
         self.badges = badges()
@@ -43,13 +46,17 @@ struct CompactRowLayout<Leading: View, Title: View, Badges: View, Trailing: View
                 repoNumber
                     .fixedSize()
                 if let age {
-                    if let ageWidth {
-                        Text(age)
-                            .frame(width: ageWidth, alignment: .trailing)
-                    } else {
-                        Text(age)
-                            .fixedSize()
+                    Group {
+                        if let ageWidth {
+                            Text(age)
+                                .frame(width: ageWidth, alignment: .trailing)
+                        } else {
+                            Text(age)
+                                .fixedSize()
+                        }
                     }
+                    .help(ageHelp ?? "")
+                    .accessibilityLabel(ageHelp ?? age)
                 }
             }
             .font(.system(size: 11))

@@ -17,6 +17,7 @@
   --red: #ff4245;
   /* Palette */
   --secondary-text: rgba(255, 255, 255, 0.549);
+  --pill-text: rgba(255, 255, 255, 0.8);
   --fill: rgba(255, 255, 255, 0.06);
   --strong-fill: rgba(255, 255, 255, 0.1);
   /* Palette.field is white at 0.07; vibrancy makes it read as about 0.09. */
@@ -68,6 +69,7 @@
   --red: #ff383c;
   /* Palette */
   --secondary-text: rgba(0, 0, 0, 0.6);
+  --pill-text: rgba(0, 0, 0, 0.7);
   --fill: rgba(0, 0, 0, 0.06);
   --strong-fill: rgba(0, 0, 0, 0.1);
   --field: #ffffff;
@@ -319,7 +321,7 @@ body {
 .pill.merged { color: var(--merged-text); background: var(--merged-fill); }
 .pill.closed { color: var(--closed-text); background: var(--closed-fill); }
 /* ReadyToMergePill: gray on Palette.fill; the changes-requested Pill: amber at 0.12 */
-.pill.ready { color: var(--secondary-text); background: var(--fill); }
+.pill.ready { color: var(--pill-text); background: var(--fill); }
 .pill.changes { color: var(--changes-requested); background: var(--changes-fill); }
 
 /* Mine's folded "Recently closed" section */

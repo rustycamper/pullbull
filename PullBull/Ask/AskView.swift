@@ -202,7 +202,7 @@ private struct AskRow: View {
         case "merged": EndedPill(merged: true)
         case "closed": EndedPill(merged: false)
         case "draft": DraftPill()
-        default: Pill(symbol: nil, text: "Open", foreground: Palette.secondaryText, fill: Palette.fill)
+        default: Pill(symbol: nil, text: "Open", foreground: Palette.pillText, fill: Palette.fill)
         }
     }
 

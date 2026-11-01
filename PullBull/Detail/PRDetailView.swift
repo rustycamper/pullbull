@@ -116,8 +116,10 @@ struct PRDetailView: View {
                     StatePill(pr: pr)
                     HStack(spacing: 6) {
                         AvatarView(login: pr.author, url: pr.authorAvatarURL, size: 20)
-                        Text("\(pr.author) opened \(RelativeAge.ago(pr.createdAt, now: now))")
-                            .lineLimit(1)
+                        // Two lines beside a wide pill, so "updated" is never cut off.
+                        Text(OpenedLine.text(author: pr.author, opened: pr.createdAt, updated: pr.updatedAt, now: now))
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)

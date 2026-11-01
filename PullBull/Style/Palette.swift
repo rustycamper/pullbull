@@ -30,6 +30,12 @@ enum Palette {
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
             ? .secondaryLabelColor : NSColor.black.withAlphaComponent(0.6)
     })
+    /// A neutral pill's text (Open, Ready to merge) on its fill: about 7.5:1 in both appearances, where
+    /// `secondaryText` on a fill drops near 4:1 in dark mode at the pills' 10pt.
+    static let pillText = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor.white.withAlphaComponent(0.8) : NSColor.black.withAlphaComponent(0.7)
+    })
     static let separator = Color(nsColor: .separatorColor)
     static let fill = Color.primary.opacity(0.06)
     /// The skeleton's sweeping highlight: a lighter fill in light mode, a brighter one in dark mode.
