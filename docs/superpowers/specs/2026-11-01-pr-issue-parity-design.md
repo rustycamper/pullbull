@@ -27,6 +27,7 @@ The two halves of the app grew separately. A side-by-side audit found the same f
 - **The description is the same view on both pages** (`DescriptionSection`). It sits unboxed on the material at the section gutter, 12.5pt with 3pt line spacing, and folds when long. Cards are for structured data and prose isn't. An empty description reads "No description provided.".
 - **Conversation shows the newest comments**, with "N earlier comments · view on GitHub" counted above them, on both pages. A PR page holds the newest 50 (`comments(last:50)`). An issue page holds the last two.
 - **The comment total comes from the page's own data**, `PRDetail.commentTotal` from the query's `totalCount` and not the row's count. A linked PR opened from an issue page has no row to borrow from. Details cached before the total was stored fall back to the comments held.
+- **Details stays a card:** it holds a field name and a clickable value per row, which is the macOS grouped-form pattern. An empty value ("No one", "None") is tertiary, as macOS draws a field's placeholder (`EmptyValue`). It sits below the secondary field name, so a filled field stands out from an empty one. The same secondary for both made an empty card read as busy as a full one.
 - **An empty section looks the same:** an issue page's "Linked pull requests" with none shows the empty card (`DetailCard` with an `EmptyLine`) that a PR page's empty sections use.
 - **The issue page's state pill is the row's pill** (`IssueEndedPill` with its glyph), so a closed issue looks the same in the list and on its page.
 

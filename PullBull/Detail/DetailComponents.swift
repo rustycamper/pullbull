@@ -288,6 +288,16 @@ struct CardRow<Value: View>: View {
 
 /// An issue's or PR's Assignees or Labels row: clickable where the sets are offered, with the picker
 /// anchored on the row.
+/// A card row's value when there is none ("No one", "None"). Tertiary, as macOS draws a field's placeholder,
+/// so it sits below the secondary field name and a filled value stands out from an empty one.
+struct EmptyValue: View {
+    let text: String
+
+    var body: some View {
+        Text(text).foregroundStyle(.tertiary)
+    }
+}
+
 struct SetEditRow<Value: View>: View {
     let model: AppModel
     let key: PRKey

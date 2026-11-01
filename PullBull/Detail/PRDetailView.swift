@@ -158,7 +158,7 @@ struct PRDetailView: View {
             DetailCard {
                 SetEditRow(model: model, key: key, field: .assignees) {
                     if pr.assignees.isEmpty {
-                        Text("No one").foregroundStyle(.secondary)
+                        EmptyValue(text: "No one")
                     } else {
                         AssigneeFlow(assignees: pr.assignees, me: me)
                     }
@@ -166,7 +166,7 @@ struct PRDetailView: View {
                 CardDivider()
                 SetEditRow(model: model, key: key, field: .labels) {
                     if pr.labels.isEmpty {
-                        Text("None").foregroundStyle(.secondary)
+                        EmptyValue(text: "None")
                     } else {
                         DetailLabels(labels: pr.labels, color: pr.labelColor(at:))
                     }

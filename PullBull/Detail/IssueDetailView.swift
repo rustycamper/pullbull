@@ -158,7 +158,7 @@ struct IssueDetailView: View {
                 }
                 SetEditRow(model: model, key: key, field: .assignees) {
                     if issue.assignees.isEmpty {
-                        Text("No one").foregroundStyle(.secondary)
+                        EmptyValue(text: "No one")
                     } else {
                         AssigneeFlow(assignees: issue.assignees, me: me)
                     }
@@ -166,7 +166,7 @@ struct IssueDetailView: View {
                 CardDivider()
                 SetEditRow(model: model, key: key, field: .labels) {
                     if issue.labels.isEmpty {
-                        Text("None").foregroundStyle(.secondary)
+                        EmptyValue(text: "None")
                     } else {
                         DetailLabels(labels: issue.labels, color: issue.labelColor(at:))
                     }
