@@ -226,7 +226,9 @@ struct IssueDetailView: View {
     }
 
     private func conversationSection(_ detail: IssueDetail, now: Date) -> some View {
-        ConversationSection(comments: detail.lastComments, total: detail.commentTotal, webURL: webURL, now: now)
+        ConversationSection(
+            comments: detail.lastComments, total: detail.commentTotal, earlier: detail.earlierCommentCount,
+            webURL: webURL, now: now)
     }
 
     // MARK: Loading and errors

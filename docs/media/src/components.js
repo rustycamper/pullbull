@@ -285,7 +285,7 @@
     const [glyph, color] = ISSUE_GLYPH[issue.glyph || "open"];
     let meta = `<span>${opts.inRepoGroup ? "" : esc(issue.repo) + " "}#${issue.number}</span>`;
     if (issue.age) meta += `<span class="dot">·</span><span>${esc(issue.age)}</span>`;
-    if (issue.comments > 0) meta += `<span class="label" style="margin-left:2px">${sym("bubble.left", 9.5)}<span>${issue.comments}</span></span>`;
+    if (issue.comments > 0) meta += `<span class="label" style="margin-left:4px">${sym("bubble.left", 9.5)}<span>${issue.comments}</span></span>`;
     // Every candidate chip is drawn; fitIssueMeta() then drops chips from the end into "+N" until the
     // line fits, as ViewThatFits does in IssueMetaLine.
     const labels = issue.labels || [];

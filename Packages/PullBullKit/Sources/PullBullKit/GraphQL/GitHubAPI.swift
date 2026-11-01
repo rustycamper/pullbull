@@ -220,12 +220,14 @@ public struct PRDetail: Codable, Sendable {
     public let checkCount: Int?
     /// Pending review requests; nil in details cached before they were stored.
     public let requests: [Reviewer]?
+    /// Every comment on the PR; `comments` holds the newest 50. Nil in details cached before it was stored.
+    public let commentCount: Int?
 
     public init(
         key: PRKey, body: String, checks: [Check], reviews: [Review],
         comments: [Comment], files: [ChangedFile], updatedAt: Date? = nil, ci: CIState? = nil,
         changedFiles: Int? = nil, additions: Int? = nil, deletions: Int? = nil, checkCount: Int? = nil,
-        requests: [Reviewer]? = nil
+        requests: [Reviewer]? = nil, commentCount: Int? = nil
     ) {
         self.key = key
         self.body = body
@@ -240,8 +242,12 @@ public struct PRDetail: Codable, Sendable {
         self.deletions = deletions
         self.checkCount = checkCount
         self.requests = requests
+        self.commentCount = commentCount
     }
 
+    public var commentTotal: Int { max(commentCount ?? 0, comments.count) }
+    /// The comments older than those held, counted above them on the page, as on an issue page.
+    public var earlierCommentCount: Int { commentTotal - comments.count }
     public var fileTotal: Int { max(changedFiles ?? 0, files.count) }
     public var additionsTotal: Int { additions ?? files.reduce(0) { $0 + $1.additions } }
     public var deletionsTotal: Int { deletions ?? files.reduce(0) { $0 + $1.deletions } }
@@ -691,7 +697,8 @@ public struct GitHubAPI: Sendable {
         let reviews = reviewNodes.compactMap { try? Decoding.review($0) }
         let requestNodes = (pr["reviewRequests"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
 
-        let commentNodes = (pr["comments"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
+        let commentsConnection = pr["comments"] as? [String: Any]
+        let commentNodes = commentsConnection?["nodes"] as? [[String: Any]] ?? []
         let comments = commentNodes.compactMap(Self.comment).sorted { $0.createdAt < $1.createdAt }
 
         let filesConnection = pr["files"] as? [String: Any]
@@ -712,7 +719,8 @@ public struct GitHubAPI: Sendable {
             additions: pr["additions"] as? Int,
             deletions: pr["deletions"] as? Int,
             checkCount: checkCount,
-            requests: requestNodes.compactMap(Decoding.reviewer))
+            requests: requestNodes.compactMap(Decoding.reviewer),
+            commentCount: (commentsConnection?["totalCount"] as? Int).map { $0 - (commentNodes.count - comments.count) })
     }
 
     /// Issue `key` with who last closed it; nil when it is gone (deleted, transferred, no access) or

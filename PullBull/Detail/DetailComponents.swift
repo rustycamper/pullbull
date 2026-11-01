@@ -390,14 +390,14 @@ struct FlowLayout: Layout {
 struct ConversationSection: View {
     /// Oldest first.
     let comments: [Comment]
-    /// Every comment on the item, shown or not.
+    /// Every comment on the item, shown or not, and how many of them are older than those shown
+    /// (`PRDetail` / `IssueDetail`'s `commentTotal` and `earlierCommentCount`).
     let total: Int
+    let earlier: Int
     let webURL: URL
     let now: Date
 
     var body: some View {
-        let total = max(total, comments.count)
-        let earlier = total - comments.count
         DetailSection(title: "Conversation", summary: total == 1 ? "1 comment" : "\(total) comments") {
             VStack(alignment: .leading, spacing: 10) {
                 if earlier > 0 {
@@ -448,6 +448,7 @@ struct DescriptionSection: View {
     }
 }
 
+/// Long descriptions fold to their first lines so the sections below stay in reach.
 private struct DescriptionText: View {
     let source: String
     @State private var expanded = false

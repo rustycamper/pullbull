@@ -187,7 +187,7 @@ struct PRDetailView: View {
             DescriptionSection(source: detail.body)
             statusSections(detail)
         }
-        conversationSection(detail.comments, now: now)
+        conversationSection(detail, now: now)
         filesSection(detail)
     }
 
@@ -305,9 +305,11 @@ struct PRDetailView: View {
         return model.edits.overrides.apply(toRequests: requests, on: key)
     }
 
-    private func conversationSection(_ comments: [Comment], now: Date) -> some View {
-        let total = max(pr?.commentCount ?? 0, comments.count)
-        return ConversationSection(comments: comments, total: total, webURL: webURL, now: now)
+    private func conversationSection(_ detail: PRDetail, now: Date) -> some View {
+        // The detail's own total, not the row's: a linked PR opened from an issue has no row.
+        ConversationSection(
+            comments: detail.comments, total: detail.commentTotal, earlier: detail.earlierCommentCount,
+            webURL: webURL, now: now)
     }
 
     private func filesSection(_ detail: PRDetail) -> some View {
@@ -500,7 +502,6 @@ struct TeamGlyph: View {
 
 // MARK: - Pieces
 
-/// Long descriptions fold to their first lines so the checks and reviewers stay in reach.
 /// "Conflicts with main · resolve on GitHub" under the branches: an amber triangle, gray text.
 private struct ConflictLine: View {
     let baseRef: String

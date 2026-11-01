@@ -1,8 +1,9 @@
 import SwiftUI
 import PullBullKit
 
-/// One issue in an Issues list: the state glyph, the title and a meta line (repo #num · age · comments ·
-/// label chips), with assignee avatars on the right. Compact rows fit on one line. A search result draws
+/// One issue in an Issues list: the state glyph, the title and a meta line (repo #num · age · search role ·
+/// comments · label chips), with assignee avatars on the right and, when closed, its pill. Compact rows fit
+/// on one line. A search result draws
 /// as a row of the tab it is laid out for, with its marks.
 struct IssueRow: View {
     let model: AppModel
@@ -96,6 +97,8 @@ struct IssueRow: View {
                 // Ended items carry their pill, as a closed PR row does.
                 IssueEndedPill(glyph: issue.glyph)
                     .padding(.top, 2)
+                    // The glyph already reads "Closed as completed" to VoiceOver.
+                    .accessibilityHidden(true)
             }
         }
         .padding(.horizontal, 8)
@@ -125,7 +128,7 @@ struct IssueRow: View {
             EmptyView()
         } trailing: {
             AssigneeStack(assignees: avatars, showUnassigned: tab == .board, size: 16)
-            if !issue.isOpen { IssueEndedPill(glyph: issue.glyph) }
+            if !issue.isOpen { IssueEndedPill(glyph: issue.glyph).accessibilityHidden(true) }
         }
     }
 }
