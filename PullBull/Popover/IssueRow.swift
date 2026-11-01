@@ -130,7 +130,7 @@ struct IssueRow: View {
     }
 }
 
-/// repo #num · updated age · comment count · label chips. Chips that don't fit drop off the end into
+/// repo #num · updated age · search role · comment count · label chips. Chips that don't fit drop off the end into
 /// "+N", so the repo, age and comments always show. Under a repo header the repo is left out.
 struct IssueMetaLine: View {
     let issue: BoardIssue
@@ -171,13 +171,14 @@ struct IssueMetaLine: View {
                 Text(age)
                     .ageHelp(Self.ageHelp(of: issue, now: now))
             }
-            if issue.commentCount > 0 {
-                CommentCount(count: issue.commentCount)
-                    .padding(.leading, 2)
-            }
+            // The role, then the comment count, in a PR row's order and spacing.
             if let role {
                 MetaDot()
                 Text(role)
+            }
+            if issue.commentCount > 0 {
+                CommentCount(count: issue.commentCount)
+                    .padding(.leading, 4)
             }
             LabelChips(set: chips, fit: fitting)
         }
