@@ -37,7 +37,7 @@ public enum ReviewRules {
         guard let mine, let reviewedAt = mine.submittedAt else {
             let teams = Set(myTeams.map { $0.lowercased() })
             let teamSlug = pr.reviewRequests.lazy.compactMap { request -> String? in
-                if case .team(let slug) = request, teams.contains(slug.lowercased()) { return slug }
+                if case .team(let slug, _) = request, teams.contains(slug.lowercased()) { return slug }
                 return nil
             }.first
             return teamSlug.map { .needsReview(.teamRequested($0)) } ?? .notRequested

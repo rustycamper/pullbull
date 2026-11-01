@@ -209,11 +209,14 @@ public struct PRDetail: Codable, Sendable {
     public let additions: Int?
     public let deletions: Int?
     public let checkCount: Int?
+    /// Pending review requests; nil in details cached before they were stored.
+    public let requests: [Reviewer]?
 
     public init(
         key: PRKey, body: String, checks: [Check], reviews: [Review],
         comments: [Comment], files: [ChangedFile], updatedAt: Date? = nil, ci: CIState? = nil,
-        changedFiles: Int? = nil, additions: Int? = nil, deletions: Int? = nil, checkCount: Int? = nil
+        changedFiles: Int? = nil, additions: Int? = nil, deletions: Int? = nil, checkCount: Int? = nil,
+        requests: [Reviewer]? = nil
     ) {
         self.key = key
         self.body = body
@@ -227,6 +230,7 @@ public struct PRDetail: Codable, Sendable {
         self.additions = additions
         self.deletions = deletions
         self.checkCount = checkCount
+        self.requests = requests
     }
 
     public var fileTotal: Int { max(changedFiles ?? 0, files.count) }
@@ -657,6 +661,7 @@ public struct GitHubAPI: Sendable {
             as? Int).map { $0 - (contexts.count - checks.count) }
         let reviewNodes = (pr["latestReviews"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
         let reviews = reviewNodes.compactMap { try? Decoding.review($0) }
+        let requestNodes = (pr["reviewRequests"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
 
         let commentNodes = (pr["comments"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
         let comments = commentNodes.compactMap(Self.comment).sorted { $0.createdAt < $1.createdAt }
@@ -678,7 +683,8 @@ public struct GitHubAPI: Sendable {
                 .map { $0 - (fileNodes.count - files.count) },
             additions: pr["additions"] as? Int,
             deletions: pr["deletions"] as? Int,
-            checkCount: checkCount)
+            checkCount: checkCount,
+            requests: requestNodes.compactMap(Decoding.reviewer))
     }
 
     /// Issue `key` with who last closed it; nil when it is gone (deleted, transferred, no access) or

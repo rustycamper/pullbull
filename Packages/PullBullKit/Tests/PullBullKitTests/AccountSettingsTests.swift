@@ -392,7 +392,7 @@ private func notice(_ source: AccountSource, org: String?, access: OrgAccess?) -
             createdAt: at, updatedAt: at, closedAt: nil, headRef: "h", baseRef: "main", ci: .none,
             headCommitDate: at, commentCount: 0, lastCommentAuthor: nil,
             latestReviews: [Review(author: reviewer, state: .approved, submittedAt: at)],
-            reviewRequests: [.user(requested), .team("core")])
+            reviewRequests: [.user(requested), .team(slug: "core", name: "core")])
     }
 
     @Test func collectsListAndDetailAvatars() {

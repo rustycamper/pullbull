@@ -76,7 +76,7 @@ private struct NoTransport: GraphQLTransport {
     }
 
     @Test func teamRequestNeverMatchesUser() {
-        let p = pr(1, requests: [.team("alice")])
+        let p = pr(1, requests: [.team(slug: "alice", name: "alice")])
         #expect(PersonMatch.roles(of: p, login: "alice", viewer: "v").isEmpty)
     }
 

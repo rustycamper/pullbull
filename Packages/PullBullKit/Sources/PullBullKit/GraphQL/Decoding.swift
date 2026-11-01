@@ -265,11 +265,11 @@ public enum Decoding {
         )
     }
 
-    private static func reviewer(_ node: [String: Any]) -> Reviewer? {
+    static func reviewer(_ node: [String: Any]) -> Reviewer? {
         guard let r = node["requestedReviewer"] as? [String: Any] else { return nil }
         switch r["__typename"] as? String {
         case "User": return (r["login"] as? String).map(Reviewer.user)
-        case "Team": return (r["slug"] as? String).map(Reviewer.team)
+        case "Team": return (r["slug"] as? String).map { .team(slug: $0, name: r["name"] as? String ?? $0) }
         default: return nil
         }
     }

@@ -30,7 +30,7 @@ import Testing
     }
 
     @Test func teamRequestNoReviewNeedsReview() {
-        let pr = Self.pr(requests: [.team("core")])
+        let pr = Self.pr(requests: [.team(slug: "core", name: "core")])
         #expect(Self.status(pr, teams: ["core"]) == .needsReview(.teamRequested("core")))
     }
 
@@ -38,7 +38,7 @@ import Testing
         let pr = Self.pr(
             headCommitDate: Self.t0,
             reviews: [Review(author: "me", state: .commented, submittedAt: Self.t0.addingTimeInterval(60))],
-            requests: [.team("core")])
+            requests: [.team(slug: "core", name: "core")])
         #expect(Self.status(pr, teams: ["core"]) == .reviewedByMe)
     }
 
@@ -67,7 +67,7 @@ import Testing
     @Test func pendingDraftReviewIgnored() {
         let draft = Review(author: "me", state: .pending, submittedAt: nil)
         #expect(Self.status(Self.pr(reviews: [draft])) == .notRequested)
-        #expect(Self.status(Self.pr(reviews: [draft], requests: [.team("core")]), teams: ["core"]) == .needsReview(.teamRequested("core")))
+        #expect(Self.status(Self.pr(reviews: [draft], requests: [.team(slug: "core", name: "core")]), teams: ["core"]) == .needsReview(.teamRequested("core")))
     }
 
     @Test func ownPRNotRequested() {
@@ -76,7 +76,7 @@ import Testing
     }
 
     @Test func otherTeamNotRequested() {
-        let pr = Self.pr(requests: [.team("other")])
+        let pr = Self.pr(requests: [.team(slug: "other", name: "other")])
         #expect(Self.status(pr, teams: ["core"]) == .notRequested)
     }
 
@@ -102,7 +102,7 @@ import Testing
         #expect(Self.status(Self.pr(requests: [.user("ME")]), me: "me") == .needsReview(.requested))
         let r = Review(author: "ME", state: .approved, submittedAt: Self.t0)
         #expect(Self.status(Self.pr(headCommitDate: Self.t0, reviews: [r]), me: "me") == .approvedByMe)
-        #expect(Self.status(Self.pr(requests: [.team("Core")]), teams: ["core"]) == .needsReview(.teamRequested("Core")))
+        #expect(Self.status(Self.pr(requests: [.team(slug: "Core", name: "Core")]), teams: ["core"]) == .needsReview(.teamRequested("Core")))
     }
 
     @Test func dismissedReviewCountsAsReviewedByMe() {
@@ -154,12 +154,12 @@ import Testing
     }
 
     @Test func directRequestWinsOverTeamRequest() {
-        let pr = Self.pr(requests: [.team("core"), .user("me")])
+        let pr = Self.pr(requests: [.team(slug: "core", name: "core"), .user("me")])
         #expect(Self.status(pr, teams: ["core"]) == .needsReview(.requested))
     }
 
     @Test func teamReasonNamesMyTeamNotAnother() {
-        let pr = Self.pr(requests: [.team("other"), .team("Backend")])
+        let pr = Self.pr(requests: [.team(slug: "other", name: "other"), .team(slug: "Backend", name: "Backend")])
         #expect(Self.status(pr, teams: ["core", "backend"]) == .needsReview(.teamRequested("Backend")))
     }
 
@@ -167,7 +167,7 @@ import Testing
         let pr = Self.pr(
             headCommitOid: "bbb",
             reviews: [Review(author: "me", state: .commented, submittedAt: Self.t0, commitOid: "aaa")],
-            requests: [.team("core")])
+            requests: [.team(slug: "core", name: "core")])
         #expect(Self.status(pr, teams: ["core"]) == .needsReview(.newCommitsSinceReview))
     }
 

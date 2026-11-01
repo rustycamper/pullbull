@@ -424,7 +424,7 @@ struct ReviewerEntry: Identifiable, Equatable {
             return nil
         }
         let requestedTeams = requests.compactMap { reviewer -> String? in
-            if case .team(let slug) = reviewer { return slug }
+            if case .team(_, let name) = reviewer { return name }
             return nil
         }
         func same(_ a: String, _ b: String) -> Bool { a.caseInsensitiveCompare(b) == .orderedSame }
@@ -438,8 +438,8 @@ struct ReviewerEntry: Identifiable, Equatable {
         for login in requestedUsers where !result.contains(where: { same($0.name, login) }) {
             result.append(ReviewerEntry(name: login, isTeam: false, status: .requested))
         }
-        for slug in requestedTeams {
-            result.append(ReviewerEntry(name: slug, isTeam: true, status: .requested))
+        for name in requestedTeams {
+            result.append(ReviewerEntry(name: name, isTeam: true, status: .requested))
         }
         return result
     }

@@ -25,7 +25,7 @@ private func node(_ name: String) throws -> [String: Any] {
         #expect(first.latestReviews[0].author == "bob")
         #expect(first.latestReviews[1].author == "ghost")
         #expect(first.latestReviews[1].state == .changesRequested)
-        #expect(first.reviewRequests.contains(.team("backend")))
+        #expect(first.reviewRequests.contains(.team(slug: "backend", name: "backend")))
         #expect(first.reviewRequests.contains(.user("carol")))
         #expect(first.headCommitDate != nil)
         #expect(page.prs[1].isDraft)
@@ -280,5 +280,45 @@ private func node(_ name: String) throws -> [String: Any] {
         var n = try node("pr_ghost_author")
         n["createdAt"] = "not a date"
         #expect(throws: (any Error).self) { try Decoding.pullRequest(from: n) }
+    }
+
+    // MARK: - Reviewers
+
+    @Test func oldCachedTeamReviewerDecodes() throws {
+        let old = Data(#"{"team":{"_0":"backend"}}"#.utf8)
+        #expect(try JSONDecoder().decode(Reviewer.self, from: old) == .team(slug: "backend", name: "backend"))
+    }
+
+    @Test func oldCachedUserReviewerDecodes() throws {
+        let old = Data(#"{"user":{"_0":"carol"}}"#.utf8)
+        #expect(try JSONDecoder().decode(Reviewer.self, from: old) == .user("carol"))
+    }
+
+    @Test func reviewerRoundTrips() throws {
+        for reviewer in [Reviewer.team(slug: "backend", name: "Back End"), .user("carol")] {
+            #expect(try JSONDecoder().decode(Reviewer.self, from: JSONEncoder().encode(reviewer)) == reviewer)
+        }
+    }
+
+    @Test func teamRequestDecodesName() {
+        let node: [String: Any] = ["requestedReviewer": ["__typename": "Team", "slug": "backend", "name": "Back End"]]
+        #expect(Decoding.reviewer(node) == .team(slug: "backend", name: "Back End"))
+    }
+
+    @Test func teamWithoutNameFallsBackToSlug() {
+        let node: [String: Any] = ["requestedReviewer": ["__typename": "Team", "slug": "backend"]]
+        #expect(Decoding.reviewer(node) == .team(slug: "backend", name: "backend"))
+    }
+
+    @Test func reviewerKeyIgnoresCaseAndName() {
+        #expect(Reviewer.team(slug: "BackEnd", name: "x").key == "team:backend")
+        #expect(Reviewer.user("Alice").key == "alice")
+        #expect(Reviewer.team(slug: "backend", name: "Back End").displayName == "Back End")
+        #expect(Reviewer.user("Alice").displayName == "Alice")
+    }
+
+    @Test func listQueryAsksForTeamNames() {
+        #expect(Queries.search.contains("... on Team{slug name}"))
+        #expect(Queries.detail.contains("... on Team{slug name}"))
     }
 }

@@ -521,6 +521,7 @@ private func page(_ nodes: [String], cursor: String, next: Bool) -> String {
         #expect(detail.files.count == 6)
         #expect(detail.comments.map(\.body) == ["First", "Second"])
         #expect(detail.reviews.first?.state == .approved)
+        #expect(detail.requests == [.user("carol"), .team(slug: "backend", name: "Back End")])
         #expect(detail.updatedAt == ISO8601DateFormatter().date(from: "2026-10-25T13:00:00Z"))
         #expect(detail.ci == .failure)
         // PR-level totals, not the sums of the first page of files and checks.
