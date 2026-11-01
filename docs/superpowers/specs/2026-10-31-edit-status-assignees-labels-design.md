@@ -1,6 +1,6 @@
 # Edit Status, assignees and labels
 
-PullBull lets you change an issue's board Status, and the assignees and labels of an issue or pull request, from the popover. Today it is read-only: noticing that #412 sits in the wrong column means opening the browser, waiting for Projects to load and dragging the card. This turns that into: select the row, press a key, type a few letters, Return.
+PullBull lets you change an issue's board Status, and the assignees and labels of an issue, from the popover. Today it is read-only: noticing that #412 sits in the wrong column means opening the browser, waiting for Projects to load and dragging the card. This turns that into: select the row, press a key, type a few letters, Return.
 
 ## Why
 
@@ -9,14 +9,15 @@ PullBull's pitch is that the browser is slow for a quick look. Triage is the nat
 ## Goals
 
 - Set or clear the board Status of an issue on the board PullBull shows, and add an issue that isn't on that board to it with a Status.
-- Add and remove assignees on issues and PRs.
-- Add and remove labels on issues and PRs.
+- Add and remove assignees on issues.
+- Add and remove labels on issues.
 - From the keyboard first, from any list row (every tab and search results) and from the detail; also from the mouse (right-click menu, the detail's fields).
 - The change shows at once everywhere the item appears, and survives refreshes that haven't caught up yet.
 - Every edit can be undone right after.
 
 ## Non-goals
 
+- Labels and assignees on pull requests. They stay read-only, so the app never needs a permission that could touch a PR.
 - Status on pull requests. The board query reads only issue cards, and `status:` is issues-only; PR cards stay out of scope.
 - Other board fields (Priority, Iteration, Estimate), milestones, issue type.
 - Bulk edits. The lists have no multi-select.
@@ -50,16 +51,16 @@ PullBull writes exactly three things to GitHub, each only when the user picks a 
 
 ### Keys
 
-Bare letters start a search ("just type"), so edits need a modifier. Builder's call: the bindings below. Check them against the existing key handling and change them if one clashes.
+Bare letters start a search ("just type"), so edits need a modifier. The bindings below.
 
 | Key | Does | Where |
 |---|---|---|
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd> | Status picker | Issue row or issue detail, when a board is shown |
-| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>A</kbd> | Assignees picker | Any issue or PR row, or detail |
-| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>L</kbd> | Labels picker | Any issue or PR row, or detail |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>A</kbd> | Assignees picker | Issue row or issue detail |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>L</kbd> | Labels picker | Issue row or issue detail |
 | <kbd>⌘</kbd><kbd>Z</kbd> | Undo the last edit | For 10 seconds after it, until you type in the search field |
 
-These keys work in search results too, where the search field keeps focus while arrows walk the rows. When the picker closes during a search, focus returns to the search field.
+These keys work in search results too (on issues), where the search field keeps focus while arrows walk the rows. When the picker closes during a search, focus returns to the search field.
 
 ### Mouse
 
@@ -71,11 +72,14 @@ These keys work in search results too, where the search field keeps focus while 
 The picker reuses the search completion list's look and keys: a small popup anchored to the row (or the detail field), with a filter field on top and a list below.
 
 - **Placement:** 300 pt wide, below its row, or above it when there's no room below, placed from its measured height and always wholly inside the popover. Opened from the detail, it anchors to the detail's Status row, not the list row under the detail. With its row scrolled out of view, it opens near the top. The filter has focus when it opens. A click outside closes it, and so does the popover hiding.
-- **Status (single choice):** the board's Status options in board order, each with a filled dot in the option's colour, as GitHub shows a Status, and its open count (as `status:` shows them), then **Clear Status** when the item has one. The current Status is checked. <kbd>↑</kbd><kbd>↓</kbd> choose, <kbd>Return</kbd> applies and closes, <kbd>Esc</kbd> closes without change. Typing filters by part of the name, case ignored; with no match it says "No Status called “…”". The Keyboard Shortcuts window lists these keys in an Editing section ("Choose a Status", "Apply", "Close without change").
-- **Assignees and labels (several):** the current ones checked and listed first, then the rest. <kbd>Return</kbd> (or a click) toggles the highlighted entry and keeps the picker open. Closing applies all the toggles as one edit: <kbd>Esc</kbd>, a click outside, or the picker's key again. Closing with nothing toggled sends nothing. This matches GitHub's own sidebar pickers, which apply when they close. The edit's undo covers a mistake. <kbd>⌘</kbd><kbd>Return</kbd> applies and closes too.
-  - Assignees: the viewer first, then people assignable in the item's repo, with avatars. GitHub allows at most 10 assignees; at 10, unchecked entries are dimmed.
+- **Status (single choice):** the board's Status options in board order, each with a filled dot in the option's colour, as GitHub shows a Status, and its open count (as `status:` shows them), then **Clear Status** when the item has one. The current Status is checked. <kbd>↑</kbd><kbd>↓</kbd> choose, <kbd>Return</kbd> applies and closes, <kbd>Esc</kbd> closes without change. Typing filters by part of the name, case ignored; with no match it says "No Status called “…”". The Keyboard Shortcuts window lists these keys in an Editing section. A key appears once per section, so <kbd>↩</kbd> is one row, "Apply, or tick" (Status applies; assignees and labels tick or untick), beside Set Status <kbd>⌥⌘S</kbd>, Assignees <kbd>⌥⌘A</kbd>, Labels <kbd>⌥⌘L</kbd>, Undo <kbd>⌘Z</kbd>, Choose <kbd>↑↓</kbd>, "Apply and close" <kbd>⌘↩</kbd> (assignees and labels) and Close <kbd>Esc</kbd> (Status closes without change; assignees and labels apply).
+- **Assignees and labels (several):** the current ones checked and listed first, then the rest. The row order is fixed when the first load lands; later loads append and never reshuffle. <kbd>Return</kbd> (or a click) toggles the highlighted entry and keeps the picker open. Closing applies all the toggles as one edit: <kbd>Esc</kbd>, <kbd>⌘</kbd><kbd>Return</kbd>, a click outside, the picker's key again, or the popover hiding. Closing with nothing toggled sends nothing. This matches GitHub's own sidebar pickers, which apply when they close. The edit's undo covers a mistake. <kbd>⌘</kbd><kbd>Return</kbd> applies and closes too.
+  - Assignees: ticked people first, then the viewer, then people assignable in the item's repo, with avatars. GitHub allows at most 10 assignees; at 10, unticked entries are dimmed.
   - Labels: the repo's labels with their colour dots and descriptions.
-- The issue or PR the picker edits is named in its header (`acme/widgets#412`), so an edit from a list never lands on the wrong row.
+  - Loading says "Loading labels…" or "Loading people…". A filter with no match says "No label called “…”" or "No one called “…”". An empty candidate list says "No labels" or "No people".
+  - A current label or assignee that has no candidate (not yet loaded, or no longer in the list) is shown ticked and locked, so it can't be removed by mistake.
+  - Opening one picker closes the other. While a picker is open, the other pickers' keys do nothing. Switching accounts drops an open picker unsent.
+- The issue the picker edits is named in its header (`acme/widgets#412`), so an edit from a list never lands on the wrong row.
 
 ### After an edit
 
@@ -100,6 +104,7 @@ The picker reuses the search completion list's look and keys: a small popup anch
   - "Couldn't add #412 to the board: …"
   - "Couldn't remove #412 from the board: …" (undoing an add)
   - "Couldn't change labels on #412: …", "Couldn't change assignees on #412: …"
+- A half-applied edit's undo reverses only the applied half, and that undo is not itself undoable.
 - A partial failure names both halves, labels by name and people by login, comma-joined: "Added bug to #412, but couldn't remove triage: …" or "Removed triage from #412, but couldn't add bug: …". When neither half applied, it reads as the plain failure above. When GitHub gives no reason, the reason reads "GitHub didn't apply it".
 - Offline or rate-limited: the picker opens (from cached candidates where there are any), but applying fails at once with the existing offline or rate-limit wording. No queueing for later.
 - A snapshot cached before the board's project and Status field IDs were stored can't be written to until the board's next fetch: the edit fails with "…: the board hasn't finished loading. Try again in a moment".
@@ -130,8 +135,10 @@ Mutations go through the existing `GitHubAPI` and transport, with the same error
 ### Picker candidates
 
 - Status options: from the snapshot (`boardStatusOptions`), already loaded.
-- Labels: `repository.labels`, all pages, with `id name color description`. Fetched when the picker first opens for a repo and cached in memory for the session. A refetch on open may run in the background and replace the list when it lands.
-- Assignees: `repository.assignableUsers(first:100)`, with `id login avatarUrl`, cached the same way. When the repo has more than 100, typing in the filter queries `assignableUsers(query:)`.
+- Labels: `repository.labels`, with `id name color description`, in pages of 100 capped at 10 pages (1,000 labels). Fetched when the picker first opens for a repo and cached in memory for the session. A refetch on open may run in the background; its results append to the rows and never reorder them.
+- Assignees: `repository.assignableUsers(first:100)`, with `id login avatarUrl`, cached the same way. When the repo has more than 100, typing in the filter queries `assignableUsers(query:)`. A filter query's answer never marks the assignee list complete. A failed filter query changes nothing on screen: the rows stay and the user can retype.
+- The same queries also read the issue's own labels and assignees with their IDs, so the picker can tick them without a candidate. An issue's own labels past 100 aren't read.
+- `viewerCanUpdate` isn't used: triage users may label without it. A refusal shows the failure line instead.
 - Candidates aren't written to disk.
 
 ### The local override until GitHub catches up
@@ -142,28 +149,26 @@ Search-backed lists (Assigned, Created, PR tabs, search) can return the old valu
 - An override is stored as a change, not as a whole item: the Status option ID (or none), and the labels and assignees added and removed. Applying it to any model of the item (a PR row, a `BoardIssue`, a detail) changes only those fields.
 - Agreement means: the same Status option ID (not its name, so a renamed option still agrees), and every added label or assignee present and every removed one absent, compared case-insensitively, on the first copy of the item found (board, then Assigned, Created, Closed, then PR lists). A removal from the board agrees once the card is gone. If the board no longer has the overriding option (it was deleted), the override is dropped at once.
 - Assigning or unassigning yourself on an open issue agrees only once Assigned agrees too (when Assigned was fetched). The board copy shows the new assignee at once, but Assigned comes from search and lags; dropping the override on the board copy alone would make the row flicker on Assigned.
-- Self-assigning puts the open issue on Assigned from the `BoardIssue` PullBull holds, from the board or Created copy. Both carry `issueRowFields`, which is all an Assigned row shows. An issue found only through search shows on Assigned once search lists it. Assigning someone else inserts nothing. A PR has no Assigned list, so nothing is inserted for PRs; on a PR an override shows labels only.
+- Self-assigning puts the open issue on Assigned from the `BoardIssue` PullBull holds, from the board or Created copy. Both carry `issueRowFields`, which is all an Assigned row shows. An issue found only through search shows on Assigned once search lists it. Assigning someone else inserts nothing. A PR has no Assigned list and takes no edits, so nothing is inserted for PRs.
 - Tabs, search results and the detail read the snapshot through the overrides. The stored snapshot stays as GitHub returned it. Notification change detection compares raw snapshots, so an override never fakes an event.
 - An override is dropped when a fetched snapshot agrees with it, or when 5 minutes pass, or when it is undone or fails. After 5 minutes GitHub's answer wins, even if it differs: someone else changed it, or the write didn't stick.
 - Overrides apply oldest first, so several edits to one item before a refresh show their net result. When a fetch agrees with an edit, the older edits to the same item that it replaced are dropped with it: any older Status edit, or an older label or assignee edit that touched one of the same labels or people. Todo → Doing → Done followed by a fetch showing Done leaves nothing behind, and neither does adding to the board and undoing it. An older edit to a different label still waits for GitHub to show it. Each override is checked against fetches independently, so a fetch that agrees with an earlier edit doesn't drop a later one.
 - The copies search results and the detail use keep the issue's node ID and its board item's node ID, so editing from them needs no lookup.
-- Own edits don't notify: `ChangeDetector` already skips Status moves and assignments whose actor is the viewer (`Notify/ChangeDetector.swift`, `statusEvents` and `assignedEvents`). Label changes don't notify today. Keep it that way, and cover it with a test.
+- Own edits don't notify: `ChangeDetector` already skips Status moves and assignments whose actor is the viewer (`Notify/ChangeDetector.swift`, `statusEvents` and `assignedEvents`). Label changes don't notify. A test pins that the viewer's own label changes raise no notification; the own-assignment case was already pinned.
 
 ## Permissions
 
 ### GitHub App
 
 - Change the app's permissions: **Issues: Read and write**, **Projects (organization): Read and write**. Everything else stays read-only.
-- Pull requests stay **Read-only**. The app never gets a permission that could merge. Before the permissions change ships, the builder checks on a test app and a test org whether `addLabelsToLabelable` and `addAssigneesToAssignable` accept a PR with Issues write alone.
-  - If they do, PR labels and assignees ship as described, gated on the installation's `issues` permission like issue edits.
-  - If they don't, labels and assignees on PRs are left out of this release. Their keys and menu items don't appear on PR rows or the PR detail, and the copy says "issues" where it would have said "issues and PRs". Adding them later is a separate permission change.
+- Pull requests stay read-only: PullBull edits no labels or assignees on them, and their rows and detail have no such key, menu item or clickable field.
 - Installation permission keys: `issues: write` gates labels and assignees; `organization_projects: write` gates Status.
 - Request all the write permissions in one change, before the Status release. Every new permission makes org owners re-approve, so they should approve once, not once per release.
 - Existing installations keep their old, read-only permissions until an owner accepts the new ones. `AccessChecker` already reads each installation's `permissions`; the edit controls use them:
   - The installation grants write: the keys, menu items and clickable fields work.
   - It doesn't: the keys and the menu items still show. Choosing one shows a one-line note in place of the picker: "Editing needs PullBull's new permissions for acme. An org owner accepts them on GitHub." It links to the installation's permissions page (`AccessChecker` already builds `installations/new/permissions`). Lists and details look as today. No banners, no badges.
   - Not known yet (the account's installations haven't loaded): the edit goes, and GitHub's answer decides. A refusal shows the failure line.
-- A GitHub App user token can do only what the user can do. A user with read-only access to a repo gets refused. If GraphQL exposes it, use the item's `viewerCanUpdate` (and `viewerCanLabel`, if it exists) to show the same one-line note in place of the picker instead of failing after the fact. Otherwise rely on the failure path.
+- A GitHub App user token can do only what the user can do. A user with read-only access to a repo gets refused, and the failure line says so.
 - Personal boards: GitHub Apps can't reach them at all. Nothing changes: those boards are read through a `gh` login, as today.
 - Update `docs/github-app-setup.md`: the permission table and the app's description text.
 
@@ -175,9 +180,9 @@ Search-backed lists (Assigned, Created, PR tabs, search) can return the old valu
 ## Docs and copy
 
 - README tagline: "Keyboard-first · Native SwiftUI · Edits only what you pick".
-- README Privacy row: "Writes to GitHub: board Status, assignees and labels, only when you pick them. Never merges, comments, approves or closes." While only Status ships, it reads "An issue's board Status, only when you pick it. Never merges, comments, approves or closes". The row keeps its eye icon.
+- README Privacy row: "An issue's board Status, assignees and labels, only when you pick them. Never merges, comments, approves or closes". The row keeps its eye icon.
 - CONTRIBUTING out-of-scope: "Writing to GitHub beyond Status, assignees and labels (merge, comment, approve, close)". Reason: "PullBull triages; GitHub is where work is written".
-- Manual: a new **Editing** section (keys, picker, undo, overrides in one sentence, permissions); the Keyboard tables (list and detail); right-click lists in Pull Requests and Issues; Sign in table (the token row reads "Writes only what you pick, renews itself"; both board rows add "`project` to set Status").
+- Manual: a new **Editing** section (keys, picker, undo, overrides in one sentence, permissions); the Keyboard tables (list and detail); right-click list in Issues; Sign in table (the token row reads "Writes only what you pick, renews itself"; both board rows add "`project` to set Status").
 - GitHub App description (`docs/github-app-setup.md`): the same sentence as Privacy.
 - Release notes: say plainly that PullBull now writes these three fields, and that org owners will be asked to accept new permissions.
 
@@ -185,9 +190,25 @@ Search-backed lists (Assigned, Created, PR tabs, search) can return the old valu
 
 1. **Permissions and plumbing:** node IDs in queries and models (cache-compatible), mutation support in `GitHubAPI`, write-permission detection for the app and `gh`, override store with reconciliation, undo, the error message. App permission change requested here.
 2. **Status:** picker, keys, right-click submenu, detail click, add-to-board, clear, undo.
-3. **Assignees and labels:** the multi-select picker, candidate fetching, the diff mutations, for issues and PRs.
+3. **Assignees and labels:** the multi-select picker, candidate fetching, the diff mutations, for issues.
 
 Each step ships as its own PR. The README and manual change with the step that makes them true. Release notes are written at release time from the merged PRs.
+
+## Rulings made during the build
+
+- The candidate queries also read the issue's own labels and assignees with their IDs. The picker then ticks what the issue has even before the candidate list is complete. An issue's own labels past 100 aren't read, because such issues are rare and the cost is a second query.
+- Label pages are capped at 10 (1,000 labels), which bounds the work on unusually large repos.
+- The row order is fixed at the first load and later loads append. Rows that move under the cursor while the user ticks cause wrong ticks.
+- A current value without a candidate is shown ticked and locked. It can't be unticked, because the picker has no ID to send for the removal it would cause.
+- The popover hiding applies the ticks, the same as any other close, so nothing the user ticked is lost.
+- An account switch drops the picker unsent. Its candidates and IDs belong to the other account.
+- `viewerCanUpdate` isn't used. Triage users may label without it, so using it would block people who are allowed. A refusal shows the failure line.
+- Opening one picker closes the other, and while one is open the other pickers' keys do nothing. Two open edits on one issue would race.
+- A half-applied undo is not itself undoable, as with any undo.
+- A filter query's answer never marks the assignee list complete, since it covers only the matches. A failed filter query changes nothing on screen, so the user can retype.
+- The Shortcuts window lists <kbd>↩</kbd> once in Editing ("Apply, or tick"), because a key appears once per section.
+- An empty candidate list says "No labels" or "No people", distinct from a filter with no match.
+- No notification for the viewer's own label changes is pinned by a test, as the own-assignment case already was.
 
 ## Testing
 
@@ -200,9 +221,12 @@ Per CONTRIBUTING, logic lives in PullBullKit with tests; views stay thin. Tests 
 - Permission gating: installation permissions, `gh` scopes, `viewerCanUpdate`.
 - Undo: the inverse of each edit, including delete-from-board for an add; ⌘Z expires after 10 seconds, only the last edit's answer arms it, typing in the search field ends it, and another board's fetch drops it.
 - Add to the board: a card already there (a stale snapshot) gets the Status and is neither rolled back nor undone by deletion.
+- Candidate paging: labels page up to the 10-page cap; a filter query never marks the assignee list complete; a failed one changes nothing.
+- Picker ticks and order: Return ticks and unticks, a tick toggled back sends nothing, the order is fixed at the first load and later loads append, ticked-without-candidate stays locked, the 10-assignee cap.
+- Partial results: only the applied half is kept and undone.
 - Selection: follows the row to its new lane, moves to the next row when the row leaves the list, and returns to the row when an undo or failure brings it back.
 - Picker placement: below, above, clamped on screen, capped to the popover.
-- No notification for the viewer's own Status, assignment or label changes.
+- No notification for the viewer's own Status, assignment or label changes (each pinned by a test).
 - Old cached snapshots without node IDs decode and still allow an edit.
 
 Manual check against real GitHub, on a test org with a board and a test repo, before each PR leaves draft. For each field, cover:
@@ -217,5 +241,4 @@ Manual check against real GitHub, on a test org with a board and a test repo, be
 
 ## Left to the builder
 
-- Paging limits for labels on unusually large repos.
 - The assignees and labels picker's anchoring in compact cards.

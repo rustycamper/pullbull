@@ -104,20 +104,22 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 - **Done:** click its header to unfold. Never counted
 - **Labels:** chips as on [pull requests](#pull-requests). The board card lists them all
 - **Switch board:** on the Board tab, click its name in the filter row, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd>
-- **Right-click a row:** [Status](#editing) (when a board is shown) · copy link or Markdown link · open on GitHub · show only this repo · show only updated · search author
+- **Right-click a row:** [Status](#editing) (when a board is shown) · [Assignees…](#editing) · [Labels…](#editing) · copy link or Markdown link · open on GitHub · show only this repo · show only updated · search author
 - **Right-click a group header** (a Status lane, No status, Not on board or a repo): **Open All *N* on GitHub**, from two issues up; above 8 it asks first. Done has none. Headers in search results get the tab's menus, without Show Only Updated
 - **Detail:** board card (incl. labels) · linked PRs (<kbd>Esc</kbd> returns) · description · last two comments
 
 ## Editing
 
-Set an issue's board Status from PullBull. It writes nothing else.
+Set an issue's board Status, assignees and labels from PullBull. It writes nothing else.
 
 - **Open the picker:** select an issue row or search result and press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd>, click Status on the issue detail's board card, or right-click a row → **Status** to pick one straight away
+- **Assignees and labels:** select an issue row or search result, or open the issue, and press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>A</kbd> (assignees) or <kbd>⌥</kbd><kbd>⌘</kbd><kbd>L</kbd> (labels), click Assignees or Labels on the detail, or right-click a row → **Assignees…** or **Labels…**. Issues only; pull requests stay read-only
+- **Multi-select picker:** ticked entries first, then you (assignees), then the rest, in an order that stays put while you tick. Labels show their colour and description, people their avatar. Type to filter, <kbd>↑</kbd> <kbd>↓</kbd> to choose, <kbd>Return</kbd> to tick or untick and keep it open. <kbd>Esc</kbd>, <kbd>⌘</kbd><kbd>Return</kbd>, a click outside, the picker's own key or the popover hiding closes it and applies the ticks as one edit; nothing ticked sends nothing. An issue has at most 10 assignees: at 10, the unticked people are dimmed
 - **Picker:** the board's Status options in board order, each with its open count, and **Clear Status** when the issue has one; the current one is checked. Type to filter, <kbd>↑</kbd> <kbd>↓</kbd> to choose, <kbd>Return</kbd> to apply, <kbd>Esc</kbd> to close without change
 - **Which issues:** those on the board, and those in a repo the board's owner owns (an org board takes that org's issues; a personal board, your own). Picking a Status for an issue not on the board adds it
 - **After an edit:** the row moves to its new lane at once and stays selected; nothing else is shown. PullBull keeps showing your edit until GitHub's answers catch up, for at most 5 minutes
-- **Undo:** <kbd>⌘</kbd><kbd>Z</kbd> within 10 seconds puts the previous Status back, or takes an issue the edit added off the board again. Only the last edit. Typing in the search field after it hands <kbd>⌘</kbd><kbd>Z</kbd> back to the text
-- **When it fails:** the change is taken back and a line above the footer says why, with **Open on GitHub**, until you dismiss it or edit again
+- **Undo:** <kbd>⌘</kbd><kbd>Z</kbd> within 10 seconds puts the previous Status back, or takes an issue the edit added off the board again; for assignees and labels, it takes the added ones off and puts the removed ones back, and when GitHub applied only part of an edit, only that part. Only the last edit. Typing in the search field after it hands <kbd>⌘</kbd><kbd>Z</kbd> back to the text
+- **When it fails:** the change is taken back and a line above the footer says why, with **Open on GitHub**, until you dismiss it or edit again. When GitHub applied only half of an assignee or label edit, the line says which: "Added docs to #412, but couldn't remove bug: …"
 - **Permissions:** with Sign in with GitHub, an org owner accepts PullBull's new permissions on GitHub once; until then the picker says so and links there. With a `gh` login, setting Status needs the `project` scope: the picker shows the `gh auth refresh -s project` command to run
 
 ## Search
@@ -260,6 +262,7 @@ Settings → Ask AI.
 | <kbd>Esc</kbd> | Clear search → clear repo → close |
 | <kbd>⌘</kbd><kbd>W</kbd> | Close |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd> | [Status picker](#editing) on the selected issue, when a board is shown. In search results too |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>A</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>L</kbd> | [Assignees or labels picker](#editing) on the selected issue. In search results too |
 | <kbd>⌘</kbd><kbd>Z</kbd> | Undo the last edit, for 10 seconds after it |
 
 | Detail | |
@@ -273,6 +276,7 @@ Settings → Ask AI.
 | <kbd>⌘</kbd><kbd>R</kbd> | Refresh |
 | <kbd>⌘</kbd><kbd>/</kbd> | Keyboard Shortcuts window |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd> | [Status picker](#editing), on an issue |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>A</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>L</kbd> | [Assignees or labels picker](#editing), on an issue |
 | <kbd>⌘</kbd><kbd>Z</kbd> | Undo the last edit, for 10 seconds after it |
 
 The order is the one on screen when you opened the first item; a refresh doesn't reshuffle it. An item that has left the lists since is skipped, unless its detail was already loaded.
