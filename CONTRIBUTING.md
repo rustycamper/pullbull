@@ -22,7 +22,7 @@ swift test --package-path Packages/PullBullKit
 - [ ] Logic goes in `PullBullKit`, with tests. Views stay thin
 - [ ] One change per PR
 
-CI on PRs from forks waits for a maintainer's approval.
+CI on PRs from forks waits for a maintainer's approval. A PR that changes only docs (Markdown, `docs/`, the issue and PR templates) skips the build and tests; the secrets scan always runs.
 
 ## Out of scope
 
