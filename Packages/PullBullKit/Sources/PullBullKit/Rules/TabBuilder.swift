@@ -296,9 +296,7 @@ public enum TabBuilder {
     ) -> TabContents {
         let since: [PRKey: Date] = sort == .waitingLongest
             ? rows.reduce(into: [:]) { starts, row in
-                let reviewLayout = tab == .review && row.reviewReason != nil
-                starts[row.id] = ReviewWait.make(
-                    for: row.pr, me: me, myTeams: myTeams, reviewLayout: reviewLayout, now: now)?.since
+                starts[row.id] = ReviewWait.make(for: row, on: tab, me: me, myTeams: myTeams, now: now)?.since
             }
             : [:]
         var seen = Set<PRKey>()
@@ -308,10 +306,10 @@ public enum TabBuilder {
                 if a.pr.createdAt != b.pr.createdAt { return a.pr.createdAt < b.pr.createdAt }
             case .waitingLongest:
                 switch (since[a.id], since[b.id]) {
-                case let (x?, y?) where x != y: return x < y
+                case let (x?, y?): if x != y { return x < y }
                 case (.some, nil): return true
                 case (nil, .some): return false
-                default: if a.pr.updatedAt != b.pr.updatedAt { return a.pr.updatedAt > b.pr.updatedAt }
+                case (nil, nil): if a.pr.updatedAt != b.pr.updatedAt { return a.pr.updatedAt > b.pr.updatedAt }
                 }
             case .recentlyUpdated, .newestFirst:
                 if a.pr.updatedAt != b.pr.updatedAt { return a.pr.updatedAt > b.pr.updatedAt }

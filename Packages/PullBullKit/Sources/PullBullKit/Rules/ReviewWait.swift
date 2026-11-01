@@ -66,6 +66,12 @@ public struct ReviewWait: Equatable, Sendable {
             label: "No reviewer requested, ready for \(RelativeAge.spoken(from: since, to: now))", since: since)
     }
 
+    /// The wait `row` shows on `tab`: Review's short form for a row with a reason there (it waits on the
+    /// viewer), the full form otherwise. The row's chips and the Waiting longest sort both read it.
+    public static func make(for row: Row, on tab: PRTab, me: String, myTeams: Set<String>, now: Date) -> ReviewWait? {
+        make(for: row.pr, me: me, myTeams: myTeams, reviewLayout: tab == .review && row.reviewReason != nil, now: now)
+    }
+
     /// `@org/slug` for a team, or the bare slug when the repo has no owner.
     static func teamPath(_ slug: String, repo: String) -> String {
         (repo.split(separator: "/").first.map { "\($0)/" } ?? "") + slug

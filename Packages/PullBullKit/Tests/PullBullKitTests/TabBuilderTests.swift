@@ -242,6 +242,18 @@ private func snap(
         #expect(built.review.rows.map(\.id.number) == [2, 1])
     }
 
+    /// Waits that started at the same moment break the tie by repo and number, as every sort does.
+    @Test func equalWaitsBreakTiesByNumber() {
+        var s = AppSettings()
+        s.setSort(.waitingLongest, for: PRTab.team)
+        let dana = Reviewer.user("dana")
+        let team = [
+            pr(2, updated: 0.5, requests: [dana], waits: [3]), pr(1, updated: 2, requests: [dana], waits: [3]),
+        ]
+        let built = TabBuilder.build(snap(team: team), settings: s, now: now)
+        #expect(built.team.rows.map(\.id.number) == [1, 2])
+    }
+
     @Test func recentlyClosedIgnoresTheSort() {
         var s = AppSettings()
         s.setSort(.oldestFirst, for: PRTab.mine)

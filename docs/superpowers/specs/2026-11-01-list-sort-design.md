@@ -40,7 +40,8 @@ Each list tab gets a Sort choice: what's new, what's stuck, or what's old. The d
 - **Waiting longest:** by the review wait `ReviewWait` computes for the row (PR #33), longest first. It uses the wait the row actually shows: Review's short form on a Review row counted for you or your team, and the full form everywhere else, including a Review row that isn't waiting on you and a search result laid out with another tab's chips.
   - It orders by when the wait started, oldest first. That is the same order as by length and needs no `now`.
   - A PR whose row shows no age follows in Recently updated order. That covers drafts, PRs reviewed or approved with nothing pending, and a wait whose start isn't known for every pending reviewer (the row then shows names with no age).
-  - The row and the sort read the start from one shared `ReviewWait` accessor, so they can't disagree.
+  - The row and the sort read the wait from one shared function, `ReviewWait.make(for:on:me:myTeams:now:)`, which picks the short or full form from the row's tab and reason, so they can't disagree.
+  - Waits that started at the same moment break the tie by repo and number, like every other sort.
 - **Oldest first:** by when it was opened (`createdAt`), oldest first, on every tab and for drafts too. This is today's "Oldest review request first", now on every tab.
 - **Newest first** (issue tabs): by when it was opened, newest first.
 - An issue missing the date its sort uses (`updatedAt`, or `createdAt` for Newest/Oldest first) goes after the dated ones.
@@ -50,7 +51,9 @@ Each list tab gets a Sort choice: what's new, what's stuck, or what's old. The d
 
 - A sort button on the right end of the filter bar, after the spacer: `↑↓` (SF Symbol `arrow.up.arrow.down`). It opens a menu of that tab's three choices, with a checkmark on the current one.
 - When the tab isn't on its default, the button shows the choice's short name beside the icon ("Waiting longest") in the accent colour. When it is on the default, it shows only the icon, in the filter bar's usual secondary style. That's the "never hidden" rule.
-- The same three choices appear as **Sort By ▸** in the list's right-click menu, next to **Show Only Updated**.
+- The button opens an AppKit menu with the current choice positioned over it, the same kind of menu as the repository and board menus beside it in the filter bar.
+- The same three choices appear as **Sort By ▸** wherever **Show Only Updated** is offered: the list's background, group headers and rows outside search. That includes a Done header and the rows of Mine's Recently closed. The sort is the tab's, so choosing there sorts the tab and the ended section simply doesn't move. Hiding it there would make the menu differ by row for no gain.
+- Ask's screen shows no sort button. It has no list to order.
 - Help and VoiceOver: "Sort: Recently updated".
 
 ## What the sort applies to

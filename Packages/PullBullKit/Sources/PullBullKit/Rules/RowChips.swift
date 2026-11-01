@@ -87,10 +87,7 @@ public struct RowChips: Equatable, Sendable {
     /// `me` and `myTeams` decide "You" and the Review tab's short wait; `now` measures it.
     public init(row: Row, tab: PRTab, me: String, myTeams: Set<String>, now: Date) {
         let pr = row.pr
-        // Only a Review row with a reason waits on the viewer; a dimmed or uncounted one gets the full form.
-        let reviewLayout = tab == .review && row.reviewReason != nil
-        let wait = ReviewWait.make(for: pr, me: me, myTeams: myTeams, reviewLayout: reviewLayout, now: now)
-            .map(Info.reviewWait)
+        let wait = ReviewWait.make(for: row, on: tab, me: me, myTeams: myTeams, now: now).map(Info.reviewWait)
         let approvals = pr.latestReviews.filter { $0.state == .approved }.count
         let changesRequestedBy = pr.latestReviews.filter { $0.state == .changesRequested }.map(\.author)
 

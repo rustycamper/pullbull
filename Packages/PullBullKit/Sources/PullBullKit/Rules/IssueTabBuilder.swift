@@ -309,7 +309,6 @@ public enum IssueTabBuilder {
         return order.flatMap { group(.repo($0), byRepo[$0] ?? [], counted: true, sort: sort, presorted: true) }
     }
 
-    /// A one-element array, or empty when there are no issues.
     /// A one-element array, or empty when there are no issues. `presorted` keeps the issues' order.
     private static func group(
         _ kind: IssueGroupKind, _ issues: [BoardIssue], counted: Bool, sort: ListSort, presorted: Bool = false
