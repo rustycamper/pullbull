@@ -120,8 +120,11 @@ struct IssueDetailView: View {
                     if let author = issue.author ?? (issue.createdAt != nil ? "ghost" : nil) {
                         HStack(spacing: 6) {
                             AvatarView(login: author, url: URL(string: "https://github.com/\(author).png"), size: 20)
-                            Text(openedText(author: author, issue: issue, now: now))
-                                .lineLimit(1)
+                            // Two lines beside a wide pill, so "updated" is never cut off, as on a PR page.
+                            Text(OpenedLine.text(
+                                author: author, opened: issue.createdAt, updated: issue.updatedAt, now: now))
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
@@ -132,11 +135,6 @@ struct IssueDetailView: View {
         }
         .padding(.horizontal, Metrics.detailGutter)
         .padding(.top, 14)
-    }
-
-    private func openedText(author: String, issue: BoardIssue, now: Date) -> String {
-        guard let created = issue.createdAt else { return "\(author) opened" }
-        return "\(author) opened \(RelativeAge.ago(created, now: now))"
     }
 
     // MARK: Board card

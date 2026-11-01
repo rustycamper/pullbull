@@ -16,4 +16,13 @@ import Testing
         #expect(OpenedLine.text(author: "rado", opened: t0, updated: t0 + 600, now: now) == "rado opened 4d ago")
         #expect(OpenedLine.text(author: "rado", opened: t0, updated: t0 + 20, now: t0 + 30) == "rado opened just now")
     }
+
+    /// Issues can lack either date (`BoardIssue`'s are optional).
+    @Test func missingDatesLeaveTheirPartOut() {
+        let now = t0 + 4 * 86_400
+        #expect(OpenedLine.text(author: "rado", opened: nil, updated: nil, now: now) == "rado opened")
+        #expect(OpenedLine.text(author: "rado", opened: nil, updated: now - 3600, now: now)
+            == "rado opened · updated 1h ago")
+        #expect(OpenedLine.text(author: "rado", opened: t0, updated: nil, now: now) == "rado opened 4d ago")
+    }
 }

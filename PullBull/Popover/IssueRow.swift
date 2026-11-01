@@ -103,7 +103,8 @@ struct IssueRow: View {
     private var compactBody: some View {
         CompactRowLayout(
             repoNumber: RepoNumber(key: issue.key, showsRepo: !inRepoGroup, compact: true),
-            age: IssueMetaLine.age(of: issue, now: now), ageWidth: issue.isOpen ? 24 : nil
+            age: IssueMetaLine.age(of: issue, now: now), ageWidth: issue.isOpen ? 24 : nil,
+            ageHelp: IssueMetaLine.ageHelp(of: issue, now: now)
         ) {
             Image(symbol: glyph.symbol)
                 .font(.system(size: 11))
@@ -151,12 +152,21 @@ struct IssueMetaLine: View {
         return issue.updatedAt.map { RelativeAge.short(from: $0, to: now) }
     }
 
+    /// What an open issue's age measures, as on a PR row; a closed issue's age already says "closed".
+    static func ageHelp(of issue: BoardIssue, now: Date) -> String? {
+        guard issue.isOpen, let updated = issue.updatedAt else { return nil }
+        return "Updated \(RelativeAge.ago(updated, now: now))"
+    }
+
     private func line(chips: LabelChipSet, fitting: ChipFit) -> some View {
         HStack(spacing: 5) {
             RepoNumber(key: issue.key, showsRepo: showsRepo)
             if let age {
                 MetaDot()
+                let help = Self.ageHelp(of: issue, now: now)
                 Text(age)
+                    .help(help ?? "")
+                    .accessibilityLabel(help ?? age)
             }
             if issue.commentCount > 0 {
                 CommentCount(count: issue.commentCount)

@@ -86,6 +86,7 @@ When the viewer requests a reviewer with ⌥⌘R, the override that adds the req
 - A row's own age (`#779 · 1h`) stays the last update: it's the list's sign of activity and what the lists sort by, while the wait says how long a PR has sat. Showing the opened age there instead would often repeat the wait (`4d · No reviewer 4d`).
 - So the number on the row is also on the PR page, its byline names both: "rado opened 4d ago · updated 1h ago", leaving out "updated" when it would read the same as "opened". Beside a wide pill the byline wraps to a second line rather than cutting "updated" off.
 - The row's age (full and compact) says "Updated 1h ago" on hover and to VoiceOver.
+- Issues follow the same rule, so the two screens read alike: an open issue's row age says "Updated 1h ago", and the issue page's byline is "erin opened 3d ago · updated 5h ago". An issue can lack either date; the missing part is left out. A closed issue's row age already reads "closed 3d ago" and gets no tooltip.
 - Neutral pills on a fill (Open, Ready to merge, an issue's not-planned Closed, Ask's Open) use a stronger text colour, about 7.5:1 in both appearances; the secondary text colour on a fill was near 4:1 in dark mode at the pills' 10pt.
 
 ## Data
@@ -131,6 +132,7 @@ The wait is a pure function in PullBullKit, next to `ReviewRules` and `RowChips`
 - **The short form needs a counted Review row.** Found in the final review: a dimmed or uncounted row with the viewer's team still pending isn't waiting on the viewer.
 - **Compact rows show no wait.** The owner saw the real list in compact mode, nearly every row with two bare ages, and found it confusing; replacing the updated age with the wait would make the number change when the PR is opened. The wait belongs to full rows.
 - **The row keeps "updated"; the PR page adds it.** The owner saw a row's `1h` and the page's "opened 4d ago" disagree. Of showing "opened" on the row or "updated" on the page, the page won: the row keeps its activity signal and doesn't repeat the wait.
+- **Issues match PRs.** The owner asked for the PR and issue screens to stay consistent in what they display.
 - **Neutral pills get their own text colour.** The owner found the Open pill too faint in dark mode; only pill text changes, so the app's other gray text stays as it is.
 - **Unseen and bot requests don't count.** GitHub returns them with no reviewer; naming or ageing a row by something nobody can see or nudge would be noise.
 - **Missing beats wrong, in the hover too.** With an unknown time the hover lists names only, not ages for the known ones, so it can't contradict the row.
