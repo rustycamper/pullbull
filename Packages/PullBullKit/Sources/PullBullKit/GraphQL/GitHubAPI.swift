@@ -968,6 +968,110 @@ public struct GitHubAPI: Sendable {
             complete: !more)
     }
 
+    /// What the reviewers picker offers on pull request `key`: people (filtered by `query` past the first
+    /// 100), the PR's past reviewers with their verdicts, its suggested reviewers, its requests, and the
+    /// teams of an organisation owner. A team list that can't be read (no `read:org`, no Members
+    /// permission) leaves teams out and throws nothing.
+    public func reviewerCandidates(for key: PRKey, query: String?) async throws -> ReviewerCandidates {
+        let (owner, name) = try Self.ownerAndName(key)
+        var variables: [String: Any] = ["owner": owner, "name": name, "n": key.number]
+        if let query, !query.isEmpty { variables["q"] = query }
+        let data = try await execute(Mutations.reviewerCandidates, variables)
+        guard let repository = data["repository"] as? [String: Any] else {
+            throw APIError.notFound("\(key.repo) not found")
+        }
+        let users = repository["assignableUsers"] as? [String: Any]
+        let people = Self.candidates(in: users, label: false)
+        let morePeople = (users?["pageInfo"] as? [String: Any])?["hasNextPage"] as? Bool == true
+        let isOrganization = (repository["owner"] as? [String: Any])?["__typename"] as? String == "Organization"
+        let teams = isOrganization ? try await teamCandidates(owner: owner, query: query) : nil
+
+        let pr = repository["item"] as? [String: Any] ?? [:]
+        let author = ((pr["author"] as? [String: Any])?["login"] as? String)?.lowercased()
+        var verdicts: [String: ReviewState] = [:]
+        var reviewed: [SetCandidate] = []
+        for node in Self.nodes(pr["latestReviews"]) {
+            guard let person = node["author"] as? [String: Any], person["__typename"] as? String == "User",
+                  let review = try? Decoding.review(node), let candidate = Self.person(person) else { continue }
+            verdicts[candidate.key] = review.state
+            reviewed.append(candidate)
+        }
+        func with(_ c: SetCandidate, suggested: Bool = false) -> SetCandidate {
+            SetCandidate(id: c.id, name: c.name, avatarURL: c.avatarURL, team: c.team,
+                         verdict: verdicts[c.key], isSuggested: suggested)
+        }
+
+        var seen: Set<String> = author.map { [$0] } ?? []
+        var current: [SetCandidate] = []
+        for node in Self.nodes(pr["reviewRequests"]) {
+            guard let requested = node["requestedReviewer"] as? [String: Any] else { continue }
+            let candidate: SetCandidate? = switch requested["__typename"] as? String {
+            case "User": Self.person(requested)
+            case "Team": (requested["slug"] as? String).map { Self.team(slug: $0, name: requested["name"] as? String) }
+            default: nil
+            }
+            if let candidate, seen.insert(candidate.key).inserted { current.append(with(candidate)) }
+        }
+        let suggested = (pr["suggestedReviewers"] as? [[String: Any]] ?? [])
+            .compactMap { ($0["reviewer"] as? [String: Any]).flatMap(Self.person) }
+        var all: [SetCandidate] = []
+        for candidate in reviewed where seen.insert(candidate.key).inserted { all.append(with(candidate)) }
+        for candidate in suggested where seen.insert(candidate.key).inserted { all.append(with(candidate, suggested: true)) }
+        for candidate in people + (teams?.list ?? []) where seen.insert(candidate.key).inserted {
+            all.append(with(candidate))
+        }
+        return ReviewerCandidates(
+            people: people, teams: teams?.list,
+            picker: SetCandidates(all: all, current: current, complete: !morePeople && teams?.complete != false))
+    }
+
+    /// The organisation's teams, paged as labels are; nil when GitHub won't list them.
+    private func teamCandidates(owner: String, query: String?) async throws -> (list: [SetCandidate], complete: Bool)? {
+        var list: [SetCandidate] = []
+        var after: String?
+        for _ in 0..<Self.maxLabelPages {
+            var variables: [String: Any] = ["owner": owner]
+            if let query, !query.isEmpty { variables["q"] = query }
+            if let after { variables["after"] = after }
+            let teams: [String: Any]
+            do {
+                guard let found = (try await execute(Mutations.teamCandidates, variables)["organization"]
+                    as? [String: Any])?["teams"] as? [String: Any] else { return nil }
+                teams = found
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                return nil
+            }
+            list += Self.nodes(teams).compactMap { node in
+                (node["slug"] as? String).map { Self.team(slug: $0, name: node["name"] as? String) }
+            }
+            let info = teams["pageInfo"] as? [String: Any]
+            guard info?["hasNextPage"] as? Bool == true, let cursor = info?["endCursor"] as? String else {
+                return (list, true)
+            }
+            after = cursor
+        }
+        return (list, false)
+    }
+
+    private static func nodes(_ connection: Any?) -> [[String: Any]] {
+        (connection as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
+    }
+
+    /// A person from a `User` node; the node ID when the node has one, else the login's key.
+    private static func person(_ node: [String: Any]) -> SetCandidate? {
+        guard let login = node["login"] as? String else { return nil }
+        return SetCandidate(
+            id: node["id"] as? String ?? login.lowercased(), name: login,
+            avatarURL: (node["avatarUrl"] as? String).flatMap(URL.init(string:)))
+    }
+
+    /// A team, its id its key; the slug stands in for a missing name.
+    private static func team(slug: String, name: String?) -> SetCandidate {
+        SetCandidate(id: "team:" + slug.lowercased(), name: name ?? slug, team: slug)
+    }
+
     private static func ownerAndName(_ key: PRKey) throws -> (String, String) {
         let parts = key.repo.split(separator: "/", maxSplits: 1).map(String.init)
         guard parts.count == 2 else { throw APIError.notFound("\(key.repo) not found") }
