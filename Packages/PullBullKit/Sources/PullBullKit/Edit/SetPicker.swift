@@ -40,6 +40,7 @@ public struct SetPicker: Equatable, Sendable {
     private let currentNames: [String]
     private let viewer: String
     private var entries: [Entry] = []
+    private var hasBuilt = false
 
     /// Names the issue in the picker's header, so an edit never lands on the wrong row: "acme/widgets#412".
     public var title: String { "\(key.repo)#\(key.number)" }
@@ -66,7 +67,7 @@ public struct SetPicker: Equatable, Sendable {
             pool.append(candidate)
         }
 
-        if isLoading {
+        if !hasBuilt {
             entries = firstEntries(from: pool)
         } else {
             var known = Set(entries.map { Self.fold($0.candidate.name) })
@@ -84,6 +85,7 @@ public struct SetPicker: Equatable, Sendable {
             entries += ordered(fresh).map { Entry(candidate: $0, isChecked: false, wasChecked: false, isPlaceholder: false) }
         }
 
+        hasBuilt = true
         isLoading = false
         loadError = nil
         refresh(keeping: highlighted.map { replaced[$0] ?? $0 })

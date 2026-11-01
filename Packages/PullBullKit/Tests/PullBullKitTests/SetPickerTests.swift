@@ -179,6 +179,17 @@ import Testing
         #expect(picker.change == nil)
     }
 
+    @Test func aLoadAfterAFailedFirstLoadBuildsTheRows() {
+        var picker = labelPicker(current: ["bug"])
+        picker.failedToLoad("offline")
+        picker.load(SetCandidates(all: [label("docs"), label("bug")], current: [], complete: true))
+        #expect(names(picker) == ["bug", "docs"])
+        #expect(ticked(picker) == ["bug"])
+        #expect(picker.loadError == nil)
+        #expect(!picker.isLoading)
+        #expect(picker.change == nil)
+    }
+
     @Test func aFailedRefetchKeepsTheCachedRows() {
         var picker = labelPicker(current: [])
         picker.load(SetCandidates(all: [label("bug")], current: [], complete: true))
