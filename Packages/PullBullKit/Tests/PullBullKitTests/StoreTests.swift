@@ -419,15 +419,47 @@ private func sample() -> Snapshot {
         let d = defaults()
         let store = SettingsStore(defaults: d)
         var s = AppSettings()
-        #expect(!s.groupTeamByAuthor && !s.reviewOldestFirst)
+        #expect(!s.groupTeamByAuthor && s.sort(for: PRTab.review) == .recentlyUpdated)
         s.groupTeamByAuthor = true
-        s.reviewOldestFirst = true
+        s.setSort(.oldestFirst, for: PRTab.review)
         store.save(s)
         let loaded = store.load()
-        #expect(loaded.groupTeamByAuthor && loaded.reviewOldestFirst)
+        #expect(loaded.groupTeamByAuthor && loaded.sort(for: PRTab.review) == .oldestFirst)
         d.set(Data(#"{"account":"me","org":"o"}"#.utf8), forKey: "settings.v1")
         let old = store.load()
-        #expect(!old.groupTeamByAuthor && !old.reviewOldestFirst)
+        #expect(!old.groupTeamByAuthor && old.sort(for: PRTab.review) == .recentlyUpdated)
+    }
+
+    @Test func eachTabRemembersItsSort() throws {
+        var s = AppSettings()
+        #expect(s.sort(for: PRTab.review) == .recentlyUpdated && s.sort(for: IssueTab.board) == .recentlyUpdated)
+        s.setSort(.waitingLongest, for: PRTab.team)
+        s.setSort(.newestFirst, for: IssueTab.created)
+        let loaded = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(s))
+        #expect(loaded.sort(for: PRTab.team) == .waitingLongest && loaded.sort(for: IssueTab.created) == .newestFirst)
+        #expect(loaded.sort(for: PRTab.review) == .recentlyUpdated)
+    }
+
+    @Test func aSortTheTabDoesntOfferIsTheDefault() throws {
+        let s = try JSONDecoder().decode(
+            AppSettings.self, from: Data(#"{"sorts":{"review":"newestFirst","board":"waitingLongest"}}"#.utf8))
+        #expect(s.sort(for: PRTab.review) == .recentlyUpdated && s.sort(for: IssueTab.board) == .recentlyUpdated)
+    }
+
+    @Test func oldReviewOldestFirstMigrates() throws {
+        let old = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"reviewOldestFirst":true}"#.utf8))
+        #expect(old.sort(for: PRTab.review) == .oldestFirst)
+        let newer = try JSONDecoder().decode(
+            AppSettings.self, from: Data(#"{"reviewOldestFirst":true,"sorts":{"review":"recentlyUpdated"}}"#.utf8))
+        #expect(newer.sort(for: PRTab.review) == .recentlyUpdated)
+        let written = String(decoding: try JSONEncoder().encode(old), as: UTF8.self)
+        #expect(!written.contains("reviewOldestFirst"))
+    }
+
+    @Test func unknownSortValueKeepsTheDefault() throws {
+        let s = try JSONDecoder().decode(
+            AppSettings.self, from: Data(#"{"reviewOldestFirst":true,"sorts":{"review":"byStars"}}"#.utf8))
+        #expect(s.sort(for: PRTab.review) == .recentlyUpdated)
     }
 
     @Test func followPendingCIDefaultsOn() throws {

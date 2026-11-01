@@ -185,7 +185,7 @@ private func snap(
 
     @Test func reviewOldestFirstSortsByCreatedAscending() {
         var s = AppSettings()
-        s.reviewOldestFirst = true
+        s.setSort(.oldestFirst, for: PRTab.review)
         let prs = [
             pr(1, created: 2, updated: 1), pr(2, created: 9, updated: 5), pr(3, created: 9, updated: 3),
             pr(4, created: 4, updated: 2),

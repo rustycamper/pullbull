@@ -61,7 +61,7 @@ public enum SearchLayout {
         _ results: SearchResults, on tab: PRTab, grouping: PRGrouping, settings: AppSettings, org: OrgContext
     ) -> SearchPRLayout {
         let rows = results.openPRs.map { TabBuilder.row(for: $0, on: tab, me: org.viewer, myTeams: org.myTeams) }
-        let contents = TabBuilder.contents(rows, oldestFirst: tab == .review && settings.reviewOldestFirst)
+        let contents = TabBuilder.contents(rows, oldestFirst: settings.sort(for: tab) == .oldestFirst)
         let ended = results.closedPRs.sorted { a, b in
             let ca = a.closedAt ?? .distantPast, cb = b.closedAt ?? .distantPast
             if ca != cb { return ca > cb }

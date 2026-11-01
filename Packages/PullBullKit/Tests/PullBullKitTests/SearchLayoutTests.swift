@@ -137,11 +137,11 @@ private func key(_ n: Int, _ repo: String = "o/a") -> PRKey { PRKey(repo: repo, 
 
     @Test func reviewOldestFirst() {
         var settings = AppSettings()
-        settings.reviewOldestFirst = true
+        settings.setSort(.oldestFirst, for: PRTab.review)
         let prs = [pr(1, created: 10, updated: 1), pr(2, created: 30, updated: 2), pr(3, created: 20, updated: 3)]
         let shown = layout(prs, on: .review, grouping: .none, settings: settings)
         #expect(shown.contents.rows.map(\.pr.key.number) == [2, 3, 1])
-        settings.reviewOldestFirst = false
+        settings.setSort(.recentlyUpdated, for: PRTab.review)
         #expect(layout(prs, on: .review, grouping: .none, settings: settings).contents.rows.map(\.pr.key.number)
             == [1, 2, 3])
     }

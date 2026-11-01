@@ -47,9 +47,6 @@ struct GeneralSettingsTab: View {
             Toggle(isOn: $model.settings.groupTeamByAuthor) {
                 RowLabel("Group Team by author", note: "Team only; other lists follow the setting above")
             }
-            Toggle(isOn: $model.settings.reviewOldestFirst) {
-                RowLabel("Oldest review request first", note: "By when each pull request was opened")
-            }
             Toggle(isOn: $model.settings.compact) {
                 RowLabel("Compact cards", note: "One line per pull request or issue")
             }
