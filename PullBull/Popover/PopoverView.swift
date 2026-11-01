@@ -562,6 +562,13 @@ struct PopoverView: View {
                 model.openSetPicker(Self.commandKey(event) == "a" ? .assignees : .labels, for: key)
                 return true
             }
+            // ⌥⌘R: the reviewers picker on the selected PR; never a refresh, whatever is selected.
+            if Self.isOptionCommand(event, flags: flags, letter: "r") {
+                if let key = model.selectedPRKey(in: listKeys), model.isReviewersOffered(for: key) {
+                    model.openSetPicker(.reviewers, for: key)
+                }
+                return true
+            }
             // ⌘Z: takes back the last edit while it can be; typing since hands ⌘Z back to the field.
             if Self.isCommandZ(event, flags: flags) {
                 return model.undoLastEdit()
@@ -883,6 +890,13 @@ struct PopoverView: View {
             model.openSetPicker(Self.commandKey(event) == "a" ? .assignees : .labels, for: key)
             return true
         }
+        // ⌥⌘R: the reviewers picker on a PR detail; never a reload.
+        if Self.isOptionCommand(event, flags: flags, letter: "r") {
+            if case .detail(let key) = model.route, model.isReviewersOffered(for: key) {
+                model.openSetPicker(.reviewers, for: key)
+            }
+            return true
+        }
         if Self.isCommandZ(event, flags: flags) { return model.undoLastEdit() }
         // ⇧⌘↩ and ⌃⌘C act on a PR detail only.
         if Self.isShiftCommandReturn(event, flags: flags) {
@@ -994,13 +1008,13 @@ struct PopoverView: View {
     }
 
     /// The open Status picker: ↑/↓ choose, ↩ applies, Esc and ⌥⌘S close it; every other key reaches its
-    /// filter field. ⌥⌘A and ⌥⌘L are swallowed: another picker doesn't open over this one.
+    /// filter field. ⌥⌘A, ⌥⌘L and ⌥⌘R are swallowed: another picker doesn't open over this one.
     private func handleStatusPickerKey(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
         if Self.isOptionCommand(event, flags: flags, letter: "s") {
             model.closeStatusPicker()
             return true
         }
-        if Self.isOptionCommand(event, flags: flags, letter: "a") || Self.isOptionCommand(event, flags: flags, letter: "l") {
+        if ["a", "l", "r"].contains(where: { Self.isOptionCommand(event, flags: flags, letter: $0) }) {
             return true
         }
         let plain = flags.subtracting([.capsLock, .numericPad, .function]).isEmpty
@@ -1020,12 +1034,16 @@ struct PopoverView: View {
         }
     }
 
-    /// The open assignee or label picker: ↑/↓ move, ↩ ticks or unticks, ⌘↩, Esc and its own ⌥⌘ key apply
-    /// and close it; every other key reaches its filter field. The other pickers' keys are swallowed.
+    /// The open reviewer, assignee or label picker: ↑/↓ move, ↩ ticks or unticks, ⌘↩, Esc and its own ⌥⌘
+    /// key apply and close it; every other key reaches its filter field. The other pickers' keys are swallowed.
     private func handleSetPickerKey(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
         if Self.isOptionCommand(event, flags: flags, letter: "s") { return true }
-        if Self.isOptionCommand(event, flags: flags, letter: "a") || Self.isOptionCommand(event, flags: flags, letter: "l") {
-            let own = model.setPicker?.field == .assignees ? "a" : "l"
+        if ["a", "l", "r"].contains(where: { Self.isOptionCommand(event, flags: flags, letter: $0) }) {
+            let own = switch model.setPicker?.field {
+            case .assignees: "a"
+            case .reviewers: "r"
+            default: "l"
+            }
             if Self.commandKey(event) == own { model.closeSetPicker(apply: true) }
             return true
         }

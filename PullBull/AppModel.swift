@@ -1949,7 +1949,7 @@ extension AppModel {
 
     /// As GitHub sent it. Reads `rawSearchResults`, not `searchResults`, so `openedPR` never keeps an edit
     /// that is later undone or refused.
-    private func fetchedPullRequest(for key: PRKey) -> PullRequest? {
+    func fetchedPullRequest(for key: PRKey) -> PullRequest? {
         if let snapshot {
             let lists = [snapshot.reviewCandidates, snapshot.mine, snapshot.team, snapshot.recentlyClosed]
             for list in lists {

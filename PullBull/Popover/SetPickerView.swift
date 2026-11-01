@@ -1,8 +1,8 @@
 import PullBullKit
 import SwiftUI
 
-/// The assignee or label picker: the issue it edits, a filter, then the candidates with the ticked ones
-/// first. In place of the rows, the note when this account may not edit here.
+/// The reviewer, assignee or label picker: the issue or PR it edits, a filter, then the candidates with the
+/// ticked ones first. In place of the rows, the note when this account may not edit here.
 struct SetPickerView: View {
     let model: AppModel
     @State private var filter = ""
@@ -42,7 +42,7 @@ struct SetPickerView: View {
                         ScrollView {
                             VStack(spacing: 0) {
                                 ForEach(Array(picker.rows.enumerated()), id: \.element.id) { index, row in
-                                    SetPickerRowView(row: row, labels: labels, selected: index == picker.selection) {
+                                    SetPickerRowView(row: row, field: picker.field, selected: index == picker.selection) {
                                         model.moveSetPicker(by: index - picker.selection)
                                         model.toggleSetPicker()
                                     }
@@ -67,7 +67,7 @@ struct SetPickerView: View {
             // Once the filter is in the window: asked for sooner, the focus lands on the search field.
             .onAppear { DispatchQueue.main.async { filterFocused = true } }
             .accessibilityElement(children: .contain)
-            .accessibilityLabel("\(labels ? "Labels" : "Assignees") for \(picker.title)")
+            .accessibilityLabel("\(Self.what(picker.field)) for \(picker.title)")
         }
     }
 
@@ -79,16 +79,24 @@ struct SetPickerView: View {
         } else if picker.isLoading {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
-                Text(labels ? "Loading labels…" : "Loading people…")
+                Text(labels ? "Loading labels…" : picker.field == .reviewers ? "Loading reviewers…" : "Loading people…")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
         } else if filter.isEmpty {
-            message(labels ? "No labels" : "No people")
+            message(labels ? "No labels" : picker.field == .reviewers ? "No reviewers to ask" : "No people")
         } else {
             message(labels ? "No label called “\(filter)”" : "No one called “\(filter)”")
+        }
+    }
+
+    private static func what(_ field: EditField) -> String {
+        switch field {
+        case .labels: "Labels"
+        case .reviewers: "Reviewers"
+        case .assignees, .status: "Assignees"
         }
     }
 
@@ -104,7 +112,7 @@ struct SetPickerView: View {
 
 private struct SetPickerRowView: View {
     let row: SetPickerRow
-    let labels: Bool
+    let field: EditField
     let selected: Bool
     let action: () -> Void
     @State private var hovering = false
@@ -117,10 +125,12 @@ private struct SetPickerRowView: View {
                     .opacity(row.isChecked ? 1 : 0)
                     .frame(width: 18)
                     .accessibilityHidden(true)
-                if labels {
+                if field == .labels {
                     if let color = LabelDotColor.parse(row.candidate.color) {
                         LabelDot(color: color)
                     }
+                } else if row.candidate.team != nil {
+                    TeamGlyph(size: 18)
                 } else {
                     AvatarView(login: row.candidate.name, url: row.candidate.avatarURL, size: 18)
                 }
@@ -128,7 +138,13 @@ private struct SetPickerRowView: View {
                     Text(row.candidate.name)
                         .font(.system(size: 13))
                         .lineLimit(1)
-                    if let detail = row.candidate.detail, !detail.isEmpty {
+                    // Unticking takes back the request, never the review.
+                    if row.candidate.verdict != nil && !row.isChecked {
+                        Text("Their review stays")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    } else if let detail = row.candidate.detail, !detail.isEmpty {
                         Text(detail)
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
@@ -137,6 +153,9 @@ private struct SetPickerRowView: View {
                     }
                 }
                 Spacer(minLength: 0)
+                if let verdict = row.candidate.verdict {
+                    VerdictPill(status: .reviewed(verdict))
+                }
             }
             .padding(.horizontal, 8)
             .frame(minHeight: 26)
@@ -149,8 +168,15 @@ private struct SetPickerRowView: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            row.isChecked ? "\(row.candidate.name), \(labels ? "applied" : "assigned")" : row.candidate.name)
+        .accessibilityLabel(row.isChecked ? "\(row.candidate.name), \(ticked)" : row.candidate.name)
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : [.isButton])
+    }
+
+    private var ticked: String {
+        switch field {
+        case .labels: "applied"
+        case .reviewers: "requested"
+        case .assignees, .status: "assigned"
+        }
     }
 }
