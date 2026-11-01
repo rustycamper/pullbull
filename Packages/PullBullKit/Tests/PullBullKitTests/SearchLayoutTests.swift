@@ -26,14 +26,15 @@ private func pr(
 
 private func issue(
     _ n: Int, repo: String = "o/a", open: Bool = true, status: String? = nil, updated: Double = 1,
-    closed: Double? = nil
+    closed: Double? = nil, created: Double? = nil
 ) -> BoardIssue {
     let value = status.map { id in
         BoardStatusValue(optionId: id, name: options.first { $0.id == id }?.name ?? "Gone")
     }
     return BoardIssue(
         key: PRKey(repo: repo, number: n), title: "i\(n)", url: URL(string: "https://x/i\(n)")!,
-        isOpen: open, updatedAt: hoursAgo(updated), closedAt: closed.map(hoursAgo), status: value)
+        isOpen: open, createdAt: created.map(hoursAgo), updatedAt: hoursAgo(updated),
+        closedAt: closed.map(hoursAgo), status: value)
 }
 
 private func snap(board: [BoardIssue] = [], statusOptions: [StatusOption]? = options) -> Snapshot {
@@ -165,6 +166,20 @@ private func key(_ n: Int, _ repo: String = "o/a") -> PRKey { PRKey(repo: repo, 
         let shown = layout(prs, on: .team, grouping: .none, settings: settings)
         #expect(shown.contents.rows.map(\.pr.key.number) == [2, 1])
         #expect(shown.ended.map(\.key.number) == [3, 4])
+    }
+
+    @Test func issueSearchFollowsTheTabsSort() {
+        var settings = AppSettings()
+        settings.grouping = .none
+        settings.setSort(.oldestFirst, for: IssueTab.created)
+        let issues = [
+            issue(1, updated: 1, created: 10), issue(2, updated: 5, created: 50),
+            issue(3, open: false, updated: 30, closed: 30, created: 90),
+            issue(4, open: false, updated: 5, closed: 5, created: 20),
+        ]
+        let shown = layout(issues, on: .created, settings: settings)
+        #expect(shown.contents.groups.flatMap(\.issues).map(\.key.number) == [2, 1])
+        #expect(shown.ended.map(\.key.number) == [4, 3])
     }
 
     @Test func endedGoInClosed() {
