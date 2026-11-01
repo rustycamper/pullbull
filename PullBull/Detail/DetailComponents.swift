@@ -286,8 +286,6 @@ struct CardRow<Value: View>: View {
     }
 }
 
-/// An issue's or PR's Assignees or Labels row: clickable where the sets are offered, with the picker
-/// anchored on the row.
 /// A card row's value when there is none ("No one", "None"). Tertiary, as macOS draws a field's placeholder,
 /// so it sits below the secondary field name and a filled value stands out from an empty one.
 struct EmptyValue: View {
@@ -298,6 +296,8 @@ struct EmptyValue: View {
     }
 }
 
+/// An issue's or PR's Assignees or Labels row: clickable where the sets are offered, with the picker
+/// anchored on the row.
 struct SetEditRow<Value: View>: View {
     let model: AppModel
     let key: PRKey
@@ -434,8 +434,6 @@ struct ConversationSection: View {
     }
 }
 
-/// A PR or issue page's Description: prose straight on the material at the section gutter, not boxed in a
-/// card (cards are for structured data), folded when long. One view for both pages.
 /// A PR or issue page's byline (`OpenedLine.parts`): one line when it fits beside the state pill, otherwise
 /// a line per part, so it breaks at the " · " and never inside "merged 7h ago".
 struct Byline: View {
@@ -457,6 +455,8 @@ struct Byline: View {
     }
 }
 
+/// A PR or issue page's Description: prose straight on the material at the section gutter, not boxed in a
+/// card (cards are for structured data), folded when long. One view for both pages.
 struct DescriptionSection: View {
     let source: String
 

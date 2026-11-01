@@ -7,7 +7,7 @@ import PullBullKit
 struct CompactRowLayout<Leading: View, Title: View, Badges: View, Trailing: View>: View {
     let repoNumber: RepoNumber
     let age: String?
-    /// The age's column, so short ages line up down a list; nil sizes it to fit (an ended item's "merged Oct 12").
+    /// The age's column, so short ages line up down a list; nil sizes it to fit (an ended item's "Oct 12").
     let ageWidth: CGFloat?
     /// What the age measures, on hover and for VoiceOver ("Updated 1h ago"); nil leaves the age bare.
     let ageHelp: String?
@@ -107,8 +107,9 @@ struct CompactChipGlyphs: View {
 }
 
 extension View {
-    /// What a row's age measures ("Updated 1h ago"), on hover and for VoiceOver. Nil adds nothing, so an
-    /// ended row's age ("merged Oct 12") reads as itself and leaves the row's own tooltip in place.
+    /// What a row's age measures ("Updated 1h ago", "Merged 2d ago"), on hover and for VoiceOver. Nil adds
+    /// nothing, so a full ended row's age ("merged Oct 12") reads as itself and leaves the row's own tooltip
+    /// in place.
     @ViewBuilder func ageHelp(_ help: String?) -> some View {
         if let help { self.help(help).accessibilityLabel(help) } else { self }
     }

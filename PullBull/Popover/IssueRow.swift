@@ -2,8 +2,8 @@ import SwiftUI
 import PullBullKit
 
 /// One issue in an Issues list: the state glyph, the title and a meta line (repo #num · age · search role ·
-/// comments · label chips), with assignee avatars on the right and, when closed, its pill. Compact rows fit
-/// on one line. A search result draws
+/// comments · label chips), with assignee avatars on the right and, when closed, its pill (full rows only).
+/// Compact rows fit on one line. A search result draws
 /// as a row of the tab it is laid out for, with its marks.
 struct IssueRow: View {
     let model: AppModel
@@ -132,7 +132,7 @@ struct IssueRow: View {
         } badges: {
             EmptyView()
         } trailing: {
-            // No ended pill, as on a compact PR row: the glyph and "closed 3d ago" already say it.
+            // No ended pill, as on a compact PR row: the glyph and the bare age ("3d") already say it.
             AssigneeStack(assignees: avatars, showUnassigned: tab == .board, size: 16)
         }
     }
