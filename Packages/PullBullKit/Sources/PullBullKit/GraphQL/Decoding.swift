@@ -69,8 +69,20 @@ public enum Decoding {
             lastCommentByBot: lastCommenter.map { $0["__typename"] as? String == "Bot" },
             additions: node["additions"] as? Int, deletions: node["deletions"] as? Int,
             nodeId: node["id"] as? String,
-            assignees: assignees(in: node)
+            assignees: assignees(in: node),
+            reviewRequestTimes: requestTimes(node),
+            readyForReviewAt: timeline(node, "readyEvent").last.flatMap { lenientDate($0["createdAt"]) }
         )
+    }
+
+    /// The newest ReviewRequestedEvent per reviewer, by `Reviewer.key`.
+    private static func requestTimes(_ node: [String: Any]) -> [String: Date] {
+        var times: [String: Date] = [:]
+        for event in timeline(node, "reviewRequestEvents") {
+            guard let reviewer = reviewer(event), let at = lenientDate(event["createdAt"]) else { continue }
+            times[reviewer.key] = max(times[reviewer.key] ?? at, at)
+        }
+        return times
     }
 
     /// An issue node (`issueRowFields`); nil without number, title, url or repo. `status` and
@@ -257,11 +269,13 @@ public enum Decoding {
         case "PENDING": state = .pending
         default: throw DecodingError(message: "unknown review state \(raw)")
         }
+        let author = node["author"] as? [String: Any]
         return Review(
-            author: (node["author"] as? [String: Any])?["login"] as? String ?? "ghost",
+            author: author?["login"] as? String ?? "ghost",
             state: state,
             submittedAt: try optionalDate(node["submittedAt"]),
-            commitOid: (node["commit"] as? [String: Any])?["oid"] as? String
+            commitOid: (node["commit"] as? [String: Any])?["oid"] as? String,
+            byBot: author.map { $0["__typename"] as? String == "Bot" }
         )
     }
 

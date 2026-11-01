@@ -197,6 +197,19 @@ private func card(_ snapshot: Snapshot, _ key: PRKey) -> BoardIssue? {
         #expect(o.apply(to: results).openPRs[0].reviewRequests.map(\.key) == ["team:core", "alice"])
     }
 
+    @Test func requestedReviewerGetsTheEditTimeAsRequestTime() {
+        var o = EditOverrides()
+        o.record(.reviewers(added: [.user("Dana")], removed: []), on: editKey(77), at: t0)
+        #expect(o.apply(to: editPR(77)).reviewRequestTimes["dana"] == t0)
+    }
+
+    @Test func alreadyPendingReviewerKeepsGitHubsTime() {
+        var o = EditOverrides()
+        o.record(.reviewers(added: [.user("dana")], removed: []), on: editKey(77), at: t0)
+        let pr = editPR(77, requests: [.user("Dana")], requestTimes: ["dana": t0 - 3600])
+        #expect(o.apply(to: pr).reviewRequestTimes["dana"] == t0 - 3600)
+    }
+
     @Test func reviewersAgreeOnFirstSnapshotCopy() {
         var o = EditOverrides()
         o.record(.reviewers(added: [.user("alice")], removed: []), on: editKey(77), at: t0)

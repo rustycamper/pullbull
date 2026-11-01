@@ -1,5 +1,5 @@
 // Demo data for the Mine tab: devon's open PRs with every review state Mine draws (Ready to merge,
-// Changes requested, approvals, No reviews, Conflicts), a draft, a red CI failure, and the "Recently
+// Changes requested, approvals, Conflicts), a draft, a red CI failure, and the "Recently
 // closed" group opened to show its Merged and Closed pills.
 window.SCENES = window.SCENES || {};
 window.SCENES.mine = {
@@ -20,7 +20,7 @@ window.SCENES.mine = {
       repo: "widgets",
       rows: [
         { title: "Add a retry budget to webhook delivery", number: 1302, author: "devon", age: "2h", ci: "success", info: [{ approvals: 2 }], action: "readyToMerge" },
-        { title: "Split the widget registry into modules", number: 1296, author: "devon", age: "6h", ci: "pending", draft: true, info: ["noReviews"] },
+        { title: "Split the widget registry into modules", number: 1296, author: "devon", age: "6h", ci: "pending", draft: true, info: [] },
       ],
     },
     {

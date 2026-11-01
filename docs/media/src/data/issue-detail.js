@@ -8,7 +8,7 @@ window.SCENES["issue-detail"] = {
   boardTitle: "Roadmap",
   issue: {
     repo: "api", number: 503, title: "Timeouts in the api contract tests",
-    author: "erin", opened: "3d ago", status: "In progress",
+    author: "erin", opened: "3d ago · updated 5h ago", status: "In progress",
     assignees: ["devon", "bob"],
     labels: [
       { name: "ci", color: "fbca04" },

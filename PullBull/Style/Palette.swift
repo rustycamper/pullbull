@@ -30,6 +30,12 @@ enum Palette {
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
             ? .secondaryLabelColor : NSColor.black.withAlphaComponent(0.6)
     })
+    /// A neutral pill's text (Open, Ready to merge) on its fill: about 7.5:1 in both appearances, where
+    /// `secondaryText` on a fill drops near 4:1 in dark mode at the pills' 10pt.
+    static let pillText = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor.white.withAlphaComponent(0.8) : NSColor.black.withAlphaComponent(0.7)
+    })
     static let separator = Color(nsColor: .separatorColor)
     static let fill = Color.primary.opacity(0.06)
     /// The skeleton's sweeping highlight: a lighter fill in light mode, a brighter one in dark mode.
@@ -115,26 +121,5 @@ extension Palette {
         case .pink: dynamic(light: 0xAD2471, dark: 0xF38DC4)
         case .purple: mergedText
         }
-    }
-}
-
-/// Short relative times as the design uses them: "just now", "3m", "5h", "2d".
-enum RelativeAge {
-    static func short(from date: Date, to now: Date) -> String {
-        let seconds = max(0, now.timeIntervalSince(date))
-        switch seconds {
-        case ..<60: return "now"
-        case ..<3600: return "\(Int(seconds / 60))m"
-        case ..<86_400: return "\(Int(seconds / 3600))h"
-        case ..<(86_400 * 30): return "\(Int(seconds / 86_400))d"
-        case ..<(86_400 * 365): return "\(Int(seconds / (86_400 * 30)))mo"
-        default: return "\(Int(seconds / (86_400 * 365)))y"
-        }
-    }
-
-    /// "just now" or "12m ago".
-    static func ago(_ date: Date, now: Date) -> String {
-        let value = short(from: date, to: now)
-        return value == "now" ? "just now" : "\(value) ago"
     }
 }

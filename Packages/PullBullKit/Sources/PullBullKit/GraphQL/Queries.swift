@@ -12,11 +12,14 @@ enum Queries {
       author{login avatarUrl}
       comments(last:1){totalCount nodes{author{__typename login}}}
       commits(last:1){nodes{commit{oid committedDate statusCheckRollup{state contexts{\(rollupCounts)}}}}}
-      latestReviews(first:20){nodes{author{login} state submittedAt commit{oid}}}
+      latestReviews(first:20){nodes{author{__typename login} state submittedAt commit{oid}}}
       reviewRequests(first:20){nodes{requestedReviewer{__typename ... on User{login} ... on Team{slug name}}}}
       labels(first:20){nodes{name color}}
       assignees(first:10){nodes{login avatarUrl}}
       mergedBy{login}
+      reviewRequestEvents: timelineItems(itemTypes:[REVIEW_REQUESTED_EVENT], last:20){\
+    nodes{... on ReviewRequestedEvent{createdAt requestedReviewer{__typename ... on User{login} ... on Team{slug}}}}}
+      readyEvent: timelineItems(itemTypes:[READY_FOR_REVIEW_EVENT], last:1){nodes{... on ReadyForReviewEvent{createdAt}}}
     }
     """
 

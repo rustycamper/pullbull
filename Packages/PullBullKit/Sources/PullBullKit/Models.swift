@@ -49,12 +49,15 @@ public struct Review: Hashable, Codable, Sendable {
     public let submittedAt: Date?
     /// The commit the review was submitted on; nil when unknown (older caches, detail reviews).
     public let commitOid: String?
+    /// Whether a bot (Copilot, a review app) wrote it; nil when unknown (older caches, detail reviews).
+    public let byBot: Bool?
 
-    public init(author: String, state: ReviewState, submittedAt: Date?, commitOid: String? = nil) {
+    public init(author: String, state: ReviewState, submittedAt: Date?, commitOid: String? = nil, byBot: Bool? = nil) {
         self.author = author
         self.state = state
         self.submittedAt = submittedAt
         self.commitOid = commitOid
+        self.byBot = byBot
     }
 }
 
@@ -150,6 +153,12 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
     public let nodeId: String?
     /// The first ten assignees; empty in snapshots cached before they were stored. Set by edit overrides too.
     public internal(set) var assignees: [Assignee]
+    /// When each pending review request was made, by `Reviewer.key`: the newest ReviewRequestedEvent
+    /// naming that reviewer, or the time of a PullBull edit that added it. A pending request missing here
+    /// has an unknown time. Empty in snapshots cached before it was stored.
+    public internal(set) var reviewRequestTimes: [String: Date]
+    /// The last ReadyForReviewEvent; nil when the PR was never a draft, and in snapshots cached before it.
+    public let readyForReviewAt: Date?
 
     public var glyph: PRGlyph { PRGlyph(state: state, isDraft: isDraft) }
     /// The colour of the label at `index`, nil when GitHub gave none or the cache predates it.
@@ -167,7 +176,7 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         latestReviews: [Review], reviewRequests: [Reviewer], headCommitOid: String? = nil, labels: [String] = [],
         labelColors: [String?] = [], mergedBy: String? = nil, mergeable: Mergeable? = nil,
         lastCommentByBot: Bool? = nil, additions: Int? = nil, deletions: Int? = nil, nodeId: String? = nil,
-        assignees: [Assignee] = []
+        assignees: [Assignee] = [], reviewRequestTimes: [String: Date] = [:], readyForReviewAt: Date? = nil
     ) {
         self.key = key
         self.title = title
@@ -197,6 +206,8 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         self.deletions = deletions
         self.nodeId = nodeId
         self.assignees = assignees
+        self.reviewRequestTimes = reviewRequestTimes
+        self.readyForReviewAt = readyForReviewAt
     }
 
     /// Pull requests cached before labels or assignees were stored have none.
@@ -230,6 +241,8 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         deletions = try c.decodeIfPresent(Int.self, forKey: .deletions)
         nodeId = try c.decodeIfPresent(String.self, forKey: .nodeId)
         assignees = try c.decodeIfPresent([Assignee].self, forKey: .assignees) ?? []
+        reviewRequestTimes = try c.decodeIfPresent([String: Date].self, forKey: .reviewRequestTimes) ?? [:]
+        readyForReviewAt = try c.decodeIfPresent(Date.self, forKey: .readyForReviewAt)
     }
 }
 

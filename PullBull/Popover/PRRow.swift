@@ -145,7 +145,11 @@ struct PRRow: View {
     }
 
     /// Review state in two tiers: a capsule only when the PR needs acting on, glyph-and-text otherwise.
-    private var chips: RowChips { RowChips(row: row, tab: chipTab) }
+    private var chips: RowChips {
+        RowChips(
+            row: row, tab: chipTab, me: model.snapshot?.org.viewer ?? model.settings.account ?? "",
+            myTeams: model.snapshot?.org.myTeams ?? [], now: now)
+    }
 
     /// `repo #num`, or `#num` under a repo header or the focus. A search result outside the focus (a link)
     /// names its repo.
@@ -156,6 +160,8 @@ struct PRRow: View {
     }
 
     private var age: String { RelativeAge.short(from: pr.updatedAt, to: now) }
+    /// The row's age is the last update; the PR page's byline names it too (`OpenedLine`).
+    private var updatedHelp: String { "Updated \(RelativeAge.ago(pr.updatedAt, now: now))" }
 
     /// One line at a fixed height, so a row is as tall with a capsule as without one. Under pressure the
     /// label chips drop off the end into "+N" first, then (on Review and Team) the author goes (its avatar
@@ -183,8 +189,9 @@ struct PRRow: View {
             }
             Text(age)
                 .fixedSize()
+                .help(updatedHelp)
                 // The avatar, which names a left-out author on hover, is hidden from VoiceOver.
-                .accessibilityLabel(fitting.lean ? "\(pr.author), \(age)" : age)
+                .accessibilityLabel(fitting.lean ? "\(pr.author), \(updatedHelp)" : updatedHelp)
             if let role = marks?.role {
                 MetaDot()
                 Text(role)
@@ -225,7 +232,7 @@ struct PRRow: View {
     private var compactBody: some View {
         CompactRowLayout(
             repoNumber: RepoNumber(key: pr.key, showsRepo: showsRepo, compact: true),
-            age: age, ageWidth: 24
+            age: age, ageWidth: 24, ageHelp: updatedHelp
         ) {
             switch layoutTab {
             case .mine:
@@ -247,7 +254,8 @@ struct PRRow: View {
             let chips = chips
             CompactChipGlyphs(
                 chips: chips,
-                reason: layoutTab == .review && !row.dimmed ? chips.info.first(where: { $0 != .conflicts }) : nil)
+                reason: layoutTab == .review && !row.dimmed
+                    ? chips.info.first(where: { $0 != .conflicts && !$0.isReviewWait }) : nil)
         } trailing: {
             CIGlyph(state: pr.ci)
         }
@@ -393,17 +401,30 @@ struct CommentCount: View {
 }
 
 /// A `RowChips.Info` that follows the age after a `·`: glyph and text, the glyph amber for a warning.
+/// A review wait's name shortens before its age, which never truncates.
 struct MetaInfo: View {
     let info: RowChips.Info
 
     var body: some View {
-        Label { Text(info.text) } icon: {
+        Label { title } icon: {
             Image(systemName: info.symbol)
                 .foregroundStyle(info.isWarning ? AnyShapeStyle(Palette.amberGlyph) : AnyShapeStyle(.secondary))
         }
             .labelStyle(TightLabelStyle(spacing: 3))
             .help(info.label)
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel(info.label)
+    }
+
+    @ViewBuilder private var title: some View {
+        if case .reviewWait(let wait) = info {
+            HStack(spacing: 3) {
+                if let who = wait.who { Text(who).lineLimit(1).truncationMode(.tail) }
+                if let age = wait.age { Text(age).fixedSize() }
+            }
+        } else {
+            Text(info.text)
+        }
     }
 }
 
@@ -467,7 +488,7 @@ struct ReadyToMergePill: View {
     var fill = Palette.fill
 
     var body: some View {
-        Pill(symbol: "arrow.triangle.merge", text: "Ready to merge", foreground: Palette.secondaryText, fill: fill)
+        Pill(symbol: "arrow.triangle.merge", text: "Ready to merge", foreground: Palette.pillText, fill: fill)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Ready to merge")
     }

@@ -182,13 +182,13 @@
   /** StatePill for an open PR: Draft, Ready to merge (on strongFill) or Open. */
   function prStatePill(pr) {
     if (pr.state === "merged") return pill("Merged", { symbol: "pullbull.pullrequest.merged", fg: "var(--merged-text)", fill: "var(--merged-fill)" });
-    if (pr.readyToMerge) return pill("Ready to merge", { symbol: "arrow.triangle.merge", fg: "var(--secondary-text)", fill: "var(--strong-fill)" });
-    return pill("Open", { symbol: "pullbull.pullrequest", fg: "var(--secondary-text)", fill: "var(--strong-fill)" });
+    if (pr.readyToMerge) return pill("Ready to merge", { symbol: "arrow.triangle.merge", fg: "var(--pill-text)", fill: "var(--strong-fill)" });
+    return pill("Open", { symbol: "pullbull.pullrequest", fg: "var(--pill-text)", fill: "var(--strong-fill)" });
   }
 
   function summaryBlock(title, pillHtml, author, opened, extra = "") {
     return `<div class="detail-summary"><div class="detail-heading">${esc(title)}</div>` +
-      `<div class="hstack" style="gap:8px;margin-top:8px">${pillHtml}<span class="hstack f12 c-secondary" style="gap:6px">${avatar(author, 20)}<span class="nowrap">${esc(author)} opened ${esc(opened)}</span></span></div>${extra}</div>`;
+      `<div class="hstack" style="gap:8px;margin-top:8px">${pillHtml}<span class="hstack f12 c-secondary" style="gap:6px">${avatar(author, 20)}<span style="min-width:0">${esc(author)} opened ${esc(opened)}</span></span></div>${extra}</div>`;
   }
 
   function prDetail(d) {
@@ -228,7 +228,7 @@
     const linked = section("Linked pull requests", String(is.linked.length), card(is.linked.map(linkedPRLine)));
     const description = section("Description", null, card([`<div class="issue-description">${markdown(is.body)}</div>`]));
     const conversation = conversationSection(is.lastComments, is.commentTotal, is.commentTotal - is.lastComments.length);
-    const pillHtml = pill("Open", { symbol: "pullbull.issue", fg: "var(--secondary-text)", fill: "var(--strong-fill)" });
+    const pillHtml = pill("Open", { symbol: "pullbull.issue", fg: "var(--pill-text)", fill: "var(--strong-fill)" });
     const body = summaryBlock(is.title, pillHtml, is.author, is.opened) + board + linked + description + conversation;
     return `<div class="detail">${detailHeader(`${is.repo} #${is.number}`)}<div class="detail-scroll"><div class="detail-content">${body}</div></div>` +
       bottomBar(["rectangle.split.3x1", "arrow.up.right.square"]) + `</div>`;

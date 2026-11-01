@@ -15,7 +15,7 @@ func editIssue(
 
 func editPR(
     _ number: Int, labels: [String] = [], assignees: [String] = [], author: String = "al", state: PRState = .open,
-    reviews: [Review] = [], requests: [Reviewer] = []
+    reviews: [Review] = [], requests: [Reviewer] = [], requestTimes: [String: Date] = [:]
 ) -> PullRequest {
     let at = Date(timeIntervalSince1970: 1_800_000_000)
     return PullRequest(
@@ -23,7 +23,7 @@ func editPR(
         author: author, authorAvatarURL: nil, state: state, isDraft: false, createdAt: at, updatedAt: at, closedAt: nil,
         headRef: "a", baseRef: "main", ci: .none, headCommitDate: nil, commentCount: 0, lastCommentAuthor: nil,
         latestReviews: reviews, reviewRequests: requests, labels: labels, labelColors: labels.map { _ in nil },
-        assignees: assignees.map { Assignee(login: $0, avatarURL: nil) })
+        assignees: assignees.map { Assignee(login: $0, avatarURL: nil) }, reviewRequestTimes: requestTimes)
 }
 
 func editSnapshot(

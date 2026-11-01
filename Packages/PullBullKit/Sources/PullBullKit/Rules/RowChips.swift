@@ -13,7 +13,8 @@ public struct RowChips: Equatable, Sendable {
     /// Glyph-and-text metadata in the meta line.
     public enum Info: Equatable, Sendable {
         case approvals(Int)
-        case noReviews
+        /// Who the review waits on and for how long (`ReviewWait`); on every tab, before Conflicts.
+        case reviewWait(ReviewWait)
         /// A Review row I approved that doesn't count toward the tab.
         case youApprovedNotCounted
         case reRequested
@@ -27,7 +28,7 @@ public struct RowChips: Equatable, Sendable {
         public var symbol: String {
             switch self {
             case .approvals, .youApprovedNotCounted: "checkmark"
-            case .noReviews: "clock"
+            case .reviewWait: "clock"
             case .reRequested: "arrow.uturn.left"
             case .newCommits: "arrow.triangle.2.circlepath"
             case .viaTeam: "person.2"
@@ -39,7 +40,7 @@ public struct RowChips: Equatable, Sendable {
         public var text: String {
             switch self {
             case .approvals(let n): "\(n)"
-            case .noReviews: "No reviews"
+            case .reviewWait(let wait): wait.text
             case .youApprovedNotCounted: "You approved · not counted"
             case .reRequested: "Re-requested"
             case .newCommits: "New commits"
@@ -52,7 +53,7 @@ public struct RowChips: Equatable, Sendable {
         public var label: String {
             switch self {
             case .approvals(let n): n == 1 ? "1 approval" : "\(n) approvals"
-            case .noReviews: "No reviews yet"
+            case .reviewWait(let wait): wait.label
             case .newCommits: "New commits since your review"
             case .viaTeam(let team): "Requested via @\(team)"
             case .conflicts: "Merge conflicts"
@@ -68,6 +69,11 @@ public struct RowChips: Equatable, Sendable {
             if case .approvals = self { return true }
             return false
         }
+
+        public var isReviewWait: Bool {
+            if case .reviewWait = self { return true }
+            return false
+        }
     }
 
     public let action: Action?
@@ -78,8 +84,13 @@ public struct RowChips: Equatable, Sendable {
         self.info = info
     }
 
-    public init(row: Row, tab: PRTab) {
+    /// `me` and `myTeams` decide "You" and the Review tab's short wait; `now` measures it.
+    public init(row: Row, tab: PRTab, me: String, myTeams: Set<String>, now: Date) {
         let pr = row.pr
+        // Only a Review row with a reason waits on the viewer; a dimmed or uncounted one gets the full form.
+        let reviewLayout = tab == .review && row.reviewReason != nil
+        let wait = ReviewWait.make(for: pr, me: me, myTeams: myTeams, reviewLayout: reviewLayout, now: now)
+            .map(Info.reviewWait)
         let approvals = pr.latestReviews.filter { $0.state == .approved }.count
         let changesRequestedBy = pr.latestReviews.filter { $0.state == .changesRequested }.map(\.author)
 
@@ -88,12 +99,13 @@ public struct RowChips: Equatable, Sendable {
             let action = Self.action(for: pr, changesRequestedBy: changesRequestedBy)
             var info: [Info] = []
             if approvals > 0 { info.append(.approvals(approvals)) }
-            if approvals == 0 && changesRequestedBy.isEmpty { info.append(.noReviews) }
+            if let wait { info.append(wait) }
             if pr.hasConflicts { info.append(.conflicts) }
             self.init(action: action, info: info)
         case .team:
             var info: [Info] = []
             if approvals > 0 { info.append(.approvals(approvals)) }
+            if let wait { info.append(wait) }
             if pr.hasConflicts { info.append(.conflicts) }
             self.init(action: nil, info: info)
         case .review:
@@ -104,11 +116,12 @@ public struct RowChips: Equatable, Sendable {
                 case .reRequested: .reRequested
                 case .newCommitsSinceReview: .newCommits
                 case .teamRequested(let slug):
-                    .viaTeam((pr.key.repo.split(separator: "/").first.map { "\($0)/" } ?? "") + slug)
+                    .viaTeam(ReviewWait.teamPath(slug, repo: pr.key.repo))
                 case .requested, nil: nil
                 }
             }
             var info = reason.map { [$0] } ?? []
+            if let wait { info.append(wait) }
             if pr.hasConflicts { info.append(.conflicts) }
             self.init(action: nil, info: info)
         }

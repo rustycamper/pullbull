@@ -9,13 +9,15 @@ struct CompactRowLayout<Leading: View, Title: View, Badges: View, Trailing: View
     let age: String?
     /// The age's column, so short ages line up down a list; nil sizes it to fit (an ended item's "merged Oct 12").
     let ageWidth: CGFloat?
+    /// What the age measures, on hover and for VoiceOver ("Updated 1h ago"); nil leaves the age bare.
+    let ageHelp: String?
     let leading: Leading
     let title: Title
     let badges: Badges
     let trailing: Trailing
 
     init(
-        repoNumber: RepoNumber, age: String?, ageWidth: CGFloat? = 24,
+        repoNumber: RepoNumber, age: String?, ageWidth: CGFloat? = 24, ageHelp: String? = nil,
         @ViewBuilder leading: () -> Leading,
         @ViewBuilder title: () -> Title,
         @ViewBuilder badges: () -> Badges,
@@ -24,6 +26,7 @@ struct CompactRowLayout<Leading: View, Title: View, Badges: View, Trailing: View
         self.repoNumber = repoNumber
         self.age = age
         self.ageWidth = ageWidth
+        self.ageHelp = ageHelp
         self.leading = leading()
         self.title = title()
         self.badges = badges()
@@ -43,13 +46,16 @@ struct CompactRowLayout<Leading: View, Title: View, Badges: View, Trailing: View
                 repoNumber
                     .fixedSize()
                 if let age {
-                    if let ageWidth {
-                        Text(age)
-                            .frame(width: ageWidth, alignment: .trailing)
-                    } else {
-                        Text(age)
-                            .fixedSize()
+                    Group {
+                        if let ageWidth {
+                            Text(age)
+                                .frame(width: ageWidth, alignment: .trailing)
+                        } else {
+                            Text(age)
+                                .fixedSize()
+                        }
                     }
+                    .ageHelp(ageHelp)
                 }
             }
             .font(.system(size: 11))
@@ -63,7 +69,7 @@ struct CompactRowLayout<Leading: View, Title: View, Badges: View, Trailing: View
 }
 
 /// A compact row's review glyphs, standing in for the meta line's capsule and info: changes requested,
-/// ready to merge, a Review reason, then conflicts.
+/// ready to merge, a Review reason, then conflicts. The review wait is a full row's alone (`RowChips.Info.reviewWait`).
 struct CompactChipGlyphs: View {
     let chips: RowChips
     /// Review rows only: why the review is asked for.
@@ -97,5 +103,13 @@ struct CompactChipGlyphs: View {
                 .help(RowChips.Info.conflicts.label)
                 .accessibilityLabel(RowChips.Info.conflicts.label)
         }
+    }
+}
+
+extension View {
+    /// What a row's age measures ("Updated 1h ago"), on hover and for VoiceOver. Nil adds nothing, so an
+    /// ended row's age ("merged Oct 12") reads as itself and leaves the row's own tooltip in place.
+    @ViewBuilder func ageHelp(_ help: String?) -> some View {
+        if let help { self.help(help).accessibilityLabel(help) } else { self }
     }
 }

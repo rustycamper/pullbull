@@ -155,7 +155,12 @@ public struct EditOverrides: Equatable, Sendable {
         case .assignees(let added, let removed):
             pr.assignees = changeAssignees(pr.assignees, added, removed)
         case .reviewers(let added, let removed):
+            let before = Set(pr.reviewRequests.map(\.key))
             pr.reviewRequests = changeRequests(pr.reviewRequests, added, removed)
+            // A new request starts its wait now; one already pending keeps GitHub's time.
+            for key in added.map(\.key) where !before.contains(key) {
+                pr.reviewRequestTimes[key] = entry.madeAt
+            }
         }
         return pr
     }

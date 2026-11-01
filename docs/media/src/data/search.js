@@ -21,9 +21,9 @@ window.SCENES.search = {
     count: 5,
     // Laid out as the Team tab is, grouped by repo (newest group first) with Team's rows; no context line.
     groups: [
-      { repo: "widgets", rows: [{ title: "Fix flaky checkout test on CI", number: 1291, author: "bob", age: "1h", ci: "success", info: [] }] },
-      { repo: "api", rows: [{ title: "Add contract tests for webhook retries", number: 484, author: "erin", age: "3h", ci: "pending", info: [] }] },
-      { repo: "gadgets", rows: [{ title: "Run the e2e test suite in the merge queue", number: 79, author: "frank", age: "1d", ci: "failure", info: [] }] },
+      { repo: "widgets", rows: [{ title: "Fix flaky checkout test on CI", number: 1291, author: "bob", age: "1h", ci: "success", info: [{ wait: "You 1h" }] }] },
+      { repo: "api", rows: [{ title: "Add contract tests for webhook retries", number: 484, author: "erin", age: "3h", ci: "pending", info: [{ wait: "@initech/platform +1 5h" }] }] },
+      { repo: "gadgets", rows: [{ title: "Run the e2e test suite in the merge queue", number: 79, author: "frank", age: "1d", ci: "failure", info: [{ wait: "No reviewer 1d" }] }] },
     ],
     closed: [
       { title: "Retry flaky tests once before failing", repo: "widgets", number: 1270, state: "merged", when: "Oct 21" },

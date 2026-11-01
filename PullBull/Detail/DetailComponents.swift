@@ -126,7 +126,7 @@ struct StatePill: View {
             } else if ReviewRules.isReadyToMerge(pr) {
                 ReadyToMergePill(fill: Palette.strongFill)
             } else {
-                Pill(symbol: Palette.prGlyph(.open), text: "Open", foreground: Palette.secondaryText, fill: Palette.strongFill)
+                Pill(symbol: Palette.prGlyph(.open), text: "Open", foreground: Palette.pillText, fill: Palette.strongFill)
             }
         }
     }
