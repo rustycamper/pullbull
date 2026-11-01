@@ -117,24 +117,3 @@ extension Palette {
         }
     }
 }
-
-/// Short relative times as the design uses them: "just now", "3m", "5h", "2d".
-enum RelativeAge {
-    static func short(from date: Date, to now: Date) -> String {
-        let seconds = max(0, now.timeIntervalSince(date))
-        switch seconds {
-        case ..<60: return "now"
-        case ..<3600: return "\(Int(seconds / 60))m"
-        case ..<86_400: return "\(Int(seconds / 3600))h"
-        case ..<(86_400 * 30): return "\(Int(seconds / 86_400))d"
-        case ..<(86_400 * 365): return "\(Int(seconds / (86_400 * 30)))mo"
-        default: return "\(Int(seconds / (86_400 * 365)))y"
-        }
-    }
-
-    /// "just now" or "12m ago".
-    static func ago(_ date: Date, now: Date) -> String {
-        let value = short(from: date, to: now)
-        return value == "now" ? "just now" : "\(value) ago"
-    }
-}
