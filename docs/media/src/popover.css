@@ -409,7 +409,6 @@ body {
 .diff-block { width: 7px; height: 7px; border-radius: 1.5px; }
 .diff-count { width: 64px; text-align: right; flex: none; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 .description { font-size: 12.5px; line-height: 19px; }
-.issue-description { font-size: 12px; line-height: 17px; padding: 10px 12px; }
 .comment { display: flex; align-items: flex-start; gap: 8px; }
 .comment-body { line-height: 17px; }
 .detail-bar { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 12px; flex: none; }

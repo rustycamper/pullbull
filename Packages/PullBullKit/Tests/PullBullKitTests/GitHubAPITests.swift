@@ -377,6 +377,22 @@ private func page(_ nodes: [String], cursor: String, next: Bool) -> String {
         await #expect(throws: APIError.self) { try await api(stub).orgContext(org: "o") }
     }
 
+    /// The page counts earlier comments from the detail's own total, not a list row that may be stale or absent.
+    @Test func detailCountsItsComments() async throws {
+        let body = """
+        {"data":{"repository":{"pullRequest":{"body":"","updatedAt":"2026-10-25T14:03:11Z",\
+        "latestReviews":{"nodes":[]},"files":{"nodes":[]},\
+        "comments":{"totalCount":120,"nodes":[\
+        {"author":{"login":"b"},"body":"two","createdAt":"2026-10-24T10:00:00Z"},\
+        {"author":{"login":"a"},"body":"one","createdAt":"2026-10-23T10:00:00Z"}]}}}}}
+        """
+        let detail = try await api(StubTransport(json: [body])).detail(PRKey(repo: "o/r", number: 1))
+        #expect(detail.comments.map(\.body) == ["one", "two"])
+        #expect(detail.commentTotal == 120)
+        #expect(detail.earlierCommentCount == 118)
+        #expect(Queries.detail.contains("comments(last:50){totalCount nodes{"))
+    }
+
     @Test func detailTotalsIgnoreUndecodableNodes() async throws {
         let body = """
         {"data":{"repository":{"pullRequest":{"body":"","updatedAt":"2026-10-25T14:03:11Z",\

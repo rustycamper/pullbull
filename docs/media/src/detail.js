@@ -226,7 +226,8 @@
     const labels = cardRow("Labels", `<span class="flow" style="gap:4px">${is.labels.map((l) => P.labelChip(l.name, l.color, scheme)).join("")}</span>`);
     const board = section(d.boardTitle, null, card([statusRow, assignees, labels]));
     const linked = section("Linked pull requests", String(is.linked.length), card(is.linked.map(linkedPRLine)));
-    const description = section("Description", null, card([`<div class="issue-description">${markdown(is.body)}</div>`]));
+    // The same unboxed description as a PR page (DescriptionSection).
+    const description = section("Description", null, `<div class="description">${markdown(is.body)}</div>`);
     const conversation = conversationSection(is.lastComments, is.commentTotal, is.commentTotal - is.lastComments.length);
     const pillHtml = pill("Open", { symbol: "pullbull.issue", fg: "var(--pill-text)", fill: "var(--strong-fill)" });
     const body = summaryBlock(is.title, pillHtml, is.author, is.opened) + board + linked + description + conversation;

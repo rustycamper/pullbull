@@ -247,7 +247,7 @@ enum Queries {
           }}}}}}
           reviewRequests(first:20){nodes{requestedReviewer{__typename ... on User{login} ... on Team{slug name}}}}
           latestReviews(first:20){nodes{author{login} state submittedAt}}
-          comments(first:50){nodes{author{login} body createdAt}}
+          comments(last:50){totalCount nodes{author{login} body createdAt}}
           files(first:100){totalCount nodes{path additions deletions}}
         }
       }

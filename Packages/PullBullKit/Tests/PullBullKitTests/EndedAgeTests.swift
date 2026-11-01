@@ -15,6 +15,34 @@ import Testing
             locale: locale, timeZone: utc)
     }
 
+    /// What a row and its page say for an ended item: the age, or the bare word without a close date.
+    @Test func labelFallsBackToTheWord() {
+        #expect(EndedAge.label(state: .merged, closedAt: nil, now: Self.now) == "merged")
+        #expect(EndedAge.label(state: .closed, closedAt: nil, now: Self.now) == "closed")
+        #expect(EndedAge.label(state: .closed, closedAt: Self.now - 3 * Self.day, now: Self.now) == "closed 3d ago")
+        #expect(EndedAge.label(state: .open, closedAt: Self.now, now: Self.now) == nil)
+    }
+
+    /// A compact row's age: bare, like an open compact row's, since the glyph says merged or closed.
+    @Test func compactIsTheBareAge() {
+        func compact(_ ago: TimeInterval) -> String? {
+            EndedAge.compact(closedAt: Self.now - ago, now: Self.now, locale: Self.locale, timeZone: Self.utc)
+        }
+        #expect(compact(10) == "now")
+        #expect(compact(5 * 3600) == "5h")
+        #expect(compact(7 * Self.day) == "7d")
+        #expect(compact(7 * Self.day + 1) == "Nov 7")
+        #expect(compact(400 * Self.day) == "Oct 10, 2022")
+        #expect(EndedAge.compact(closedAt: nil, now: Self.now) == nil)
+    }
+
+    /// The compact age's hover and VoiceOver text names what happened.
+    @Test func helpSpellsOutTheLabel() {
+        #expect(EndedAge.help(state: .merged, closedAt: Self.now - 2 * Self.day, now: Self.now) == "Merged 2d ago")
+        #expect(EndedAge.help(state: .closed, closedAt: nil, now: Self.now) == "Closed")
+        #expect(EndedAge.help(state: .open, closedAt: Self.now, now: Self.now) == nil)
+    }
+
     @Test func recentIsRelative() {
         #expect(Self.text(.merged, closedAgo: 10) == "merged just now")
         #expect(Self.text(.merged, closedAgo: 12 * 60) == "merged 12m ago")

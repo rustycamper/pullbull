@@ -55,6 +55,14 @@ private func detail(updatedAt: Date?, ci: CIState?) -> PRDetail {
     }
 
     /// Without PR-level totals (an old cached detail) the totals are the sums of the fetched lists.
+    /// A detail cached before the comment total was stored counts only what it holds: no "earlier" line.
+    @Test func commentTotalFallsBackToTheList() {
+        let comment = Comment(author: "a", body: "x", createdAt: Date(timeIntervalSince1970: 0))
+        let old = PRDetail(key: key, body: "", checks: [], reviews: [], comments: [comment], files: [])
+        #expect(old.commentTotal == 1)
+        #expect(old.earlierCommentCount == 0)
+    }
+
     @Test func totalsFallBackToTheLists() {
         let files = [ChangedFile(path: "a", additions: 3, deletions: 1), ChangedFile(path: "b", additions: 2, deletions: 4)]
         let checks = [Check(name: "c", state: .success, url: nil)]

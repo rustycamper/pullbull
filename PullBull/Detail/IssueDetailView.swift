@@ -41,7 +41,7 @@ struct IssueDetailView: View {
                                 RefreshFailedNote(message: error) { model.reloadIssueDetail() }
                             }
                             linkedPRsSection(detail.linkedPRs)
-                            descriptionSection(detail.body)
+                            DescriptionSection(source: detail.body)
                             conversationSection(detail, now: context.date)
                         } else {
                             placeholder
@@ -120,11 +120,11 @@ struct IssueDetailView: View {
                     if let author = issue.author ?? (issue.createdAt != nil ? "ghost" : nil) {
                         HStack(spacing: 6) {
                             AvatarView(login: author, url: URL(string: "https://github.com/\(author).png"), size: 20)
-                            // Two lines beside a wide pill, so "updated" is never cut off, as on a PR page.
-                            Text(OpenedLine.text(
-                                author: author, opened: issue.createdAt, updated: issue.updatedAt, now: now))
-                                .lineLimit(2)
-                                .fixedSize(horizontal: false, vertical: true)
+                            Byline(parts: OpenedLine.parts(
+                                author: author, opened: issue.createdAt, updated: issue.updatedAt,
+                                ended: issue.isOpen
+                                    ? nil : EndedAge.label(state: .closed, closedAt: issue.closedAt, now: now),
+                                now: now))
                         }
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
@@ -158,7 +158,7 @@ struct IssueDetailView: View {
                 }
                 SetEditRow(model: model, key: key, field: .assignees) {
                     if issue.assignees.isEmpty {
-                        Text("No one").foregroundStyle(.secondary)
+                        EmptyValue(text: "No one")
                     } else {
                         AssigneeFlow(assignees: issue.assignees, me: me)
                     }
@@ -166,7 +166,7 @@ struct IssueDetailView: View {
                 CardDivider()
                 SetEditRow(model: model, key: key, field: .labels) {
                     if issue.labels.isEmpty {
-                        Text("None").foregroundStyle(.secondary)
+                        EmptyValue(text: "None")
                     } else {
                         DetailLabels(labels: issue.labels, color: issue.labelColor(at:))
                     }
@@ -209,11 +209,10 @@ struct IssueDetailView: View {
 
     @ViewBuilder private func linkedPRsSection(_ prs: [LinkedPR]) -> some View {
         if prs.isEmpty {
-            Text("No linked pull requests")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, Metrics.detailGutter)
-                .padding(.top, 14)
+            // As the PR page's empty sections: the heading, then the empty line in a card.
+            DetailSection(title: "Linked pull requests") {
+                DetailCard { EmptyLine(text: "No linked pull requests") }
+            }
         } else {
             DetailSection(title: "Linked pull requests", summary: String(prs.count)) {
                 DetailCard {
@@ -226,55 +225,10 @@ struct IssueDetailView: View {
         }
     }
 
-    private func descriptionSection(_ source: String) -> some View {
-        DetailSection(title: "Description") {
-            DetailCard {
-                let body = source.trimmingCharacters(in: .whitespacesAndNewlines)
-                Group {
-                    if body.isEmpty {
-                        Text("No description provided.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        MarkdownText(body)
-                            .textSelection(.enabled)
-                    }
-                }
-                .font(.system(size: 12))
-                .lineSpacing(2)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-            }
-        }
-    }
-
     private func conversationSection(_ detail: IssueDetail, now: Date) -> some View {
-        let total = detail.commentTotal
-        return DetailSection(title: "Conversation", summary: total == 1 ? "1 comment" : "\(total) comments") {
-            VStack(alignment: .leading, spacing: 10) {
-                if detail.earlierCommentCount > 0 {
-                    let earlier = detail.earlierCommentCount
-                    HStack(spacing: 4) {
-                        Text(earlier == 1 ? "1 earlier comment ·" : "\(earlier) earlier comments ·")
-                            .monospacedDigit()
-                        Link("view on GitHub", destination: webURL)
-                    }
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 28)
-                }
-                if detail.lastComments.isEmpty {
-                    Text("No comments")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(Array(detail.lastComments.enumerated()), id: \.offset) { _, comment in
-                        CommentLine(comment: comment, now: now)
-                    }
-                }
-            }
-        }
+        ConversationSection(
+            comments: detail.lastComments, total: detail.commentTotal, earlier: detail.earlierCommentCount,
+            webURL: webURL, now: now)
     }
 
     // MARK: Loading and errors
@@ -336,10 +290,8 @@ private struct IssueStatePill: View {
         switch issue.glyph {
         case .open:
             Pill(symbol: Palette.issueGlyph(.open).symbol, text: "Open", foreground: Palette.pillText, fill: Palette.strongFill)
-        case .completed:
-            Pill(symbol: Palette.issueGlyph(.completed).symbol, text: "Closed", foreground: Palette.mergedText, fill: Palette.mergedFill)
-        case .notPlanned:
-            Pill(symbol: Palette.issueGlyph(.notPlanned).symbol, text: "Closed", foreground: Palette.pillText, fill: Palette.fill)
+        case .completed, .notPlanned:
+            IssueEndedPill(glyph: issue.glyph, symbol: Palette.issueGlyph(issue.glyph).symbol)
         }
     }
 }

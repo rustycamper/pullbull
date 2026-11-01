@@ -278,35 +278,13 @@ struct ClosedRow: View {
         Button {
             open()
         } label: {
-            HStack(spacing: 10) {
-                Image(symbol: Palette.prGlyph(pr.glyph))
-                    .font(.system(size: 12))
-                    .foregroundStyle(Palette.prGlyphColor(pr.glyph))
-                    .frame(width: 20)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    HStack(spacing: 5) {
-                        RepoNumber(key: pr.key)
-                        MetaDot()
-                        Text(ended(merged: merged)).fixedSize()
-                        if let role = search?.role {
-                            MetaDot()
-                            Text(role)
-                        }
-                    }
-                    .metaLineStyle()
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                EndedPill(merged: merged)
+            Group {
+                if model.settings.compact { compactBody(merged: merged) } else { fullBody(merged: merged) }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
             .contentShape(Rectangle())
             .modifier(RowFill(
-                cornerRadius: 7, selected: selected, hovering: hovering, flashing: model.rowFlash.key == pr.key))
+                cornerRadius: model.settings.compact ? 6 : 7, selected: selected, hovering: hovering,
+                flashing: model.rowFlash.key == pr.key))
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
@@ -319,6 +297,61 @@ struct ClosedRow: View {
             person: .person(model: model, login: pr.author), files: model.filesLink(for: pr),
             failingCheck: { model.openFailingCheck(pr.key) },
             sets: SetEditMenu.make(model: model, key: pr.key))
+    }
+
+    /// One line in compact mode, like every other compact row: glyph, title, `repo #num`, and the bare age it
+    /// ended ("2d", "Oct 12"). The glyph says merged or closed, so neither a pill nor the word repeats it;
+    /// hover and VoiceOver spell it out ("Merged 2d ago").
+    private func compactBody(merged: Bool) -> some View {
+        CompactRowLayout(
+            repoNumber: RepoNumber(key: pr.key, compact: true),
+            age: EndedAge.compact(closedAt: pr.closedAt, now: now), ageWidth: nil,
+            ageHelp: EndedAge.help(state: pr.state, closedAt: pr.closedAt, now: now)
+        ) {
+            Image(symbol: Palette.prGlyph(pr.glyph))
+                .font(.system(size: 11))
+                .foregroundStyle(Palette.prGlyphColor(pr.glyph))
+                .frame(width: 16)
+                // The age says "Merged 2d ago" to VoiceOver; without a close date there's no age, so the glyph does.
+                .accessibilityLabel(merged ? "Merged" : "Closed")
+                .accessibilityHidden(pr.closedAt != nil)
+        } title: {
+            Text(title)
+                .foregroundStyle(.secondary)
+        } badges: {
+            EmptyView()
+        } trailing: {
+            EmptyView()
+        }
+    }
+
+    private func fullBody(merged: Bool) -> some View {
+        HStack(spacing: 10) {
+            Image(symbol: Palette.prGlyph(pr.glyph))
+                .font(.system(size: 12))
+                .foregroundStyle(Palette.prGlyphColor(pr.glyph))
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    RepoNumber(key: pr.key)
+                    MetaDot()
+                    Text(ended(merged: merged)).fixedSize()
+                    if let role = search?.role {
+                        MetaDot()
+                        Text(role)
+                    }
+                }
+                .metaLineStyle()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            EndedPill(merged: merged)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
     }
 
     /// A search result moves `searchSelection`, a Mine row `listSelection`.
@@ -338,7 +371,7 @@ struct ClosedRow: View {
     }
 
     private func ended(merged: Bool) -> String {
-        EndedAge.text(state: pr.state, closedAt: pr.closedAt, now: now) ?? (merged ? "merged" : "closed")
+        EndedAge.label(state: pr.state, closedAt: pr.closedAt, now: now) ?? (merged ? "merged" : "closed")
     }
 }
 
@@ -503,6 +536,28 @@ struct EndedPill: View {
             Pill(symbol: nil, text: "Merged", foreground: Palette.mergedText, fill: Palette.mergedFill)
         } else {
             Pill(symbol: nil, text: "Closed", foreground: Palette.closedText, fill: Palette.closedFill)
+        }
+    }
+}
+
+/// A closed issue's pill, coloured as GitHub and the issue page colour it: purple when completed, gray when
+/// not planned. VoiceOver tells the two apart, which the shared word "Closed" doesn't.
+struct IssueEndedPill: View {
+    let glyph: IssueGlyph
+    var symbol: String?
+
+    var body: some View {
+        switch glyph {
+        case .open:
+            EmptyView()
+        case .completed:
+            Pill(symbol: symbol, text: "Closed", foreground: Palette.mergedText, fill: Palette.mergedFill)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Closed as completed")
+        case .notPlanned:
+            Pill(symbol: symbol, text: "Closed", foreground: Palette.pillText, fill: Palette.fill)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Closed as not planned")
         }
     }
 }

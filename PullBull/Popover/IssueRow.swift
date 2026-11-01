@@ -1,8 +1,9 @@
 import SwiftUI
 import PullBullKit
 
-/// One issue in an Issues list: the state glyph, the title and a meta line (repo #num · age · comments ·
-/// label chips), with assignee avatars on the right. Compact rows fit on one line. A search result draws
+/// One issue in an Issues list: the state glyph, the title and a meta line (repo #num · age · search role ·
+/// comments · label chips), with assignee avatars on the right and, when closed, its pill (full rows only).
+/// Compact rows fit on one line. A search result draws
 /// as a row of the tab it is laid out for, with its marks.
 struct IssueRow: View {
     let model: AppModel
@@ -92,6 +93,13 @@ struct IssueRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             AssigneeStack(assignees: avatars, showUnassigned: tab == .board, size: 18)
                 .padding(.top, 1)
+            if !issue.isOpen {
+                // Ended items carry their pill, as a closed PR row does.
+                IssueEndedPill(glyph: issue.glyph)
+                    .padding(.top, 2)
+                    // The glyph already reads "Closed as completed" to VoiceOver.
+                    .accessibilityHidden(true)
+            }
         }
         .padding(.horizontal, 8)
         .padding(.top, 7)
@@ -103,8 +111,13 @@ struct IssueRow: View {
     private var compactBody: some View {
         CompactRowLayout(
             repoNumber: RepoNumber(key: issue.key, showsRepo: !inRepoGroup, compact: true),
-            age: IssueMetaLine.age(of: issue, now: now), ageWidth: issue.isOpen ? 24 : nil,
-            ageHelp: IssueMetaLine.ageHelp(of: issue, now: now)
+            // A closed issue's age is bare ("2d", "Oct 12"), as on a compact PR row: the glyph says closed.
+            age: issue.isOpen
+                ? IssueMetaLine.age(of: issue, now: now) : EndedAge.compact(closedAt: issue.closedAt, now: now),
+            ageWidth: issue.isOpen ? 24 : nil,
+            ageHelp: issue.isOpen
+                ? IssueMetaLine.ageHelp(of: issue, now: now)
+                : EndedAge.help(state: .closed, closedAt: issue.closedAt, now: now)
         ) {
             Image(symbol: glyph.symbol)
                 .font(.system(size: 11))
@@ -119,12 +132,13 @@ struct IssueRow: View {
         } badges: {
             EmptyView()
         } trailing: {
+            // No ended pill, as on a compact PR row: the glyph and the bare age ("3d") already say it.
             AssigneeStack(assignees: avatars, showUnassigned: tab == .board, size: 16)
         }
     }
 }
 
-/// repo #num · updated age · comment count · label chips. Chips that don't fit drop off the end into
+/// repo #num · updated age · search role · comment count · label chips. Chips that don't fit drop off the end into
 /// "+N", so the repo, age and comments always show. Under a repo header the repo is left out.
 struct IssueMetaLine: View {
     let issue: BoardIssue
@@ -144,11 +158,10 @@ struct IssueMetaLine: View {
 
     private var age: String? { Self.age(of: issue, now: now) }
 
-    /// "closed 3d ago" for a closed issue; otherwise the time since its last update.
+    /// "closed 3d ago" for a closed issue, or just "closed" without a date, as a closed PR row says;
+    /// otherwise the time since its last update.
     static func age(of issue: BoardIssue, now: Date) -> String? {
-        if !issue.isOpen, let ended = EndedAge.text(state: .closed, closedAt: issue.closedAt, now: now) {
-            return ended
-        }
+        if !issue.isOpen { return EndedAge.label(state: .closed, closedAt: issue.closedAt, now: now) }
         return issue.updatedAt.map { RelativeAge.short(from: $0, to: now) }
     }
 
@@ -166,13 +179,14 @@ struct IssueMetaLine: View {
                 Text(age)
                     .ageHelp(Self.ageHelp(of: issue, now: now))
             }
-            if issue.commentCount > 0 {
-                CommentCount(count: issue.commentCount)
-                    .padding(.leading, 2)
-            }
+            // The role, then the comment count, in a PR row's order and spacing.
             if let role {
                 MetaDot()
                 Text(role)
+            }
+            if issue.commentCount > 0 {
+                CommentCount(count: issue.commentCount)
+                    .padding(.leading, 4)
             }
             LabelChips(set: chips, fit: fitting)
         }

@@ -286,6 +286,16 @@ struct CardRow<Value: View>: View {
     }
 }
 
+/// A card row's value when there is none ("No one", "None"). Tertiary, as macOS draws a field's placeholder,
+/// so it sits below the secondary field name and a filled value stands out from an empty one.
+struct EmptyValue: View {
+    let text: String
+
+    var body: some View {
+        Text(text).foregroundStyle(.tertiary)
+    }
+}
+
 /// An issue's or PR's Assignees or Labels row: clickable where the sets are offered, with the picker
 /// anchored on the row.
 struct SetEditRow<Value: View>: View {
@@ -382,5 +392,125 @@ struct FlowLayout: Layout {
         }
         if !current.indices.isEmpty { rows.append(current) }
         return rows
+    }
+}
+
+/// A PR or issue page's Conversation: the newest comments, with any earlier ones counted above them and
+/// a link to the rest on GitHub. One view for both pages, so they read alike.
+struct ConversationSection: View {
+    /// Oldest first.
+    let comments: [Comment]
+    /// Every comment on the item, shown or not, and how many of them are older than those shown
+    /// (`PRDetail` / `IssueDetail`'s `commentTotal` and `earlierCommentCount`).
+    let total: Int
+    let earlier: Int
+    let webURL: URL
+    let now: Date
+
+    var body: some View {
+        DetailSection(title: "Conversation", summary: total == 1 ? "1 comment" : "\(total) comments") {
+            VStack(alignment: .leading, spacing: 10) {
+                if earlier > 0 {
+                    HStack(spacing: 4) {
+                        Text(earlier == 1 ? "1 earlier comment ·" : "\(earlier) earlier comments ·")
+                            .monospacedDigit()
+                        Link("view on GitHub", destination: webURL)
+                    }
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 28)
+                }
+                if comments.isEmpty {
+                    Text("No comments")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(Array(comments.enumerated()), id: \.offset) { _, comment in
+                        CommentLine(comment: comment, now: now)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// A PR or issue page's byline (`OpenedLine.parts`): one line when it fits beside the state pill, otherwise
+/// a line per part, so it breaks at the " · " and never inside "merged 7h ago".
+struct Byline: View {
+    let parts: [String]
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            Text(parts.joined(separator: " · "))
+                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 1) {
+                ForEach(parts, id: \.self) { part in
+                    Text(part)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(parts.joined(separator: ", "))
+    }
+}
+
+/// A PR or issue page's Description: prose straight on the material at the section gutter, not boxed in a
+/// card (cards are for structured data), folded when long. One view for both pages.
+struct DescriptionSection: View {
+    let source: String
+
+    var body: some View {
+        DetailSection(title: "Description") {
+            let body = source.trimmingCharacters(in: .whitespacesAndNewlines)
+            Group {
+                if body.isEmpty {
+                    Text("No description provided.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    DescriptionText(source: body)
+                }
+            }
+            .font(.system(size: 12.5))
+            .lineSpacing(3)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+/// Long descriptions fold to their first lines so the sections below stay in reach.
+private struct DescriptionText: View {
+    let source: String
+    @State private var expanded = false
+
+    private static let foldedLines = 10
+    private static let foldedHeight: CGFloat = 170
+    private var isLong: Bool {
+        source.count > 600 || source.split(separator: "\n", omittingEmptySubsequences: false).count > Self.foldedLines
+    }
+    private var folded: Bool { isLong && !expanded }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            MarkdownText(source)
+                .textSelection(.enabled)
+                .frame(maxHeight: folded ? Self.foldedHeight : nil, alignment: .top)
+                .clipped()
+                .mask {
+                    if folded {
+                        LinearGradient(
+                            stops: [.init(color: .black, location: 0.75), .init(color: .clear, location: 1)],
+                            startPoint: .top, endPoint: .bottom)
+                    } else {
+                        Color.black
+                    }
+                }
+            if isLong {
+                Button(expanded ? "Show less" : "Show more") { expanded.toggle() }
+                    .buttonStyle(.link)
+                    .font(.system(size: 11, weight: .medium))
+            }
+        }
     }
 }

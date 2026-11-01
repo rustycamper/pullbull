@@ -116,10 +116,9 @@ struct PRDetailView: View {
                     StatePill(pr: pr)
                     HStack(spacing: 6) {
                         AvatarView(login: pr.author, url: pr.authorAvatarURL, size: 20)
-                        // Two lines beside a wide pill, so "updated" is never cut off.
-                        Text(OpenedLine.text(author: pr.author, opened: pr.createdAt, updated: pr.updatedAt, now: now))
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
+                        Byline(parts: OpenedLine.parts(
+                            author: pr.author, opened: pr.createdAt, updated: pr.updatedAt,
+                            ended: EndedAge.label(state: pr.state, closedAt: pr.closedAt, now: now), now: now))
                     }
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
@@ -159,7 +158,7 @@ struct PRDetailView: View {
             DetailCard {
                 SetEditRow(model: model, key: key, field: .assignees) {
                     if pr.assignees.isEmpty {
-                        Text("No one").foregroundStyle(.secondary)
+                        EmptyValue(text: "No one")
                     } else {
                         AssigneeFlow(assignees: pr.assignees, me: me)
                     }
@@ -167,7 +166,7 @@ struct PRDetailView: View {
                 CardDivider()
                 SetEditRow(model: model, key: key, field: .labels) {
                     if pr.labels.isEmpty {
-                        Text("None").foregroundStyle(.secondary)
+                        EmptyValue(text: "None")
                     } else {
                         DetailLabels(labels: pr.labels, color: pr.labelColor(at:))
                     }
@@ -182,12 +181,12 @@ struct PRDetailView: View {
     @ViewBuilder private func sections(_ detail: PRDetail, now: Date) -> some View {
         if pr?.state == .open {
             statusSections(detail)
-            descriptionSection(detail)
+            DescriptionSection(source: detail.body)
         } else {
-            descriptionSection(detail)
+            DescriptionSection(source: detail.body)
             statusSections(detail)
         }
-        conversationSection(detail.comments, now: now)
+        conversationSection(detail, now: now)
         filesSection(detail)
     }
 
@@ -197,25 +196,6 @@ struct PRDetailView: View {
             reviewersSection(reviews: detail.reviews, pr: pr, detail: detail)
         } else if !detail.reviews.isEmpty || detail.requests?.isEmpty == false {
             reviewersSection(reviews: detail.reviews, pr: nil, detail: detail)
-        }
-    }
-
-    private func descriptionSection(_ detail: PRDetail) -> some View {
-        // Prose straight on the material at the section gutter, not boxed in a card: cards are for structured data.
-        DetailSection(title: "Description") {
-            let body = detail.body.trimmingCharacters(in: .whitespacesAndNewlines)
-            Group {
-                if body.isEmpty {
-                    Text("No description provided.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    DescriptionText(source: body)
-                }
-            }
-            .font(.system(size: 12.5))
-            .lineSpacing(3)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -324,30 +304,11 @@ struct PRDetailView: View {
         return model.edits.overrides.apply(toRequests: requests, on: key)
     }
 
-    private func conversationSection(_ comments: [Comment], now: Date) -> some View {
-        let total = max(pr?.commentCount ?? 0, comments.count)
-        return DetailSection(title: "Conversation", summary: total == 1 ? "1 comment" : "\(total) comments") {
-            VStack(alignment: .leading, spacing: 10) {
-                if comments.isEmpty {
-                    Text("No comments")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(Array(comments.enumerated()), id: \.offset) { _, comment in
-                        CommentLine(comment: comment, now: now)
-                    }
-                }
-                if total > comments.count {
-                    HStack(spacing: 4) {
-                        Text("Showing the first \(comments.count) of \(total) ·")
-                        Link("view on GitHub", destination: webURL)
-                    }
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 28)
-                }
-            }
-        }
+    private func conversationSection(_ detail: PRDetail, now: Date) -> some View {
+        // The detail's own total, not the row's: a linked PR opened from an issue has no row.
+        ConversationSection(
+            comments: detail.comments, total: detail.commentTotal, earlier: detail.earlierCommentCount,
+            webURL: webURL, now: now)
     }
 
     private func filesSection(_ detail: PRDetail) -> some View {
@@ -539,42 +500,6 @@ struct TeamGlyph: View {
 }
 
 // MARK: - Pieces
-
-/// Long descriptions fold to their first lines so the checks and reviewers stay in reach.
-private struct DescriptionText: View {
-    let source: String
-    @State private var expanded = false
-
-    private static let foldedLines = 10
-    private static let foldedHeight: CGFloat = 170
-    private var isLong: Bool {
-        source.count > 600 || source.split(separator: "\n", omittingEmptySubsequences: false).count > Self.foldedLines
-    }
-    private var folded: Bool { isLong && !expanded }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            MarkdownText(source)
-                .textSelection(.enabled)
-                .frame(maxHeight: folded ? Self.foldedHeight : nil, alignment: .top)
-                .clipped()
-                .mask {
-                    if folded {
-                        LinearGradient(
-                            stops: [.init(color: .black, location: 0.75), .init(color: .clear, location: 1)],
-                            startPoint: .top, endPoint: .bottom)
-                    } else {
-                        Color.black
-                    }
-                }
-            if isLong {
-                Button(expanded ? "Show less" : "Show more") { expanded.toggle() }
-                    .buttonStyle(.link)
-                    .font(.system(size: 11, weight: .medium))
-            }
-        }
-    }
-}
 
 /// "Conflicts with main · resolve on GitHub" under the branches: an amber triangle, gray text.
 private struct ConflictLine: View {
