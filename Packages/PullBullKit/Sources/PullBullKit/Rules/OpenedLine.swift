@@ -8,12 +8,19 @@ public enum OpenedLine {
     public static func text(
         author: String, opened: Date?, updated: Date?, ended: String? = nil, now: Date
     ) -> String {
+        parts(author: author, opened: opened, updated: updated, ended: ended, now: now).joined(separator: " · ")
+    }
+
+    /// The byline's parts, which `text` joins with " · ". A page too narrow for one line breaks between them.
+    public static func parts(
+        author: String, opened: Date?, updated: Date?, ended: String? = nil, now: Date
+    ) -> [String] {
         let openedAgo = opened.map { RelativeAge.ago($0, now: now) }
         let line = "\(author) opened" + (openedAgo.map { " \($0)" } ?? "")
-        if let ended { return "\(line) · \(ended)" }
+        if let ended { return [line, ended] }
         guard let updatedAgo = updated.map({ RelativeAge.ago($0, now: now) }), updatedAgo != openedAgo else {
-            return line
+            return [line]
         }
-        return "\(line) · updated \(updatedAgo)"
+        return [line, "updated \(updatedAgo)"]
     }
 }

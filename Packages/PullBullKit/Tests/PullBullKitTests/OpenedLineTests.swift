@@ -26,6 +26,14 @@ import Testing
             == "rado opened · closed")
     }
 
+    /// The page breaks the byline at its " · ", never inside a part, so each part stands alone.
+    @Test func partsAreWhatTheLineJoins() {
+        let now = t0 + 20 * 86_400
+        #expect(OpenedLine.parts(author: "rado", opened: t0, updated: nil, ended: "merged 7h ago", now: now)
+            == ["rado opened 20d ago", "merged 7h ago"])
+        #expect(OpenedLine.parts(author: "rado", opened: t0, updated: t0 + 20, now: t0 + 30) == ["rado opened just now"])
+    }
+
     /// Issues can lack either date (`BoardIssue`'s are optional).
     @Test func missingDatesLeaveTheirPartOut() {
         let now = t0 + 4 * 86_400

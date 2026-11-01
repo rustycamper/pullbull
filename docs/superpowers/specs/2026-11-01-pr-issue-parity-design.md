@@ -23,7 +23,7 @@ The two halves of the app grew separately. A side-by-side audit found the same f
 - **The byline names what the row shows beside the opening:**
   - Open: "rado opened 4d ago · updated 1h ago". The update is left out when it reads the same as the opening.
   - Merged or closed: "rado opened Oct 2 · merged Oct 12", the row's ended text, in place of the update. Someone opening a closed row then finds the row's date on the page.
-  - The byline wraps to two lines beside a wide pill rather than cutting its second part off.
+  - One line when it fits beside the state pill; otherwise it breaks at the " · ", a line per part, never inside "merged 7h ago" (`OpenedLine.parts`, the `Byline` view).
 - **The description is the same view on both pages** (`DescriptionSection`). It sits unboxed on the material at the section gutter, 12.5pt with 3pt line spacing, and folds when long. Cards are for structured data and prose isn't. An empty description reads "No description provided.".
 - **Conversation shows the newest comments**, with "N earlier comments · view on GitHub" counted above them, on both pages. A PR page holds the newest 50 (`comments(last:50)`). An issue page holds the last two.
 - **The comment total comes from the page's own data**, `PRDetail.commentTotal` from the query's `totalCount` and not the row's count. A linked PR opened from an issue page has no row to borrow from. Details cached before the total was stored fall back to the comments held.

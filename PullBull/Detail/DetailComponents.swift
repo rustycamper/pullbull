@@ -426,6 +426,27 @@ struct ConversationSection: View {
 
 /// A PR or issue page's Description: prose straight on the material at the section gutter, not boxed in a
 /// card (cards are for structured data), folded when long. One view for both pages.
+/// A PR or issue page's byline (`OpenedLine.parts`): one line when it fits beside the state pill, otherwise
+/// a line per part, so it breaks at the " · " and never inside "merged 7h ago".
+struct Byline: View {
+    let parts: [String]
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            Text(parts.joined(separator: " · "))
+                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 1) {
+                ForEach(parts, id: \.self) { part in
+                    Text(part)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(parts.joined(separator: ", "))
+    }
+}
+
 struct DescriptionSection: View {
     let source: String
 
