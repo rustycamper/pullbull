@@ -163,10 +163,8 @@ struct IssueMetaLine: View {
             RepoNumber(key: issue.key, showsRepo: showsRepo)
             if let age {
                 MetaDot()
-                let help = Self.ageHelp(of: issue, now: now)
                 Text(age)
-                    .help(help ?? "")
-                    .accessibilityLabel(help ?? age)
+                    .ageHelp(Self.ageHelp(of: issue, now: now))
             }
             if issue.commentCount > 0 {
                 CommentCount(count: issue.commentCount)

@@ -55,8 +55,7 @@ struct CompactRowLayout<Leading: View, Title: View, Badges: View, Trailing: View
                                 .fixedSize()
                         }
                     }
-                    .help(ageHelp ?? "")
-                    .accessibilityLabel(ageHelp ?? age)
+                    .ageHelp(ageHelp)
                 }
             }
             .font(.system(size: 11))
@@ -104,5 +103,13 @@ struct CompactChipGlyphs: View {
                 .help(RowChips.Info.conflicts.label)
                 .accessibilityLabel(RowChips.Info.conflicts.label)
         }
+    }
+}
+
+extension View {
+    /// What a row's age measures ("Updated 1h ago"), on hover and for VoiceOver. Nil adds nothing, so an
+    /// ended row's age ("merged Oct 12") reads as itself and leaves the row's own tooltip in place.
+    @ViewBuilder func ageHelp(_ help: String?) -> some View {
+        if let help { self.help(help).accessibilityLabel(help) } else { self }
     }
 }
