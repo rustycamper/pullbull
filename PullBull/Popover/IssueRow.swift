@@ -46,7 +46,8 @@ struct IssueRow: View {
             issue, focus: FocusMenuItem(model: model, repo: issue.key.repo),
             time: search == nil ? TimeFocusMenu(model: model) : nil,
             person: .person(model: model, login: issue.author),
-            status: StatusMenu.make(model: model, key: issue.key))
+            status: StatusMenu.make(model: model, key: issue.key),
+            sets: SetEditMenu.make(model: model, key: issue.key))
     }
 
     /// A search result moves `searchSelection`, a tab row `listSelection`.

@@ -154,7 +154,7 @@ struct IssueDetailView: View {
                     statusRow(name: "No status") { statusGlyph("circle.dotted") }
                     CardDivider()
                 }
-                CardRow(name: "Assignees") {
+                setRow(.assignees) {
                     if issue.assignees.isEmpty {
                         Text("No one").foregroundStyle(.secondary)
                     } else {
@@ -173,7 +173,7 @@ struct IssueDetailView: View {
                     }
                 }
                 CardDivider()
-                CardRow(name: "Labels") {
+                setRow(.labels) {
                     if issue.labels.isEmpty {
                         Text("None").foregroundStyle(.secondary)
                     } else {
@@ -202,6 +202,23 @@ struct IssueDetailView: View {
             .help("Set Status (⌥⌘S)")
             .accessibilityHint("Opens the Status picker")
             .editPickerAnchor(for: key, field: .status, model: model)
+        } else {
+            row
+        }
+    }
+
+    /// The Assignees or Labels row: clickable where the sets are offered, with the picker anchored on the row.
+    @ViewBuilder private func setRow(_ field: EditField, @ViewBuilder value: @escaping () -> some View) -> some View {
+        let isAssignees = field == .assignees
+        let row = CardRow(name: isAssignees ? "Assignees" : "Labels", value: value)
+        if model.isSetEditOffered(for: key) {
+            Button { model.openSetPicker(field, for: key) } label: {
+                row.contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(isAssignees ? "Change assignees (⌥⌘A)" : "Change labels (⌥⌘L)")
+            .accessibilityHint(isAssignees ? "Opens the assignee picker" : "Opens the label picker")
+            .editPickerAnchor(for: key, field: field, model: model)
         } else {
             row
         }
