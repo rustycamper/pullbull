@@ -153,6 +153,12 @@ import Testing
         #expect(Self.chips(row, .review).info[1].text == "2d")
     }
 
+    @Test func reviewRowWithoutAReasonGetsTheFullForm() {
+        // A dimmed or uncounted Review row isn't waiting on the viewer, so a bare age would mislead.
+        let row = Self.row(requests: [(.user("me"), Self.t0 + 3 * 86_400)])
+        #expect(Self.chips(row, .review).info.first?.text == "You 2d")
+    }
+
     @Test func reviewTeamWithoutOwnerUsesTheBareSlug() {
         #expect(Self.chips(Self.row(repo: "", reason: .teamRequested("web")), .review).info == [.viaTeam("web")])
     }

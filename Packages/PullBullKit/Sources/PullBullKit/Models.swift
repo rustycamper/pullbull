@@ -49,12 +49,15 @@ public struct Review: Hashable, Codable, Sendable {
     public let submittedAt: Date?
     /// The commit the review was submitted on; nil when unknown (older caches, detail reviews).
     public let commitOid: String?
+    /// Whether a bot (Copilot, a review app) wrote it; nil when unknown (older caches, detail reviews).
+    public let byBot: Bool?
 
-    public init(author: String, state: ReviewState, submittedAt: Date?, commitOid: String? = nil) {
+    public init(author: String, state: ReviewState, submittedAt: Date?, commitOid: String? = nil, byBot: Bool? = nil) {
         self.author = author
         self.state = state
         self.submittedAt = submittedAt
         self.commitOid = commitOid
+        self.byBot = byBot
     }
 }
 

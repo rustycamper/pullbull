@@ -89,6 +89,11 @@ import Testing
         #expect(Self.wait(Self.pr(reviews: [dismissed])) == nil)
     }
 
+    @Test func botReviewDoesNotCountAsReviewed() {
+        let copilot = Review(author: "copilot-pull-request-reviewer", state: .commented, submittedAt: Self.t0, byBot: true)
+        #expect(Self.wait(Self.pr(reviews: [copilot]))?.who == "No reviewer")
+    }
+
     @Test func pendingDraftReviewDoesNotCount() {
         let pending = Review(author: "bob", state: .pending, submittedAt: nil)
         #expect(Self.wait(Self.pr(reviews: [pending]))?.who == "No reviewer")

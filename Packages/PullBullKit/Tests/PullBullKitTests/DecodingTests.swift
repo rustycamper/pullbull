@@ -42,15 +42,17 @@ private func node(_ name: String) throws -> [String: Any] {
         "comments":{"totalCount":0,"nodes":[]},\
         "commits":{"nodes":[{"commit":{"oid":"head1","committedDate":"2026-10-24T10:00:00Z","statusCheckRollup":null}}]},\
         "latestReviews":{"nodes":[{"author":{"login":"me"},"state":"APPROVED","submittedAt":"2026-10-24T11:00:00Z",\
-        "commit":{"oid":"old1"}},{"author":{"login":"x"},"state":"COMMENTED","submittedAt":null,"commit":null}]},\
+        "commit":{"oid":"old1"}},{"author":{"__typename":"Bot","login":"x"},"state":"COMMENTED","submittedAt":null,"commit":null}]},\
         "reviewRequests":{"nodes":[]}}
         """
         let node = try #require(try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
         let pr = try Decoding.pullRequest(from: node)
         #expect(pr.headCommitOid == "head1")
         #expect(pr.latestReviews.map(\.commitOid) == ["old1", nil])
+        #expect(pr.latestReviews.map(\.byBot) == [false, true])
         #expect(Queries.prFields.contains("commit{oid committedDate"))
         #expect(Queries.prFields.contains("submittedAt commit{oid}"))
+        #expect(Queries.prFields.contains("latestReviews(first:20){nodes{author{__typename login}"))
     }
 
     @Test func decodesRequestAndReadyTimes() throws {

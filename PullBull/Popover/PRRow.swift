@@ -409,6 +409,7 @@ struct MetaInfo: View {
         }
             .labelStyle(TightLabelStyle(spacing: 3))
             .help(info.label)
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel(info.label)
     }
 

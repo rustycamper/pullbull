@@ -53,7 +53,8 @@ public struct ReviewWait: Equatable, Sendable {
                 label: "Waiting on review: " + byAge.joined(separator: ", "))
         }
 
-        let reviewed = pr.latestReviews.contains { $0.state != .pending && $0.submittedAt != nil }
+        // A bot's review (Copilot, a review app) lands on nearly every PR; it isn't someone reviewing.
+        let reviewed = pr.latestReviews.contains { $0.state != .pending && $0.submittedAt != nil && $0.byBot != true }
         guard !reviewed else { return nil }
         let since = pr.readyForReviewAt ?? pr.createdAt
         return ReviewWait(

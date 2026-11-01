@@ -269,11 +269,13 @@ public enum Decoding {
         case "PENDING": state = .pending
         default: throw DecodingError(message: "unknown review state \(raw)")
         }
+        let author = node["author"] as? [String: Any]
         return Review(
-            author: (node["author"] as? [String: Any])?["login"] as? String ?? "ghost",
+            author: author?["login"] as? String ?? "ghost",
             state: state,
             submittedAt: try optionalDate(node["submittedAt"]),
-            commitOid: (node["commit"] as? [String: Any])?["oid"] as? String
+            commitOid: (node["commit"] as? [String: Any])?["oid"] as? String,
+            byBot: author.map { $0["__typename"] as? String == "Bot" }
         )
     }
 
