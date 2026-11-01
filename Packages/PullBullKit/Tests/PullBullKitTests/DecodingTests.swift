@@ -377,4 +377,9 @@ private func node(_ name: String) throws -> [String: Any] {
         #expect(Queries.search.contains("... on Team{slug name}"))
         #expect(Queries.detail.contains("... on Team{slug name}"))
     }
+
+    /// A PR page shows its newest comments, with the earlier ones counted above, as an issue page does.
+    @Test func prDetailAsksForTheNewestComments() {
+        #expect(Queries.detail.contains("comments(last:50){nodes{author{login} body createdAt}}"))
+    }
 }

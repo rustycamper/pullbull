@@ -250,31 +250,7 @@ struct IssueDetailView: View {
     }
 
     private func conversationSection(_ detail: IssueDetail, now: Date) -> some View {
-        let total = detail.commentTotal
-        return DetailSection(title: "Conversation", summary: total == 1 ? "1 comment" : "\(total) comments") {
-            VStack(alignment: .leading, spacing: 10) {
-                if detail.earlierCommentCount > 0 {
-                    let earlier = detail.earlierCommentCount
-                    HStack(spacing: 4) {
-                        Text(earlier == 1 ? "1 earlier comment ·" : "\(earlier) earlier comments ·")
-                            .monospacedDigit()
-                        Link("view on GitHub", destination: webURL)
-                    }
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 28)
-                }
-                if detail.lastComments.isEmpty {
-                    Text("No comments")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(Array(detail.lastComments.enumerated()), id: \.offset) { _, comment in
-                        CommentLine(comment: comment, now: now)
-                    }
-                }
-            }
-        }
+        ConversationSection(comments: detail.lastComments, total: detail.commentTotal, webURL: webURL, now: now)
     }
 
     // MARK: Loading and errors

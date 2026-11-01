@@ -326,28 +326,7 @@ struct PRDetailView: View {
 
     private func conversationSection(_ comments: [Comment], now: Date) -> some View {
         let total = max(pr?.commentCount ?? 0, comments.count)
-        return DetailSection(title: "Conversation", summary: total == 1 ? "1 comment" : "\(total) comments") {
-            VStack(alignment: .leading, spacing: 10) {
-                if comments.isEmpty {
-                    Text("No comments")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(Array(comments.enumerated()), id: \.offset) { _, comment in
-                        CommentLine(comment: comment, now: now)
-                    }
-                }
-                if total > comments.count {
-                    HStack(spacing: 4) {
-                        Text("Showing the first \(comments.count) of \(total) ·")
-                        Link("view on GitHub", destination: webURL)
-                    }
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 28)
-                }
-            }
-        }
+        return ConversationSection(comments: comments, total: total, webURL: webURL, now: now)
     }
 
     private func filesSection(_ detail: PRDetail) -> some View {

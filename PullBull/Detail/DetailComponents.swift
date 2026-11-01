@@ -384,3 +384,42 @@ struct FlowLayout: Layout {
         return rows
     }
 }
+
+/// A PR or issue page's Conversation: the newest comments, with any earlier ones counted above them and
+/// a link to the rest on GitHub. One view for both pages, so they read alike.
+struct ConversationSection: View {
+    /// Oldest first.
+    let comments: [Comment]
+    /// Every comment on the item, shown or not.
+    let total: Int
+    let webURL: URL
+    let now: Date
+
+    var body: some View {
+        let total = max(total, comments.count)
+        let earlier = total - comments.count
+        DetailSection(title: "Conversation", summary: total == 1 ? "1 comment" : "\(total) comments") {
+            VStack(alignment: .leading, spacing: 10) {
+                if earlier > 0 {
+                    HStack(spacing: 4) {
+                        Text(earlier == 1 ? "1 earlier comment ·" : "\(earlier) earlier comments ·")
+                            .monospacedDigit()
+                        Link("view on GitHub", destination: webURL)
+                    }
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 28)
+                }
+                if comments.isEmpty {
+                    Text("No comments")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(Array(comments.enumerated()), id: \.offset) { _, comment in
+                        CommentLine(comment: comment, now: now)
+                    }
+                }
+            }
+        }
+    }
+}
