@@ -12,6 +12,32 @@ private func install(
 }
 
 @Suite struct EditPermissionTests {
+    @Test func pullRequestsWriteGatesPREditsOnly() {
+        let prOnly = install(["issues": "read", "pull_requests": "write"])
+        for field in [EditField.labels, .assignees] {
+            #expect(EditPermission.of(
+                field, account: app, boardOwner: nil, installation: prOnly, ghAccounts: [], onPullRequest: true) == .ready)
+            guard case .needsAppApproval = EditPermission.of(
+                field, account: app, boardOwner: nil, installation: prOnly, ghAccounts: [])
+            else { Issue.record("issue edits still need Issues write"); return }
+        }
+        let issuesOnly = install(["issues": "write", "pull_requests": "read"])
+        #expect(EditPermission.of(
+            .labels, account: app, boardOwner: nil, installation: issuesOnly, ghAccounts: [], onPullRequest: true)
+            == .needsAppApproval(
+                owner: "acme", isOrganization: true,
+                url: URL(string: "https://github.com/organizations/acme/settings/installations/9")))
+        #expect(EditPermission.of(
+            .labels, account: app, boardOwner: nil, installation: install(["pull_requests": "admin"]), ghAccounts: [],
+            onPullRequest: true) == .ready)
+    }
+
+    @Test func ghLoginEditsPullRequests() {
+        let gh = [GhAccount(login: "me", scopes: ["repo", "read:org"], active: true)]
+        #expect(EditPermission.of(
+            .assignees, account: ghMe, boardOwner: nil, installation: nil, ghAccounts: gh, onPullRequest: true) == .ready)
+    }
+
     @Test func appInstallWithWriteIsReady() {
         let writable = install(["issues": "write", "organization_projects": "write"])
         for field in [EditField.status, .labels, .assignees] {

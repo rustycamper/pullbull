@@ -101,6 +101,8 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
     public let deletions: Int?
     /// GitHub's node ID, which mutations take; nil in snapshots cached before it was stored.
     public let nodeId: String?
+    /// The first ten assignees; empty in snapshots cached before they were stored. Set by edit overrides too.
+    public internal(set) var assignees: [Assignee]
 
     public var glyph: PRGlyph { PRGlyph(state: state, isDraft: isDraft) }
     /// The colour of the label at `index`, nil when GitHub gave none or the cache predates it.
@@ -117,7 +119,8 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         commentCount: Int, lastCommentAuthor: String?,
         latestReviews: [Review], reviewRequests: [Reviewer], headCommitOid: String? = nil, labels: [String] = [],
         labelColors: [String?] = [], mergedBy: String? = nil, mergeable: Mergeable? = nil,
-        lastCommentByBot: Bool? = nil, additions: Int? = nil, deletions: Int? = nil, nodeId: String? = nil
+        lastCommentByBot: Bool? = nil, additions: Int? = nil, deletions: Int? = nil, nodeId: String? = nil,
+        assignees: [Assignee] = []
     ) {
         self.key = key
         self.title = title
@@ -146,9 +149,10 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         self.additions = additions
         self.deletions = deletions
         self.nodeId = nodeId
+        self.assignees = assignees
     }
 
-    /// Pull requests cached before labels were stored have none.
+    /// Pull requests cached before labels or assignees were stored have none.
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         key = try c.decode(PRKey.self, forKey: .key)
@@ -178,6 +182,7 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         additions = try c.decodeIfPresent(Int.self, forKey: .additions)
         deletions = try c.decodeIfPresent(Int.self, forKey: .deletions)
         nodeId = try c.decodeIfPresent(String.self, forKey: .nodeId)
+        assignees = try c.decodeIfPresent([Assignee].self, forKey: .assignees) ?? []
     }
 }
 

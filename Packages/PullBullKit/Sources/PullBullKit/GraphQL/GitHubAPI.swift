@@ -835,8 +835,8 @@ public struct GitHubAPI: Sendable {
     /// The most pages of labels read for one repo.
     public static let maxLabelPages = 10
 
-    /// The repo's labels by name, and the issue's own. `complete` is false when the repo has more
-    /// than `maxLabelPages` pages. The issue's labels past the first 100 are not read.
+    /// The repo's labels by name, and the issue's or PR's own. `complete` is false when the repo has more
+    /// than `maxLabelPages` pages. Its labels past the first 100 are not read.
     public func labelCandidates(for key: PRKey) async throws -> SetCandidates {
         let (owner, name) = try Self.ownerAndName(key)
         var all: [SetCandidate] = []
@@ -850,7 +850,7 @@ public struct GitHubAPI: Sendable {
                 throw APIError.notFound("\(key.repo) not found")
             }
             if page == 0 {
-                current = Self.candidates(in: repository["issue"], field: "labels", label: true)
+                current = Self.candidates(in: repository["item"], field: "labels", label: true)
             }
             let labels = repository["labels"] as? [String: Any]
             all += Self.candidates(in: labels, label: true)
@@ -864,7 +864,7 @@ public struct GitHubAPI: Sendable {
     }
 
     /// The first hundred people assignable in the repo (those matching `query`, when it isn't empty),
-    /// and the issue's assignees. `complete` is false when there were more.
+    /// and the issue's or PR's assignees. `complete` is false when there were more.
     public func assigneeCandidates(for key: PRKey, query: String?) async throws -> SetCandidates {
         let (owner, name) = try Self.ownerAndName(key)
         var variables: [String: Any] = ["owner": owner, "name": name, "n": key.number]
@@ -877,7 +877,7 @@ public struct GitHubAPI: Sendable {
         let more = (users?["pageInfo"] as? [String: Any])?["hasNextPage"] as? Bool == true
         return SetCandidates(
             all: Self.candidates(in: users, label: false),
-            current: Self.candidates(in: repository["issue"], field: "assignees", label: false),
+            current: Self.candidates(in: repository["item"], field: "assignees", label: false),
             complete: !more)
     }
 

@@ -13,7 +13,7 @@ private let modifierOrder = ["⌃", "⌥", "⇧", "⌘"]
 
     @Test func editingShortcuts() throws {
         let editing = try #require(ShortcutCatalog.sections(toggle: nil).first { $0.title == "Editing" })
-        #expect(editing.note == "Issue rows, search results and the issue detail")
+        #expect(editing.note == "Issue and pull request rows, search results and both details")
         #expect(editing.shortcuts == [
             Shortcut("Set Status", [["⌥", "⌘", "S"]], note: "When a board is shown"),
             Shortcut("Assignees", [["⌥", "⌘", "A"]]),

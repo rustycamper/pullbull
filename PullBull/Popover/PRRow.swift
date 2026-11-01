@@ -49,10 +49,12 @@ struct PRRow: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .accessibilityAddTraits(selected ? [.isSelected] : [])
+        .editPickerAnchor(for: pr.key, field: nil, model: model)
         .prContextMenu(
             pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
             time: marks == nil ? TimeFocusMenu(model: model) : nil, person: .person(model: model, login: pr.author),
-            files: model.filesLink(for: pr), failingCheck: { model.openFailingCheck(pr.key) })
+            files: model.filesLink(for: pr), failingCheck: { model.openFailingCheck(pr.key) },
+            sets: SetEditMenu.make(model: model, key: pr.key))
     }
 
     /// A search result moves `searchSelection`, a tab row `listSelection`.
@@ -302,11 +304,13 @@ struct ClosedRow: View {
         .onHover { hovering = $0 }
         .accessibilityAddTraits(selected ? [.isSelected] : [])
         .help(pr.title)
+        .editPickerAnchor(for: pr.key, field: nil, model: model)
         .prContextMenu(
             pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
             time: search == nil ? TimeFocusMenu(model: model) : nil,
             person: .person(model: model, login: pr.author), files: model.filesLink(for: pr),
-            failingCheck: { model.openFailingCheck(pr.key) })
+            failingCheck: { model.openFailingCheck(pr.key) },
+            sets: SetEditMenu.make(model: model, key: pr.key))
     }
 
     /// A search result moves `searchSelection`, a Mine row `listSelection`.

@@ -38,7 +38,7 @@ private func variables(_ body: [String: Any]) -> [String: Any] { body["variables
         let t = QueueTransport([
             #"""
             {"data":{"repository":{
-              "issue":{"labels":{"nodes":[{"id":"LA_bug","name":"bug","color":"d73a4a","description":"Broken"}]}},
+              "item":{"labels":{"nodes":[{"id":"LA_bug","name":"bug","color":"d73a4a","description":"Broken"}]}},
               "labels":{"nodes":[
                 {"id":"LA_bug","name":"bug","color":"d73a4a","description":"Broken"},
                 {"id":"LA_docs","name":"docs","color":"0075ca","description":null}],
@@ -78,7 +78,7 @@ private func variables(_ body: [String: Any]) -> [String: Any] { body["variables
         let t = QueueTransport([
             #"""
             {"data":{"repository":{
-              "issue":{"assignees":{"nodes":[{"id":"U_carol","login":"carol","avatarUrl":"https://a.test/c.png"}]}},
+              "item":{"assignees":{"nodes":[{"id":"U_carol","login":"carol","avatarUrl":"https://a.test/c.png"}]}},
               "assignableUsers":{"nodes":[
                 {"id":"U_alice","login":"alice","avatarUrl":"https://a.test/a.png"},
                 {"id":"U_bob","login":"bob","avatarUrl":"https://a.test/b.png"}],
@@ -100,17 +100,17 @@ private func variables(_ body: [String: Any]) -> [String: Any] { body["variables
 
     @Test func assigneeQuerySendsTheFilter() async throws {
         let t = QueueTransport([
-            #"{"data":{"repository":{"issue":{"assignees":{"nodes":[]}},"assignableUsers":{"nodes":[],"pageInfo":{"hasNextPage":false}}}}}"#
+            #"{"data":{"repository":{"item":{"assignees":{"nodes":[]}},"assignableUsers":{"nodes":[],"pageInfo":{"hasNextPage":false}}}}}"#
         ])
         let result = try await api(t).assigneeCandidates(for: key, query: "al")
         #expect(variables(try #require(t.bodies.first))["q"] as? String == "al")
         #expect(result.complete)
     }
 
-    @Test func aMissingIssueHasNoCurrentValues() async throws {
+    @Test func aMissingItemHasNoCurrentValues() async throws {
         let t = QueueTransport([
             #"""
-            {"data":{"repository":{"issue":null,
+            {"data":{"repository":{"item":null,
               "assignableUsers":{"nodes":[{"id":"U_alice","login":"alice","avatarUrl":"https://a.test/a.png"}],
               "pageInfo":{"hasNextPage":false}}}}}
             """#
@@ -119,6 +119,29 @@ private func variables(_ body: [String: Any]) -> [String: Any] { body["variables
         #expect(result.current.isEmpty)
         #expect(result.all.map(\.name) == ["alice"])
         #expect(result.complete)
+    }
+
+    @Test func candidatesReadAPullRequestsOwnValues() async throws {
+        let t = QueueTransport([
+            #"""
+            {"data":{"repository":{
+              "item":{"assignees":{"nodes":[{"id":"U_carol","login":"carol","avatarUrl":null}]}},
+              "assignableUsers":{"nodes":[],"pageInfo":{"hasNextPage":false}}}}}
+            """#,
+            #"""
+            {"data":{"repository":{
+              "item":{"labels":{"nodes":[{"id":"LA_bug","name":"bug","color":"d73a4a","description":null}]}},
+              "labels":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}
+            """#,
+        ])
+        #expect(try await api(t).assigneeCandidates(for: key, query: nil).current.map(\.name) == ["carol"])
+        #expect(try await api(t).labelCandidates(for: key).current.map(\.id) == ["LA_bug"])
+        for body in t.bodies {
+            let query = try #require(body["query"] as? String)
+            #expect(query.contains("item: issueOrPullRequest(number:$n)"))
+            #expect(query.contains("... on PullRequest{"))
+            #expect(!query.contains("issue(number:"))
+        }
     }
 
     @Test func laterLabelPagesSkipTheIssue() async throws {

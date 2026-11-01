@@ -17,7 +17,7 @@ PullBull's pitch is that the browser is slow for a quick look. Triage is the nat
 
 ## Non-goals
 
-- Labels and assignees on pull requests. They stay read-only, so the app never needs a permission that could touch a PR.
+- Pull requests: their reviewers, assignees and labels are covered by `2026-11-01-edit-pr-reviewers-assignees-labels-design.md`.
 - Status on pull requests. The board query reads only issue cards, and `status:` is issues-only; PR cards stay out of scope.
 - Other board fields (Priority, Iteration, Estimate), milestones, issue type.
 - Bulk edits. The lists have no multi-select.
@@ -149,7 +149,7 @@ Search-backed lists (the issues tabs Mine and Created, PR tabs, search) can retu
 - An override is stored as a change, not as a whole item: the Status option ID (or none), and the labels and assignees added and removed. Applying it to any model of the item (a PR row, a `BoardIssue`, a detail) changes only those fields.
 - Agreement means: the same Status option ID (not its name, so a renamed option still agrees), and every added label or assignee present and every removed one absent, compared case-insensitively, on the first copy of the item found (board, then Mine, Created, Closed, then PR lists). A removal from the board agrees once the card is gone. If the board no longer has the overriding option (it was deleted), the override is dropped at once.
 - Assigning or unassigning yourself on an open issue agrees only once Mine agrees too (when Mine was fetched). The board copy shows the new assignee at once, but Mine comes from search and lags; dropping the override on the board copy alone would make the row flicker on Mine.
-- Self-assigning puts the open issue on Mine from the `BoardIssue` PullBull holds, from the board or Created copy. Both carry `issueRowFields`, which is all an Mine row shows. An issue found only through search shows on Mine once search lists it. Assigning someone else inserts nothing. A PR has no assigned list and takes no edits, so nothing is inserted for PRs.
+- Self-assigning puts the open issue on Mine from the `BoardIssue` PullBull holds, from the board or Created copy. Both carry `issueRowFields`, which is all an Mine row shows. An issue found only through search shows on Mine once search lists it. Assigning someone else inserts nothing. A PR has no assigned list, so assigning yourself to a PR inserts nothing.
 - Tabs, search results and the detail read the snapshot through the overrides. The stored snapshot stays as GitHub returned it. Notification change detection compares raw snapshots, so an override never fakes an event.
 - An override is dropped when a fetched snapshot agrees with it, or when 5 minutes pass, or when it is undone or fails. After 5 minutes GitHub's answer wins, even if it differs: someone else changed it, or the write didn't stick.
 - Overrides apply oldest first, so several edits to one item before a refresh show their net result. When a fetch agrees with an edit, the older edits to the same item that it replaced are dropped with it: any older Status edit, or an older label or assignee edit that touched one of the same labels or people. Todo → Doing → Done followed by a fetch showing Done leaves nothing behind, and neither does adding to the board and undoing it. An older edit to a different label still waits for GitHub to show it. Each override is checked against fetches independently, so a fetch that agrees with an earlier edit doesn't drop a later one.
@@ -160,9 +160,9 @@ Search-backed lists (the issues tabs Mine and Created, PR tabs, search) can retu
 
 ### GitHub App
 
-- Change the app's permissions: **Issues: Read and write**, **Projects (organization): Read and write**. Everything else stays read-only.
-- Pull requests stay read-only: PullBull edits no labels or assignees on them, and their rows and detail have no such key, menu item or clickable field.
-- Installation permission keys: `issues: write` gates labels and assignees; `organization_projects: write` gates Status.
+- Change the app's permissions: **Issues**, **Pull requests** and **Projects (organization)**: Read and write. Everything else stays read-only.
+- Pull requests: see the PR edit spec for their keys, menu items, Details card and the Pull requests permission.
+- Installation permission keys: `issues: write` gates labels and assignees on issues, `pull_requests: write` on pull requests; `organization_projects: write` gates Status.
 - Request all the write permissions in one change, before the Status release. Every new permission makes org owners re-approve, so they should approve once, not once per release.
 - Existing installations keep their old, read-only permissions until an owner accepts the new ones. `AccessChecker` already reads each installation's `permissions`; the edit controls use them:
   - The installation grants write: the keys, menu items and clickable fields work.

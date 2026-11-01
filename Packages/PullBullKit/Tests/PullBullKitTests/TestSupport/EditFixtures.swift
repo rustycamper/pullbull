@@ -13,13 +13,14 @@ func editIssue(
         assignees: assignees.map { Assignee(login: $0, avatarURL: nil) }, status: status)
 }
 
-func editPR(_ number: Int, labels: [String] = []) -> PullRequest {
+func editPR(_ number: Int, labels: [String] = [], assignees: [String] = []) -> PullRequest {
     let at = Date(timeIntervalSince1970: 1_800_000_000)
     return PullRequest(
         key: editKey(number), title: "PR \(number)", url: URL(string: "https://github.com/o/r/pull/\(number)")!,
         author: "al", authorAvatarURL: nil, state: .open, isDraft: false, createdAt: at, updatedAt: at, closedAt: nil,
         headRef: "a", baseRef: "main", ci: .none, headCommitDate: nil, commentCount: 0, lastCommentAuthor: nil,
-        latestReviews: [], reviewRequests: [], labels: labels, labelColors: labels.map { _ in nil })
+        latestReviews: [], reviewRequests: [], labels: labels, labelColors: labels.map { _ in nil },
+        assignees: assignees.map { Assignee(login: $0, avatarURL: nil) })
 }
 
 func editSnapshot(

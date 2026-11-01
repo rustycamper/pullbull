@@ -1941,15 +1941,23 @@ extension AppModel {
         details[key]
     }
 
-    /// The list data for `key`: the current lists first, then search results, then the PR as opened.
+    /// The list data for `key`, with pending edits laid over it: the current lists first, then search
+    /// results, then the PR as opened.
     func pullRequest(for key: PRKey) -> PullRequest? {
+        fetchedPullRequest(for: key).map(edits.overrides.apply(to:))
+    }
+
+    /// As GitHub sent it. Reads `rawSearchResults`, not `searchResults`, so `openedPR` never keeps an edit
+    /// that is later undone or refused.
+    private func fetchedPullRequest(for key: PRKey) -> PullRequest? {
         if let snapshot {
             let lists = [snapshot.reviewCandidates, snapshot.mine, snapshot.team, snapshot.recentlyClosed]
             for list in lists {
                 if let pr = list.first(where: { $0.key == key }) { return pr }
             }
         }
-        if let results = searchResults, let pr = (results.openPRs + results.closedPRs).first(where: { $0.key == key }) {
+        if let results = rawSearchResults,
+           let pr = (results.openPRs + results.closedPRs).first(where: { $0.key == key }) {
             return pr
         }
         return openedPR?.key == key ? openedPR : nil
@@ -2053,7 +2061,7 @@ extension AppModel {
         case .detail: break
         }
         if case .detail = route {} else { detailReturnRoute = route }
-        openedPR = pullRequest(for: key)
+        openedPR = fetchedPullRequest(for: key)
         closeCompletion()
         route = .detail(key)
         loadDetail(key)

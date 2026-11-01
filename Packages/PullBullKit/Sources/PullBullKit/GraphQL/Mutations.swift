@@ -66,11 +66,14 @@ enum Mutations {
     }
     """
 
-    /// A page of the repo's labels by name, and on the first page (`withIssue`) the issue's own.
+    /// A page of the repo's labels by name, and on the first page (`withIssue`) the issue's or PR's own.
     static let labelCandidates = """
     query($owner:String!,$name:String!,$n:Int!,$after:String,$withIssue:Boolean!){
       repository(owner:$owner, name:$name){
-        issue(number:$n) @include(if:$withIssue){labels(first:100){nodes{id name color description}}}
+        item: issueOrPullRequest(number:$n) @include(if:$withIssue){
+          ... on Issue{labels(first:100){nodes{id name color description}}}
+          ... on PullRequest{labels(first:100){nodes{id name color description}}}
+        }
         labels(first:100, after:$after, orderBy:{field:NAME,direction:ASC}){
           nodes{id name color description}
           pageInfo{hasNextPage endCursor}
@@ -79,11 +82,15 @@ enum Mutations {
     }
     """
 
-    /// The first hundred people assignable in the repo (matching `$q` when given) and the issue's assignees.
+    /// The first hundred people assignable in the repo (matching `$q` when given) and the issue's or PR's
+    /// assignees.
     static let assigneeCandidates = """
     query($owner:String!,$name:String!,$n:Int!,$q:String){
       repository(owner:$owner, name:$name){
-        issue(number:$n){assignees(first:10){nodes{id login avatarUrl}}}
+        item: issueOrPullRequest(number:$n){
+          ... on Issue{assignees(first:10){nodes{id login avatarUrl}}}
+          ... on PullRequest{assignees(first:10){nodes{id login avatarUrl}}}
+        }
         assignableUsers(first:100, query:$q){nodes{id login avatarUrl} pageInfo{hasNextPage}}
       }
     }

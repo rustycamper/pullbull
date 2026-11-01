@@ -127,19 +127,23 @@ struct BulkOpenItem {
 }
 
 extension View {
-    /// Right-click: the repo focus and person search items (list and search rows), Copy Branch Name, Copy
-    /// Checkout Command, Copy Link, Copy as Markdown Link, Open on GitHub, the files item (`files.menuTitle`)
-    /// and, on a PR whose checks failed, Open Failing Check. VoiceOver gets Copy as Markdown Link as an
-    /// action too.
+    /// Right-click: the repo focus and person search items (list and search rows), Assignees… and Labels…
+    /// where they're offered, Copy Branch Name, Copy Checkout Command, Copy Link, Copy as Markdown Link, Open on
+    /// GitHub, the files item (`files.menuTitle`) and, on a PR whose checks failed, Open Failing Check.
+    /// VoiceOver gets Copy as Markdown Link as an action too.
     func prContextMenu(
         _ pr: PullRequest, focus: FocusMenuItem? = nil, time: TimeFocusMenu? = nil, person: FocusMenuItem? = nil,
-        files: FilesLink? = nil, failingCheck: (() -> Void)? = nil
+        files: FilesLink? = nil, failingCheck: (() -> Void)? = nil, sets: SetEditMenu? = nil
     ) -> some View {
         contextMenu {
             if focus != nil || time != nil || person != nil {
                 if let focus { FocusMenuButton(item: focus) }
                 if let time { time }
                 if let person { PersonMenuButton(item: person) }
+                Divider()
+            }
+            if let sets {
+                sets
                 Divider()
             }
             Button("Copy Branch Name", systemImage: "arrow.triangle.branch") { PRActions.copyBranch(pr) }
@@ -238,12 +242,12 @@ struct StatusMenu: View {
     }
 }
 
-/// "Assignees…" and "Labels…" on an issue's context menu: each opens its picker on the row.
+/// "Assignees…" and "Labels…" on an issue's or pull request's context menu: each opens its picker on the row.
 struct SetEditMenu: View {
     let model: AppModel
     let key: PRKey
 
-    /// Nil where the sets aren't offered on the issue.
+    /// Nil where the sets aren't offered on the item.
     static func make(model: AppModel, key: PRKey) -> SetEditMenu? {
         model.isSetEditOffered(for: key) ? SetEditMenu(model: model, key: key) : nil
     }
