@@ -182,9 +182,9 @@ struct PRDetailView: View {
     @ViewBuilder private func sections(_ detail: PRDetail, now: Date) -> some View {
         if pr?.state == .open {
             statusSections(detail)
-            descriptionSection(detail)
+            DescriptionSection(source: detail.body)
         } else {
-            descriptionSection(detail)
+            DescriptionSection(source: detail.body)
             statusSections(detail)
         }
         conversationSection(detail.comments, now: now)
@@ -197,25 +197,6 @@ struct PRDetailView: View {
             reviewersSection(reviews: detail.reviews, pr: pr, detail: detail)
         } else if !detail.reviews.isEmpty || detail.requests?.isEmpty == false {
             reviewersSection(reviews: detail.reviews, pr: nil, detail: detail)
-        }
-    }
-
-    private func descriptionSection(_ detail: PRDetail) -> some View {
-        // Prose straight on the material at the section gutter, not boxed in a card: cards are for structured data.
-        DetailSection(title: "Description") {
-            let body = detail.body.trimmingCharacters(in: .whitespacesAndNewlines)
-            Group {
-                if body.isEmpty {
-                    Text("No description provided.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    DescriptionText(source: body)
-                }
-            }
-            .font(.system(size: 12.5))
-            .lineSpacing(3)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -520,41 +501,6 @@ struct TeamGlyph: View {
 // MARK: - Pieces
 
 /// Long descriptions fold to their first lines so the checks and reviewers stay in reach.
-private struct DescriptionText: View {
-    let source: String
-    @State private var expanded = false
-
-    private static let foldedLines = 10
-    private static let foldedHeight: CGFloat = 170
-    private var isLong: Bool {
-        source.count > 600 || source.split(separator: "\n", omittingEmptySubsequences: false).count > Self.foldedLines
-    }
-    private var folded: Bool { isLong && !expanded }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            MarkdownText(source)
-                .textSelection(.enabled)
-                .frame(maxHeight: folded ? Self.foldedHeight : nil, alignment: .top)
-                .clipped()
-                .mask {
-                    if folded {
-                        LinearGradient(
-                            stops: [.init(color: .black, location: 0.75), .init(color: .clear, location: 1)],
-                            startPoint: .top, endPoint: .bottom)
-                    } else {
-                        Color.black
-                    }
-                }
-            if isLong {
-                Button(expanded ? "Show less" : "Show more") { expanded.toggle() }
-                    .buttonStyle(.link)
-                    .font(.system(size: 11, weight: .medium))
-            }
-        }
-    }
-}
-
 /// "Conflicts with main · resolve on GitHub" under the branches: an amber triangle, gray text.
 private struct ConflictLine: View {
     let baseRef: String

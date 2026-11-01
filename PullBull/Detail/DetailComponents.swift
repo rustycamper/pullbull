@@ -423,3 +423,62 @@ struct ConversationSection: View {
         }
     }
 }
+
+/// A PR or issue page's Description: prose straight on the material at the section gutter, not boxed in a
+/// card (cards are for structured data), folded when long. One view for both pages.
+struct DescriptionSection: View {
+    let source: String
+
+    var body: some View {
+        DetailSection(title: "Description") {
+            let body = source.trimmingCharacters(in: .whitespacesAndNewlines)
+            Group {
+                if body.isEmpty {
+                    Text("No description provided.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    DescriptionText(source: body)
+                }
+            }
+            .font(.system(size: 12.5))
+            .lineSpacing(3)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct DescriptionText: View {
+    let source: String
+    @State private var expanded = false
+
+    private static let foldedLines = 10
+    private static let foldedHeight: CGFloat = 170
+    private var isLong: Bool {
+        source.count > 600 || source.split(separator: "\n", omittingEmptySubsequences: false).count > Self.foldedLines
+    }
+    private var folded: Bool { isLong && !expanded }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            MarkdownText(source)
+                .textSelection(.enabled)
+                .frame(maxHeight: folded ? Self.foldedHeight : nil, alignment: .top)
+                .clipped()
+                .mask {
+                    if folded {
+                        LinearGradient(
+                            stops: [.init(color: .black, location: 0.75), .init(color: .clear, location: 1)],
+                            startPoint: .top, endPoint: .bottom)
+                    } else {
+                        Color.black
+                    }
+                }
+            if isLong {
+                Button(expanded ? "Show less" : "Show more") { expanded.toggle() }
+                    .buttonStyle(.link)
+                    .font(.system(size: 11, weight: .medium))
+            }
+        }
+    }
+}

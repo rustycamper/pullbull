@@ -41,7 +41,7 @@ struct IssueDetailView: View {
                                 RefreshFailedNote(message: error) { model.reloadIssueDetail() }
                             }
                             linkedPRsSection(detail.linkedPRs)
-                            descriptionSection(detail.body)
+                            DescriptionSection(source: detail.body)
                             conversationSection(detail, now: context.date)
                         } else {
                             placeholder
@@ -209,11 +209,10 @@ struct IssueDetailView: View {
 
     @ViewBuilder private func linkedPRsSection(_ prs: [LinkedPR]) -> some View {
         if prs.isEmpty {
-            Text("No linked pull requests")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, Metrics.detailGutter)
-                .padding(.top, 14)
+            // As the PR page's empty sections: the heading, then the empty line in a card.
+            DetailSection(title: "Linked pull requests") {
+                DetailCard { EmptyLine(text: "No linked pull requests") }
+            }
         } else {
             DetailSection(title: "Linked pull requests", summary: String(prs.count)) {
                 DetailCard {
@@ -222,29 +221,6 @@ struct IssueDetailView: View {
                         LinkedPRLine(pr: pr) { model.openDetail(pr.key) }
                     }
                 }
-            }
-        }
-    }
-
-    private func descriptionSection(_ source: String) -> some View {
-        DetailSection(title: "Description") {
-            DetailCard {
-                let body = source.trimmingCharacters(in: .whitespacesAndNewlines)
-                Group {
-                    if body.isEmpty {
-                        Text("No description provided.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        MarkdownText(body)
-                            .textSelection(.enabled)
-                    }
-                }
-                .font(.system(size: 12))
-                .lineSpacing(2)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
             }
         }
     }
