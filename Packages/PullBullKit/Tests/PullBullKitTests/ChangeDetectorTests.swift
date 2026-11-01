@@ -45,8 +45,8 @@ private func events(_ old: Snapshot?, _ new: Snapshot, toggles: NotificationTogg
 
     @Test func aNewReasonForAPRStillNeedingReviewDoesNotNotifyAgain() {
         let commented = Review(author: "me", state: .commented, submittedAt: now.addingTimeInterval(-60))
-        let teamRequested = snap(review: [pr(1, requests: [.team("core")])])
-        let reRequested = snap(review: [pr(1, reviews: [commented], requests: [.user("me"), .team("core")])])
+        let teamRequested = snap(review: [pr(1, requests: [.team(slug: "core", name: "core")])])
+        let reRequested = snap(review: [pr(1, reviews: [commented], requests: [.user("me"), .team(slug: "core", name: "core")])])
         let e = ChangeDetector.events(
             old: teamRequested, new: reRequested, me: "me", myTeams: ["core"], toggles: .init())
         #expect(e.isEmpty)

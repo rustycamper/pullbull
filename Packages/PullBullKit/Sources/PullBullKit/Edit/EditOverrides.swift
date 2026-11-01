@@ -12,6 +12,9 @@ public struct EditOverrides: Equatable, Sendable {
         let key: PRKey
         let change: EditChange
         let madeAt: Date
+        /// The pull request as it was when a reviewers edit was made, for Review to show it when the
+        /// viewer asks themselves before a fetch lists it there.
+        let copy: PullRequest?
     }
 
     /// In the order the edits were made, which is the order they apply in.
@@ -21,10 +24,11 @@ public struct EditOverrides: Equatable, Sendable {
 
     public var isEmpty: Bool { entries.isEmpty }
 
+    /// `copy`: the pull request a reviewers edit is made on, as fetched.
     @discardableResult
-    public mutating func record(_ change: EditChange, on key: PRKey, at date: Date) -> UUID {
+    public mutating func record(_ change: EditChange, on key: PRKey, at date: Date, carrying copy: PullRequest? = nil) -> UUID {
         let id = UUID()
-        entries.append(Entry(id: id, key: key, change: change, madeAt: date))
+        entries.append(Entry(id: id, key: key, change: change, madeAt: date, copy: copy))
         return id
     }
 
@@ -41,7 +45,7 @@ public struct EditOverrides: Equatable, Sendable {
             entries.remove(at: index)
         } else {
             let old = entries[index]
-            entries[index] = Entry(id: old.id, key: old.key, change: change, madeAt: old.madeAt)
+            entries[index] = Entry(id: old.id, key: old.key, change: change, madeAt: old.madeAt, copy: old.copy)
         }
     }
 
@@ -86,6 +90,12 @@ public struct EditOverrides: Equatable, Sendable {
             if case .assignees(let added, let removed) = entry.change {
                 Self.followViewer(entry.key, added: added, removed: removed, in: &shown)
             }
+            if case .reviewers(let added, _) = entry.change, let copy = entry.copy, copy.state == .open,
+               !Self.viewerKeys(shown.org).isDisjoint(with: added.map(\.key)),
+               !shown.reviewCandidates.contains(where: { $0.key == entry.key }) {
+                // Review lists what asks for the viewer's review; the tab's rules decide from here.
+                shown.reviewCandidates.append(apply(to: copy))
+            }
         }
         return shown
     }
@@ -97,6 +107,14 @@ public struct EditOverrides: Equatable, Sendable {
         shown.closedPRs = results.closedPRs.map(apply(to:))
         shown.issues = results.issues.map(apply(to:))
         return shown
+    }
+
+    /// `requests` on pull request `key` with its reviewer edits laid over: the detail's own requests.
+    public func apply(toRequests requests: [Reviewer], on key: PRKey) -> [Reviewer] {
+        entries.reduce(requests) { requests, entry in
+            guard entry.key == key, case .reviewers(let added, let removed) = entry.change else { return requests }
+            return Self.changeRequests(requests, added, removed)
+        }
     }
 
     public func apply(to issue: BoardIssue) -> BoardIssue {
@@ -119,6 +137,8 @@ public struct EditOverrides: Equatable, Sendable {
             (issue.labels, issue.labelColors) = changeLabels(issue.labels, issue.labelColors, added, removed)
         case .assignees(let added, let removed):
             issue.assignees = changeAssignees(issue.assignees, added, removed)
+        case .reviewers:
+            break
         }
         return issue
     }
@@ -134,6 +154,8 @@ public struct EditOverrides: Equatable, Sendable {
             (pr.labels, pr.labelColors) = changeLabels(pr.labels, pr.labelColors, added, removed)
         case .assignees(let added, let removed):
             pr.assignees = changeAssignees(pr.assignees, added, removed)
+        case .reviewers(let added, let removed):
+            pr.reviewRequests = changeRequests(pr.reviewRequests, added, removed)
         }
         return pr
     }
@@ -148,6 +170,16 @@ public struct EditOverrides: Equatable, Sendable {
             assignees.append(Assignee(login: person.login, avatarURL: person.avatarURL))
         }
         return assignees
+    }
+
+    /// Review requests with `removed` taken out and `added` appended, matched on login or team slug.
+    private static func changeRequests(_ requests: [Reviewer], _ added: [Reviewer], _ removed: [Reviewer]) -> [Reviewer] {
+        var requests = requests
+        requests.removeAll { request in removed.contains(request.key, by: \.key) }
+        for reviewer in added where !requests.contains(reviewer.key, by: \.key) {
+            requests.append(reviewer)
+        }
+        return requests
     }
 
     /// Labels and their colours by position; colours missing from an old cache are padded with nil so
@@ -228,7 +260,24 @@ public struct EditOverrides: Equatable, Sendable {
             if added.contains(where: { same($0.login, viewer) }) { return listed }
             if removed.contains(where: { same($0.login, viewer) }) { return !listed }
             return true
+        case .reviewers(let added, let removed):
+            guard let pr = prs(in: fetched).first(where: { $0.key == entry.key }) else { return false }
+            let have = Set(pr.reviewRequests.map(\.key))
+            guard added.allSatisfy({ have.contains($0.key) }), !removed.contains(where: { have.contains($0.key) })
+            else { return false }
+            guard pr.state == .open else { return true }
+            // Review comes from search, which lags the PR's own fields: wait for it too, or the row flickers.
+            // The viewer's own teams count as the viewer.
+            let mine = Self.viewerKeys(fetched.org)
+            let listed = Set(fetched.reviewCandidates.first { $0.key == entry.key }?.reviewRequests.map(\.key) ?? [])
+            return added.allSatisfy { !mine.contains($0.key) || listed.contains($0.key) }
+                && !removed.contains { mine.contains($0.key) && listed.contains($0.key) }
         }
+    }
+
+    /// The reviewer keys that ask for the viewer's own review: the viewer and the viewer's teams.
+    private static func viewerKeys(_ org: OrgContext) -> Set<String> {
+        Set([Reviewer.user(org.viewer).key] + org.myTeams.map { Reviewer.team(slug: $0, name: $0).key })
     }
 
     /// Whether `newer` sets something `older` set: the Status, or one of the same labels or people.
@@ -243,6 +292,8 @@ public struct EditOverrides: Equatable, Sendable {
             return shared((a1 + r1).map(\.name), (a2 + r2).map(\.name))
         case (.assignees(let a1, let r1), .assignees(let a2, let r2)):
             return shared((a1 + r1).map(\.login), (a2 + r2).map(\.login))
+        case (.reviewers(let a1, let r1), .reviewers(let a2, let r2)):
+            return !Set((a1 + r1).map(\.key)).isDisjoint(with: (a2 + r2).map(\.key))
         default:
             return false
         }
@@ -268,5 +319,11 @@ public struct EditOverrides: Equatable, Sendable {
 
     private static func same(_ a: String, _ b: String) -> Bool {
         a.caseInsensitiveCompare(b) == .orderedSame
+    }
+}
+
+private extension Array where Element == Reviewer {
+    func contains(_ key: String, by path: KeyPath<Reviewer, String>) -> Bool {
+        contains { $0[keyPath: path] == key }
     }
 }

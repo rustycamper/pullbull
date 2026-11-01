@@ -2,6 +2,15 @@ import Foundation
 
 public protocol GraphQLTransport: Sendable {
     func send(_ body: Data, token: String) async throws -> (Data, HTTPURLResponse)
+    /// A REST request to `https://api.github.com` + `path` with a JSON body.
+    func send(_ method: String, path: String, body: Data, token: String) async throws -> (Data, HTTPURLResponse)
+}
+
+extension GraphQLTransport {
+    /// Transports that never send REST (most test doubles) refuse it.
+    public func send(_ method: String, path: String, body: Data, token: String) async throws -> (Data, HTTPURLResponse) {
+        throw APIError.server(501)
+    }
 }
 
 public enum APIError: Error, Equatable {
@@ -209,11 +218,14 @@ public struct PRDetail: Codable, Sendable {
     public let additions: Int?
     public let deletions: Int?
     public let checkCount: Int?
+    /// Pending review requests; nil in details cached before they were stored.
+    public let requests: [Reviewer]?
 
     public init(
         key: PRKey, body: String, checks: [Check], reviews: [Review],
         comments: [Comment], files: [ChangedFile], updatedAt: Date? = nil, ci: CIState? = nil,
-        changedFiles: Int? = nil, additions: Int? = nil, deletions: Int? = nil, checkCount: Int? = nil
+        changedFiles: Int? = nil, additions: Int? = nil, deletions: Int? = nil, checkCount: Int? = nil,
+        requests: [Reviewer]? = nil
     ) {
         self.key = key
         self.body = body
@@ -227,6 +239,7 @@ public struct PRDetail: Codable, Sendable {
         self.additions = additions
         self.deletions = deletions
         self.checkCount = checkCount
+        self.requests = requests
     }
 
     public var fileTotal: Int { max(changedFiles ?? 0, files.count) }
@@ -331,6 +344,25 @@ public struct URLSessionTransport: GraphQLTransport {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
         return (data, http)
+    }
+
+    public func send(_ method: String, path: String, body: Data, token: String) async throws -> (Data, HTTPURLResponse) {
+        let request = Self.restRequest(method, path: path, body: body, token: token)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+        return (data, http)
+    }
+
+    static func restRequest(_ method: String, path: String, body: Data, token: String) -> URLRequest {
+        var request = URLRequest(url: URL(string: "https://api.github.com\(path)")!)
+        request.httpMethod = method
+        request.timeoutInterval = 20
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        return request
     }
 }
 
@@ -657,6 +689,7 @@ public struct GitHubAPI: Sendable {
             as? Int).map { $0 - (contexts.count - checks.count) }
         let reviewNodes = (pr["latestReviews"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
         let reviews = reviewNodes.compactMap { try? Decoding.review($0) }
+        let requestNodes = (pr["reviewRequests"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
 
         let commentNodes = (pr["comments"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
         let comments = commentNodes.compactMap(Self.comment).sorted { $0.createdAt < $1.createdAt }
@@ -678,7 +711,8 @@ public struct GitHubAPI: Sendable {
                 .map { $0 - (fileNodes.count - files.count) },
             additions: pr["additions"] as? Int,
             deletions: pr["deletions"] as? Int,
-            checkCount: checkCount)
+            checkCount: checkCount,
+            requests: requestNodes.compactMap(Decoding.reviewer))
     }
 
     /// Issue `key` with who last closed it; nil when it is gone (deleted, transferred, no access) or
@@ -813,6 +847,59 @@ public struct GitHubAPI: Sendable {
             Mutations.assignees(adding: !adding.isEmpty, removing: !removing.isEmpty), subject, adding, removing)
     }
 
+    /// Requests reviews from `adding` and removes the requests of `removing` on PR `key`, over REST, which
+    /// takes logins and team slugs and changes only what it names. The add goes first. Once one half has
+    /// applied, the other's failure is a partial result; a failure with nothing applied throws.
+    public func changeReviewers(of key: PRKey, adding: [Reviewer], removing: [Reviewer]) async throws -> SetChangeResult {
+        let path = "/repos/\(key.repo)/pulls/\(key.number)/requested_reviewers"
+        var addError: APIError?
+        if !adding.isEmpty {
+            do {
+                try await rest("POST", path, Self.reviewersBody(adding, alwaysPeople: false))
+            } catch let error as APIError {
+                guard case .writeRefused = error, !removing.isEmpty else { throw error }
+                addError = error
+            }
+        }
+        guard !removing.isEmpty else { return SetChangeResult(addApplied: true, removeApplied: true, refusal: nil) }
+        do {
+            // GitHub requires `reviewers` on a removal, even when only teams go.
+            try await rest("DELETE", path, Self.reviewersBody(removing, alwaysPeople: true))
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            if let addError { throw addError }
+            guard !adding.isEmpty else { throw error }
+            return SetChangeResult(addApplied: true, removeApplied: false, refusal: Self.reason(error))
+        }
+        if let addError {
+            return SetChangeResult(addApplied: false, removeApplied: true, refusal: Self.reason(addError))
+        }
+        return SetChangeResult(addApplied: true, removeApplied: true, refusal: nil)
+    }
+
+    /// `reviewers` (logins) and `team_reviewers` (slugs), each only when it has any, unless `alwaysPeople`.
+    private static func reviewersBody(_ reviewers: [Reviewer], alwaysPeople: Bool) -> [String: Any] {
+        var body: [String: Any] = [:]
+        let people = reviewers.compactMap { reviewer -> String? in
+            if case .user(let login) = reviewer { return login }
+            return nil
+        }
+        let teams = reviewers.compactMap { reviewer -> String? in
+            if case .team(let slug, _) = reviewer { return slug }
+            return nil
+        }
+        if alwaysPeople || !people.isEmpty { body["reviewers"] = people }
+        if !teams.isEmpty { body["team_reviewers"] = teams }
+        return body
+    }
+
+    /// The words of a refused write; the refresh wording for anything else.
+    private static func reason(_ error: any Error) -> String {
+        if case APIError.writeRefused(let message) = error { return message }
+        return RefreshError(error).message
+    }
+
     /// The issue's (`content`, its node ID) item on the board `project`, archived or not; nil when it
     /// isn't on that board.
     public func projectItem(of content: String, in project: String) async throws -> String? {
@@ -879,6 +966,110 @@ public struct GitHubAPI: Sendable {
             all: Self.candidates(in: users, label: false),
             current: Self.candidates(in: repository["item"], field: "assignees", label: false),
             complete: !more)
+    }
+
+    /// What the reviewers picker offers on pull request `key`: people (filtered by `query` past the first
+    /// 100), the PR's past reviewers with their verdicts, its suggested reviewers, its requests, and the
+    /// teams of an organisation owner. A team list that can't be read (no `read:org`, no Members
+    /// permission) leaves teams out and throws nothing.
+    public func reviewerCandidates(for key: PRKey, query: String?) async throws -> ReviewerCandidates {
+        let (owner, name) = try Self.ownerAndName(key)
+        var variables: [String: Any] = ["owner": owner, "name": name, "n": key.number]
+        if let query, !query.isEmpty { variables["q"] = query }
+        let data = try await execute(Mutations.reviewerCandidates, variables)
+        guard let repository = data["repository"] as? [String: Any] else {
+            throw APIError.notFound("\(key.repo) not found")
+        }
+        let users = repository["assignableUsers"] as? [String: Any]
+        let people = Self.candidates(in: users, label: false)
+        let morePeople = (users?["pageInfo"] as? [String: Any])?["hasNextPage"] as? Bool == true
+        let isOrganization = (repository["owner"] as? [String: Any])?["__typename"] as? String == "Organization"
+        let teams = isOrganization ? try await teamCandidates(owner: owner, query: query) : nil
+
+        let pr = repository["item"] as? [String: Any] ?? [:]
+        let author = ((pr["author"] as? [String: Any])?["login"] as? String)?.lowercased()
+        var verdicts: [String: ReviewState] = [:]
+        var reviewed: [SetCandidate] = []
+        for node in Self.nodes(pr["latestReviews"]) {
+            guard let person = node["author"] as? [String: Any], person["__typename"] as? String == "User",
+                  let review = try? Decoding.review(node), let candidate = Self.person(person) else { continue }
+            verdicts[candidate.key] = review.state
+            reviewed.append(candidate)
+        }
+        func with(_ c: SetCandidate, suggested: Bool = false) -> SetCandidate {
+            SetCandidate(id: c.id, name: c.name, avatarURL: c.avatarURL, team: c.team,
+                         verdict: verdicts[c.key], isSuggested: suggested)
+        }
+
+        var seen: Set<String> = author.map { [$0] } ?? []
+        var current: [SetCandidate] = []
+        for node in Self.nodes(pr["reviewRequests"]) {
+            guard let requested = node["requestedReviewer"] as? [String: Any] else { continue }
+            let candidate: SetCandidate? = switch requested["__typename"] as? String {
+            case "User": Self.person(requested)
+            case "Team": (requested["slug"] as? String).map { Self.team(slug: $0, name: requested["name"] as? String) }
+            default: nil
+            }
+            if let candidate, seen.insert(candidate.key).inserted { current.append(with(candidate)) }
+        }
+        let suggested = (pr["suggestedReviewers"] as? [[String: Any]] ?? [])
+            .compactMap { ($0["reviewer"] as? [String: Any]).flatMap(Self.person) }
+        var all: [SetCandidate] = []
+        for candidate in reviewed where seen.insert(candidate.key).inserted { all.append(with(candidate)) }
+        for candidate in suggested where seen.insert(candidate.key).inserted { all.append(with(candidate, suggested: true)) }
+        for candidate in people + (teams?.list ?? []) where seen.insert(candidate.key).inserted {
+            all.append(with(candidate))
+        }
+        return ReviewerCandidates(
+            people: people, teams: teams?.list,
+            picker: SetCandidates(all: all, current: current, complete: !morePeople && teams?.complete != false))
+    }
+
+    /// The organisation's teams, paged as labels are; nil when GitHub won't list them.
+    private func teamCandidates(owner: String, query: String?) async throws -> (list: [SetCandidate], complete: Bool)? {
+        var list: [SetCandidate] = []
+        var after: String?
+        for _ in 0..<Self.maxLabelPages {
+            var variables: [String: Any] = ["owner": owner]
+            if let query, !query.isEmpty { variables["q"] = query }
+            if let after { variables["after"] = after }
+            let teams: [String: Any]
+            do {
+                guard let found = (try await execute(Mutations.teamCandidates, variables)["organization"]
+                    as? [String: Any])?["teams"] as? [String: Any] else { return nil }
+                teams = found
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                return nil
+            }
+            list += Self.nodes(teams).compactMap { node in
+                (node["slug"] as? String).map { Self.team(slug: $0, name: node["name"] as? String) }
+            }
+            let info = teams["pageInfo"] as? [String: Any]
+            guard info?["hasNextPage"] as? Bool == true, let cursor = info?["endCursor"] as? String else {
+                return (list, true)
+            }
+            after = cursor
+        }
+        return (list, false)
+    }
+
+    private static func nodes(_ connection: Any?) -> [[String: Any]] {
+        (connection as? [String: Any])?["nodes"] as? [[String: Any]] ?? []
+    }
+
+    /// A person from a `User` node; the node ID when the node has one, else the login's key.
+    private static func person(_ node: [String: Any]) -> SetCandidate? {
+        guard let login = node["login"] as? String else { return nil }
+        return SetCandidate(
+            id: node["id"] as? String ?? login.lowercased(), name: login,
+            avatarURL: (node["avatarUrl"] as? String).flatMap(URL.init(string:)))
+    }
+
+    /// A team, its id its key; the slug stands in for a missing name.
+    private static func team(slug: String, name: String?) -> SetCandidate {
+        SetCandidate(id: "team:" + slug.lowercased(), name: name ?? slug, team: slug)
     }
 
     private static func ownerAndName(_ key: PRKey) throws -> (String, String) {
@@ -958,6 +1149,31 @@ public struct GitHubAPI: Sendable {
         errors.contains { $0["type"] as? String == "FORBIDDEN" }
     }
 
+    /// The error a non-2xx status means; nil for 2xx. `refusing`: a REST write, where a 403 that isn't a
+    /// rate limit, a 404 or a 422 is the write refused, in the body's `message`.
+    private func httpError(_ data: Data, _ response: HTTPURLResponse, refusing: Bool = false) -> APIError? {
+        if let sso = APIError.ssoRequired(in: response) { return sso }
+        let status = response.statusCode
+        if (200..<300).contains(status) { return nil }
+        if status == 401 { return .unauthorized }
+        if let limited = APIError.rateLimited(in: response, body: data, now: now()) { return limited }
+        if refusing, [403, 404, 422].contains(status) {
+            let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            return .writeRefused(body?["message"] as? String ?? "GitHub didn't apply the change")
+        }
+        return status == 403 ? .forbidden : .server(status)
+    }
+
+    /// Sends one REST write with a JSON body; throws unless the answer is 2xx.
+    private func rest(_ method: String, _ path: String, _ body: [String: Any]) async throws {
+        try Task.checkCancellation()
+        let data = try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
+        let (answer, response) = try await sendAuthorized(with: auth) { token in
+            try await transport.send(method, path: path, body: data, token: token)
+        }
+        if let error = httpError(answer, response, refusing: true) { throw error }
+    }
+
     /// `execute`, also returning the errors that came alongside partial data, for callers that tell a
     /// null field GitHub wouldn't show from one that isn't there.
     private func executeReportingErrors(
@@ -971,20 +1187,7 @@ public struct GitHubAPI: Sendable {
             try await transport.send(body, token: token)
         }
 
-        if let sso = APIError.ssoRequired(in: response) { throw sso }
-        switch response.statusCode {
-        case 401:
-            throw APIError.unauthorized
-        case 403, 429:
-            if let limited = APIError.rateLimited(in: response, body: data, now: now()) { throw limited }
-            throw response.statusCode == 403 ? APIError.forbidden : APIError.server(response.statusCode)
-        case 500...:
-            throw APIError.server(response.statusCode)
-        case 200..<300:
-            break
-        default:
-            throw APIError.server(response.statusCode)
-        }
+        if let error = httpError(data, response) { throw error }
 
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw APIError.graphQL("malformed response")

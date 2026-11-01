@@ -80,9 +80,9 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 > Ready to merge = approved, no changes requested, checks green or none, no conflicts, not a draft. It doesn't see branch protection (required review count).
 
 - **Pending CI:** while checks run on your PRs, PullBull checks up to 5 of them (newest commits first) every 30 s, for up to 20 minutes each, so *CI failed* and *Ready to merge* arrive sooner. Not while offline or rate-limited. Settings → General → Check my pending CI more often
-- **Detail:** assignees and labels (click to change), reviewers, checks, description, conversation, files. Markdown incl. `<details>`. **Open Failing Check** beside failed checks
+- **Detail:** assignees, labels and reviewers (click to change), checks, description, conversation, files. Markdown incl. `<details>`. **Open Failing Check** beside failed checks
 - **Labels:** up to two chips per row (none in compact cards), each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail's Details card lists them all
-- **Right-click a row:** [Assignees…](#editing) · [Labels…](#editing) · copy branch, link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · show only updated · search author
+- **Right-click a row:** [Reviewers…](#editing) · [Assignees…](#editing) · [Labels…](#editing) · copy branch, link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · show only updated · search author
 - **Right-click a group header** (repo, author): **Open All *N* on GitHub**, from two PRs up; above 8 it asks first. An author header's menu also offers **Search @*login*** and **Show Only Updated**. Headers in search results get the tab's menus, without Show Only Updated
 - **Footer:** account · refresh · open on GitHub · settings. Turns amber with **Retry** when a refresh fails
 - **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Lists your signed-in accounts, then GitHub CLI logins, each with the org it opens in; then Add Account… and Account Settings…. Each account comes back with its last org, and each org with its last board
@@ -110,16 +110,17 @@ A PR with merge conflicts shows a **Conflicts** note on every tab.
 
 ## Editing
 
-Set an issue's board Status, and the assignees and labels of issues and pull requests, from PullBull. It writes nothing else.
+Set an issue's board Status, a pull request's reviewers, and the assignees and labels of issues and pull requests, from PullBull. It writes nothing else.
 
 - **Open the picker:** select an issue row or search result and press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd>, click Status on the issue detail's board card, or right-click a row → **Status** to pick one straight away
 - **Assignees and labels:** select an issue or pull request row or search result, or open it, and press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>A</kbd> (assignees) or <kbd>⌥</kbd><kbd>⌘</kbd><kbd>L</kbd> (labels), click Assignees or Labels on the detail (on a pull request, in its Details card), or right-click a row → **Assignees…** or **Labels…**. Open, closed and merged pull requests alike
+- **Reviewers:** select a pull request row or search result, or open it, and press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>R</kbd>, click the detail's Reviewers card, or right-click a row → **Reviewers…**. The picker lists who is requested now (ticked), past reviewers with their latest verdict, you, the people GitHub suggests, everyone else who can be requested, then the organisation's teams. The author and bots are never listed. Ticking a past reviewer asks them again. Unticking a requested reviewer who has already reviewed takes back the request, not the review: the row says "Their review stays". Teams show on organisation repos when PullBull can read the team list (a `gh` login needs `read:org`); otherwise the picker lists people only. Open, closed and merged pull requests alike
 - **Multi-select picker:** ticked entries first, then you (assignees), then the rest, in an order that stays put while you tick. Labels show their colour and description, people their avatar. Type to filter, <kbd>↑</kbd> <kbd>↓</kbd> to choose, <kbd>Return</kbd> to tick or untick and keep it open. <kbd>Esc</kbd>, <kbd>⌘</kbd><kbd>Return</kbd>, a click outside, the picker's own key or the popover hiding closes it and applies the ticks as one edit; nothing ticked sends nothing. An issue or pull request has at most 10 assignees: at 10, the unticked people are dimmed
 - **Picker:** the board's Status options in board order, each with its open count, and **Clear Status** when the issue has one; the current one is checked. Type to filter, <kbd>↑</kbd> <kbd>↓</kbd> to choose, <kbd>Return</kbd> to apply, <kbd>Esc</kbd> to close without change
 - **Which issues:** those on the board, and those in a repo the board's owner owns (an org board takes that org's issues; a personal board, your own). Picking a Status for an issue not on the board adds it
-- **After an edit:** the row moves to its new lane at once and stays selected; nothing else is shown. PullBull keeps showing your edit until GitHub's answers catch up, for at most 5 minutes
-- **Undo:** <kbd>⌘</kbd><kbd>Z</kbd> within 10 seconds puts the previous Status back, or takes an issue the edit added off the board again; for assignees and labels, it takes the added ones off and puts the removed ones back, and when GitHub applied only part of an edit, only that part. Only the last edit. Typing in the search field after it hands <kbd>⌘</kbd><kbd>Z</kbd> back to the text
-- **When it fails:** the change is taken back and a line above the footer says why, with **Open on GitHub**, until you dismiss it or edit again. When GitHub applied only half of an assignee or label edit, the line says which: "Added docs to #412, but couldn't remove bug: …"
+- **After an edit:** the row moves to its new lane at once and stays selected; nothing else is shown. PullBull keeps showing your edit until GitHub's answers catch up, for at most 5 minutes. Asking yourself to review someone else's open pull request puts it on Review at once; taking your request back takes it off, unless a request for one of your teams keeps it there
+- **Undo:** <kbd>⌘</kbd><kbd>Z</kbd> within 10 seconds puts the previous Status back, or takes an issue the edit added off the board again; for reviewers, assignees and labels, it takes the added ones off and puts the removed ones back (a removed reviewer is asked again), and when GitHub applied only part of an edit, only that part. Only the last edit. Typing in the search field after it hands <kbd>⌘</kbd><kbd>Z</kbd> back to the text
+- **When it fails:** the change is taken back and a line above the footer says why, with **Open on GitHub**, until you dismiss it or edit again. When GitHub applied only half of a reviewer, assignee or label edit, the line says which: "Added docs to #412, but couldn't remove bug: …" or "Asked alice to review #412, but couldn't remove bob: …"
 - **Permissions:** with Sign in with GitHub, an org owner accepts PullBull's new permissions on GitHub once; until then the picker says so and links there. Pull requests need PullBull's Pull requests permission, accepted the same way. With a `gh` login, setting Status needs the `project` scope: the picker shows the `gh auth refresh -s project` command to run
 
 ## Search
@@ -150,7 +151,7 @@ Set an issue's board Status, and the assignees and labels of issues and pull req
 - `#123` and links work only on their own
 - Results are laid out like the tab you're on, or the one you narrowed to: the same repo, author or Status groups and headers. Merged and closed items follow in **Closed and merged** (issues: **Closed**), open until you fold it for this search. Results span all tabs; click a tab to narrow, or press <kbd>←</kbd> / <kbd>→</kbd> at the field's start / end to narrow to the tab beside the one the results are laid out for (<kbd>←</kbd> from the first tab does nothing). No key goes back to everything; click the narrowed tab again, or **Search everything** in the narrowed empty state
 - The footer says what is searched and how many match, with a spinner while GitHub answers. <kbd>⌥</kbd><kbd>⌘</kbd><kbd>↩</kbd> Ask AI shows there when it fits
-- **Right-click a result:** [Status](#editing) (issues, when a board is shown) · [Assignees…](#editing) · [Labels…](#editing) · copy branch (PRs), link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · search author. The checkout, files and failing check items are on PRs. Search author replaces the query; show only this repo keeps it and searches that repo
+- **Right-click a result:** [Status](#editing) (issues, when a board is shown) · [Reviewers…](#editing) (PRs) · [Assignees…](#editing) · [Labels…](#editing) · copy branch (PRs), link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · search author. The checkout, files and failing check items are on PRs. Search author replaces the query; show only this repo keeps it and searches that repo
 - Each result looks as it does in that tab: avatars on Review and Team, the review notes and counts the tab shows, assignees on issues. A soft yellow highlight marks the words that matched, and `· author` (or reviewer, assignee) after the age says why an `@` matched. Merged and closed PRs carry their pill
 - Compact cards (Settings → General) apply to results too, as in the tabs
 - Matches in the other mode show a hint: <kbd>⌘</kbd><kbd>1</kbd> / <kbd>⌘</kbd><kbd>2</kbd>
@@ -262,6 +263,7 @@ Settings → Ask AI.
 | <kbd>Esc</kbd> | Clear search → clear repo → close |
 | <kbd>⌘</kbd><kbd>W</kbd> | Close |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd> | [Status picker](#editing) on the selected issue, when a board is shown. In search results too |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>R</kbd> | [Reviewers picker](#editing) on the selected pull request. In search results too |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>A</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>L</kbd> | [Assignees or labels picker](#editing) on the selected issue or pull request. In search results too |
 | <kbd>⌘</kbd><kbd>Z</kbd> | Undo the last edit, for 10 seconds after it |
 
@@ -276,6 +278,7 @@ Settings → Ask AI.
 | <kbd>⌘</kbd><kbd>R</kbd> | Refresh |
 | <kbd>⌘</kbd><kbd>/</kbd> | Keyboard Shortcuts window |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd> | [Status picker](#editing), on an issue |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>R</kbd> | [Reviewers picker](#editing), on a pull request |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>A</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>L</kbd> | [Assignees or labels picker](#editing), on an issue or pull request |
 | <kbd>⌘</kbd><kbd>Z</kbd> | Undo the last edit, for 10 seconds after it |
 
@@ -335,7 +338,7 @@ Reopen within a minute and the detail is still there.
 | | Status changed on the board | off |
 | | Closed or reopened | on |
 
-With Settings → General → Check my pending CI more often, CI failed and Ready to merge arrive within about 30 s while your checks run: for up to 5 of your PRs, for 20 minutes each, and not at a 1-minute refresh interval. Your own comments, moves and closes never notify. Several comments on one issue between refreshes make one notification ("3 new comments"). Status changes count on the board the Board tab shows, as "In Progress → In Review"; moves the board's automation makes after a close or a merge don't notify, the close does.
+With Settings → General → Check my pending CI more often, CI failed and Ready to merge arrive within about 30 s while your checks run: for up to 5 of your PRs, for 20 minutes each, and not at a 1-minute refresh interval. Your own comments, moves and closes never notify, nor does asking yourself or one of your teams to review. Several comments on one issue between refreshes make one notification ("3 new comments"). Status changes count on the board the Board tab shows, as "In Progress → In Review"; moves the board's automation makes after a close or a merge don't notify, the close does.
 
 Click a notification to open the detail.
 

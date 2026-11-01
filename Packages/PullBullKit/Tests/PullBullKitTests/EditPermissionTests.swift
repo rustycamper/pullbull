@@ -134,6 +134,17 @@ private func install(
             == .needsGhScope(command: "gh auth switch --user me && gh auth refresh -s project && gh auth switch --user work"))
     }
 
+    @Test func reviewersNeedPullRequestsWrite() {
+        let issuesOnly = install(["issues": "write", "pull_requests": "read"])
+        guard case .needsAppApproval = EditPermission.of(
+            .reviewers, account: app, boardOwner: nil, installation: issuesOnly, ghAccounts: [])
+        else { Issue.record("reviewers need Pull requests write"); return }
+        #expect(EditPermission.of(
+            .reviewers, account: app, boardOwner: nil, installation: install(["pull_requests": "write"]),
+            ghAccounts: []) == .ready)
+        #expect(EditPermission.of(.reviewers, account: ghMe, boardOwner: nil, installation: nil, ghAccounts: []) == .ready)
+    }
+
     @Test func writeAccessFlags() {
         #expect(install(["issues": "write"]).canWriteIssues)
         #expect(!install(["issues": "read"]).canWriteIssues)

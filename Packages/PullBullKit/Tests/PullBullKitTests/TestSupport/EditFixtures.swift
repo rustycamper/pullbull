@@ -13,25 +13,30 @@ func editIssue(
         assignees: assignees.map { Assignee(login: $0, avatarURL: nil) }, status: status)
 }
 
-func editPR(_ number: Int, labels: [String] = [], assignees: [String] = []) -> PullRequest {
+func editPR(
+    _ number: Int, labels: [String] = [], assignees: [String] = [], author: String = "al", state: PRState = .open,
+    reviews: [Review] = [], requests: [Reviewer] = []
+) -> PullRequest {
     let at = Date(timeIntervalSince1970: 1_800_000_000)
     return PullRequest(
         key: editKey(number), title: "PR \(number)", url: URL(string: "https://github.com/o/r/pull/\(number)")!,
-        author: "al", authorAvatarURL: nil, state: .open, isDraft: false, createdAt: at, updatedAt: at, closedAt: nil,
+        author: author, authorAvatarURL: nil, state: state, isDraft: false, createdAt: at, updatedAt: at, closedAt: nil,
         headRef: "a", baseRef: "main", ci: .none, headCommitDate: nil, commentCount: 0, lastCommentAuthor: nil,
-        latestReviews: [], reviewRequests: [], labels: labels, labelColors: labels.map { _ in nil },
+        latestReviews: reviews, reviewRequests: requests, labels: labels, labelColors: labels.map { _ in nil },
         assignees: assignees.map { Assignee(login: $0, avatarURL: nil) })
 }
 
 func editSnapshot(
     board: [BoardIssue] = [], assigned: [BoardIssue]? = [], created: [BoardIssue]? = [], mine: [PullRequest] = [],
     viewer: String = "me", options: [StatusOption]? = nil, boardProject: Int? = 1,
-    boardOwner: BoardOwner? = .org("o"), boardIds: BoardIds? = nil
+    boardOwner: BoardOwner? = .org("o"), boardIds: BoardIds? = nil,
+    review: [PullRequest] = [], team: [PullRequest] = [], myTeams: Set<String> = []
 ) -> Snapshot {
     Snapshot(
         fetchedAt: Date(timeIntervalSince1970: 1_800_000_000),
-        org: OrgContext(org: "o", viewer: viewer, members: [], myTeams: [], repos: []),
-        reviewCandidates: [], mine: mine, team: [], recentlyClosed: [], boardIssues: board, boardProject: boardProject,
+        org: OrgContext(org: "o", viewer: viewer, members: [], myTeams: myTeams, repos: []),
+        reviewCandidates: review, mine: mine, team: team, recentlyClosed: [], boardIssues: board,
+        boardProject: boardProject,
         assignedIssues: assigned, createdIssues: created, boardStatusOptions: options, boardOwner: boardOwner,
         boardIds: boardIds)
 }

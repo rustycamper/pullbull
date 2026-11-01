@@ -58,7 +58,7 @@ extension AppModel {
         statusPicker = nil
     }
 
-    // MARK: Assignee and label pickers
+    // MARK: Reviewer, assignee and label pickers
 
     /// The key of the open picker, Status or set; the popover's focus and key routing read it.
     var editPickerKey: PRKey? { statusPicker?.key ?? setPicker?.key }
@@ -67,6 +67,11 @@ extension AppModel {
     /// with a running account.
     func isSetEditOffered(for key: PRKey) -> Bool {
         (issue(for: key) != nil || pullRequest(for: key) != nil) && runningAccount != nil
+    }
+
+    /// Whether the pull request `key` can have its reviewers edited: one PullBull holds, with a running account.
+    func isReviewersOffered(for key: PRKey) -> Bool {
+        pullRequest(for: key) != nil && runningAccount != nil
     }
 
     /// The issue or PR ⌥⌘A and ⌥⌘L act on: the selected result while searching, else the highlighted row.
@@ -83,35 +88,50 @@ extension AppModel {
             onPullRequest: pullRequest(for: key) != nil)
     }
 
-    /// Opens the picker for `field` (`.labels` or `.assignees`) on `key`, applying an open one first. The
-    /// cached candidates show at once; a fetch follows.
+    /// Opens the picker for `field` (`.labels`, `.assignees` or `.reviewers`) on `key`, applying an open one
+    /// first. The cached candidates show at once; a fetch follows.
     func openSetPicker(_ field: EditField, for key: PRKey) {
         closeSetPicker(apply: true)
         guard let account = runningAccount else { return }
-        let current: [String]
-        if let issue = issue(for: key) {
-            current = field == .labels ? issue.labels : issue.assignees.map(\.login)
+        let viewer = shownSnapshot?.org.viewer ?? settings.account ?? ""
+        let permission = setEditPermission(field, for: key)
+        var picker: SetPicker
+        if field == .reviewers {
+            guard let pr = pullRequest(for: key) else { return }
+            picker = SetPicker(reviewersOf: key, requested: pr.reviewRequests, viewer: viewer, permission: permission)
+        } else if let issue = issue(for: key) {
+            let current = field == .labels ? issue.labels : issue.assignees.map(\.login)
+            picker = SetPicker(field: field, key: key, current: current, viewer: viewer, permission: permission)
         } else if let pr = pullRequest(for: key) {
-            current = field == .labels ? pr.labels : pr.assignees.map(\.login)
+            let current = field == .labels ? pr.labels : pr.assignees.map(\.login)
+            picker = SetPicker(field: field, key: key, current: current, viewer: viewer, permission: permission)
         } else {
             return
         }
-        let permission = setEditPermission(field, for: key)
         statusPicker = nil
-        var picker = SetPicker(
-            field: field, key: key, current: current, viewer: shownSnapshot?.org.viewer ?? settings.account ?? "",
-            permission: permission)
         let cacheKey = Self.setCandidatesKey(field, key)
         guard Self.allows(permission) else {
             setPicker = picker
             return
         }
-        if let cached = setCandidates[cacheKey] { picker.load(cached) }
+        let cached = field == .reviewers ? cachedReviewerCandidates(for: key) : setCandidates[cacheKey]
+        if let cached { picker.load(cached) }
         setPicker = picker
         let client = api(for: account)
         setPickerTask?.cancel()
         setPickerTask = Task { [weak self] in
             do {
+                if field == .reviewers {
+                    let answer = try await client.reviewerCandidates(for: key, query: nil)
+                    guard let self, !Task.isCancelled, self.isSetPickerCurrent(key, field, account) else { return }
+                    self.setCandidates[cacheKey] = SetCandidates(
+                        all: answer.people, current: [], complete: answer.picker.complete)
+                    if let teams = answer.teams {
+                        self.setCandidates[Self.teamCandidatesKey(key)] = SetCandidates(all: teams, current: [], complete: true)
+                    }
+                    self.setPicker?.load(answer.picker)
+                    return
+                }
                 let answer = field == .labels
                     ? try await client.labelCandidates(for: key)
                     : try await client.assigneeCandidates(for: key, query: nil)
@@ -125,12 +145,12 @@ extension AppModel {
         }
     }
 
-    /// Filters the rows; for people past the first 100, GitHub is asked after a 0.3 s pause.
+    /// Filters the rows; for people (and teams) past the first 100, GitHub is asked after a 0.3 s pause.
     func filterSetPicker(_ text: String) {
         guard var picker = setPicker else { return }
         picker.setFilter(text)
         setPicker = picker
-        guard picker.field == .assignees, !picker.isComplete, Self.allows(picker.permission),
+        guard picker.field != .labels, !picker.isComplete, Self.allows(picker.permission),
               let account = runningAccount else { return }
         setFilterTask?.cancel()
         let query = text.trimmingCharacters(in: .whitespaces)
@@ -139,9 +159,11 @@ extension AppModel {
         let client = api(for: account)
         setFilterTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled,
-                  let answer = try? await client.assigneeCandidates(for: key, query: query),
-                  let self, !Task.isCancelled, self.isSetPickerCurrent(key, field, account) else { return }
+            guard !Task.isCancelled else { return }
+            let answer = field == .reviewers
+                ? try? await client.reviewerCandidates(for: key, query: query).picker
+                : try? await client.assigneeCandidates(for: key, query: query)
+            guard let answer, let self, !Task.isCancelled, self.isSetPickerCurrent(key, field, account) else { return }
             self.setPicker?.load(answer, fromQuery: true)
         }
     }
@@ -170,8 +192,26 @@ extension AppModel {
         setPicker?.key == key && setPicker?.field == field && runningAccount == account
     }
 
+    /// Reviewers share the assignees' people: both are the repo's assignable people.
     private static func setCandidatesKey(_ field: EditField, _ key: PRKey) -> String {
         "\(field == .labels ? "labels" : "assignees")|\(key.repo)"
+    }
+
+    /// The teams of `key`'s owner.
+    private static func teamCandidatesKey(_ key: PRKey) -> String {
+        "teams|\(key.repo.split(separator: "/").first.map(String.init) ?? "")"
+    }
+
+    /// The cached people (but the PR's author) and teams for the reviewers picker on `key`; nil when
+    /// neither is cached. The PR's own requests, reviews and suggestions come with the fetch.
+    private func cachedReviewerCandidates(for key: PRKey) -> SetCandidates? {
+        let people = setCandidates[Self.setCandidatesKey(.reviewers, key)]
+        let teams = setCandidates[Self.teamCandidatesKey(key)]
+        guard people != nil || teams != nil else { return nil }
+        let author = pullRequest(for: key)?.author.lowercased()
+        return SetCandidates(
+            all: (people?.all ?? []).filter { $0.key != author } + (teams?.all ?? []),
+            current: [], complete: people?.complete ?? false)
     }
 
     // MARK: Edits
@@ -214,7 +254,8 @@ extension AppModel {
         let itemId = addedItemId ?? card?.boardItemNodeId
         let board = snapshot?.boardIds
         let before = shownListKeys()
-        let id = edits.begin(change, on: key, at: Date())
+        let copy: PullRequest? = if case .reviewers = change { fetchedPullRequest(for: key) } else { nil }
+        let id = edits.begin(change, on: key, at: Date(), carrying: copy)
         refreshShown()
         followEditedRow(key, from: before)
         let client = api(for: account)
@@ -225,8 +266,11 @@ extension AppModel {
                 case .status:
                     added = try await StatusEditor(api: client).apply(
                         change, on: key, itemId: itemId, contentId: contentId, board: board)
-                case .labels, .assignees:
+                case .labels, .assignees, .reviewers:
                     let result = try await SetEditor(api: client).apply(change, on: key, contentId: contentId)
+                    if result.addApplied, case .reviewers(let added, _) = change, self?.asksViewer(added) == true {
+                        NotificationService.shared.ownReviewRequest(on: key)
+                    }
                     if !(result.addApplied && result.removeApplied) {
                         guard let self else { return }
                         let before = self.shownListKeys()
@@ -245,6 +289,17 @@ extension AppModel {
                 self.edits.failed(id, change: change, on: key, url: url, error: error)
                 self.refreshShown()
                 self.followEditedRow(key, from: before)
+            }
+        }
+    }
+
+    /// Whether `reviewers` include the viewer, or one of the viewer's teams.
+    private func asksViewer(_ reviewers: [Reviewer]) -> Bool {
+        guard let org = shownSnapshot?.org else { return false }
+        return reviewers.contains { reviewer in
+            switch reviewer {
+            case .user(let login): login.caseInsensitiveCompare(org.viewer) == .orderedSame
+            case .team(let slug, _): org.myTeams.contains(slug.lowercased())
             }
         }
     }

@@ -101,6 +101,22 @@ private func record(at date: Date, _ change: EditChange = .labels(added: [bug], 
             == "Added alice, bob to #412, but couldn't remove carol: nope")
     }
 
+    @Test func reviewersFailureMessage() {
+        #expect(EditMessage.failure(.reviewers(added: [.user("alice")], removed: []), on: editKey(88),
+            error: APIError.writeRefused("nope")) == "Couldn't change reviewers on #88: nope")
+    }
+
+    @Test func reviewersPartialMessages() {
+        let change = EditChange.reviewers(
+            added: [.user("alice"), .team(slug: "backend", name: "Back End")], removed: [.user("bob")])
+        #expect(EditMessage.partial(change, on: editKey(88),
+            result: SetChangeResult(addApplied: true, removeApplied: false, refusal: "nope"))
+            == "Asked alice, Back End to review #88, but couldn't remove bob: nope")
+        #expect(EditMessage.partial(.reviewers(added: [.user("alice")], removed: [.user("bob")]), on: editKey(88),
+            result: SetChangeResult(addApplied: false, removeApplied: true, refusal: "nope"))
+            == "Removed bob from #88, but couldn't ask alice: nope")
+    }
+
     @Test func neitherPartAppliedReadsAsAFailure() {
         let result = SetChangeResult(addApplied: false, removeApplied: false, refusal: "nope")
         #expect(EditMessage.partial(.labels(added: [bug], removed: [triage]), on: k412, result: result)

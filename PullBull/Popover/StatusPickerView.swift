@@ -2,7 +2,7 @@ import AppKit
 import PullBullKit
 import SwiftUI
 
-/// Where the open edit picker (Status, assignees or labels) opens: the edited issue's row, or the detail's
+/// Where the open edit picker (Status, reviewers, assignees or labels) opens: the edited issue's or PR's row, or the detail's
 /// row for the field.
 struct EditPickerAnchorKey: PreferenceKey {
     static let defaultValue: Anchor<CGRect>? = nil

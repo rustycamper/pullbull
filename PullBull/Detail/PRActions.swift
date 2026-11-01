@@ -242,7 +242,8 @@ struct StatusMenu: View {
     }
 }
 
-/// "Assignees…" and "Labels…" on an issue's or pull request's context menu: each opens its picker on the row.
+/// "Reviewers…" (pull requests), "Assignees…" and "Labels…" on an issue's or pull request's context menu:
+/// each opens its picker on the row.
 struct SetEditMenu: View {
     let model: AppModel
     let key: PRKey
@@ -253,6 +254,9 @@ struct SetEditMenu: View {
     }
 
     var body: some View {
+        if model.isReviewersOffered(for: key) {
+            Button("Reviewers…", systemImage: "person.2") { model.openSetPicker(.reviewers, for: key) }
+        }
         Button("Assignees…", systemImage: "person.badge.plus") { model.openSetPicker(.assignees, for: key) }
         Button("Labels…", systemImage: "tag") { model.openSetPicker(.labels, for: key) }
     }

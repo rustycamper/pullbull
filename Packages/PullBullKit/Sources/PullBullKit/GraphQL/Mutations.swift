@@ -96,6 +96,36 @@ enum Mutations {
     }
     """
 
+    /// The first hundred people assignable in the repo (matching `$q` when given), the owner's kind, and
+    /// the pull request's author, suggested reviewers, review requests and latest reviews.
+    static let reviewerCandidates = """
+    query($owner:String!,$name:String!,$n:Int!,$q:String){
+      repository(owner:$owner, name:$name){
+        owner{__typename}
+        item: issueOrPullRequest(number:$n){
+          ... on PullRequest{
+            author{login}
+            suggestedReviewers{reviewer{id login avatarUrl}}
+            reviewRequests(first:100){nodes{requestedReviewer{
+              __typename ... on User{id login avatarUrl} ... on Team{slug name}
+            }}}
+            latestReviews(first:100){nodes{author{__typename login avatarUrl ... on User{id}} state}}
+          }
+        }
+        assignableUsers(first:100, query:$q){nodes{id login avatarUrl} pageInfo{hasNextPage}}
+      }
+    }
+    """
+
+    /// A page of an organisation's teams (matching `$q` when given).
+    static let teamCandidates = """
+    query($owner:String!,$after:String,$q:String){
+      organization(login:$owner){
+        teams(first:100, after:$after, query:$q){nodes{slug name} pageInfo{hasNextPage endCursor}}
+      }
+    }
+    """
+
     /// The node ID of an issue or pull request, by owner, name and number.
     static let nodeId = """
     query($owner:String!,$name:String!,$n:Int!){

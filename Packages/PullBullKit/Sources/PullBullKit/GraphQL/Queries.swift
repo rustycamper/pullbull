@@ -13,7 +13,7 @@ enum Queries {
       comments(last:1){totalCount nodes{author{__typename login}}}
       commits(last:1){nodes{commit{oid committedDate statusCheckRollup{state contexts{\(rollupCounts)}}}}}
       latestReviews(first:20){nodes{author{login} state submittedAt commit{oid}}}
-      reviewRequests(first:20){nodes{requestedReviewer{__typename ... on User{login} ... on Team{slug}}}}
+      reviewRequests(first:20){nodes{requestedReviewer{__typename ... on User{login} ... on Team{slug name}}}}
       labels(first:20){nodes{name color}}
       assignees(first:10){nodes{login avatarUrl}}
       mergedBy{login}
@@ -242,6 +242,7 @@ enum Queries {
             ... on CheckRun{name conclusion status detailsUrl}
             ... on StatusContext{context state targetUrl}
           }}}}}}
+          reviewRequests(first:20){nodes{requestedReviewer{__typename ... on User{login} ... on Team{slug name}}}}
           latestReviews(first:20){nodes{author{login} state submittedAt}}
           comments(first:50){nodes{author{login} body createdAt}}
           files(first:100){totalCount nodes{path additions deletions}}

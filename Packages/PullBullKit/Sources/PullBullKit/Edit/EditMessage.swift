@@ -6,7 +6,7 @@ public enum EditMessage {
         failure(change, on: key, reason: reason(for: error))
     }
 
-    /// Which part of a label or assignee change GitHub didn't apply; nil when it applied both.
+    /// Which part of a label, assignee or reviewer change GitHub didn't apply; nil when it applied both.
     public static func partial(_ change: EditChange, on key: PRKey, result: SetChangeResult) -> String? {
         if result.addApplied && result.removeApplied { return nil }
         let reason = result.refusal ?? "GitHub didn't apply it"
@@ -17,6 +17,11 @@ public enum EditMessage {
             (added, removed) = (a.map(\.name).joined(separator: ", "), r.map(\.name).joined(separator: ", "))
         case .assignees(let a, let r):
             (added, removed) = (a.map(\.login).joined(separator: ", "), r.map(\.login).joined(separator: ", "))
+        case .reviewers(let a, let r):
+            let (asked, removedNames) = (a.map(\.displayName).joined(separator: ", "), r.map(\.displayName).joined(separator: ", "))
+            return result.addApplied
+                ? "Asked \(asked) to review #\(key.number), but couldn't remove \(removedNames): \(reason)"
+                : "Removed \(removedNames) from #\(key.number), but couldn't ask \(asked): \(reason)"
         case .status:
             return failure(change, on: key, reason: reason)
         }
@@ -35,6 +40,7 @@ public enum EditMessage {
         case .status: "set Status on \(number)"
         case .labels: "change labels on \(number)"
         case .assignees: "change assignees on \(number)"
+        case .reviewers: "change reviewers on \(number)"
         }
         return "Couldn't \(what): \(reason)"
     }

@@ -2,7 +2,7 @@ import Foundation
 
 /// What an edit changes on GitHub.
 public enum EditField: Sendable {
-    case status, labels, assignees
+    case status, labels, assignees, reviewers
 }
 
 /// Whether the current account may make an edit, and if not, what it needs.
@@ -33,7 +33,8 @@ public enum EditPermission: Equatable, Sendable {
             // GitHub gives apps no permission for user-owned boards.
             if field == .status, boardOwner?.isUser == true { return .unavailable }
             let canWrite = field == .status ? installation.canWriteProjects
-                : onPullRequest ? installation.canWritePullRequests : installation.canWriteIssues
+                : onPullRequest || field == .reviewers ? installation.canWritePullRequests
+                : installation.canWriteIssues
             if canWrite { return .ready }
             return .needsAppApproval(
                 owner: installation.org, isOrganization: installation.isOrganization,

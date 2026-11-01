@@ -51,6 +51,8 @@ public enum EditChange: Hashable, Sendable {
     case status(from: BoardStatusValue?, to: BoardStatusValue?, placement: BoardPlacement)
     case labels(added: [LabelRef], removed: [LabelRef])
     case assignees(added: [PersonRef], removed: [PersonRef])
+    /// A pull request's review requests: people by login, teams by slug.
+    case reviewers(added: [Reviewer], removed: [Reviewer])
 
     /// The edit that puts things back.
     public var inverse: EditChange {
@@ -58,6 +60,7 @@ public enum EditChange: Hashable, Sendable {
         case .status(let from, let to, let placement): .status(from: to, to: from, placement: placement.inverse)
         case .labels(let added, let removed): .labels(added: removed, removed: added)
         case .assignees(let added, let removed): .assignees(added: removed, removed: added)
+        case .reviewers(let added, let removed): .reviewers(added: removed, removed: added)
         }
     }
 
@@ -69,15 +72,18 @@ public enum EditChange: Hashable, Sendable {
             .labels(added: result.addApplied ? added : [], removed: result.removeApplied ? removed : [])
         case .assignees(let added, let removed):
             .assignees(added: result.addApplied ? added : [], removed: result.removeApplied ? removed : [])
+        case .reviewers(let added, let removed):
+            .reviewers(added: result.addApplied ? added : [], removed: result.removeApplied ? removed : [])
         }
     }
 
-    /// Nothing to send: no labels or assignees toggled, or the same Status on an issue already on the board.
+    /// Nothing to send: no labels, assignees or reviewers toggled, or the same Status on an issue already on the board.
     public var isEmpty: Bool {
         switch self {
         case .status(let from, let to, let placement): placement == .already && from?.optionId == to?.optionId
         case .labels(let added, let removed): added.isEmpty && removed.isEmpty
         case .assignees(let added, let removed): added.isEmpty && removed.isEmpty
+        case .reviewers(let added, let removed): added.isEmpty && removed.isEmpty
         }
     }
 }

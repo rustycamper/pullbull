@@ -74,6 +74,11 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         gate.reset()
     }
 
+    /// The viewer just asked themselves, or one of their teams, to review `key`: that request posts nothing.
+    func ownReviewRequest(on key: PRKey) {
+        gate.ownReviewRequest(on: key, at: Date())
+    }
+
     /// Feeds one coordinator update; posts what changed since the previous live fetch.
     func process(
         _ snapshot: Snapshot?, _ status: RefreshStatus, toggles: NotificationToggles, filters: ReviewFilters

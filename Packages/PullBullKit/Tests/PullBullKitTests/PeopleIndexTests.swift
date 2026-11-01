@@ -56,7 +56,7 @@ private func logins(_ index: PeopleIndex, _ prefix: String, limit: Int = 6) -> [
         let index = PeopleIndex.build(snapshot(
             members: ["mem"],
             review: [pr(1, author: "pra", avatar: prAvatar, reviews: [Review(author: "rev", state: .approved, submittedAt: t0)],
-                        requests: [.user("req"), .team("core")])],
+                        requests: [.user("req"), .team(slug: "core", name: "core")])],
             board: [issue(2, author: "iss", assignees: [Assignee(login: "pra", avatarURL: assigneeAvatar),
                                                          Assignee(login: "asg", avatarURL: assigneeAvatar)])]))
         let all = Set(logins(index, "", limit: 50))

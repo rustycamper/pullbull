@@ -233,4 +233,116 @@ import Testing
         #expect(!picker.isLoading)
         #expect(names(picker) == ["bug"])
     }
+
+    // MARK: Reviewers
+
+    func team(_ slug: String, _ name: String) -> SetCandidate {
+        SetCandidate(id: "team:\(slug)", name: name, team: slug)
+    }
+
+    func reviewer(_ login: String, verdict: ReviewState? = nil, suggested: Bool = false) -> SetCandidate {
+        SetCandidate(id: "U_\(login)", name: login, verdict: verdict, isSuggested: suggested)
+    }
+
+    func reviewersPicker(requested: [Reviewer] = [.user("carol"), .team(slug: "backend", name: "Back End")])
+        -> SetPicker {
+        SetPicker(reviewersOf: key, requested: requested, viewer: "me", permission: .ready)
+    }
+
+    /// Carol and Back End requested; bob reviewed; sue suggested; amy, zed and the viewer assignable; team Ops.
+    var reviewerAnswer: SetCandidates {
+        SetCandidates(
+            all: [reviewer("bob", verdict: .approved), reviewer("sue", suggested: true),
+                  reviewer("zed"), reviewer("me"), reviewer("amy"), team("ops", "Ops")],
+            current: [reviewer("carol", verdict: .commented), team("backend", "Back End")],
+            complete: true)
+    }
+
+    @Test func reviewerRowOrder() {
+        var picker = reviewersPicker()
+        picker.load(reviewerAnswer)
+        #expect(names(picker) == ["carol", "Back End", "bob", "me", "sue", "amy", "zed", "Ops"])
+        #expect(ticked(picker) == ["carol", "Back End"])
+        #expect(picker.rows.first { $0.candidate.name == "carol" }?.candidate.verdict == .commented)
+    }
+
+    @Test func networkAnswerReordersUntouchedRows() {
+        var picker = reviewersPicker()
+        picker.load(SetCandidates(all: ["amy", "bob", "me", "sue", "zed"].map(person), current: [], complete: true))
+        picker.load(reviewerAnswer)
+        #expect(names(picker) == ["carol", "Back End", "bob", "me", "sue", "amy", "zed", "Ops"])
+    }
+
+    @Test func noReorderAfterATick() {
+        var picker = reviewersPicker()
+        picker.load(SetCandidates(all: ["amy", "bob", "me", "sue", "zed"].map(person), current: [], complete: true))
+        let before = names(picker)
+        picker.move(by: 2)
+        picker.toggleSelected()
+        picker.load(reviewerAnswer)
+        #expect(Array(names(picker).prefix(before.count)) == before)
+        #expect(names(picker).last == "Ops")
+    }
+
+    @Test func reviewStaysOnlyOnAnUntickedRequest() {
+        var picker = reviewersPicker()
+        picker.load(reviewerAnswer)
+        func stays(_ name: String) -> Bool? { picker.rows.first { $0.candidate.name == name }?.reviewStays }
+        #expect(stays("carol") == false)
+        #expect(stays("bob") == false)
+        picker.toggleSelected()
+        #expect(stays("carol") == true)
+        picker.toggleSelected()
+        #expect(stays("carol") == false)
+    }
+
+    @Test func tickingPastReviewerAdds() {
+        var picker = reviewersPicker()
+        picker.load(reviewerAnswer)
+        picker.move(by: 2)
+        picker.toggleSelected()
+        #expect(picker.change == .reviewers(added: [.user("bob")], removed: []))
+    }
+
+    @Test func untickRemovesAndToggleBackSendsNothing() {
+        var picker = reviewersPicker()
+        picker.load(reviewerAnswer)
+        picker.move(by: 1)
+        picker.toggleSelected()
+        #expect(picker.change == .reviewers(added: [], removed: [.team(slug: "backend", name: "Back End")]))
+        picker.toggleSelected()
+        #expect(picker.change == nil)
+    }
+
+    @Test func missingRequestedTeamShowsByName() {
+        var picker = reviewersPicker(requested: [.team(slug: "backend", name: "Back End")])
+        picker.load(SetCandidates(all: [person("amy")], current: [], complete: true))
+        let row = picker.rows[0]
+        #expect(row.candidate.name == "Back End")
+        #expect(row.candidate.team == "backend")
+        #expect(row.isChecked && row.isEnabled)
+        picker.toggleSelected()
+        #expect(picker.change == .reviewers(added: [], removed: [.team(slug: "backend", name: "Back End")]))
+    }
+
+    /// Provisional until the check against GitHub: no cap is documented.
+    @Test func noReviewerCap() {
+        let many = (1...12).map { Reviewer.user("p\($0)") }
+        var picker = reviewersPicker(requested: many)
+        picker.load(SetCandidates(all: (1...12).map { person("p\($0)") } + [person("amy")], current: [], complete: true))
+        #expect(picker.rows.allSatisfy { $0.isEnabled })
+    }
+
+    @Test func teamAndPersonWithSameNameBothShow() {
+        var picker = reviewersPicker(requested: [])
+        picker.load(SetCandidates(all: [person("ops"), team("ops", "ops")], current: [], complete: true))
+        #expect(names(picker) == ["ops", "ops"])
+    }
+
+    @Test func assigneeAndLabelMatchingIsUnchanged() {
+        var picker = peoplePicker(current: ["Ann"])
+        picker.load(SetCandidates(all: [person("ann")], current: [], complete: true))
+        #expect(ticked(picker) == ["ann"])
+        #expect(picker.rows[0].isEnabled)
+    }
 }

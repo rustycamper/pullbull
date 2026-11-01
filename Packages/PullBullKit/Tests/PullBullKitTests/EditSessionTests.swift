@@ -171,4 +171,18 @@ private func status(_ key: PRKey, _ session: EditSession, in snapshot: Snapshot 
         #expect(EditChange.assignees(added: [alice], removed: []).keeping(removedOnly) == .assignees(added: [], removed: []))
         #expect(move.keeping(addedOnly) == move)
     }
+
+    @Test func reviewersInverseSwaps() {
+        let change = EditChange.reviewers(added: [.user("alice")], removed: [.team(slug: "core", name: "Core")])
+        #expect(change.inverse == .reviewers(added: [.team(slug: "core", name: "Core")], removed: [.user("alice")]))
+        #expect(!change.isEmpty)
+        #expect(EditChange.reviewers(added: [], removed: []).isEmpty)
+    }
+
+    @Test func reviewersKeepingDropsUnappliedHalf() {
+        let change = EditChange.reviewers(added: [.user("alice")], removed: [.user("bob")])
+        let removedOnly = SetChangeResult(addApplied: false, removeApplied: true, refusal: "nope")
+        #expect(change.keeping(removedOnly) == .reviewers(added: [], removed: [.user("bob")]))
+        #expect(change.keeping(addedOnly) == .reviewers(added: [.user("alice")], removed: []))
+    }
 }

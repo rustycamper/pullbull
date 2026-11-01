@@ -16,13 +16,14 @@ private let modifierOrder = ["⌃", "⌥", "⇧", "⌘"]
         #expect(editing.note == "Issue and pull request rows, search results and both details")
         #expect(editing.shortcuts == [
             Shortcut("Set Status", [["⌥", "⌘", "S"]], note: "When a board is shown"),
+            Shortcut("Reviewers", [["⌥", "⌘", "R"]], note: "Pull requests"),
             Shortcut("Assignees", [["⌥", "⌘", "A"]]),
             Shortcut("Labels", [["⌥", "⌘", "L"]]),
             Shortcut("Undo the last edit", [["⌘", "Z"]], note: "For 10 seconds after it"),
             Shortcut("Choose", [["↑"], ["↓"]], note: "In a picker; type to filter"),
-            Shortcut("Apply, or tick", [["↩"]], note: "Status: applies. Assignees and labels: ticks or unticks"),
-            Shortcut("Apply and close", [["⌘", "↩"]], note: "Assignees and labels"),
-            Shortcut("Close", [["Esc"]], note: "Status: without change. Assignees and labels: applies"),
+            Shortcut("Apply, or tick", [["↩"]], note: "Status: applies. Reviewers, assignees and labels: ticks or unticks"),
+            Shortcut("Apply and close", [["⌘", "↩"]], note: "Reviewers, assignees and labels"),
+            Shortcut("Close", [["Esc"]], note: "Status: without change. Reviewers, assignees and labels: applies"),
         ])
     }
 

@@ -192,9 +192,9 @@ struct PRDetailView: View {
     @ViewBuilder private func statusSections(_ detail: PRDetail) -> some View {
         checksSection(detail)
         if let pr {
-            reviewersSection(reviews: detail.reviews, pr: pr)
-        } else if !detail.reviews.isEmpty {
-            reviewersSection(reviews: detail.reviews, pr: nil)
+            reviewersSection(reviews: detail.reviews, pr: pr, detail: detail)
+        } else if !detail.reviews.isEmpty || detail.requests?.isEmpty == false {
+            reviewersSection(reviews: detail.reviews, pr: nil, detail: detail)
         }
     }
 
@@ -281,21 +281,45 @@ struct PRDetailView: View {
         return text.isEmpty ? nil : text.joined(separator: " · ")
     }
 
-    private func reviewersSection(reviews: [Review], pr: PullRequest?) -> some View {
-        let entries = ReviewerEntry.entries(reviews: reviews, requests: pr?.reviewRequests ?? [], author: pr?.author)
+    /// Clickable where the reviewers can be changed, with the picker anchored on the card.
+    @ViewBuilder
+    private func reviewersSection(reviews: [Review], pr: PullRequest?, detail: PRDetail? = nil) -> some View {
+        let entries = ReviewerEntry.entries(
+            reviews: reviews, requests: reviewRequests(pr: pr, detail: detail), author: pr?.author)
         let me = model.snapshot?.org.viewer ?? model.settings.account
-        return DetailSection(title: "Reviewers") {
-            DetailCard {
-                if entries.isEmpty {
-                    EmptyLine(text: "No reviewers")
-                } else {
-                    ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                        if index > 0 { CardDivider() }
-                        ReviewerLine(entry: entry, isMe: !entry.isTeam && entry.name.caseInsensitiveCompare(me ?? "") == .orderedSame)
-                    }
+        let card = DetailCard {
+            if entries.isEmpty {
+                EmptyLine(text: "No reviewers")
+            } else {
+                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                    if index > 0 { CardDivider() }
+                    ReviewerLine(entry: entry, isMe: !entry.isTeam && entry.name.caseInsensitiveCompare(me ?? "") == .orderedSame)
                 }
             }
         }
+        DetailSection(title: "Reviewers") {
+            if model.isReviewersOffered(for: key) {
+                Button { model.openSetPicker(.reviewers, for: key) } label: {
+                    card.contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Change reviewers (⌥⌘R)")
+                .accessibilityHint("Opens the reviewer picker")
+                .editPickerAnchor(for: key, field: .reviewers, model: model)
+            } else {
+                card
+            }
+        }
+    }
+
+    /// The detail's own requests while it is current for the PR, else the list copy's; edits laid over
+    /// either way.
+    private func reviewRequests(pr: PullRequest?, detail: PRDetail?) -> [Reviewer] {
+        guard let pr else { return detail?.requests ?? [] }
+        guard let requests = detail?.requests, let fetched = model.fetchedPullRequest(for: key),
+              detail?.isCurrent(for: fetched) == true
+        else { return pr.reviewRequests }
+        return model.edits.overrides.apply(toRequests: requests, on: key)
     }
 
     private func conversationSection(_ comments: [Comment], now: Date) -> some View {
@@ -424,7 +448,7 @@ struct ReviewerEntry: Identifiable, Equatable {
             return nil
         }
         let requestedTeams = requests.compactMap { reviewer -> String? in
-            if case .team(let slug) = reviewer { return slug }
+            if case .team(_, let name) = reviewer { return name }
             return nil
         }
         func same(_ a: String, _ b: String) -> Bool { a.caseInsensitiveCompare(b) == .orderedSame }
@@ -438,8 +462,8 @@ struct ReviewerEntry: Identifiable, Equatable {
         for login in requestedUsers where !result.contains(where: { same($0.name, login) }) {
             result.append(ReviewerEntry(name: login, isTeam: false, status: .requested))
         }
-        for slug in requestedTeams {
-            result.append(ReviewerEntry(name: slug, isTeam: true, status: .requested))
+        for name in requestedTeams {
+            result.append(ReviewerEntry(name: name, isTeam: true, status: .requested))
         }
         return result
     }
@@ -452,12 +476,7 @@ private struct ReviewerLine: View {
     var body: some View {
         HStack(spacing: 8) {
             if entry.isTeam {
-                Image(systemName: "person.2.fill")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 20, height: 20)
-                    .background(Circle().fill(Palette.strongFill))
-                    .accessibilityHidden(true)
+                TeamGlyph(size: 20)
             } else {
                 AvatarView(login: entry.name, url: URL(string: "https://github.com/\(entry.name).png"), size: 20)
             }
@@ -468,18 +487,26 @@ private struct ReviewerLine: View {
             }
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
-            let look = Self.look(entry.status)
-            Pill(symbol: look.symbol, text: look.text, foreground: look.color, fill: look.fill, symbolColor: look.symbolColor)
+            VerdictPill(status: entry.status)
         }
         .font(.system(size: 12))
         .padding(.horizontal, 10)
         .frame(minHeight: 34)
         .accessibilityElement(children: .combine)
     }
+}
 
-    /// Gray for every state except changes requested (orange) and the approved check (green glyph,
-    /// gray text); each state has its own glyph.
-    static func look(_ status: ReviewerEntry.Status)
+/// A reviewer's state: requested, or their latest verdict. Gray for every state except changes
+/// requested (orange) and the approved check (green glyph, gray text); each state has its own glyph.
+struct VerdictPill: View {
+    let status: ReviewerEntry.Status
+
+    var body: some View {
+        let look = Self.look(status)
+        Pill(symbol: look.symbol, text: look.text, foreground: look.color, fill: look.fill, symbolColor: look.symbolColor)
+    }
+
+    private static func look(_ status: ReviewerEntry.Status)
         -> (symbol: String, text: String, color: Color, fill: Color, symbolColor: Color?)
     {
         switch status {
@@ -492,6 +519,20 @@ private struct ReviewerLine: View {
         case .reviewed(.dismissed): ("minus.circle", "Dismissed", .secondary, Palette.fill, nil)
         case .reviewed(.pending): ("ellipsis", "Pending", .secondary, Palette.fill, nil)
         }
+    }
+}
+
+/// A team where a person would show an avatar.
+struct TeamGlyph: View {
+    let size: CGFloat
+
+    var body: some View {
+        Image(systemName: "person.2.fill")
+            .font(.system(size: size * 0.45))
+            .foregroundStyle(.secondary)
+            .frame(width: size, height: size)
+            .background(Circle().fill(Palette.strongFill))
+            .accessibilityHidden(true)
     }
 }
 

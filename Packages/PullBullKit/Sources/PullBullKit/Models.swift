@@ -58,9 +58,55 @@ public struct Review: Hashable, Codable, Sendable {
     }
 }
 
+/// Someone asked to review: a person by login, or a team by slug with its display name.
 public enum Reviewer: Hashable, Codable, Sendable {
     case user(String)
-    case team(String)
+    case team(slug: String, name: String)
+
+    /// Who this is, whatever the case or the team's name: "alice", "team:backend".
+    public var key: String {
+        switch self {
+        case .user(let login): login.lowercased()
+        case .team(let slug, _): "team:" + slug.lowercased()
+        }
+    }
+
+    /// The login, or the team's name.
+    public var displayName: String {
+        switch self {
+        case .user(let login): login
+        case .team(_, let name): name
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey { case user, team }
+    private enum FieldKeys: String, CodingKey { case _0, slug, name }
+
+    /// Caches from before team names hold `{"team":{"_0":slug}}`; the slug then serves as the name.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if container.contains(.user) {
+            let fields = try container.nestedContainer(keyedBy: FieldKeys.self, forKey: .user)
+            self = .user(try fields.decode(String.self, forKey: ._0))
+            return
+        }
+        let fields = try container.nestedContainer(keyedBy: FieldKeys.self, forKey: .team)
+        let slug = try fields.decodeIfPresent(String.self, forKey: .slug) ?? fields.decode(String.self, forKey: ._0)
+        self = .team(slug: slug, name: try fields.decodeIfPresent(String.self, forKey: .name) ?? slug)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .user(let login):
+            var fields = container.nestedContainer(keyedBy: FieldKeys.self, forKey: .user)
+            try fields.encode(login, forKey: ._0)
+        case .team(let slug, let name):
+            var fields = container.nestedContainer(keyedBy: FieldKeys.self, forKey: .team)
+            try fields.encode(slug, forKey: .slug)
+            try fields.encode(name, forKey: .name)
+        }
+    }
 }
 
 public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
@@ -84,7 +130,8 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
     /// Whether the newest comment's author is a bot; nil with no comment and in snapshots cached before it was stored.
     public let lastCommentByBot: Bool?
     public let latestReviews: [Review]
-    public let reviewRequests: [Reviewer]
+    /// Set by edit overrides too.
+    public internal(set) var reviewRequests: [Reviewer]
     /// The head commit's oid; nil in snapshots cached before it was stored.
     public let headCommitOid: String?
     /// Label names; empty in snapshots cached before they were stored. Set by edit overrides too.
