@@ -33,7 +33,7 @@ Keyboard-first · Native SwiftUI · Edits only what you pick
 | <img src="docs/media/icons/arrow-triangle-2-circlepath.png" width="22" height="22" alt=""> | Re-requests and new commits after your review go unnoticed | Both land back in **Review**, marked with why |
 | <img src="docs/media/icons/rectangle-split-3x1.png" width="22" height="22" alt=""> | The Projects board is slow for a quick look | **Mine** and **Board** issue tabs, grouped by board Status |
 | <img src="docs/media/icons/link.png" width="22" height="22" alt=""> | Finding the PR that closes an issue takes clicks | Issue detail lists its linked PRs. Open one, <kbd>Esc</kbd> returns |
-|  | Answering a question in a thread means opening the browser | **Comment** from the detail, <kbd>⌥</kbd><kbd>⌘</kbd><kbd>M</kbd>, type `@login` to tag people, <kbd>⌘</kbd><kbd>↩</kbd> to send |
+| <img src="docs/media/icons/bubble-left.png" width="22" height="22" alt=""> | Answering a question in a thread means opening the browser | **Comment** from the detail, <kbd>⌥</kbd><kbd>⌘</kbd><kbd>M</kbd>, type `@login` to tag people, <kbd>⌘</kbd><kbd>↩</kbd> to send |
 | <img src="docs/media/icons/bolt.png" width="22" height="22" alt=""> | "Where is #123?" means opening a browser | <kbd>⌃</kbd><kbd>⌥</kbd><kbd>P</kbd>, type `#123` or paste the link, <kbd>Return</kbd> |
 | <img src="docs/media/icons/person-2.png" width="22" height="22" alt=""> | Work and personal GitHub accounts mean signing out and back in | Switch accounts on the fly from the footer (<kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>). Each comes back with its own org and board |
 | <img src="docs/media/icons/slider-horizontal-3.png" width="22" height="22" alt=""> | Notifications are all or nothing | Toggle each event separately |

@@ -82,7 +82,7 @@ A PR waiting on review shows who it waits on and for how long (🕒 @dana 3d, "+
 > Ready to merge = approved, no changes requested, checks green or none, no conflicts, not a draft. It doesn't see branch protection (required review count).
 
 - **Pending CI:** while checks run on your PRs, PullBull checks up to 5 of them (newest commits first) every 30 s, for up to 20 minutes each, so *CI failed* and *Ready to merge* arrive sooner. Not while offline or rate-limited. Settings → General → Check my pending CI more often
-- **Detail:** who opened it and when it was last updated (the row's age), or when it was merged or closed · assignees, labels and reviewers (click to change) · checks · description (long ones fold) · the newest comments, with earlier ones counted above · a [comment field](#commenting) · files. Markdown incl. `<details>`. **Open Failing Check** beside failed checks
+- **Detail:** who opened it and when it was last updated (the row's age), or when it was merged or closed · assignees, labels and reviewers (click to change) · checks · description (long ones fold) · the newest comments, with earlier ones counted above · files. A [comment field](#commenting) is pinned at the bottom. Markdown incl. `<details>`. **Open Failing Check** beside failed checks
 - **Labels:** up to two chips per row (none in compact cards), each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail's Details card lists them all
 - **Right-click a row:** [Reviewers…](#editing) · [Assignees…](#editing) · [Labels…](#editing) · copy branch, link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · show only updated · search author
 - **Right-click a group header** (repo, author): **Open All *N* on GitHub**, from two PRs up; above 8 it asks first. An author header's menu also offers **Search @*login*** and **Show Only Updated**. Headers in search results get the tab's menus, without Show Only Updated
@@ -108,7 +108,7 @@ A PR waiting on review shows who it waits on and for how long (🕒 @dana 3d, "+
 - **Switch board:** on the Board tab, click its name in the filter row, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd>
 - **Right-click a row:** [Status](#editing) (when a board is shown) · [Assignees…](#editing) · [Labels…](#editing) · copy link or Markdown link · open on GitHub · show only this repo · show only updated · search author
 - **Right-click a group header** (a Status lane, No status, Not on board or a repo): **Open All *N* on GitHub**, from two issues up; above 8 it asks first. Done has none. Headers in search results get the tab's menus, without Show Only Updated
-- **Detail:** who opened it and when it was last updated (the row's age), or when it was closed · board card (incl. labels) · linked PRs (<kbd>Esc</kbd> returns) · description (long ones fold) · the last two comments, with earlier ones counted above · a [comment field](#commenting). Markdown incl. `<details>`
+- **Detail:** who opened it and when it was last updated (the row's age), or when it was closed · board card (incl. labels) · linked PRs (<kbd>Esc</kbd> returns) · description (long ones fold) · the last two comments, with earlier ones counted above. Markdown incl. `<details>`. A [comment field](#commenting) is pinned at the bottom
 
 ## Editing
 
@@ -129,8 +129,9 @@ Set an issue's board Status, a pull request's reviewers, and the assignees and l
 
 Write a comment on an open, closed or merged issue or pull request from its detail. It goes out only when you post it.
 
-- **Where:** a comment field at the bottom of the detail, under the Conversation. Opening a detail or the popover never puts the caret in it: press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>M</kbd>, or click it.
-- **Post:** <kbd>⌘</kbd><kbd>Return</kbd> in the field, or the **Comment** button. <kbd>Return</kbd> writes a new line. Elsewhere <kbd>⌘</kbd><kbd>Return</kbd> still opens the item on GitHub. Empty text sends nothing
+- **Where:** a comment field pinned at the bottom of the detail, above the buttons, so it stays in view while the page scrolls. Opening a detail or the popover never puts the caret in it: press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>M</kbd>, or click it.
+- **Post:** <kbd>⌘</kbd><kbd>Return</kbd> in the field, or the **Comment** button. Empty text sends nothing
+- **Keys in the field:** <kbd>Return</kbd> writes a new line. Outside the field, <kbd>⌘</kbd><kbd>Return</kbd> still opens the item on GitHub
 - **Tagging:** type `@login` (or `@owner/team`) by hand; GitHub turns it into a mention and notifies the person when the comment posts. PullBull doesn't suggest names yet
 - **Esc twice:** the first <kbd>Esc</kbd> leaves the field, the second closes the detail. Nothing you typed is lost
 - **Drafts:** kept in memory for each account and item, across closing the detail, moving to another item, and closing the popover. They go on quit or sign-out

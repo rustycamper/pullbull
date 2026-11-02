@@ -230,7 +230,9 @@ Each step ships as its own PR. Step 1 is useful alone: `@login` typed by hand al
 Per CONTRIBUTING, logic lives in PullBullKit with tests.
 
 - **Request building:** path, method and body; trimming; the 201 decoded; 403, 404, 410, 422 as refusals, with `errors[].message` preferred to `message`; a timeout and a 5xx as outcome unknown.
-- **Outcome unknown:** a refetched detail holding the viewer's comment with the same body, created after the post, counts as success; one without it leaves the draft and the "Couldn't confirm" line.
+- **Outcome unknown:** a refetched detail holding the viewer's comment with the same body, created no earlier than 60 s before the post started (clock skew), counts as success, though an issue page shows only its last two comments to the check; one without it leaves the draft and the "Couldn't confirm" line.
+- **Clock skew:** a viewer comment created 59 s before the post started counts; one created 61 s before does not.
+- **Org switch:** a refused or unconfirmed post still shows its failure line after an org switch on the same account; an account switch does not show it for the other account.
 - **Posted comments:** appended to the detail until a post-post fetch holds the ID; a pre-post detail never drops it; dropped at 5 minutes; the issue page shows the newest two with "earlier" recomputed; rows count it and name the viewer last; dropped on a higher `commentCount`; stacking; cleared on account change; never in saved details or the snapshot.
 - **`is:unanswered`:** an item leaves it on posting.
 - **Drafts:** kept per account and item; across route changes, `showListInsteadOfDetail` and `clearAccountData`; dropped on sign-out; restored on refusal; cleared on success.
