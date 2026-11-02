@@ -46,9 +46,12 @@ struct CommentField<Secondary: View>: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .overlay(alignment: .top) { Hairline() }
-        // A field taken away while focused (the permission lost) comes back unfocused.
+        // A field taken away while focused (the permission lost) comes back unfocused, and its @ list ends:
+        // the torn-down text view never reports the blur.
         .onChange(of: ready) { _, ready in
-            if !ready { isFocused = false }
+            guard !ready else { return }
+            isFocused = false
+            model.commentFieldBlurred(key: key)
         }
         // The @ list floats over the detail's scroll area, its bottom on the row's top, so it rises as the
         // field grows.
