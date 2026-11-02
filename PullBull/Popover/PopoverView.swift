@@ -401,9 +401,9 @@ struct PopoverView: View {
         if searching {
             fieldFocused = true
         } else {
-            // Shown, the window puts the caret in its first text field; the list keeps the keys until
-            // the field is picked.
-            if (window.firstResponder as? NSTextView)?.isFieldEditor == true { window.makeFirstResponder(nil) }
+            // Shown, the window puts the caret in its first text field, or keeps it in the comment field it
+            // was closed on; the list or detail keeps the keys until a field is picked.
+            if window.firstResponder is NSText { window.makeFirstResponder(nil) }
             fieldFocused = false
             fieldOpen = false
         }
@@ -569,6 +569,8 @@ struct PopoverView: View {
                 }
                 return true
             }
+            // ⌥⌘M comments only in a detail, where the thread is in view; here it's taken and does nothing.
+            if Self.isOptionCommand(event, flags: flags, letter: "m") { return true }
             // ⌘Z: takes back the last edit while it can be; typing since hands ⌘Z back to the field.
             if Self.isCommandZ(event, flags: flags) {
                 return model.undoLastEdit()
@@ -846,8 +848,24 @@ struct PopoverView: View {
 
     /// The detail views have no search: Esc, ← and ⌘[ go back, ⌥↓ / ⌥↑ step through the list it came
     /// from, ⌘↩ opens the page on GitHub, ⌘C copies its link (unless text is selected), ⌘⇧C its
-    /// reference, ⌥⌘C its Markdown link, ⌘R fetches it again. Every other key passes through.
+    /// reference, ⌥⌘C its Markdown link, ⌘R fetches it again, ⌥⌘M focuses the comment field. Every other
+    /// key passes through. While the comment field has focus it owns the keyboard (`CommentFieldKeys`).
     private func handleDetailKey(_ event: NSEvent, flags: NSEvent.ModifierFlags, in window: NSWindow) -> Bool {
+        if let field = window.firstResponder as? CommentEditor, let key = field.key {
+            let action = CommentFieldKeys.route(
+                keyCode: event.keyCode, flags: Self.modifiers(flags), mentionsOpen: false,
+                composing: field.hasMarkedText())
+            switch action {
+            case .post:
+                model.postComment(on: key, isPullRequest: field.isPullRequest)
+                return true
+            case .leaveField:
+                window.makeFirstResponder(nil)
+                return true
+            case .text, .closeMentions, .moveMention, .acceptMention:
+                return false
+            }
+        }
         guard flags.contains(.command) else {
             if event.keyCode == SearchKeyMonitor.upArrow || event.keyCode == SearchKeyMonitor.downArrow {
                 // ⌥ only (arrows carry .numericPad and .function); a repeat steps again. Without a walk the
@@ -876,6 +894,18 @@ struct PopoverView: View {
             return true
         }
         if Self.isOptionCommandC(event, flags: flags) { return model.copyShownDetailMarkdownLink() }
+        // ⌥⌘M: the comment field, where this account can comment.
+        if Self.isOptionCommand(event, flags: flags, letter: "m") {
+            switch model.route {
+            case .detail(let key) where model.isCommentShown(for: key, isPullRequest: true):
+                model.requestCommentFieldFocus(on: key)
+            case .issueDetail(let key) where model.isCommentShown(for: key, isPullRequest: false):
+                model.requestCommentFieldFocus(on: key)
+            default:
+                break
+            }
+            return true
+        }
         if Self.isOptionCommand(event, flags: flags, letter: "s") {
             guard case .issueDetail(let key) = model.route, model.isStatusOffered(for: key) else { return false }
             model.openStatusPicker(for: key)
@@ -1081,6 +1111,16 @@ struct PopoverView: View {
         flags.subtracting([.capsLock, .numericPad, .function]) == .command && commandKey(event) == "z"
     }
 
+    /// The flags as `KeyCombo` modifiers: caps lock, numeric pad and function drop out.
+    private static func modifiers(_ flags: NSEvent.ModifierFlags) -> KeyCombo.Modifiers {
+        var modifiers: KeyCombo.Modifiers = []
+        if flags.contains(.control) { modifiers.insert(.control) }
+        if flags.contains(.option) { modifiers.insert(.option) }
+        if flags.contains(.shift) { modifiers.insert(.shift) }
+        if flags.contains(.command) { modifiers.insert(.command) }
+        return modifiers
+    }
+
     /// ⌥⌘C exactly: no ⇧ or ⌃.
     private static func isOptionCommandC(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
         flags.subtracting([.capsLock, .numericPad, .function]) == [.command, .option] && commandKey(event) == "c"
@@ -1102,6 +1142,7 @@ struct PopoverView: View {
         case SearchKeyMonitor.letterZ: return "z"
         case SearchKeyMonitor.letterA: return "a"
         case SearchKeyMonitor.letterL: return "l"
+        case SearchKeyMonitor.letterM: return "m"
         default: return typed
         }
     }

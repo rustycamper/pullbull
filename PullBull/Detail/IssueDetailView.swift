@@ -4,8 +4,8 @@ import PullBullKit
 
 /// The detail of one issue inside the popover: state and author, a board card (Status, Assignees, Labels,
 /// each changeable where offered), the pull requests that close it, the description and the last two
-/// comments, with View on board and Open on GitHub pinned at the bottom. It shows the list data and the
-/// cached detail at once; `AppModel` refreshes the detail in place.
+/// comments, with the comment field, View on board and Open on GitHub pinned at the bottom. It shows the
+/// list data and the cached detail at once; `AppModel` refreshes the detail in place.
 struct IssueDetailView: View {
     let model: AppModel
     let key: PRKey
@@ -55,6 +55,7 @@ struct IssueDetailView: View {
                 }
             }
             .frame(maxHeight: .infinity)
+            CommentField(model: model, key: key, isPullRequest: false)
             bottomBar
         }
         // Links in issue text are untrusted: only web links open, anything else is dropped.
@@ -226,9 +227,12 @@ struct IssueDetailView: View {
     }
 
     private func conversationSection(_ detail: IssueDetail, now: Date) -> some View {
-        ConversationSection(
-            comments: detail.lastComments, total: detail.commentTotal, earlier: detail.earlierCommentCount,
-            webURL: webURL, now: now)
+        // The page shows the newest two, comments posted from here included until the detail holds them.
+        let shown = model.postedComments.conversation(
+            for: key, held: detail.lastComments, total: detail.commentTotal, keep: 2, now: now)
+        return ConversationSection(
+            comments: shown.comments, total: shown.total, earlier: shown.earlier,
+            sendingIndex: shown.sendingIndex, webURL: webURL, now: now)
     }
 
     // MARK: Loading and errors
