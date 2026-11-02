@@ -384,11 +384,8 @@ struct PRDetailView: View {
 
     /// The comment field, Copy branch and Open on GitHub, on one row.
     private var bottomBar: some View {
-        CommentField(model: model, key: key, isPullRequest: true) {
+        CommentField(model: model, key: key, isPullRequest: true, webURL: webURL) {
             if let pr { CopyBranchButton(pr: pr) }
-            OutlinedIconButton(name: "Open on GitHub", systemImage: "arrow.up.right.square") {
-                NSWorkspace.shared.open(webURL)
-            }
         }
     }
 }

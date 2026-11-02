@@ -2,23 +2,23 @@ import Testing
 @testable import PullBullKit
 
 @Suite struct CommentRowTests {
-    @Test func unfocusedShowsTheItemButtonsAndNoCommentButton() {
+    @Test func unfocusedShowsTheSecondaryButtonAndNoCommentButton() {
         let row = CommentRow(focused: false, sending: false)
         #expect(!row.showsCommentButton)
-        #expect(row.showsItemButtons)
+        #expect(row.showsSecondaryButton)
     }
 
-    @Test func focusedTheCommentButtonTakesTheItemButtonsPlace() {
+    @Test func focusedTheCommentButtonTakesTheSecondaryButtonsPlace() {
         let row = CommentRow(focused: true, sending: false)
         #expect(row.showsCommentButton)
-        #expect(!row.showsItemButtons)
+        #expect(!row.showsSecondaryButton)
         #expect(CommentRow(focused: true, sending: true) == row)
     }
 
     @Test func sendingUnfocusedKeepsBothInView() {
         let row = CommentRow(focused: false, sending: true)
         #expect(row.showsCommentButton)
-        #expect(row.showsItemButtons)
+        #expect(row.showsSecondaryButton)
     }
 
     @Test func previewIsTheFirstLineWithText() {

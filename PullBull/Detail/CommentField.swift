@@ -2,16 +2,20 @@ import AppKit
 import PullBullKit
 import SwiftUI
 
-/// A detail's bottom row: the comment field, then the item's own buttons (Copy branch or View on board,
-/// and Open on GitHub). Unfocused, the field is one line as tall as the buttons, reading "Comment…" with
-/// ⌥⌘M at its end, or a pencil and a waiting draft's first line. ⌥⌘M or a click focuses it: the Comment
-/// button takes the buttons' place and the field grows upward with the text to 8 lines, then scrolls.
-/// Where the account can't comment yet, the note saying what it needs takes the field's place.
-struct CommentField<Buttons: View>: View {
+/// A detail's bottom row: the comment field, the item's second button (Copy branch or View on board),
+/// and Open on GitHub last. Unfocused, the field is one line as tall as the buttons, reading "Comment…"
+/// with ⌥⌘M at its end, or a pencil and a waiting draft's first line. ⌥⌘M or a click focuses it: the
+/// Comment button takes the second button's place, Open on GitHub stays, and the field grows upward with
+/// the text to 8 lines, then scrolls. Where the account can't comment yet, the note saying what it needs
+/// takes the field's place.
+struct CommentField<Secondary: View>: View {
     let model: AppModel
     let key: PRKey
     let isPullRequest: Bool
-    @ViewBuilder let buttons: Buttons
+    /// Where Open on GitHub goes.
+    let webURL: URL
+    /// Copy branch on a PR, View on board on an issue on the board.
+    @ViewBuilder let secondary: Secondary
 
     @State private var isFocused = false
     /// The text's laid-out height, reported by the text view.
@@ -36,11 +40,18 @@ struct CommentField<Buttons: View>: View {
                 Spacer(minLength: 0)
             }
             if row.showsCommentButton { commentButton }
-            if row.showsItemButtons { buttons }
+            if row.showsSecondaryButton { secondary }
+            OutlinedIconButton(name: "Open on GitHub", systemImage: "arrow.up.right.square") {
+                NSWorkspace.shared.open(webURL)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .overlay(alignment: .top) { Hairline() }
+        // A field taken away while focused (the permission lost) comes back unfocused.
+        .onChange(of: ready) { _, ready in
+            if !ready { isFocused = false }
+        }
     }
 
     private var field: some View {
@@ -57,7 +68,8 @@ struct CommentField<Buttons: View>: View {
             .background(RoundedRectangle(cornerRadius: 6).fill(Palette.field))
             .overlay(
                 RoundedRectangle(cornerRadius: 6).strokeBorder(isFocused ? Color.accentColor : Palette.separator))
-            .help(CommentTextView.help)
+            // Focused, no tooltip covers the text being written.
+            .help(isFocused ? "" : CommentTextView.help)
     }
 
     private var commentButton: some View {
@@ -199,7 +211,6 @@ struct CommentTextView: NSViewRepresentable {
         textView.minSize = .zero
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude)
         textView.setAccessibilityLabel("Comment on \(key.repo)#\(key.number)")
-        textView.toolTip = Self.help
         textView.postsFrameChangedNotifications = true
 
         let scrollView = NSScrollView()
@@ -238,6 +249,7 @@ struct CommentTextView: NSViewRepresentable {
         }
         // Unfocused, the SwiftUI line above shows the draft; the view stays for VoiceOver and clicks.
         scrollView.alphaValue = isFocused ? 1 : 0
+        textView.toolTip = isFocused ? nil : Self.help
         // Focused, the field grows from one line; once it has, the caret is brought into view.
         if isFocused, !coordinator.shownFocused {
             DispatchQueue.main.async { [weak textView] in

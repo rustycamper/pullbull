@@ -1,17 +1,17 @@
 import Foundation
 
-/// What a detail's bottom row shows beside the comment field: the Comment button, the item's own buttons
-/// (Copy branch or View on board, and Open on GitHub), and how the unfocused field reads a draft.
+/// What a detail's bottom row shows beside the comment field: the Comment button, the item's second
+/// button (Copy branch or View on board), and how the unfocused field reads a draft. Open on GitHub is
+/// always there, last.
 public struct CommentRow: Equatable, Sendable {
     /// While the field has focus, and while a post is sending, so "Sending…" stays in view.
     public let showsCommentButton: Bool
-    /// Hidden only while the field has focus, never because a draft waits, so Open on GitHub stays a click
-    /// away.
-    public let showsItemButtons: Bool
+    /// Gives way to the Comment button only while the field has focus, never because a draft waits.
+    public let showsSecondaryButton: Bool
 
     public init(focused: Bool, sending: Bool) {
         showsCommentButton = focused || sending
-        showsItemButtons = !focused
+        showsSecondaryButton = !focused
     }
 
     /// The draft's first line with text in it, which the unfocused field shows; nil when there's none.

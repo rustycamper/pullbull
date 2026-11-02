@@ -268,15 +268,12 @@ struct IssueDetailView: View {
 
     /// The comment field, View on board and Open on GitHub, on one row.
     private var bottomBar: some View {
-        CommentField(model: model, key: key, isPullRequest: false) {
+        CommentField(model: model, key: key, isPullRequest: false, webURL: webURL) {
             if let boardURL {
                 OutlinedIconButton(
                     name: model.snapshot?.boardTitle.map { "Open in \($0)" } ?? "View on board",
                     systemImage: "rectangle.split.3x1"
                 ) { NSWorkspace.shared.open(boardURL) }
-            }
-            OutlinedIconButton(name: "Open on GitHub", systemImage: "arrow.up.right.square") {
-                NSWorkspace.shared.open(webURL)
             }
         }
     }
