@@ -1117,11 +1117,13 @@ public struct GitHubAPI: Sendable {
         return (list, false)
     }
 
-    /// GitHub answered, and the answer was no: an error in the GraphQL body, a missing scope, a 403 or a
-    /// missing owner. Anything else (offline, a 5xx, a rate limit) means it wasn't asked.
+    /// GitHub answered, and the answer was no: a missing scope or a 403. A user's login or a token that
+    /// can't read the org's teams answers with data and no teams, and comes back as nil before this. Anything
+    /// else (offline, a 5xx, a rate limit, a body that isn't GitHub's, an error with no data) means it
+    /// wasn't asked.
     private static func isRefusal(_ error: Error) -> Bool {
         switch error as? APIError {
-        case .graphQL, .insufficientScopes, .forbidden, .notFound: true
+        case .insufficientScopes, .forbidden: true
         default: false
         }
     }

@@ -184,8 +184,10 @@ private func variables(_ body: [String: Any]) -> [String: Any] { body["variables
         #expect(variables(t.bodies[1])["q"] == nil)
     }
 
-    @Test func teamsAreNilOnAnError() async throws {
-        let t = QueueTransport([#"{"errors":[{"message":"Resource not accessible"}]}"#])
+    @Test func teamsAreNilWhenGitHubAnswersWithoutThem() async throws {
+        let t = QueueTransport([
+            #"{"data":{"organization":{"teams":null}},"errors":[{"type":"INSUFFICIENT_SCOPES","message":"read:org"}]}"#
+        ])
         #expect(try await api(t).teams(owner: "acme", query: nil) == nil)
         let ok = QueueTransport([
             #"{"data":{"organization":{"teams":{"nodes":[{"slug":"backend","name":"Back End"}],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}"#
@@ -206,6 +208,19 @@ private func variables(_ body: [String: Any]) -> [String: Any] { body["variables
         let t = QueueTransport([#"{"message":"Bad Gateway"}"#], statuses: [502])
         await #expect(throws: APIError.server(502)) {
             _ = try await api(t).teams(owner: "acme", query: nil)
+        }
+    }
+
+    /// An error with no data, or a page that isn't GitHub's, isn't an answer: thrown, so it isn't kept
+    /// as "no teams" for the session.
+    @Test func teamsThrowWithoutAnAnswer() async throws {
+        let failed = QueueTransport([#"{"errors":[{"message":"Something went wrong while executing your query."}]}"#])
+        await #expect(throws: APIError.graphQL("Something went wrong while executing your query.")) {
+            _ = try await api(failed).teams(owner: "acme", query: nil)
+        }
+        let portal = QueueTransport(["<html>Sign in to Wi-Fi</html>"])
+        await #expect(throws: APIError.graphQL("malformed response")) {
+            _ = try await api(portal).teams(owner: "acme", query: nil)
         }
     }
 
