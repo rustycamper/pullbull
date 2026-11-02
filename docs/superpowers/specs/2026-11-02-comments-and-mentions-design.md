@@ -58,10 +58,11 @@ Nothing else, ever. This replaces the reviewers spec's sentence wherever the pro
 ### The text view
 
 - An `NSTextView` wrapped for SwiftUI (`NSViewRepresentable`), not `TextEditor`: the mention list, the caret position and the key routing need its selection and delegate.
-- Plain text only: rich text off, paste as plain text, and smart quotes, smart dashes, text replacement and automatic link detection off, so Markdown and code arrive as typed. Spelling check stays on.
-- PullBull has no Edit menu, so the view handles ⌘Z, ⇧⌘Z, ⌘X, ⌘C, ⌘V and ⌘A itself.
+- Plain text only: rich text off, paste as plain text, and smart quotes, smart dashes, text replacement and automatic link detection off, so Markdown and code arrive as typed. Automatic spelling correction and text completion are off too; spell checking stays on.
+- PullBull has no Edit menu, so the view handles ⌘Z, ⇧⌘Z, ⌘X, ⌘C, ⌘V and ⌘A itself. ⌘X and ⌘V also work by key position on non-Latin layouts. Any other ⌘-chord with no binding in the field does nothing, without a beep.
 - `allowsUndo` is on. The undo stack is cleared when a draft is loaded into the field and when a post succeeds, so ⌘Z after a post never brings back the sent text.
-- The field never becomes first responder on its own. The popover's show-time rule that drops the caret from a field editor (`PopoverView`, "Shown, the window puts the caret in its first text field") covers any `NSText`, and the view refuses first responder until ⌥⌘M or a click asks for it.
+- The field never becomes first responder on its own. The popover's show-time rule that drops the caret from a field editor (`PopoverView`, "Shown, the window puts the caret in its first text field") covers any `NSText`, and the view refuses first responder until something asks for it: ⌥⌘M, a click, or a refused post returning focus to that same item's field. Any change of the detail stack (a linked PR pushed over an issue, for one) takes focus out of a comment field.
+- Clicking an unfocused field puts the caret where it was. Leaving the field scrolls it to the top.
 
 ### Keys
 
@@ -123,12 +124,15 @@ The comment field has its own completion, in PullBullKit, separate from search's
   - the failure line says "Couldn't comment on #88: …" with GitHub's reason (a locked conversation, an archived repo, a body too long, issues turned off) and **Open on GitHub**; VoiceOver announces it.
 - **Outcome unknown** (timeout, dropped connection, a 5xx: GitHub may have made the comment):
   - the comment stays dimmed and marked "Sending…", and the field stays read-only, while PullBull checks. ⌘↩ can't send it twice meanwhile;
-  - the detail is fetched again at once. If that fetch fails, the check fails. If it holds a comment by the viewer, created after the post started, whose body equals the sent text, the post counts as a success (above) without sending again;
+  - the detail is fetched again at once. If that fetch fails, the check fails. An issue page holds only its last two comments, so the check sees only those. If it holds a comment by the viewer, created no earlier than 60 s before the post started (clock skew), whose body equals the sent text, the post counts as a success (above) without sending again;
   - otherwise the dimmed comment goes, the text stays in the field as the draft, and the failure line says "Couldn't confirm your comment on #88. Check the Conversation before sending again." with **Open on GitHub**.
 - There is no undo. ⌘Z inside the field is text undo; the edit undo (⌘Z within 10 s) never deletes a comment, and a post, sent or failed, leaves the edit undo's state as it was.
+- On a detail, the failure line sits directly above the comment field (or the permission note), following its height.
 - The failure line is the edits' line with a comment variant. An edit, or another post, replaces it, as edits replace each other's failures.
 - Posting on a closed or merged item is allowed, as GitHub allows it.
 - **Account change mid-post:** the answer applies only if the account that posted is still current, as edits guard today. If it isn't, the draft of the posting account is cleared on success and kept otherwise, and nothing else changes.
+- In-flight posts are tracked per account and item, and survive account switches, so a post can't be sent twice after a switch mid-post.
+- A refused or unconfirmed post shows its failure line even after an org switch on the same account: the guard compares the account, not the org.
 
 ### Notifications
 
@@ -161,12 +165,12 @@ The comment field has its own completion, in PullBullKit, separate from search's
 
 ### The posted comment until GitHub's reads catch up
 
-- `PostedComment` (the item's `PRKey`, the `Comment`, the list copy's `commentCount` it was posted on top of, and when) is a new type beside the edit overrides, not an `EditChange`. It lives in its own store on the model, cleared by `clearAccountData` like the overrides; a detail opened again after an account change is fetched fresh and shows the comment from GitHub.
+- `PostedComment` (the item's `PRKey`, the `Comment`, the `commentCount` it was posted on top of, called `begin`, and when) is a new type beside the edit overrides, not an `EditChange`. It lives in its own store on the model, cleared by `clearAccountData` like the overrides; a detail opened again after an account change is fetched fresh and shows the comment from GitHub.
 - It is applied at display time only. Saved details (`saveDetail`) and the snapshot stay as GitHub sent them.
-- **Detail:** a posted comment is appended to the Conversation, and the page's total raised by one, until a detail fetched after the post holds its ID; then it is dropped. A detail fetched before the post never drops it. If no fetch after the post holds it within 5 minutes of posting, it is dropped then.
+- **Detail:** a posted comment is appended to the Conversation, and the page's total raised by one, until a detail fetched after the post holds its ID; then it is dropped. It also leaves a detail once the page holds a newer comment (`createdAt` at or after its own), so an issue page's two-comment window can't bring it back. A detail fetched before the post never drops it. If no fetch after the post holds it within 5 minutes of posting, it is dropped then.
   - On a PR page the posted comment follows the 50 held; on an issue page the page shows the newest two after appending, and "N earlier comments" is recomputed from the raised total.
-- **Rows:** a posted comment raises `commentCount` by one and sets `lastCommentAuthor` to the viewer (`lastCommentByBot` false) on every list and search copy of the item. Those three fields on `PullRequest` and `BoardIssue` become `var`. It is dropped once the snapshot's copy has a `commentCount` above the one it was posted on top of. Someone else's comment can satisfy that too; the fetched copy then names its true last author, which is right. An item in no list just keeps the overlay until its 5 minutes are up.
-- Several posts on one item stack: each adds one.
+- **Rows:** a posted comment raises `commentCount` by one and sets `lastCommentAuthor` to the viewer (`lastCommentByBot` false) on every list and search copy of the item. Those three fields on `PullRequest` and `BoardIssue` become `var`. `begin` comes from the raw list copy, else the search copy, else the opened item. Search rows are raised too. Each copy is judged on its own: the post is applied to a copy only while that copy's count is at or below `begin`, and it is dropped once every copy has a `commentCount` above it. Someone else's comment can satisfy that too; the fetched copy then names its true last author, which is right. An item in no list just keeps the overlay until its 5 minutes are up.
+- Several posts on one item stack: each adds one. Expired posts are pruned before a new one is counted. A refused post between two others re-bases the later ones, so each still adds exactly one on top of the count that remains.
 
 ### Mention candidates
 

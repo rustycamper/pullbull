@@ -23,7 +23,7 @@ This builds on `2026-10-31-edit-status-assignees-labels-design.md` (the edit spe
 
 - Submitting, approving or dismissing reviews, or anything else that writes a review. PullBull only asks people to review.
 - Status on pull requests (board cards for PRs stay out of scope, as in the edit spec).
-- Draft or ready-for-review, merge, close, comment, titles, bodies, milestones, linked issues.
+- Draft or ready-for-review, merge, close, titles, bodies, milestones, linked issues. Commenting is in the [comments spec](2026-11-02-comments-and-mentions-design.md).
 - Editing CODEOWNERS or branch protection. Owners GitHub requested automatically show as requested like anyone else and can be removed like anyone else.
 - Bulk edits.
 
