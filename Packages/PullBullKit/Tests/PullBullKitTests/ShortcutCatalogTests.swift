@@ -8,7 +8,21 @@ private let modifierOrder = ["⌃", "⌥", "⇧", "⌘"]
     @Test func sectionsInOrder() {
         #expect(ShortcutCatalog.sections(toggle: nil).map(\.title)
             == ["PullBull", "Lists", "Copy and open", "Search", "Completion list", "Editing", "Detail",
-                "Ask AI answers"])
+                "Commenting", "Ask AI answers"])
+    }
+
+    @Test func commentingShortcuts() throws {
+        let commenting = try #require(ShortcutCatalog.sections(toggle: nil).first { $0.title == "Commenting" })
+        #expect(commenting.shortcuts == [
+            Shortcut("Comment", [["⌥", "⌘", "M"]], note: "Issue or pull request detail"),
+            Shortcut("Post", [["⌘", "↩"]], note: "In the comment field; elsewhere ⌘↩ opens on GitHub"),
+        ])
+    }
+
+    @Test func detailOpenOnGitHubSaysNotWhileTyping() throws {
+        let detail = try #require(ShortcutCatalog.sections(toggle: nil).first { $0.title == "Detail" })
+        #expect(detail.shortcuts.contains(
+            Shortcut("Open on GitHub", [["⌘", "↩"]], note: "Not while typing a comment")))
     }
 
     @Test func editingShortcuts() throws {

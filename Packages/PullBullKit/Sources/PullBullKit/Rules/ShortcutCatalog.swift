@@ -95,7 +95,11 @@ public enum ShortcutCatalog {
                 Shortcut("Back", [["Esc"], ["←"], ["⌘", "["]]),
                 Shortcut("Next / previous item", [["⌥", "↓"], ["⌥", "↑"]],
                          note: "Of the list or search you came from"),
-                Shortcut("Open on GitHub", [["⌘", "↩"]]),
+                Shortcut("Open on GitHub", [["⌘", "↩"]], note: "Not while typing a comment"),
+            ]),
+            ShortcutSection("Commenting", [
+                Shortcut("Comment", [["⌥", "⌘", "M"]], note: "Issue or pull request detail"),
+                Shortcut("Post", [["⌘", "↩"]], note: "In the comment field; elsewhere ⌘↩ opens on GitHub"),
             ]),
             ShortcutSection("Ask AI answers", [
                 Shortcut("Move the highlight", [["↑"], ["↓"]]),
