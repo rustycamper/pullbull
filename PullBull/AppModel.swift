@@ -83,6 +83,9 @@ final class AppModel {
     var commentDrafts = CommentDrafts()
     /// Comments posted from here that GitHub's reads don't show yet.
     var postedComments = PostedComments()
+    /// Posts whose outcome isn't final, per account and item. `clearAccountData` keeps them, so a post
+    /// can't be sent twice across an account or org switch.
+    var postsInFlight = InFlightPosts()
     /// Bumped when a post on `key` succeeded: the comment field on `key` clears its text and undo.
     private(set) var commentFieldReset: CommentFieldSignal?
     /// Bumped when a post on `key` was refused: the comment field on `key` takes focus.
