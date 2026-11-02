@@ -55,12 +55,9 @@ struct IssueDetailView: View {
                 }
             }
             .frame(maxHeight: .infinity)
-            VStack(spacing: 0) {
-                CommentField(model: model, key: key, isPullRequest: false)
-                bottomBar
-            }
-            // The failure line sits on top of these.
-            .detailBottomInset(for: key)
+            bottomBar
+                // The failure line sits on top of it, following the comment field as it grows.
+                .detailBottomInset(for: key)
         }
         // Links in issue text are untrusted: only web links open, anything else is dropped.
         .environment(\.openURL, OpenURLAction { url in
@@ -269,9 +266,9 @@ struct IssueDetailView: View {
 
     // MARK: Bottom bar
 
+    /// The comment field, View on board and Open on GitHub, on one row.
     private var bottomBar: some View {
-        HStack(spacing: 8) {
-            Spacer(minLength: 0)
+        CommentField(model: model, key: key, isPullRequest: false) {
             if let boardURL {
                 OutlinedIconButton(
                     name: model.snapshot?.boardTitle.map { "Open in \($0)" } ?? "View on board",
@@ -282,9 +279,6 @@ struct IssueDetailView: View {
                 NSWorkspace.shared.open(webURL)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .overlay(alignment: .top) { Hairline() }
     }
 }
 

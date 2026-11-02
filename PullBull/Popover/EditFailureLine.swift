@@ -2,8 +2,8 @@ import AppKit
 import PullBullKit
 import SwiftUI
 
-/// The height of each detail's comment field and bottom bar, by item, so the failure line sits right
-/// on the shown detail's field as it grows.
+/// The height of each detail's bottom row (the comment field and the item's buttons), by item, so the
+/// failure line sits right on the shown detail's field as it grows.
 struct DetailBottomInsetKey: PreferenceKey {
     static let defaultValue: [PRKey: CGFloat] = [:]
 
@@ -21,8 +21,8 @@ extension View {
     }
 }
 
-/// Why the last edit didn't stick, just above the footer or, on a detail, its comment field (or the
-/// note in its place) and bottom bar, until it's dismissed or the next edit.
+/// Why the last edit didn't stick, just above the footer or, on a detail, its bottom row with the
+/// comment field (or the note in its place), until it's dismissed or the next edit.
 struct EditFailureLine: View {
     let model: AppModel
 

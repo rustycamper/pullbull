@@ -2,13 +2,16 @@ import AppKit
 import PullBullKit
 import SwiftUI
 
-/// The comment field pinned above a detail's bottom bar: one line reading "Comment…", or a waiting
-/// draft's first line, until ⌥⌘M or a click focuses it; then it grows with the text to 8 lines and
-/// scrolls. Where the account can't comment yet, the note saying what it needs takes its place.
-struct CommentField: View {
+/// A detail's bottom row: the comment field, then the item's own buttons (Copy branch or View on board,
+/// and Open on GitHub). Unfocused, the field is one line as tall as the buttons, reading "Comment…" with
+/// ⌥⌘M at its end, or a pencil and a waiting draft's first line. ⌥⌘M or a click focuses it: the Comment
+/// button takes the buttons' place and the field grows upward with the text to 8 lines, then scrolls.
+/// Where the account can't comment yet, the note saying what it needs takes the field's place.
+struct CommentField<Buttons: View>: View {
     let model: AppModel
     let key: PRKey
     let isPullRequest: Bool
+    @ViewBuilder let buttons: Buttons
 
     @State private var isFocused = false
     /// The text's laid-out height, reported by the text view.
@@ -21,46 +24,50 @@ struct CommentField: View {
     private var isSending: Bool { model.isPostInFlight(for: key) }
 
     var body: some View {
-        if model.isCommentShown(for: key, isPullRequest: isPullRequest) {
-            let permission = model.commentPermission(for: key, isPullRequest: isPullRequest)
-            Group {
-                if permission == .ready {
-                    field
-                } else if let note = permission.note(for: .comment) {
-                    PermissionNote(note: note, permission: permission)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 4)
-                }
-            }
-            .overlay(alignment: .top) { Hairline() }
-        }
-    }
-
-    private var field: some View {
+        let permission = model.commentPermission(for: key, isPullRequest: isPullRequest)
+        let ready = permission == .ready
+        let row = CommentRow(focused: ready && isFocused, sending: ready && isSending)
         HStack(alignment: .bottom, spacing: 8) {
-            CommentTextView(
-                model: model, key: key, isPullRequest: isPullRequest, account: account, isSending: isSending,
-                reset: model.commentFieldReset, focusRequest: model.commentFieldFocusRequest,
-                isFocused: $isFocused, contentHeight: $contentHeight)
-                .frame(height: textHeight)
-                .overlay(alignment: .leading) {
-                    if !isFocused { unfocusedText }
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Palette.field))
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.separator))
-            Button(isSending ? "Sending…" : "Comment") {
-                model.postComment(on: key, isPullRequest: isPullRequest)
+            if ready {
+                field
+            } else if let note = permission.note(for: .comment) {
+                permissionSlot(note: note, permission: permission)
+            } else {
+                Spacer(minLength: 0)
             }
-            .controlSize(.small)
-            .disabled(isSending || draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .accessibilityLabel("Comment")
-            .padding(.bottom, 3)
+            if row.showsCommentButton { commentButton }
+            if row.showsItemButtons { buttons }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .overlay(alignment: .top) { Hairline() }
+    }
+
+    private var field: some View {
+        CommentTextView(
+            model: model, key: key, isPullRequest: isPullRequest, account: account, isSending: isSending,
+            reset: model.commentFieldReset, focusRequest: model.commentFieldFocusRequest,
+            isFocused: $isFocused, contentHeight: $contentHeight)
+            .frame(height: textHeight)
+            .overlay(alignment: .leading) {
+                if !isFocused { unfocusedText }
+            }
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, minHeight: CommentTextView.rowHeight)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Palette.field))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6).strokeBorder(isFocused ? Color.accentColor : Palette.separator))
+            .help(CommentTextView.help)
+    }
+
+    private var commentButton: some View {
+        Button(isSending ? "Sending…" : "Comment") {
+            model.postComment(on: key, isPullRequest: isPullRequest)
+        }
+        .controlSize(.small)
+        .disabled(isSending || draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        .accessibilityLabel("Comment")
+        .frame(height: CommentTextView.rowHeight)
     }
 
     /// One line unfocused; focused, the text's height between one line and eight.
@@ -69,18 +76,52 @@ struct CommentField: View {
         return min(max(contentHeight, CommentTextView.oneLineHeight), CommentTextView.eightLineHeight)
     }
 
-    /// Unfocused, the field reads "Comment…", or shows the draft's first line, dimmed. The text view
-    /// under it keeps the draft for VoiceOver and takes the click.
+    /// Unfocused, the field reads "Comment…" with its shortcut, or a pencil and the draft's first line,
+    /// dimmed. The text view under it keeps the draft for VoiceOver and takes the click.
     private var unfocusedText: some View {
-        let firstLine = draftText.split(whereSeparator: \.isNewline)
-            .first { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        return Text(firstLine.map(String.init) ?? "Comment…")
-            .font(.system(size: CommentTextView.fontSize))
-            .foregroundStyle(firstLine == nil ? Palette.tertiary : .secondary)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
+        HStack(spacing: 4) {
+            if let preview = CommentRow.preview(of: draftText) {
+                Image(systemName: "pencil")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Text(preview)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Comment…")
+                    .foregroundStyle(Palette.tertiary)
+                Spacer(minLength: 8)
+                Text("⌥⌘M")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Palette.tertiary)
+            }
+        }
+        .font(.system(size: CommentTextView.fontSize))
+        .lineLimit(1)
+        .truncationMode(.tail)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    /// In the field's place, a disabled field reading what the account needs, and the link to it.
+    private func permissionSlot(note: String, permission: EditPermission) -> some View {
+        HStack(spacing: 8) {
+            Text(note)
+                .font(.system(size: CommentTextView.fontSize))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .padding(.horizontal, 8)
+                .frame(maxWidth: .infinity, minHeight: CommentTextView.rowHeight, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Palette.fill))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.separator))
+                .help(note)
+                .accessibilityLabel(note)
+            if case .needsAppApproval(_, _, let url?) = permission {
+                Button("Open on GitHub") { NSWorkspace.shared.open(url) }
+                    .controlSize(.small)
+                    .frame(height: CommentTextView.rowHeight)
+            }
+        }
     }
 }
 
@@ -101,6 +142,9 @@ struct CommentTextView: NSViewRepresentable {
     @Binding var contentHeight: CGFloat
 
     static let fontSize: CGFloat = 12
+    /// The unfocused field's height, an outlined icon button's, so the bottom row is 40 pt.
+    static let rowHeight: CGFloat = 24
+    static let help = "Comment (⌥⌘M) · ⌘↩ to post"
     private static let font = NSFont.systemFont(ofSize: fontSize)
     private static let verticalInset: CGFloat = 4
     private static let lineHeight = NSLayoutManager().defaultLineHeight(for: font)
@@ -137,6 +181,7 @@ struct CommentTextView: NSViewRepresentable {
         textView.minSize = .zero
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude)
         textView.setAccessibilityLabel("Comment on \(key.repo)#\(key.number)")
+        textView.toolTip = Self.help
         textView.postsFrameChangedNotifications = true
 
         let scrollView = NSScrollView()
@@ -283,6 +328,12 @@ final class CommentEditor: NSTextView {
 
     /// Plain text only, whatever the pasteboard holds.
     override var readablePasteboardTypes: [NSPasteboard.PasteboardType] { [.string] }
+
+    /// Unfocused, VoiceOver reads a waiting draft as "Draft: " and its first line, as the field shows it.
+    override func accessibilityValue() -> String? {
+        if window?.firstResponder !== self, let value = CommentRow.unfocusedValue(of: string) { return value }
+        return super.accessibilityValue()
+    }
 
     func requestFocus() {
         guard let window else { return }

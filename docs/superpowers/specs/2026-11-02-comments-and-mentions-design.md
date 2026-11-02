@@ -50,9 +50,10 @@ Nothing else, ever. This replaces the reviewers spec's sentence wherever the pro
 
 ### Where the comment field lives
 
-- Both detail pages get a comment field pinned above the bottom buttons (Copy branch / Open on GitHub on a PR; View on board / Open on GitHub on an issue), so it is reachable without scrolling past 50 comments and the file list.
-- Unfocused and empty, it is one line reading "Comment…". Holding a draft, it shows the draft's first line, dimmed, so a waiting draft is visible.
-- Focused, it grows with the text up to 8 lines, then scrolls inside. The detail's scroll area shrinks to make room. The Comment button sits at its trailing edge, labelled "Comment" for VoiceOver, disabled while the text is empty or only whitespace, and reads "Sending…" while a post is in flight.
+- Both detail pages end in one row, 12 pt in from the sides and 8 pt above and below: the comment field, then the item's buttons (Copy branch / Open on GitHub on a PR; View on board / Open on GitHub on an issue). The field takes the width the buttons leave. It is reachable without scrolling past 50 comments and the file list, and sharing the buttons' row costs the scroll area no second row.
+- Unfocused, the field is one line, 24 pt tall like the buttons, so the row is 40 pt. Empty, it reads "Comment…" with ⌥⌘M at its trailing edge, both in the tertiary colour. Holding a draft, it shows a `pencil` symbol and the draft's first line, dimmed, so a waiting draft is visible, and no shortcut; VoiceOver reads its value as "Draft: " and that line. Its border is the separator colour. Its tooltip reads "Comment (⌥⌘M) · ⌘↩ to post".
+- Focused, its border takes the accent colour, so the focus shows, and the Comment button takes the item buttons' place: while typing the field needs the width. The field grows upward with the text up to 8 lines, then scrolls inside, and the detail's scroll area shrinks to make room. Leaving the field (Esc, or anything that takes focus) brings the buttons back. They hide only while the field has focus, never because a draft waits, so Open on GitHub stays a click away.
+- The Comment button is labelled "Comment" for VoiceOver, disabled while the text is empty or only whitespace, and reads "Sending…" while a post is in flight. Unfocused, there is no Comment button, except while a post is in flight: then "Sending…" shows between the field and the item's buttons, so the post stays visible after focus moves away.
 - Any detail page takes a comment, including a PR or issue that PullBull holds in no list (opened from linked PRs, Ask, a notification or a pasted link). Posting needs only the repo and number.
 
 ### The text view
@@ -127,7 +128,7 @@ The comment field has its own completion, in PullBullKit, separate from search's
   - the detail is fetched again at once. If that fetch fails, the check fails. An issue page holds only its last two comments, so the check sees only those. If it holds a comment by the viewer, created no earlier than 60 s before the post started (clock skew), whose body equals the sent text, the post counts as a success (above) without sending again;
   - otherwise the dimmed comment goes, the text stays in the field as the draft, and the failure line says "Couldn't confirm your comment on #88. Check the Conversation before sending again." with **Open on GitHub**.
 - There is no undo. ⌘Z inside the field is text undo; the edit undo (⌘Z within 10 s) never deletes a comment, and a post, sent or failed, leaves the edit undo's state as it was.
-- On a detail, the failure line sits directly above the comment field (or the permission note), following its height.
+- On a detail, the failure line sits directly above the bottom row (the comment field, or the permission note in its place), following the field as it grows.
 - The failure line is the edits' line with a comment variant. An edit, or another post, replaces it, as edits replace each other's failures: a post clears it as it is sent, leaving the edit undo as it was.
 - Posting on a closed or merged item is allowed, as GitHub allows it.
 - **Account change mid-post:** the answer applies only if the account that posted is still current, as edits guard today. If it isn't, the draft of the posting account is cleared on success and kept otherwise, and nothing else changes.
@@ -187,7 +188,7 @@ The comment field has its own completion, in PullBullKit, separate from search's
 - No new permission. The official app already has **Issues: Read and write** and **Pull requests: Read and write**.
 - A comment on an issue gates on `issues: write`; on a pull request, on `pull_requests: write`. GitHub accepts either for a PR comment; the stricter rule is deliberate, matching every other PR edit. `EditPermission.of` takes a new `EditField.comment`.
 - Whether the item is a PR comes from the route (`.detail` is a PR, `.issueDetail` an issue), not from a list copy, so a PR opened from Ask or a notification is gated as a PR. The comment field does not use `isSetEditOffered`, which requires a held item.
-- An installation without the permission shows the edit note, worded for comments ("Commenting needs PullBull's new permissions for acme. An org owner accepts them on GitHub."), with its link, in place of the comment field. `EditPermission.note` takes the field to word it.
+- An installation without the permission shows the edit note, worded for comments ("Commenting needs PullBull's new permissions for acme. An org owner accepts them on GitHub."), in the field's place in the bottom row: a disabled, field-shaped box, 24 pt tall, reading the note on one line, cut short with an ellipsis, with the whole note in its tooltip and for VoiceOver. After it comes the note's link, an **Open on GitHub** button to the installation's permission review, then the item's buttons, which stay. `EditPermission.note` takes the field to word it.
 - With no installation on the item's owner (`EditPermission.unavailable`), the field isn't shown and ⌥⌘M does nothing.
 
 ### GitHub CLI logins
@@ -259,7 +260,7 @@ Manual check against real GitHub, on a test repo in an org with a team:
 
 The user asked for comments with @mentions, and noted the app is open source. The rest are the writer's calls:
 
-- The field lives on the detail page only, pinned above the bottom buttons; rows don't take comments.
+- The field lives on the detail page only, in the bottom row before the item's buttons; rows don't take comments. Focused, the Comment button takes the buttons' place; they come back when the field is left, and a draft alone never hides them.
 - ⌥⌘M focuses it; ⌘↩ posts while it has focus and opens on GitHub otherwise; Return is a new line; Esc leaves the field and a second Esc closes the detail.
 - While the field has focus it owns the keyboard, except ⌘↩, Esc, ⌘W, ⌘, and ⌘/.
 - An `NSTextView` with plain text and substitutions off.

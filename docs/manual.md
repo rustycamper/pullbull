@@ -129,7 +129,7 @@ Set an issue's board Status, a pull request's reviewers, and the assignees and l
 
 Write a comment on an open, closed or merged issue or pull request from its detail. It goes out only when you post it.
 
-- **Where:** a comment field pinned at the bottom of the detail, above the buttons, so it stays in view while the page scrolls. Opening a detail or the popover never puts the caret in it: press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>M</kbd>, or click it.
+- **Where:** a comment field at the bottom of the detail, on one row with the buttons, so it stays in view while the page scrolls. It reads "Comment…", or shows a pencil and the first line of a waiting draft. Opening a detail or the popover never puts the caret in it: press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>M</kbd>, or click it. While you write, the field grows upward to 8 lines and the **Comment** button takes the buttons' place; leave the field and they come back
 - **Post:** <kbd>⌘</kbd><kbd>Return</kbd> in the field, or the **Comment** button. Empty text sends nothing
 - **Keys in the field:** <kbd>Return</kbd> writes a new line. Outside the field, <kbd>⌘</kbd><kbd>Return</kbd> still opens the item on GitHub
 - **Tagging:** type `@login` (or `@owner/team`) by hand; GitHub turns it into a mention and notifies the person when the comment posts. PullBull doesn't suggest names yet
@@ -140,7 +140,7 @@ Write a comment on an open, closed or merged issue or pull request from its deta
 - **Not sure:** after a timeout or a dropped connection PullBull checks the Conversation before saying anything. If your comment is there it counts as posted. If not, the line says "Couldn't confirm your comment on #88. Check the Conversation before sending again." and the text stays in the field. Check on GitHub first: the comment may have been made
 - **No undo:** a posted comment emails everyone tagged and subscribed. PullBull can't edit or delete it; GitHub can. <kbd>⌘</kbd><kbd>Z</kbd> in the field undoes typing only
 - **Your own comment** raises no "New comment" notification
-- **Permissions:** with Sign in with GitHub, an issue needs PullBull's Issues permission and a pull request its Pull requests permission; until an org owner accepts them, a note with a link takes the field's place. With a `gh` login, `repo` covers it
+- **Permissions:** with Sign in with GitHub, an issue needs PullBull's Issues permission and a pull request its Pull requests permission; until an org owner accepts them, a note with a link takes the field's place in the row (hover it for the whole note). With a `gh` login, `repo` covers it
 
 ## Search
 

@@ -156,8 +156,8 @@ struct PopoverView: View {
         // Skeletons shimmer only while the panel is open.
         .environment(\.skeletonAnimates, shown)
         .frame(width: Self.size.width, height: Self.size.height)
-        // An edit or post that didn't stick says why, above the footer, or above the detail's comment
-        // field and bottom bar, following the field as it grows.
+        // An edit or post that didn't stick says why, above the footer, or above the detail's bottom row
+        // (the comment field and the item's buttons), following the field as it grows.
         .overlayPreferenceValue(DetailBottomInsetKey.self, alignment: .bottom) { insets in
             EditFailureLine(model: model)
                 .padding(.bottom, failureLineInset(insets))
@@ -486,8 +486,8 @@ struct PopoverView: View {
         withTransaction(transaction) { layers = new }
     }
 
-    /// The failure line's distance from the bottom: the shown detail's comment field and bottom bar, or
-    /// the list's footer.
+    /// The failure line's distance from the bottom: the shown detail's bottom row, with the comment field
+    /// as tall as it has grown, or the list's footer.
     private func failureLineInset(_ insets: [PRKey: CGFloat]) -> CGFloat {
         switch model.route {
         case .detail(let key), .issueDetail(let key): insets[key] ?? 45
