@@ -224,7 +224,7 @@ enum Queries {
         issue(number:$n){
           ...issueRowFields
           body
-          lastComments: comments(last:2){totalCount nodes{id author{login} body createdAt}}
+          lastComments: comments(last:2){totalCount nodes{id author{__typename login} body createdAt}}
           closedByPullRequestsReferences(first:5, includeClosedPrs:true){nodes{
             number title url state isDraft author{login} repository{nameWithOwner}
             commits(last:1){nodes{commit{statusCheckRollup{state contexts{\(rollupCounts)}}}}}
@@ -247,7 +247,7 @@ enum Queries {
           }}}}}}
           reviewRequests(first:20){nodes{requestedReviewer{__typename ... on User{login} ... on Team{slug name}}}}
           latestReviews(first:20){nodes{author{login} state submittedAt}}
-          comments(last:50){totalCount nodes{id author{login} body createdAt}}
+          comments(last:50){totalCount nodes{id author{__typename login} body createdAt}}
           files(first:100){totalCount nodes{path additions deletions}}
         }
       }

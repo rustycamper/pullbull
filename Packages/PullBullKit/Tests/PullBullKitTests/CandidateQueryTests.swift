@@ -6,21 +6,26 @@ import Testing
 private final class QueueTransport: GraphQLTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var queue: [Data]
+    private var statuses: [Int]
     private var sent: [Data] = []
 
-    init(_ json: [String]) { queue = json.map { Data($0.utf8) } }
+    /// `statuses`: the HTTP status of each answer in turn; 200 past the end.
+    init(_ json: [String], statuses: [Int] = []) {
+        queue = json.map { Data($0.utf8) }
+        self.statuses = statuses
+    }
 
     var bodies: [[String: Any]] {
         lock.withLock { sent.compactMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } }
     }
 
     func send(_ body: Data, token: String) async throws -> (Data, HTTPURLResponse) {
-        let data = lock.withLock {
+        let (data, status) = lock.withLock {
             sent.append(body)
-            return queue.removeFirst()
+            return (queue.removeFirst(), statuses.isEmpty ? 200 : statuses.removeFirst())
         }
         let response = HTTPURLResponse(
-            url: URL(string: "https://api.github.com/graphql")!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            url: URL(string: "https://api.github.com/graphql")!, statusCode: status, httpVersion: nil, headerFields: nil)!
         return (data, response)
     }
 }
@@ -155,6 +160,68 @@ private func variables(_ body: [String: Any]) -> [String: Any] { body["variables
         #expect(first["withIssue"] as? Bool == true)
         #expect(first["after"] == nil)
         #expect(second["withIssue"] as? Bool == false)
+    }
+
+    @Test func mentionableCandidatesSendOwnerNameAndQuery() async throws {
+        let t = QueueTransport([
+            #"""
+            {"data":{"repository":{"mentionableUsers":{"nodes":[
+              {"id":"U_a","login":"alice","avatarUrl":"https://a.test/a.png"}],
+              "pageInfo":{"hasNextPage":true}}}}}
+            """#,
+            #"{"data":{"repository":{"mentionableUsers":{"nodes":[],"pageInfo":{"hasNextPage":false}}}}}"#,
+        ])
+        let result = try await api(t).mentionableCandidates(repo: "acme/widgets", query: "al")
+        #expect(result.all.map(\.name) == ["alice"])
+        #expect(result.all[0].avatarURL == URL(string: "https://a.test/a.png"))
+        #expect(!result.complete)
+        let sent = variables(try #require(t.bodies.first))
+        #expect(sent["owner"] as? String == "acme")
+        #expect(sent["name"] as? String == "widgets")
+        #expect(sent["q"] as? String == "al")
+        let empty = try await api(t).mentionableCandidates(repo: "acme/widgets", query: "")
+        #expect(empty.complete)
+        #expect(variables(t.bodies[1])["q"] == nil)
+    }
+
+    @Test func teamsAreNilWhenGitHubAnswersWithoutThem() async throws {
+        let t = QueueTransport([
+            #"{"data":{"organization":{"teams":null}},"errors":[{"type":"INSUFFICIENT_SCOPES","message":"read:org"}]}"#
+        ])
+        #expect(try await api(t).teams(owner: "acme", query: nil) == nil)
+        let ok = QueueTransport([
+            #"{"data":{"organization":{"teams":{"nodes":[{"slug":"backend","name":"Back End"}],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}"#
+        ])
+        let teams = try #require(try await api(ok).teams(owner: "acme", query: nil))
+        #expect(teams.map(\.team) == ["backend"])
+    }
+
+    @Test func teamsAreNilForAUsersAccount() async throws {
+        let t = QueueTransport([
+            #"{"data":{"organization":null},"errors":[{"type":"NOT_FOUND","message":"Could not resolve to an Organization"}]}"#
+        ])
+        #expect(try await api(t).teams(owner: "alice", query: nil) == nil)
+    }
+
+    /// GitHub couldn't be asked: thrown, so the @ list asks again on the next focus.
+    @Test func teamsThrowWhenGitHubIsNotReached() async throws {
+        let t = QueueTransport([#"{"message":"Bad Gateway"}"#], statuses: [502])
+        await #expect(throws: APIError.server(502)) {
+            _ = try await api(t).teams(owner: "acme", query: nil)
+        }
+    }
+
+    /// An error with no data, or a page that isn't GitHub's, isn't an answer: thrown, so it isn't kept
+    /// as "no teams" for the session.
+    @Test func teamsThrowWithoutAnAnswer() async throws {
+        let failed = QueueTransport([#"{"errors":[{"message":"Something went wrong while executing your query."}]}"#])
+        await #expect(throws: APIError.graphQL("Something went wrong while executing your query.")) {
+            _ = try await api(failed).teams(owner: "acme", query: nil)
+        }
+        let portal = QueueTransport(["<html>Sign in to Wi-Fi</html>"])
+        await #expect(throws: APIError.graphQL("malformed response")) {
+            _ = try await api(portal).teams(owner: "acme", query: nil)
+        }
     }
 
     @Test func aMissingRepositoryThrowsNotFound() async throws {

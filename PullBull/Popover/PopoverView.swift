@@ -158,9 +158,15 @@ struct PopoverView: View {
         .frame(width: Self.size.width, height: Self.size.height)
         // An edit or post that didn't stick says why, above the footer, or above the detail's bottom row
         // (the comment field and the item's buttons), following the field as it grows.
+        // The @ list rises over the same spot, so the line steps aside while it is open; kept in place
+        // rather than removed, so it isn't announced again when the list closes.
         .overlayPreferenceValue(DetailBottomInsetKey.self, alignment: .bottom) { insets in
+            let listOpen = model.mention != nil
             EditFailureLine(model: model)
                 .padding(.bottom, failureLineInset(insets))
+                .opacity(listOpen ? 0 : 1)
+                .allowsHitTesting(!listOpen)
+                .accessibilityHidden(listOpen)
         }
         // The edit picker opens at its row, or the detail's field row, over every layer.
         .overlayPreferenceValue(EditPickerAnchorKey.self) { anchor in
@@ -866,7 +872,7 @@ struct PopoverView: View {
     private func handleDetailKey(_ event: NSEvent, flags: NSEvent.ModifierFlags, in window: NSWindow) -> Bool {
         if let field = window.firstResponder as? CommentEditor, let key = field.key {
             let action = CommentFieldKeys.route(
-                keyCode: event.keyCode, flags: KeyCombo.Modifiers(flags), mentionsOpen: false,
+                keyCode: event.keyCode, flags: KeyCombo.Modifiers(flags), mentionsOpen: model.mention != nil,
                 composing: field.hasMarkedText())
             switch action {
             case .post:
@@ -875,7 +881,16 @@ struct PopoverView: View {
             case .leaveField:
                 window.makeFirstResponder(nil)
                 return true
-            case .text, .closeMentions, .moveMention, .acceptMention:
+            case .closeMentions:
+                model.closeMentions()
+                return true
+            case .moveMention(let offset):
+                // With no row yet ("Loading people…"), ↑ and ↓ move the caret as usual.
+                return model.moveMention(by: offset)
+            case .acceptMention:
+                // With nothing to take yet ("Loading people…"), Return and Tab type as usual.
+                return model.acceptMention()
+            case .text:
                 return false
             }
         }

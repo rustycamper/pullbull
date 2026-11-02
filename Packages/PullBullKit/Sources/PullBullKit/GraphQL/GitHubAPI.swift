@@ -169,12 +169,15 @@ public struct Comment: Codable, Sendable, Hashable {
     /// The comment's node ID; nil for a comment read before ids were kept.
     public let id: String?
     public let author: String
+    /// Whether the author is a bot; nil for a comment read before the author's type was kept.
+    public let authorIsBot: Bool?
     public let body: String
     public let createdAt: Date
 
-    public init(id: String? = nil, author: String, body: String, createdAt: Date) {
+    public init(id: String? = nil, author: String, authorIsBot: Bool? = nil, body: String, createdAt: Date) {
         self.id = id
         self.author = author
+        self.authorIsBot = authorIsBot
         self.body = body
         self.createdAt = createdAt
     }
@@ -768,8 +771,10 @@ public struct GitHubAPI: Sendable {
               let raw = node["createdAt"] as? String,
               let created = try? Decoding.date(raw)
         else { return nil }
-        let author = (node["author"] as? [String: Any])?["login"] as? String ?? "ghost"
-        return Comment(id: node["id"] as? String, author: author, body: body, createdAt: created)
+        let authorNode = node["author"] as? [String: Any]
+        let author = authorNode?["login"] as? String ?? "ghost"
+        let isBot = (authorNode?["__typename"] as? String).map { $0 == "Bot" }
+        return Comment(id: node["id"] as? String, author: author, authorIsBot: isBot, body: body, createdAt: created)
     }
 
     private static func linkedPR(_ node: [String: Any]) -> LinkedPR? {
@@ -997,6 +1002,30 @@ public struct GitHubAPI: Sendable {
             complete: !more)
     }
 
+    /// The first hundred people who can be mentioned in `repo` ("owner/name"; those matching `query`, when
+    /// it isn't empty). `complete` is false when there were more. `current` is empty.
+    public func mentionableCandidates(repo: String, query: String?) async throws -> SetCandidates {
+        let parts = repo.split(separator: "/", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { throw APIError.notFound("\(repo) not found") }
+        var variables: [String: Any] = ["owner": parts[0], "name": parts[1]]
+        if let query, !query.isEmpty { variables["q"] = query }
+        let data = try await execute(Mutations.mentionableCandidates, variables)
+        guard let repository = data["repository"] as? [String: Any] else {
+            throw APIError.notFound("\(repo) not found")
+        }
+        let users = repository["mentionableUsers"] as? [String: Any]
+        let more = (users?["pageInfo"] as? [String: Any])?["hasNextPage"] as? Bool == true
+        return SetCandidates(all: Self.candidates(in: users, label: false), current: [], complete: !more)
+    }
+
+    /// The organisation's teams (those matching `query`, when it isn't empty); nil when GitHub won't list
+    /// them (a user's account, no `read:org`, no Members permission). Throws when GitHub couldn't be
+    /// asked (offline, a 5xx, a rate limit), so a caller can try again. A list cut at `maxLabelPages`
+    /// pages is returned as read.
+    public func teams(owner: String, query: String?) async throws -> [SetCandidate]? {
+        try await teamCandidates(owner: owner, query: query, throwsUnanswered: true)?.list
+    }
+
     /// What the reviewers picker offers on pull request `key`: people (filtered by `query` past the first
     /// 100), the PR's past reviewers with their verdicts, its suggested reviewers, its requests, and the
     /// teams of an organisation owner. A team list that can't be read (no `read:org`, no Members
@@ -1054,8 +1083,11 @@ public struct GitHubAPI: Sendable {
             picker: SetCandidates(all: all, current: current, complete: !morePeople && teams?.complete != false))
     }
 
-    /// The organisation's teams, paged as labels are; nil when GitHub won't list them.
-    private func teamCandidates(owner: String, query: String?) async throws -> (list: [SetCandidate], complete: Bool)? {
+    /// The organisation's teams, paged as labels are; nil when GitHub won't list them. `throwsUnanswered`:
+    /// a failure to ask GitHub at all is thrown rather than read as nil.
+    private func teamCandidates(
+        owner: String, query: String?, throwsUnanswered: Bool = false
+    ) async throws -> (list: [SetCandidate], complete: Bool)? {
         var list: [SetCandidate] = []
         var after: String?
         for _ in 0..<Self.maxLabelPages {
@@ -1070,6 +1102,7 @@ public struct GitHubAPI: Sendable {
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
+                if throwsUnanswered, !Self.isRefusal(error) { throw error }
                 return nil
             }
             list += Self.nodes(teams).compactMap { node in
@@ -1082,6 +1115,17 @@ public struct GitHubAPI: Sendable {
             after = cursor
         }
         return (list, false)
+    }
+
+    /// GitHub answered, and the answer was no: a missing scope or a 403. A user's login or a token that
+    /// can't read the org's teams answers with data and no teams, and comes back as nil before this. Anything
+    /// else (offline, a 5xx, a rate limit, a body that isn't GitHub's, an error with no data) means it
+    /// wasn't asked.
+    private static func isRefusal(_ error: Error) -> Bool {
+        switch error as? APIError {
+        case .insufficientScopes, .forbidden: true
+        default: false
+        }
     }
 
     private static func nodes(_ connection: Any?) -> [[String: Any]] {

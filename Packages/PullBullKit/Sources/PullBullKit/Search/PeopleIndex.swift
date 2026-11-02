@@ -115,6 +115,16 @@ public struct PeopleIndex: Equatable, Sendable {
         return ranked.prefix(limit).map(\.person)
     }
 
+    /// People whose login starts with `prefix` (case ignored), alphabetical, never the viewer and never "me".
+    public func people(prefix: String, limit: Int) -> [(login: String, avatarURL: URL?)] {
+        let p = prefix.lowercased()
+        return self.people
+            .filter { !$0.isViewer && $0.id.hasPrefix(p) }
+            .sorted { $0.id < $1.id }
+            .prefix(limit)
+            .map { (login: $0.login, avatarURL: $0.avatarURL) }
+    }
+
     public func contains(_ login: String) -> Bool {
         let key = login.lowercased()
         if key == "me" { return viewer != nil }

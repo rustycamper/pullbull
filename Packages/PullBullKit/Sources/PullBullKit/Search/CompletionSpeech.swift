@@ -245,6 +245,35 @@ public enum CompletionSpeech {
         "Showing issues in \(candidate.name)"
     }
 
+    // MARK: The comment field's @ list
+
+    /// One row: the login, or `<team name>, team <owner/slug>`.
+    public static func label(_ candidate: MentionCandidate) -> String {
+        candidate.isTeam ? "\(candidate.title), team \(candidate.insertText)" : candidate.title
+    }
+
+    /// The @ list opened on a new token, or went from no rows to some.
+    public static func mentionsOpened(rows: [MentionCandidate], loading: Bool) -> String {
+        switch rows.count {
+        case 0: return loading ? "Loading people" : "No suggestions"
+        case 1: return "1 suggestion. Up and down arrows to choose, Return to insert."
+        case let count: return "\(count) suggestions. Up and down arrows to choose, Return to insert."
+        }
+    }
+
+    /// As `change` for search's lists: open on a new token, or when the rows go from none to some or some
+    /// to none on the same token; the selected row and its place after ↑ / ↓; else nothing.
+    public static func mentionChange(from old: MentionSpeechState?, to new: MentionSpeechState?) -> String? {
+        guard let new else { return nil }
+        guard let old, old.start == new.start, old.rows.isEmpty == new.rows.isEmpty else {
+            return mentionsOpened(rows: new.rows, loading: new.loading)
+        }
+        guard old.rows == new.rows, old.selection != new.selection, new.rows.indices.contains(new.selection) else {
+            return nil
+        }
+        return "\(label(new.rows[new.selection])), \(new.selection + 1) of \(new.rows.count)"
+    }
+
     private static func items(_ count: Int) -> String? {
         switch count {
         case 0: return nil
@@ -266,5 +295,21 @@ public enum CompletionSpeech {
         if old.candidates.isEmpty != new.candidates.isEmpty { return opened(new) }
         guard old.candidates == new.candidates, old.selection != new.selection else { return nil }
         return selected(new)
+    }
+}
+
+/// What VoiceOver needs of the comment field's @ list: where its token starts, its rows and selection, and
+/// whether people are still loading.
+public struct MentionSpeechState: Equatable, Sendable {
+    public let start: Int
+    public let rows: [MentionCandidate]
+    public let selection: Int
+    public let loading: Bool
+
+    public init(start: Int, rows: [MentionCandidate], selection: Int, loading: Bool) {
+        self.start = start
+        self.rows = rows
+        self.selection = selection
+        self.loading = loading
     }
 }

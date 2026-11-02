@@ -8,6 +8,39 @@ struct CommentFieldSignal: Equatable {
     let n: Int
 }
 
+/// The @ list over the comment field on `key`: the token at the caret, its rows (at most 8), the
+/// highlighted one, and whether people are still loading with nothing to show yet ("Loading people…").
+struct MentionState: Equatable {
+    let key: PRKey
+    let token: MentionToken
+    var rows: [MentionCandidate]
+    var selection: Int
+    var loading: Bool
+
+    var speech: MentionSpeechState {
+        MentionSpeechState(start: token.range.lowerBound, rows: rows, selection: selection, loading: loading)
+    }
+}
+
+/// The focused comment field as the @ list reads it. `caret` is nil while text is selected.
+struct MentionField {
+    let key: PRKey
+    let isPullRequest: Bool
+    var text: String
+    var caret: Int?
+    /// Where the token Esc closed starts: caret moves leave it closed; typing opens it again.
+    var dismissedAt: Int?
+}
+
+/// A row taken from the @ list, for the comment field on `key` to put in its text with its own undo.
+struct MentionInsertion: Equatable {
+    let key: PRKey
+    let range: Range<Int>
+    let replacement: String
+    let caret: Int
+    let n: Int
+}
+
 // MARK: - Commenting
 
 extension AppModel {
@@ -51,6 +84,7 @@ extension AppModel {
         guard !text.isEmpty, !isPostInFlight(for: key), !postedComments.isSending(key) else { return }
         // Another post replaces the failure line, as an edit does; ⌘Z and the last edit stay.
         edits.dismissFailure()
+        endMentions()
         let start = Date()
         let url = fetchedPullRequest(for: key)?.url ?? GitHubLinks.issue(key)
         let listCount = fetchedPullRequest(for: key)?.commentCount ?? fetchedIssue(for: key)?.commentCount
@@ -150,3 +184,208 @@ extension AppModel {
         }
     }
 }
+
+// MARK: - Mentions
+
+extension AppModel {
+    /// The comment field on `key` took focus: the repo's mentionable people and its owner's teams are
+    /// fetched unless cached, so they are usually there by the first "@".
+    func commentFieldFocused(key: PRKey, isPullRequest: Bool, text: String, caret: Int?) {
+        mentionField = MentionField(key: key, isPullRequest: isPullRequest, text: text, caret: caret)
+        loadMentionCandidates(for: key)
+        updateMention(typed: false)
+    }
+
+    /// The comment field on `key` lost focus: its @ list closes.
+    func commentFieldBlurred(key: PRKey) {
+        guard mentionField?.key == key else { return }
+        endMentions()
+    }
+
+    /// The focused field's text or caret changed (`typed` when the text did): the @ list follows the
+    /// token at the caret.
+    func commentTextChanged(key: PRKey, isPullRequest: Bool, text: String, caret: Int?, typed: Bool) {
+        let dismissed = typed ? nil : mentionField.flatMap { $0.key == key ? $0.dismissedAt : nil }
+        mentionField = MentionField(
+            key: key, isPullRequest: isPullRequest, text: text, caret: caret, dismissedAt: dismissed)
+        updateMention(typed: typed)
+    }
+
+    /// Esc: the list closes and the typed text stays.
+    func closeMentions() {
+        guard let mention else { return }
+        mentionField?.dismissedAt = mention.token.range.lowerBound
+        self.mention = nil
+        mentionFilterTask?.cancel()
+        mentionFilterTask = nil
+    }
+
+    /// ↑ or ↓ in the open list. False with no row ("Loading people…"), so the key moves the caret.
+    @discardableResult
+    func moveMention(by offset: Int) -> Bool {
+        guard var mention, !mention.rows.isEmpty else { return false }
+        mention.selection = min(max(mention.selection + offset, 0), mention.rows.count - 1)
+        self.mention = mention
+        return true
+    }
+
+    /// A click on row `index`.
+    func selectMention(_ index: Int) {
+        guard mention?.rows.indices.contains(index) == true else { return }
+        mention?.selection = index
+    }
+
+    /// Return or Tab: puts "@login " or "@owner/slug " in place of the token. False with no row to take,
+    /// so the key types as usual.
+    @discardableResult
+    func acceptMention() -> Bool {
+        guard let mention, mention.rows.indices.contains(mention.selection),
+              let field = mentionField, field.key == mention.key else { return false }
+        let row = mention.rows[mention.selection]
+        let edit = mention.token.edit(inserting: row.insertText, into: field.text)
+        // The field's text as it will be, so nothing arriving before the view applies it reopens the list.
+        let after = mention.token.inserting(row.insertText, into: field.text)
+        mentionField?.text = after.text
+        mentionField?.caret = after.caret
+        self.mention = nil
+        mentionFilterTask?.cancel()
+        mentionFilterTask = nil
+        requestMentionInsertion(on: mention.key, range: edit.range, replacement: edit.replacement, caret: edit.caret)
+        return true
+    }
+
+    /// Closes the list and forgets the field: on a post, on leaving the field, on another screen.
+    func endMentions() {
+        mentionField = nil
+        mention = nil
+        mentionFilterTask?.cancel()
+        mentionFilterTask = nil
+    }
+
+    /// The token at the caret, ranked against the thread, the cached candidates and PeopleIndex. With no
+    /// row and nothing still loading, the list is closed, so Return and Esc act on the field.
+    private func updateMention(typed: Bool) {
+        if typed {
+            mentionFilterTask?.cancel()
+            mentionFilterTask = nil
+        }
+        guard let field = mentionField, let account = runningAccount, let caret = field.caret,
+              let token = MentionToken.at(field.text, caret: caret),
+              token.range.lowerBound != field.dismissedAt else {
+            mention = nil
+            return
+        }
+        let key = field.key
+        let peopleKey = Self.mentionableKey(key)
+        let teamsKey = Self.teamCandidatesKey(key)
+        let owner = key.repo.split(separator: "/").first.map(String.init) ?? ""
+        let rows = MentionCandidates.rank(
+            prefix: token.prefix, thread: mentionThread(for: key, isPullRequest: field.isPullRequest),
+            mentionable: setCandidates[peopleKey]?.all ?? [], known: people.people(prefix: token.prefix, limit: 50),
+            teams: setCandidates[teamsKey]?.all, owner: owner, viewer: account.login)
+        let loading = rows.isEmpty && (mentionFetches[peopleKey] != nil || mentionFetches[teamsKey] != nil)
+        if rows.isEmpty && !loading {
+            mention = nil
+        } else {
+            let selection = mention.flatMap { old in
+                old.key == key && old.token.range.lowerBound == token.range.lowerBound
+                    ? MentionCandidates.selection(keeping: old.selection, of: old.rows, in: rows) : nil
+            } ?? 0
+            mention = MentionState(key: key, token: token, rows: rows, selection: selection, loading: loading)
+        }
+        if typed, MentionCandidates.wantsRemote(
+            prefix: token.prefix, rowCount: rows.count, mentionableComplete: setCandidates[peopleKey]?.complete) {
+            filterMentions(key: key, prefix: token.prefix, account: account)
+        }
+    }
+
+    /// After a 0.3 s pause in typing, GitHub is asked for mentionable people matching `prefix`; they join
+    /// the cached ones. The answer is used only while the same field shows the same token.
+    private func filterMentions(key: PRKey, prefix: String, account: AccountRef) {
+        let client = api(for: account)
+        mentionFilterTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            let answer = try? await client.mentionableCandidates(repo: key.repo, query: prefix)
+            guard let answer, let self, !Task.isCancelled, self.runningAccount == account,
+                  self.isMentionCurrent(key: key, prefix: prefix) else { return }
+            self.mentionFilterTask = nil
+            self.addMentionable(answer.all, complete: nil, for: key)
+            self.updateMention(typed: false)
+        }
+    }
+
+    private func isMentionCurrent(key: PRKey, prefix: String) -> Bool {
+        guard let field = mentionField, field.key == key, let caret = field.caret else { return false }
+        return MentionToken.at(field.text, caret: caret)?.prefix == prefix
+    }
+
+    /// Starts the fetches `key`'s @ list needs that aren't cached or under way. A failed one caches
+    /// nothing and leaves its group out, so the next focus asks again.
+    private func loadMentionCandidates(for key: PRKey) {
+        guard let account = runningAccount else { return }
+        let client = api(for: account)
+        let peopleKey = Self.mentionableKey(key)
+        if setCandidates[peopleKey] == nil, mentionFetches[peopleKey] == nil {
+            mentionFetches[peopleKey] = Task { [weak self] in
+                let answer = try? await client.mentionableCandidates(repo: key.repo, query: nil)
+                guard let self, !Task.isCancelled, self.runningAccount == account else { return }
+                self.mentionFetches[peopleKey] = nil
+                if let answer { self.addMentionable(answer.all, complete: answer.complete, for: key) }
+                self.updateMention(typed: false)
+            }
+        }
+        let teamsKey = Self.teamCandidatesKey(key)
+        let owner = key.repo.split(separator: "/").first.map(String.init) ?? ""
+        if setCandidates[teamsKey] == nil, mentionFetches[teamsKey] == nil, !owner.isEmpty {
+            mentionFetches[teamsKey] = Task { [weak self] in
+                // GitHub's nil (a user's repo, no read:org, no Members permission) is cached as no teams,
+                // so it isn't asked again on each focus; a fetch that failed is not.
+                let teams: [SetCandidate]?
+                do {
+                    teams = try await client.teams(owner: owner, query: nil) ?? []
+                } catch {
+                    teams = nil
+                }
+                guard let self, !Task.isCancelled, self.runningAccount == account else { return }
+                self.mentionFetches[teamsKey] = nil
+                if let teams { self.setCandidates[teamsKey] = SetCandidates(all: teams, current: [], complete: true) }
+                self.updateMention(typed: false)
+            }
+        }
+    }
+
+    /// Adds `found` to the cached mentionable people of `key`'s repo; `complete` is the full list's
+    /// (nil keeps what the cache says).
+    private func addMentionable(_ found: [SetCandidate], complete: Bool?, for key: PRKey) {
+        let cacheKey = Self.mentionableKey(key)
+        let held = setCandidates[cacheKey]
+        let known = Set((held?.all ?? []).map(\.key))
+        let all = (held?.all ?? []) + found.filter { !known.contains($0.key) }
+        setCandidates[cacheKey] = SetCandidates(all: all, current: [], complete: complete ?? held?.complete ?? false)
+    }
+
+    /// People in the thread on `key` as the detail holds them: comment authors, then the item's author,
+    /// assignees, requested reviewers and reviewers.
+    private func mentionThread(for key: PRKey, isPullRequest: Bool) -> [String] {
+        if isPullRequest {
+            let pr = pullRequest(for: key)
+            let held = detail(for: key)
+            return MentionCandidates.thread(
+                comments: held?.comments ?? [], author: pr?.author, assignees: pr?.assignees.map(\.login) ?? [],
+                requested: pr?.reviewRequests ?? held?.requests ?? [],
+                reviewers: (held?.reviews ?? pr?.latestReviews ?? []).map(\.author))
+        }
+        let held = issueDetails[key]
+        let item = issue(for: key) ?? held?.issue
+        return MentionCandidates.thread(
+            comments: held?.lastComments ?? [], author: item?.author,
+            assignees: item?.assignees.map(\.login) ?? [], requested: [], reviewers: [])
+    }
+
+    /// The mentionable people of `key`'s repo in `setCandidates`.
+    private static func mentionableKey(_ key: PRKey) -> String {
+        "mentionable|\(key.repo)"
+    }
+}
+

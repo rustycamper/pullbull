@@ -46,10 +46,32 @@ struct CommentField<Secondary: View>: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .overlay(alignment: .top) { Hairline() }
-        // A field taken away while focused (the permission lost) comes back unfocused.
+        // A field taken away while focused (the permission lost) comes back unfocused, and its @ list ends:
+        // the torn-down text view never reports the blur.
         .onChange(of: ready) { _, ready in
-            if !ready { isFocused = false }
+            guard !ready else { return }
+            isFocused = false
+            model.commentFieldBlurred(key: key)
         }
+        // The @ list floats over the detail's scroll area, its bottom on the row's top, so it rises as the
+        // field grows.
+        .overlay(alignment: .top) {
+            if ready, let mention, isFocused {
+                MentionList(model: model, mention: mention)
+                    .padding(.horizontal, 10)
+                    .alignmentGuide(.top) { $0[.bottom] }
+            }
+        }
+        .onChange(of: mention?.speech) { old, new in
+            if let speech = CompletionSpeech.mentionChange(from: old, to: new) {
+                AccessibilityNotification.Announcement(speech).post()
+            }
+        }
+    }
+
+    /// The @ list, when it belongs to this field.
+    private var mention: MentionState? {
+        model.mention.flatMap { $0.key == key ? $0 : nil }
     }
 
     private var field: some View {
@@ -57,7 +79,7 @@ struct CommentField<Secondary: View>: View {
             CommentTextView(
                 model: model, key: key, isPullRequest: isPullRequest, account: account, isSending: isSending,
                 reset: model.commentFieldReset, focusRequest: model.commentFieldFocusRequest,
-                isFocused: $isFocused, contentHeight: $contentHeight)
+                insertion: model.mentionInsertion, isFocused: $isFocused, contentHeight: $contentHeight)
                 .frame(height: textHeight)
                 .overlay(alignment: .leading) {
                     if !isFocused { unfocusedText }
@@ -167,6 +189,8 @@ struct CommentTextView: NSViewRepresentable {
     /// `AppModel.commentFieldReset` and `commentFieldFocusRequest`, acted on when their key is `key`.
     let reset: CommentFieldSignal?
     let focusRequest: CommentFieldSignal?
+    /// `AppModel.mentionInsertion`, made when its key is `key`.
+    let insertion: MentionInsertion?
     @Binding var isFocused: Bool
     @Binding var contentHeight: CGFloat
 
@@ -223,6 +247,7 @@ struct CommentTextView: NSViewRepresentable {
         coordinator.textView = textView
         coordinator.seenReset = reset
         coordinator.seenFocusRequest = focusRequest
+        coordinator.seenInsertion = insertion
         textView.onFocusChange = { [weak coordinator] focused in coordinator?.focusChanged(focused) }
         textView.onPost = { [model, key, isPullRequest] in model.postComment(on: key, isPullRequest: isPullRequest) }
         coordinator.observeFrame()
@@ -247,6 +272,12 @@ struct CommentTextView: NSViewRepresentable {
                 DispatchQueue.main.async { [weak textView] in textView?.requestFocus() }
             }
         }
+        if insertion != coordinator.seenInsertion {
+            coordinator.seenInsertion = insertion
+            if let insertion, insertion.key == key {
+                DispatchQueue.main.async { [weak coordinator] in coordinator?.apply(insertion) }
+            }
+        }
         // Unfocused, the SwiftUI line above shows the draft; the view stays for VoiceOver and clicks.
         scrollView.alphaValue = isFocused ? 1 : 0
         textView.toolTip = isFocused ? nil : Self.help
@@ -267,12 +298,15 @@ struct CommentTextView: NSViewRepresentable {
         var loadedAccount: String?
         var seenReset: CommentFieldSignal?
         var seenFocusRequest: CommentFieldSignal?
+        var seenInsertion: MentionInsertion?
         /// The focus the last update laid out for.
         var shownFocused = false
         /// The view's own, so loading a draft or a post can clear it without touching the window's.
         private let undo = UndoManager()
         /// Set while a draft is put in the view, whose own changes then write nothing back.
         private var loading = false
+        /// Set while an @ row's text goes in, whose in-between states don't move the @ list.
+        private var inserting = false
 
         init(_ parent: CommentTextView) {
             self.parent = parent
@@ -291,6 +325,30 @@ struct CommentTextView: NSViewRepresentable {
             textView.breakUndoCoalescing()
             undo.removeAllActions()
             reportHeight()
+            // A focused field's @ list reads the new text, after the current update.
+            if textView.window?.firstResponder === textView {
+                DispatchQueue.main.async { [weak self, weak textView] in
+                    if let textView { self?.reportMention(textView, typed: false) }
+                }
+            }
+        }
+
+        /// Puts the taken @ row in place of its token, with the view's own undo, and the caret after it.
+        func apply(_ insertion: MentionInsertion) {
+            guard let textView, textView.isEditable, !textView.hasMarkedText(),
+                  insertion.range.upperBound <= (textView.string as NSString).length else { return }
+            inserting = true
+            // Its own undo step: ⌘Z takes back the row, not the "@" typed before it.
+            textView.breakUndoCoalescing()
+            textView.insertText(
+                insertion.replacement,
+                replacementRange: NSRange(location: insertion.range.lowerBound, length: insertion.range.count))
+            textView.breakUndoCoalescing()
+            inserting = false
+            let length = (textView.string as NSString).length
+            textView.setSelectedRange(NSRange(location: min(insertion.caret, length), length: 0))
+            writeDraft(textView)
+            reportMention(textView, typed: false)
         }
 
         /// A new width rewraps the text, so its height is reported again.
@@ -306,7 +364,17 @@ struct CommentTextView: NSViewRepresentable {
         /// Passed on after the current update: focus can change while SwiftUI is updating, as when the
         /// detail closes under it.
         func focusChanged(_ focused: Bool) {
-            DispatchQueue.main.async { [weak self] in self?.parent.isFocused = focused }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.parent.isFocused = focused
+                if focused, let textView = self.textView {
+                    self.parent.model.commentFieldFocused(
+                        key: self.parent.key, isPullRequest: self.parent.isPullRequest, text: textView.string,
+                        caret: Self.caret(of: textView))
+                } else if !focused {
+                    self.parent.model.commentFieldBlurred(key: self.parent.key)
+                }
+            }
         }
 
         func undoManager(for view: NSTextView) -> UndoManager? { undo }
@@ -314,13 +382,32 @@ struct CommentTextView: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard !loading, let textView else { return }
             // An input method's unfinished text isn't the draft yet; it is once committed.
-            if !textView.hasMarkedText() { writeDraft(textView) }
+            if !textView.hasMarkedText() {
+                writeDraft(textView)
+                if !inserting { reportMention(textView, typed: true) }
+            }
             reportHeight()
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
             guard !loading, let textView, !textView.hasMarkedText() else { return }
             writeDraft(textView)
+            if !inserting { reportMention(textView, typed: false) }
+        }
+
+        /// The @ list follows the focused field's token at the caret; the token is read from the text,
+        /// never from keys, so "@" typed with ⌥, a dead key or an input method opens it.
+        private func reportMention(_ textView: NSTextView, typed: Bool) {
+            guard textView.window?.firstResponder === textView else { return }
+            parent.model.commentTextChanged(
+                key: parent.key, isPullRequest: parent.isPullRequest, text: textView.string,
+                caret: Self.caret(of: textView), typed: typed)
+        }
+
+        /// The caret, or nil while text is selected.
+        private static func caret(of textView: NSTextView) -> Int? {
+            let range = textView.selectedRange()
+            return range.length == 0 ? range.location : nil
         }
 
         private func writeDraft(_ textView: NSTextView) {

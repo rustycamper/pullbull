@@ -6,21 +6,26 @@ import Testing
 private final class QueueTransport: GraphQLTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var queue: [Data]
+    private var statuses: [Int]
     private var sent: [Data] = []
 
-    init(_ json: [String]) { queue = json.map { Data($0.utf8) } }
+    /// `statuses`: the HTTP status of each answer in turn; 200 past the end.
+    init(_ json: [String], statuses: [Int] = []) {
+        queue = json.map { Data($0.utf8) }
+        self.statuses = statuses
+    }
 
     var bodies: [[String: Any]] {
         lock.withLock { sent.compactMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } }
     }
 
     func send(_ body: Data, token: String) async throws -> (Data, HTTPURLResponse) {
-        let data = lock.withLock {
+        let (data, status) = lock.withLock {
             sent.append(body)
-            return queue.removeFirst()
+            return (queue.removeFirst(), statuses.isEmpty ? 200 : statuses.removeFirst())
         }
         let response = HTTPURLResponse(
-            url: URL(string: "https://api.github.com/graphql")!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            url: URL(string: "https://api.github.com/graphql")!, statusCode: status, httpVersion: nil, headerFields: nil)!
         return (data, response)
     }
 }
@@ -93,6 +98,15 @@ private let noTeams = #"{"data":{"organization":null},"errors":[{"type":"FORBIDD
             .reviewerCandidates(for: key, query: nil)
         let keys = (result.picker.all + result.picker.current).map(\.key)
         #expect(keys.count == Set(keys).count)
+    }
+
+    /// Unlike the @ list's `teams(owner:query:)`, the picker reads a team list GitHub couldn't be asked
+    /// for as no teams, and still opens.
+    @Test func teamsGitHubCouldNotBeAskedForAreLeftOut() async throws {
+        let t = QueueTransport([people(), #"{"message":"Bad Gateway"}"#], statuses: [200, 502])
+        let result = try await api(t).reviewerCandidates(for: key, query: nil)
+        #expect(result.teams == nil)
+        #expect(result.people.map(\.name) == ["al", "bob", "sue"])
     }
 
     @Test func peopleKeepNodeIDs() async throws {
