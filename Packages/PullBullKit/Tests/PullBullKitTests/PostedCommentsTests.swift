@@ -65,6 +65,35 @@ private let github = Comment(id: "C_new", author: "pb", body: "hello", createdAt
         #expect(r.total == 3)
     }
 
+    /// Once a detail has held it, a fetch without it means it was deleted on GitHub: not shown again.
+    @Test func deletedAfterTheDetailHeldItStaysGone() {
+        var (p, id) = began()
+        p.posted(id, as: github)
+        p.detailFetched(key, comments: held(2) + [github])
+        let r = p.conversation(for: key, held: held(2), total: 2, keep: nil, now: t0.addingTimeInterval(10))
+        #expect(r.comments == held(2))
+        #expect(r.total == 2)
+    }
+
+    /// Held only as "a newer comment is there" (an issue page's two-comment window): deleting it stays gone too.
+    @Test func deletedAfterANewerCommentWasHeldStaysGone() {
+        var (p, id) = began()
+        p.posted(id, as: github)
+        let newer = Comment(id: "IC_newer", author: "bob", body: "later", createdAt: github.createdAt.addingTimeInterval(5))
+        p.detailFetched(key, comments: [newer])
+        let r = p.conversation(for: key, held: held(1), total: 1, keep: 2, now: t0.addingTimeInterval(10))
+        #expect(!r.comments.contains(github))
+    }
+
+    /// Another item's fetch settles nothing.
+    @Test func otherItemsFetchKeepsIt() {
+        var (p, id) = began()
+        p.posted(id, as: github)
+        p.detailFetched(editKey(8), comments: [github])
+        let r = p.conversation(for: key, held: held(2), total: 2, keep: nil, now: t0.addingTimeInterval(10))
+        #expect(r.comments.last == github)
+    }
+
     @Test func preFetchDetailKeepsIt() {
         var (p, id) = began()
         p.posted(id, as: github)

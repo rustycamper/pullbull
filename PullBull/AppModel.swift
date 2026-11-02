@@ -393,7 +393,9 @@ final class AppModel {
 
     // PR detail (see the "PR detail" extension below).
     /// Details for the running account, loaded from disk or fetched; keyed by PR.
-    private(set) var details: [PRKey: PRDetail] = [:]
+    private(set) var details: [PRKey: PRDetail] = [:] {
+        didSet { settlePostedComments { details[$0]?.comments } }
+    }
     /// The fetch for the detail on screen; nil once it succeeded.
     private(set) var detailFetch: DetailFetch?
     /// Where Back returns to from the detail view.
@@ -414,7 +416,9 @@ final class AppModel {
 
     // Issue detail (see the "Issue detail" extension below).
     /// Issue details for the running account, loaded from disk or fetched; keyed by issue.
-    private(set) var issueDetails: [PRKey: IssueDetail] = [:]
+    private(set) var issueDetails: [PRKey: IssueDetail] = [:] {
+        didSet { settlePostedComments { issueDetails[$0]?.lastComments } }
+    }
     /// The fetch for the issue detail on screen; nil once it succeeded.
     private(set) var issueDetailFetch: DetailFetch?
     /// Where Back returns to from the issue detail view (`.list` or `.search`).

@@ -16,6 +16,9 @@ public struct PostedComments: Equatable, Sendable {
         var comment: Comment?
         /// A fetch has counted this comment on the rows.
         var agreed = false
+        /// A detail fetched after the post has held this comment: from then on the detail's own comments are
+        /// the truth, so a later fetch without it (deleted on GitHub) doesn't bring it back.
+        var settled = false
 
         var raisesRows: Bool { basis != nil && !agreed }
     }
@@ -135,6 +138,23 @@ public struct PostedComments: Equatable, Sendable {
 
     // MARK: Conversation
 
+    /// Items with a posted comment no detail has held yet.
+    public var unsettledKeys: Set<PRKey> {
+        Set(entries.filter { $0.comment != nil && !$0.settled }.map(\.key))
+    }
+
+    /// A detail's comments arrived for `key`: posted entries they hold (by ID, or by a comment as new as
+    /// GitHub's copy, past an issue page's window) leave the detail for good.
+    public mutating func detailFetched(_ key: PRKey, comments: [Comment]) {
+        let ids = Set(comments.compactMap(\.id))
+        for index in entries.indices where entries[index].key == key && !entries[index].settled {
+            guard let posted = entries[index].comment else { continue }
+            let held = posted.id.map(ids.contains) == true
+                || comments.contains { $0.createdAt >= posted.createdAt }
+            if held { entries[index].settled = true }
+        }
+    }
+
     /// Conversation shown on a detail: `held` (oldest first) plus entries whose ID `held` lacks and that
     /// are under 5 minutes old; `keep` trims to the newest N (2 on issue pages, nil on PR pages). A posted
     /// entry is also left out once `held` has a comment as new as GitHub's copy of it: the detail was
@@ -145,7 +165,8 @@ public struct PostedComments: Equatable, Sendable {
     {
         let heldIDs = Set(held.compactMap(\.id))
         let shown = entries.filter { entry in
-            guard entry.key == key, now.timeIntervalSince(entry.madeAt) < EditOverrides.lifetime else { return false }
+            guard entry.key == key, !entry.settled, now.timeIntervalSince(entry.madeAt) < EditOverrides.lifetime
+            else { return false }
             if let posted = entry.comment {
                 if let id = posted.id, heldIDs.contains(id) { return false }
                 if held.contains(where: { $0.createdAt >= posted.createdAt }) { return false }

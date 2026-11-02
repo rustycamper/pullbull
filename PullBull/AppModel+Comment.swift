@@ -11,6 +11,14 @@ struct CommentFieldSignal: Equatable {
 // MARK: - Commenting
 
 extension AppModel {
+    /// Lets each posted comment a stored detail now holds leave that detail for good, so deleting it on
+    /// GitHub isn't undone by the overlay. `comments` reads the stored detail's comments for a key.
+    func settlePostedComments(_ comments: (PRKey) -> [Comment]?) {
+        for key in postedComments.unsettledKeys {
+            if let held = comments(key) { postedComments.detailFetched(key, comments: held) }
+        }
+    }
+
     /// Whether this account may comment on `key`. `isPullRequest` comes from the route (`.detail` is a PR,
     /// `.issueDetail` an issue), so a PR in no list is gated as a PR.
     func commentPermission(for key: PRKey, isPullRequest: Bool) -> EditPermission {
@@ -91,6 +99,8 @@ extension AppModel {
         commentDrafts[account: post.account.login, key: post.key] = nil
         guard runningAccount == post.account else { return }
         postedComments.posted(post.id, as: comment)
+        // The unknown-outcome check found it in a detail already stored.
+        settlePostedComments { details[$0]?.comments ?? issueDetails[$0]?.lastComments }
         refreshShown()
         resetCommentField(on: post.key)
         if reload {
