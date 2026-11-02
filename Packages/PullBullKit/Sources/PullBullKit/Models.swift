@@ -128,10 +128,11 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
     public let baseRef: String
     public let ci: CIState
     public let headCommitDate: Date?
-    public let commentCount: Int
-    public let lastCommentAuthor: String?
+    /// The three comment fields are set by posted comments too.
+    public internal(set) var commentCount: Int
+    public internal(set) var lastCommentAuthor: String?
     /// Whether the newest comment's author is a bot; nil with no comment and in snapshots cached before it was stored.
-    public let lastCommentByBot: Bool?
+    public internal(set) var lastCommentByBot: Bool?
     public let latestReviews: [Review]
     /// Set by edit overrides too.
     public internal(set) var reviewRequests: [Reviewer]
@@ -372,12 +373,13 @@ public struct BoardIssue: Identifiable, Hashable, Codable, Sendable {
     public let createdAt: Date?
     public let updatedAt: Date?
     public let closedAt: Date?
-    public let commentCount: Int
+    /// The three comment fields are set by posted comments too.
+    public internal(set) var commentCount: Int
     /// The newest comment's author; set only on Assigned and Created search results, nil for a deleted
     /// (ghost) author and in issues cached before it was stored.
-    public let lastCommentAuthor: String?
+    public internal(set) var lastCommentAuthor: String?
     /// Whether the newest comment's author is a bot; set with `lastCommentAuthor`, nil otherwise.
-    public let lastCommentByBot: Bool?
+    public internal(set) var lastCommentByBot: Bool?
     /// Labels, assignees and Status are set by edit overrides too.
     public internal(set) var labels: [String]
     /// GitHub's 6-hex colour for each of `labels`, by position; nil where it's missing, and empty in
