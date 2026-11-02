@@ -50,7 +50,8 @@ struct CommentField<Secondary: View>: View {
         .onChange(of: ready) { _, ready in
             if !ready { isFocused = false }
         }
-        // The @ list floats over the detail, its bottom on the field's top.
+        // The @ list floats over the detail's scroll area, its bottom on the row's top, so it rises as the
+        // field grows.
         .overlay(alignment: .top) {
             if let mention, isFocused {
                 MentionList(model: model, mention: mention)
