@@ -1002,6 +1002,28 @@ public struct GitHubAPI: Sendable {
             complete: !more)
     }
 
+    /// The first hundred people who can be mentioned in `repo` ("owner/name"; those matching `query`, when
+    /// it isn't empty). `complete` is false when there were more. `current` is empty.
+    public func mentionableCandidates(repo: String, query: String?) async throws -> SetCandidates {
+        let parts = repo.split(separator: "/", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { throw APIError.notFound("\(repo) not found") }
+        var variables: [String: Any] = ["owner": parts[0], "name": parts[1]]
+        if let query, !query.isEmpty { variables["q"] = query }
+        let data = try await execute(Mutations.mentionableCandidates, variables)
+        guard let repository = data["repository"] as? [String: Any] else {
+            throw APIError.notFound("\(repo) not found")
+        }
+        let users = repository["mentionableUsers"] as? [String: Any]
+        let more = (users?["pageInfo"] as? [String: Any])?["hasNextPage"] as? Bool == true
+        return SetCandidates(all: Self.candidates(in: users, label: false), current: [], complete: !more)
+    }
+
+    /// The organisation's teams (those matching `query`, when it isn't empty); nil when GitHub won't list
+    /// them. A list cut at `maxLabelPages` pages is returned as read.
+    public func teams(owner: String, query: String?) async throws -> [SetCandidate]? {
+        try await teamCandidates(owner: owner, query: query)?.list
+    }
+
     /// What the reviewers picker offers on pull request `key`: people (filtered by `query` past the first
     /// 100), the PR's past reviewers with their verdicts, its suggested reviewers, its requests, and the
     /// teams of an organisation owner. A team list that can't be read (no `read:org`, no Members

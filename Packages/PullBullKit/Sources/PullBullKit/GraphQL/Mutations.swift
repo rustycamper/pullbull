@@ -96,6 +96,15 @@ enum Mutations {
     }
     """
 
+    /// The first hundred people who can be mentioned in the repo (matching `$q` when given).
+    static let mentionableCandidates = """
+    query($owner:String!,$name:String!,$q:String){
+      repository(owner:$owner, name:$name){
+        mentionableUsers(first:100, query:$q){nodes{id login avatarUrl} pageInfo{hasNextPage}}
+      }
+    }
+    """
+
     /// The first hundred people assignable in the repo (matching `$q` when given), the owner's kind, and
     /// the pull request's author, suggested reviewers, review requests and latest reviews.
     static let reviewerCandidates = """

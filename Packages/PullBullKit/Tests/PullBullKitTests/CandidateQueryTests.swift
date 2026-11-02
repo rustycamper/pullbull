@@ -157,6 +157,38 @@ private func variables(_ body: [String: Any]) -> [String: Any] { body["variables
         #expect(second["withIssue"] as? Bool == false)
     }
 
+    @Test func mentionableCandidatesSendOwnerNameAndQuery() async throws {
+        let t = QueueTransport([
+            #"""
+            {"data":{"repository":{"mentionableUsers":{"nodes":[
+              {"id":"U_a","login":"alice","avatarUrl":"https://a.test/a.png"}],
+              "pageInfo":{"hasNextPage":true}}}}}
+            """#,
+            #"{"data":{"repository":{"mentionableUsers":{"nodes":[],"pageInfo":{"hasNextPage":false}}}}}"#,
+        ])
+        let result = try await api(t).mentionableCandidates(repo: "acme/widgets", query: "al")
+        #expect(result.all.map(\.name) == ["alice"])
+        #expect(result.all[0].avatarURL == URL(string: "https://a.test/a.png"))
+        #expect(!result.complete)
+        let sent = variables(try #require(t.bodies.first))
+        #expect(sent["owner"] as? String == "acme")
+        #expect(sent["name"] as? String == "widgets")
+        #expect(sent["q"] as? String == "al")
+        let empty = try await api(t).mentionableCandidates(repo: "acme/widgets", query: "")
+        #expect(empty.complete)
+        #expect(variables(t.bodies[1])["q"] == nil)
+    }
+
+    @Test func teamsAreNilOnAnError() async throws {
+        let t = QueueTransport([#"{"errors":[{"message":"Resource not accessible"}]}"#])
+        #expect(try await api(t).teams(owner: "acme", query: nil) == nil)
+        let ok = QueueTransport([
+            #"{"data":{"organization":{"teams":{"nodes":[{"slug":"backend","name":"Back End"}],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}"#
+        ])
+        let teams = try #require(try await api(ok).teams(owner: "acme", query: nil))
+        #expect(teams.map(\.team) == ["backend"])
+    }
+
     @Test func aMissingRepositoryThrowsNotFound() async throws {
         let t = QueueTransport([#"{"data":{"repository":null}}"#])
         await #expect(throws: APIError.notFound("acme/widgets not found")) {

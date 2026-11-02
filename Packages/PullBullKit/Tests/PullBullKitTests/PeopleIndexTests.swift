@@ -174,3 +174,26 @@ private func logins(_ index: PeopleIndex, _ prefix: String, limit: Int = 6) -> [
     }
 }
 
+
+@Suite struct PeopleIndexPrefixTests {
+    private let url = URL(string: "https://a.test/d.png")!
+
+    @Test func peopleMatchOnTheLoginPrefixOnly() {
+        let index = PeopleIndex.build(snapshot(
+            viewer: "Viewer", mine: [pr(1, author: "Dana", avatar: url), pr(2, author: "adam"), pr(3, author: "Viewer")]))
+        let found = index.people(prefix: "da", limit: 8)
+        #expect(found.map(\.login) == ["Dana"])
+        #expect(found.first?.avatarURL == url)
+    }
+
+    @Test func theViewerAndMeAreNeverGiven() {
+        let index = PeopleIndex.build(snapshot(viewer: "Meg", mine: [pr(1, author: "Meg"), pr(2, author: "melvin")]))
+        #expect(index.people(prefix: "me", limit: 8).map(\.login) == ["melvin"])
+        #expect(index.people(prefix: "", limit: 8).map(\.login) == ["melvin"])
+    }
+
+    @Test func theLimitApplies() {
+        let index = PeopleIndex.build(snapshot(mine: [pr(1, author: "a1"), pr(2, author: "a2"), pr(3, author: "a3")]))
+        #expect(index.people(prefix: "a", limit: 2).count == 2)
+    }
+}
