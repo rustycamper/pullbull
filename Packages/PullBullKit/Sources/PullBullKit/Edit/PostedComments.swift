@@ -11,7 +11,7 @@ public struct PostedComments: Equatable, Sendable {
         let text: String
         let viewer: String
         /// The comment count the raw list copy would show without this entry; nil when no list holds the item.
-        let basis: Int?
+        var basis: Int?
         let madeAt: Date
         var comment: Comment?
         /// A fetch has counted this comment on the rows.
@@ -25,11 +25,12 @@ public struct PostedComments: Equatable, Sendable {
 
     public init() {}
 
-    /// Starts a post: shows `text` by `viewer` as sending. `listCount` is the raw list copy's
-    /// commentCount, nil when no list holds the item.
+    /// Starts a post: shows `text` by `viewer` as sending. `listCount` is the raw copy's commentCount from
+    /// a list, else from search results, else from the opened item; nil only when nothing holds the item.
     @discardableResult
     public mutating func begin(on key: PRKey, text: String, viewer: String, listCount: Int?, at now: Date) -> UUID {
         let id = UUID()
+        entries.removeAll { now.timeIntervalSince($0.madeAt) >= EditOverrides.lifetime }
         let pending = entries.filter { $0.key == key && $0.raisesRows }.count
         entries.append(Entry(
             id: id, key: key, text: text, viewer: viewer, basis: listCount.map { $0 + pending }, madeAt: now))
@@ -43,8 +44,14 @@ public struct PostedComments: Equatable, Sendable {
     }
 
     /// Takes one post back off, as when GitHub refused it.
+    /// Later posts on the same item that still raise rows are re-based one lower.
     public mutating func drop(_ id: UUID) {
-        entries.removeAll { $0.id == id }
+        guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
+        let dropped = entries.remove(at: index)
+        guard dropped.raisesRows else { return }
+        for later in entries.indices where later >= index && entries[later].key == dropped.key && entries[later].raisesRows {
+            entries[later].basis = entries[later].basis.map { $0 - 1 }
+        }
     }
 
     /// Whether a post on `key` is still waiting for GitHub's answer.
@@ -129,14 +136,20 @@ public struct PostedComments: Equatable, Sendable {
     // MARK: Conversation
 
     /// Conversation shown on a detail: `held` (oldest first) plus entries whose ID `held` lacks and that
-    /// are under 5 minutes old; `keep` trims to the newest N (2 on issue pages, nil on PR pages).
+    /// are under 5 minutes old; `keep` trims to the newest N (2 on issue pages, nil on PR pages). A posted
+    /// entry is also left out once `held` has a comment as new as GitHub's copy of it: the detail was
+    /// fetched after the post, and has only scrolled it out of its window. `sendingIndex` assumes at most
+    /// one post in flight per item (the field is read-only while sending).
     public func conversation(for key: PRKey, held: [Comment], total: Int, keep: Int?, now: Date)
         -> (comments: [Comment], total: Int, earlier: Int, sendingIndex: Int?)
     {
         let heldIDs = Set(held.compactMap(\.id))
         let shown = entries.filter { entry in
             guard entry.key == key, now.timeIntervalSince(entry.madeAt) < EditOverrides.lifetime else { return false }
-            if let id = entry.comment?.id, heldIDs.contains(id) { return false }
+            if let posted = entry.comment {
+                if let id = posted.id, heldIDs.contains(id) { return false }
+                if held.contains(where: { $0.createdAt >= posted.createdAt }) { return false }
+            }
             return true
         }
         var comments = held + shown.map { $0.comment ?? Comment(author: $0.viewer, body: $0.text, createdAt: $0.madeAt) }

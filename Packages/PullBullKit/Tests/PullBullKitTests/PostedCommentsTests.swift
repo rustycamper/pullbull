@@ -122,6 +122,9 @@ private let github = Comment(id: "C_new", author: "pb", body: "hello", createdAt
         let pr = p.apply(to: prWith(count: 4, last: "bob"))
         #expect(pr.commentCount == 4)
         #expect(pr.lastCommentAuthor == "bob")
+        let stale = p.apply(to: SearchResults(openPRs: [prWith(count: 3)], closedPRs: [], issues: [], phase: .done))
+        #expect(stale.openPRs[0].commentCount == 3)
+        #expect(stale.openPRs[0].lastCommentAuthor == "alice")
     }
 
     @Test func twoPostsBasesStack() {
@@ -130,6 +133,7 @@ private let github = Comment(id: "C_new", author: "pb", body: "hello", createdAt
         #expect(p.apply(to: prWith(count: 3)).commentCount == 5)
         p.reconcile(with: editSnapshot(mine: [prWith(count: 4)]), now: t0)
         #expect(p.apply(to: prWith(count: 4)).commentCount == 5)
+        #expect(p.apply(to: prWith(count: 3)).commentCount == 4)
         p.reconcile(with: editSnapshot(mine: [prWith(count: 5, last: "bob")]), now: t0)
         let pr = p.apply(to: prWith(count: 5, last: "bob"))
         #expect(pr.commentCount == 5)
@@ -166,5 +170,38 @@ private let github = Comment(id: "C_new", author: "pb", body: "hello", createdAt
         #expect(r.sendingIndex == nil)
         let pr = prWith(count: 3)
         #expect(p.apply(to: pr) == pr)
+    }
+
+    @Test func notResurrectedAfterWindowMoves() {
+        var (p, id) = began()
+        p.posted(id, as: github)
+        let first = [github, Comment(id: "C_x", author: "alice", body: "x", createdAt: t0.addingTimeInterval(5))]
+        #expect(p.conversation(for: key, held: first, total: 5, keep: 2, now: t0.addingTimeInterval(6)).total == 5)
+        let moved = [
+            Comment(id: "C_x", author: "alice", body: "x", createdAt: t0.addingTimeInterval(5)),
+            Comment(id: "C_y", author: "bob", body: "y", createdAt: t0.addingTimeInterval(8)),
+        ]
+        let r = p.conversation(for: key, held: moved, total: 6, keep: 2, now: t0.addingTimeInterval(10))
+        #expect(r.comments == moved)
+        #expect(r.total == 6)
+    }
+
+    @Test func dropRebasesLaterPosts() {
+        var p = PostedComments()
+        p.begin(on: key, text: "A", viewer: "pb", listCount: 3, at: t0)
+        let b = p.begin(on: key, text: "B", viewer: "pb", listCount: 3, at: t0)
+        p.begin(on: key, text: "C", viewer: "pb", listCount: 3, at: t0)
+        p.drop(b)
+        #expect(p.apply(to: prWith(count: 3)).commentCount == 5)
+        p.reconcile(with: editSnapshot(mine: [prWith(count: 5, last: "bob")]), now: t0)
+        #expect(p.apply(to: prWith(count: 4)).commentCount == 4)
+    }
+
+    @Test func beginPrunesExpiredBeforeBasing() {
+        var p = PostedComments()
+        p.begin(on: key, text: "one", viewer: "pb", listCount: 3, at: t0)
+        p.begin(on: key, text: "two", viewer: "pb", listCount: 3, at: t0.addingTimeInterval(life + 1))
+        #expect(p.apply(to: prWith(count: 3)).commentCount == 4)
+        #expect(p.apply(to: prWith(count: 4)).commentCount == 4)
     }
 }
