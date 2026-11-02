@@ -61,7 +61,7 @@ Nothing else, ever. This replaces the reviewers spec's sentence wherever the pro
 - Plain text only: rich text off, paste as plain text, and smart quotes, smart dashes, text replacement and automatic link detection off, so Markdown and code arrive as typed. Automatic spelling correction and text completion are off too; spell checking stays on.
 - PullBull has no Edit menu, so the view handles ⌘Z, ⇧⌘Z, ⌘X, ⌘C, ⌘V and ⌘A itself. ⌘X and ⌘V also work by key position on non-Latin layouts. Any other ⌘-chord with no binding in the field does nothing, without a beep.
 - `allowsUndo` is on. The undo stack is cleared when a draft is loaded into the field and when a post succeeds, so ⌘Z after a post never brings back the sent text.
-- The field never becomes first responder on its own. The popover's show-time rule that drops the caret from a field editor (`PopoverView`, "Shown, the window puts the caret in its first text field") covers any `NSText`, and the view refuses first responder until something asks for it: ⌥⌘M, a click, or a refused post returning focus to that same item's field. Any change of the detail stack (a linked PR pushed over an issue, for one) takes focus out of a comment field.
+- The field never becomes first responder on its own. The popover's show-time rule that drops the caret from a field editor (`PopoverView`, "Shown, the window puts the caret in its first text field") covers any `NSText`, and the view refuses first responder until something asks for it: ⌥⌘M, a click, or a refused post returning focus to that same item's field. A field in a covered layer (an issue under a linked PR's detail) ignores focus requests: it is hidden but could still become first responder, and ⌘↩ would post from it. Any change of the detail stack (a linked PR pushed over an issue, for one) takes focus out of a comment field.
 - Clicking an unfocused field puts the caret where it was. Leaving the field scrolls it to the top.
 
 ### Keys
@@ -117,10 +117,10 @@ The comment field has its own completion, in PullBullKit, separate from search's
   - the field empties, the draft is cleared, the field's undo stack is cleared, and focus stays in the field;
   - the dimmed comment becomes the real one, from GitHub's answer (its node ID, body and creation time);
   - the item's row, wherever it shows, counts the comment and has the viewer as its last commenter, so it drops out of `is:unanswered` at once;
-  - the detail is fetched again once, so the page holds GitHub's own copy;
+  - the detail is fetched again once, so the page holds GitHub's own copy. A detail held under another layer (an issue under a linked PR's detail) is fetched too, so the comment is still there when Back returns to it;
   - VoiceOver announces "Comment posted"; nothing else is shown, as for edits.
 - **Refused** (GitHub answered no):
-  - the dimmed comment goes, the count goes back, and the text stays in the field as the draft, editable, with focus in the field;
+  - the dimmed comment goes, the count goes back, and the text stays in the field as the draft, editable. Focus goes back to the field only when that item's detail is on top with no Status or set picker open; otherwise the draft waits there unfocused;
   - the failure line says "Couldn't comment on #88: …" with GitHub's reason (a locked conversation, an archived repo, a body too long, issues turned off) and **Open on GitHub**; VoiceOver announces it.
 - **Outcome unknown** (timeout, dropped connection, a 5xx: GitHub may have made the comment):
   - the comment stays dimmed and marked "Sending…", and the field stays read-only, while PullBull checks. ⌘↩ can't send it twice meanwhile;
@@ -128,7 +128,7 @@ The comment field has its own completion, in PullBullKit, separate from search's
   - otherwise the dimmed comment goes, the text stays in the field as the draft, and the failure line says "Couldn't confirm your comment on #88. Check the Conversation before sending again." with **Open on GitHub**.
 - There is no undo. ⌘Z inside the field is text undo; the edit undo (⌘Z within 10 s) never deletes a comment, and a post, sent or failed, leaves the edit undo's state as it was.
 - On a detail, the failure line sits directly above the comment field (or the permission note), following its height.
-- The failure line is the edits' line with a comment variant. An edit, or another post, replaces it, as edits replace each other's failures.
+- The failure line is the edits' line with a comment variant. An edit, or another post, replaces it, as edits replace each other's failures: a post clears it as it is sent, leaving the edit undo as it was.
 - Posting on a closed or merged item is allowed, as GitHub allows it.
 - **Account change mid-post:** the answer applies only if the account that posted is still current, as edits guard today. If it isn't, the draft of the posting account is cleared on success and kept otherwise, and nothing else changes.
 - In-flight posts are tracked per account and item, and survive account switches, so a post can't be sent twice after a switch mid-post.

@@ -168,7 +168,8 @@ struct CommentTextView: NSViewRepresentable {
         }
         if focusRequest != coordinator.seenFocusRequest {
             coordinator.seenFocusRequest = focusRequest
-            if focusRequest?.key == key {
+            // A covered layer is disabled; its field leaves the request to the detail on top.
+            if focusRequest?.key == key, context.environment.isEnabled {
                 DispatchQueue.main.async { [weak textView] in textView?.requestFocus() }
             }
         }

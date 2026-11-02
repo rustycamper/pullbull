@@ -219,6 +219,23 @@ private func status(_ key: PRKey, _ session: EditSession, in snapshot: Snapshot 
         #expect(s.failure == nil)
     }
 
+    /// A new post dismisses the failure line; an armed ⌘Z and the edit still waiting keep working.
+    @Test func dismissFailureLeavesUndoAndTheLastEditAlone() {
+        var s = EditSession()
+        let first = s.begin(move, on: k412, at: t0)
+        let record = EditRecord(key: k412, change: move, madeAt: t0, addedItemId: nil)
+        s.applied(first, record)
+        s.showFailure(commentFailure)
+        s.dismissFailure()
+        #expect(s.failure == nil)
+        #expect(s.takeUndo(now: t0 + 5) == record)
+        let second = s.begin(move, on: k413, at: t0 + 6)
+        s.dismissFailure()
+        let later = EditRecord(key: k413, change: move, madeAt: t0 + 6, addedItemId: nil)
+        s.applied(second, later)
+        #expect(s.takeUndo(now: t0 + 7) == later)
+    }
+
     @Test func commentMessages() {
         let k88 = editKey(88)
         #expect(EditMessage.commentRefused(on: k88, reason: "Issue is locked")
