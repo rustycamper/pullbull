@@ -1019,9 +1019,11 @@ public struct GitHubAPI: Sendable {
     }
 
     /// The organisation's teams (those matching `query`, when it isn't empty); nil when GitHub won't list
-    /// them. A list cut at `maxLabelPages` pages is returned as read.
+    /// them (a user's account, no `read:org`, no Members permission). Throws when GitHub couldn't be
+    /// asked (offline, a 5xx, a rate limit), so a caller can try again. A list cut at `maxLabelPages`
+    /// pages is returned as read.
     public func teams(owner: String, query: String?) async throws -> [SetCandidate]? {
-        try await teamCandidates(owner: owner, query: query)?.list
+        try await teamCandidates(owner: owner, query: query, throwsUnanswered: true)?.list
     }
 
     /// What the reviewers picker offers on pull request `key`: people (filtered by `query` past the first
@@ -1081,8 +1083,11 @@ public struct GitHubAPI: Sendable {
             picker: SetCandidates(all: all, current: current, complete: !morePeople && teams?.complete != false))
     }
 
-    /// The organisation's teams, paged as labels are; nil when GitHub won't list them.
-    private func teamCandidates(owner: String, query: String?) async throws -> (list: [SetCandidate], complete: Bool)? {
+    /// The organisation's teams, paged as labels are; nil when GitHub won't list them. `throwsUnanswered`:
+    /// a failure to ask GitHub at all is thrown rather than read as nil.
+    private func teamCandidates(
+        owner: String, query: String?, throwsUnanswered: Bool = false
+    ) async throws -> (list: [SetCandidate], complete: Bool)? {
         var list: [SetCandidate] = []
         var after: String?
         for _ in 0..<Self.maxLabelPages {
@@ -1097,6 +1102,7 @@ public struct GitHubAPI: Sendable {
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
+                if throwsUnanswered, !Self.isRefusal(error) { throw error }
                 return nil
             }
             list += Self.nodes(teams).compactMap { node in
@@ -1109,6 +1115,15 @@ public struct GitHubAPI: Sendable {
             after = cursor
         }
         return (list, false)
+    }
+
+    /// GitHub answered, and the answer was no: an error in the GraphQL body, a missing scope, a 403 or a
+    /// missing owner. Anything else (offline, a 5xx, a rate limit) means it wasn't asked.
+    private static func isRefusal(_ error: Error) -> Bool {
+        switch error as? APIError {
+        case .graphQL, .insufficientScopes, .forbidden, .notFound: true
+        default: false
+        }
     }
 
     private static func nodes(_ connection: Any?) -> [[String: Any]] {

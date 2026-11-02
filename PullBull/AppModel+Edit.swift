@@ -203,10 +203,12 @@ extension AppModel {
     }
 
     /// The cached people (but the PR's author) and teams for the reviewers picker on `key`; nil when
-    /// neither is cached. The PR's own requests, reviews and suggestions come with the fetch.
+    /// neither is cached. The PR's own requests, reviews and suggestions come with the fetch. No teams
+    /// (as the @ list caches for a user's repo or without read:org) counts as nothing cached, so the
+    /// picker shows it's loading rather than an empty list.
     private func cachedReviewerCandidates(for key: PRKey) -> SetCandidates? {
         let people = setCandidates[Self.setCandidatesKey(.reviewers, key)]
-        let teams = setCandidates[Self.teamCandidatesKey(key)]
+        let teams = setCandidates[Self.teamCandidatesKey(key)].flatMap { $0.all.isEmpty ? nil : $0 }
         guard people != nil || teams != nil else { return nil }
         let author = pullRequest(for: key)?.author.lowercased()
         return SetCandidates(

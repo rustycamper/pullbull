@@ -334,9 +334,12 @@ struct CommentTextView: NSViewRepresentable {
             guard let textView, textView.isEditable, !textView.hasMarkedText(),
                   insertion.range.upperBound <= (textView.string as NSString).length else { return }
             inserting = true
+            // Its own undo step: ⌘Z takes back the row, not the "@" typed before it.
+            textView.breakUndoCoalescing()
             textView.insertText(
                 insertion.replacement,
                 replacementRange: NSRange(location: insertion.range.lowerBound, length: insertion.range.count))
+            textView.breakUndoCoalescing()
             inserting = false
             let length = (textView.string as NSString).length
             textView.setSelectedRange(NSRange(location: min(insertion.caret, length), length: 0))

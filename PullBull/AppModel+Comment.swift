@@ -220,10 +220,13 @@ extension AppModel {
         mentionFilterTask = nil
     }
 
-    func moveMention(by offset: Int) {
-        guard var mention, !mention.rows.isEmpty else { return }
+    /// ↑ or ↓ in the open list. False with no row ("Loading people…"), so the key moves the caret.
+    @discardableResult
+    func moveMention(by offset: Int) -> Bool {
+        guard var mention, !mention.rows.isEmpty else { return false }
         mention.selection = min(max(mention.selection + offset, 0), mention.rows.count - 1)
         self.mention = mention
+        return true
     }
 
     /// A click on row `index`.
@@ -318,7 +321,7 @@ extension AppModel {
     }
 
     /// Starts the fetches `key`'s @ list needs that aren't cached or under way. A failed one caches
-    /// nothing and leaves its group out.
+    /// nothing and leaves its group out, so the next focus asks again.
     private func loadMentionCandidates(for key: PRKey) {
         guard let account = runningAccount else { return }
         let client = api(for: account)
@@ -336,8 +339,14 @@ extension AppModel {
         let owner = key.repo.split(separator: "/").first.map(String.init) ?? ""
         if setCandidates[teamsKey] == nil, mentionFetches[teamsKey] == nil, !owner.isEmpty {
             mentionFetches[teamsKey] = Task { [weak self] in
-                // Nil for a user's repo, and without read:org or the Members permission: people only.
-                let teams = try? await client.teams(owner: owner, query: nil)
+                // GitHub's nil (a user's repo, no read:org, no Members permission) is cached as no teams,
+                // so it isn't asked again on each focus; a fetch that failed is not.
+                let teams: [SetCandidate]?
+                do {
+                    teams = try await client.teams(owner: owner, query: nil) ?? []
+                } catch {
+                    teams = nil
+                }
                 guard let self, !Task.isCancelled, self.runningAccount == account else { return }
                 self.mentionFetches[teamsKey] = nil
                 if let teams { self.setCandidates[teamsKey] = SetCandidates(all: teams, current: [], complete: true) }

@@ -6,21 +6,26 @@ import Testing
 private final class QueueTransport: GraphQLTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var queue: [Data]
+    private var statuses: [Int]
     private var sent: [Data] = []
 
-    init(_ json: [String]) { queue = json.map { Data($0.utf8) } }
+    /// `statuses`: the HTTP status of each answer in turn; 200 past the end.
+    init(_ json: [String], statuses: [Int] = []) {
+        queue = json.map { Data($0.utf8) }
+        self.statuses = statuses
+    }
 
     var bodies: [[String: Any]] {
         lock.withLock { sent.compactMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } }
     }
 
     func send(_ body: Data, token: String) async throws -> (Data, HTTPURLResponse) {
-        let data = lock.withLock {
+        let (data, status) = lock.withLock {
             sent.append(body)
-            return queue.removeFirst()
+            return (queue.removeFirst(), statuses.isEmpty ? 200 : statuses.removeFirst())
         }
         let response = HTTPURLResponse(
-            url: URL(string: "https://api.github.com/graphql")!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            url: URL(string: "https://api.github.com/graphql")!, statusCode: status, httpVersion: nil, headerFields: nil)!
         return (data, response)
     }
 }
@@ -187,6 +192,21 @@ private func variables(_ body: [String: Any]) -> [String: Any] { body["variables
         ])
         let teams = try #require(try await api(ok).teams(owner: "acme", query: nil))
         #expect(teams.map(\.team) == ["backend"])
+    }
+
+    @Test func teamsAreNilForAUsersAccount() async throws {
+        let t = QueueTransport([
+            #"{"data":{"organization":null},"errors":[{"type":"NOT_FOUND","message":"Could not resolve to an Organization"}]}"#
+        ])
+        #expect(try await api(t).teams(owner: "alice", query: nil) == nil)
+    }
+
+    /// GitHub couldn't be asked: thrown, so the @ list asks again on the next focus.
+    @Test func teamsThrowWhenGitHubIsNotReached() async throws {
+        let t = QueueTransport([#"{"message":"Bad Gateway"}"#], statuses: [502])
+        await #expect(throws: APIError.server(502)) {
+            _ = try await api(t).teams(owner: "acme", query: nil)
+        }
     }
 
     @Test func aMissingRepositoryThrowsNotFound() async throws {

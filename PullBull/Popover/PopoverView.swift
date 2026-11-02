@@ -879,8 +879,8 @@ struct PopoverView: View {
                 model.closeMentions()
                 return true
             case .moveMention(let offset):
-                model.moveMention(by: offset)
-                return true
+                // With no row yet ("Loading people…"), ↑ and ↓ move the caret as usual.
+                return model.moveMention(by: offset)
             case .acceptMention:
                 // With nothing to take yet ("Loading people…"), Return and Tab type as usual.
                 return model.acceptMention()
