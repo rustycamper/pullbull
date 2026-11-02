@@ -140,7 +140,7 @@ Write a comment on an open, closed or merged issue or pull request from its deta
 - **Not sure:** after a timeout or a dropped connection PullBull checks the Conversation before saying anything. If your comment is there it counts as posted. If not, the line says "Couldn't confirm your comment on #88. Check the Conversation before sending again." and the text stays in the field. Check on GitHub first: the comment may have been made
 - **No undo:** a posted comment emails everyone tagged and subscribed. PullBull can't edit or delete it; GitHub can. <kbd>⌘</kbd><kbd>Z</kbd> in the field undoes typing only
 - **Your own comment** raises no "New comment" notification
-- **Permissions:** with Sign in with GitHub, an issue needs PullBull's Issues permission and a pull request its Pull requests permission; until an org owner accepts them, a note with a link takes the field's place in the row (hover it for the whole note). With a `gh` login, `repo` covers it
+- **Permissions:** with Sign in with GitHub, an issue needs PullBull's Issues permission and a pull request its Pull requests permission; until an org owner accepts them, a note takes the field's place in the row (hover it for the whole note); click it to accept them on GitHub. With a `gh` login, `repo` covers it
 
 ## Search
 

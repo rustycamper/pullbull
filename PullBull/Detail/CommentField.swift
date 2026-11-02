@@ -102,26 +102,44 @@ struct CommentField<Buttons: View>: View {
         .accessibilityHidden(true)
     }
 
-    /// In the field's place, a disabled field reading what the account needs, and the link to it.
+    /// In the field's place, a field-shaped box reading what the account needs. With the page where the
+    /// permissions are accepted, the box is the link to it; without one, it only reads.
+    @ViewBuilder
     private func permissionSlot(note: String, permission: EditPermission) -> some View {
-        HStack(spacing: 8) {
+        if case .needsAppApproval(_, _, let url?) = permission {
+            Button { NSWorkspace.shared.open(url) } label: {
+                permissionBox(note: note, linked: true)
+            }
+            .buttonStyle(.plain)
+            .help(note)
+            .accessibilityLabel(note)
+            .accessibilityHint("Opens GitHub to accept the permissions")
+        } else {
+            permissionBox(note: note, linked: false)
+                .help(note)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(note)
+        }
+    }
+
+    private func permissionBox(note: String, linked: Bool) -> some View {
+        HStack(spacing: 4) {
             Text(note)
-                .font(.system(size: CommentTextView.fontSize))
-                .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .padding(.horizontal, 8)
-                .frame(maxWidth: .infinity, minHeight: CommentTextView.rowHeight, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Palette.fill))
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.separator))
-                .help(note)
-                .accessibilityLabel(note)
-            if case .needsAppApproval(_, _, let url?) = permission {
-                Button("Open on GitHub") { NSWorkspace.shared.open(url) }
-                    .controlSize(.small)
-                    .frame(height: CommentTextView.rowHeight)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if linked {
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 10, weight: .medium))
             }
         }
+        .font(.system(size: CommentTextView.fontSize))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, minHeight: CommentTextView.rowHeight)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Palette.fill))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.separator))
+        .contentShape(RoundedRectangle(cornerRadius: 6))
     }
 }
 
