@@ -90,9 +90,11 @@
       `<div class="f12 comment-body">${markdown(c.body)}</div></div></div>`;
   }
 
-  /** OutlinedIconButton: a 30×24 outlined icon button; the bar is right-aligned, 8 apart, 12/8 padding. */
+  /** The bottom row: CommentField unfocused ("Comment…" with ⌥⌘M at its end, 24 pt tall, taking the
+   *  width the buttons leave), then OutlinedIconButtons, 30×24; 8 apart, 12/8 padding. */
   function bottomBar(symbols) {
-    return `<div class="detail-bar"><span class="spacer"></span>` +
+    return `<div class="detail-bar"><span class="comment-field f12"><span class="c-tertiary">Comment…</span>` +
+      `<span class="f11 c-tertiary">⌥⌘M</span></span>` +
       symbols.map((s) => `<span class="outlined-button c-secondary">${sym(s, 12, "medium")}</span>`).join("") + `</div>`;
   }
 
