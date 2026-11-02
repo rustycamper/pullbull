@@ -3,11 +3,11 @@ import PullBullKit
 import SwiftUI
 
 /// A detail's bottom row: the comment field, the item's second button (Copy branch or View on board),
-/// and Open on GitHub last. Unfocused, the field is one line as tall as the buttons, reading "Comment…"
-/// with ⌥⌘M at its end, or a pencil and a waiting draft's first line. ⌥⌘M or a click focuses it: the
-/// Comment button takes the second button's place, Open on GitHub stays, and the field grows upward with
-/// the text to 8 lines, then scrolls. Where the account can't comment yet, the note saying what it needs
-/// takes the field's place.
+/// and Open on GitHub last; the buttons never change. Unfocused, the field is one line as tall as the
+/// buttons, reading "Comment…" with ⌥⌘M at its end, or a pencil and a waiting draft's first line. ⌥⌘M or
+/// a click focuses it: ⌘↩ shows at its end, as the way to post, and it grows upward with the text to 8
+/// lines, then scrolls. While a post is in flight, "Sending…" takes the hint's place. Where the account
+/// can't comment yet, the note saying what it needs takes the field's place.
 struct CommentField<Secondary: View>: View {
     let model: AppModel
     let key: PRKey
@@ -30,7 +30,6 @@ struct CommentField<Secondary: View>: View {
     var body: some View {
         let permission = model.commentPermission(for: key, isPullRequest: isPullRequest)
         let ready = permission == .ready
-        let row = CommentRow(focused: ready && isFocused, sending: ready && isSending)
         HStack(alignment: .bottom, spacing: 8) {
             if ready {
                 field
@@ -39,8 +38,7 @@ struct CommentField<Secondary: View>: View {
             } else {
                 Spacer(minLength: 0)
             }
-            if row.showsCommentButton { commentButton }
-            if row.showsSecondaryButton { secondary }
+            secondary
             OutlinedIconButton(name: "Open on GitHub", systemImage: "arrow.up.right.square") {
                 NSWorkspace.shared.open(webURL)
             }
@@ -55,31 +53,36 @@ struct CommentField<Secondary: View>: View {
     }
 
     private var field: some View {
-        CommentTextView(
-            model: model, key: key, isPullRequest: isPullRequest, account: account, isSending: isSending,
-            reset: model.commentFieldReset, focusRequest: model.commentFieldFocusRequest,
-            isFocused: $isFocused, contentHeight: $contentHeight)
-            .frame(height: textHeight)
-            .overlay(alignment: .leading) {
-                if !isFocused { unfocusedText }
+        HStack(alignment: .bottom, spacing: 6) {
+            CommentTextView(
+                model: model, key: key, isPullRequest: isPullRequest, account: account, isSending: isSending,
+                reset: model.commentFieldReset, focusRequest: model.commentFieldFocusRequest,
+                isFocused: $isFocused, contentHeight: $contentHeight)
+                .frame(height: textHeight)
+                .overlay(alignment: .leading) {
+                    if !isFocused { unfocusedText }
+                }
+            // At the end of the last line, beside the text rather than under it.
+            if let hint = CommentRow.hint(
+                focused: isFocused, sending: isSending,
+                hasDraft: CommentRow.preview(of: draftText) != nil)
+            {
+                Text(hint)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Palette.tertiary)
+                    .frame(height: CommentTextView.oneLineHeight)
+                    .fixedSize()
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
-            .padding(.horizontal, 8)
-            .frame(maxWidth: .infinity, minHeight: CommentTextView.rowHeight)
-            .background(RoundedRectangle(cornerRadius: 6).fill(Palette.field))
-            .overlay(
-                RoundedRectangle(cornerRadius: 6).strokeBorder(isFocused ? Color.accentColor : Palette.separator))
-            // Focused, no tooltip covers the text being written.
-            .help(isFocused ? "" : CommentTextView.help)
-    }
-
-    private var commentButton: some View {
-        Button(isSending ? "Sending…" : "Comment") {
-            model.postComment(on: key, isPullRequest: isPullRequest)
         }
-        .controlSize(.small)
-        .disabled(isSending || draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        .accessibilityLabel("Comment")
-        .frame(height: CommentTextView.rowHeight)
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, minHeight: CommentTextView.rowHeight)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Palette.field))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6).strokeBorder(isFocused ? Color.accentColor : Palette.separator))
+        // Focused, no tooltip covers the text being written.
+        .help(isFocused ? "" : CommentTextView.help)
     }
 
     /// One line unfocused; focused, the text's height between one line and eight.
@@ -88,8 +91,8 @@ struct CommentField<Secondary: View>: View {
         return min(max(contentHeight, CommentTextView.oneLineHeight), CommentTextView.eightLineHeight)
     }
 
-    /// Unfocused, the field reads "Comment…" with its shortcut, or a pencil and the draft's first line,
-    /// dimmed. The text view under it keeps the draft for VoiceOver and takes the click.
+    /// Unfocused, the field reads "Comment…", or a pencil and the draft's first line, dimmed; the hint
+    /// beside it carries the shortcut. The text view under it keeps the draft for VoiceOver and takes the click.
     private var unfocusedText: some View {
         HStack(spacing: 4) {
             if let preview = CommentRow.preview(of: draftText) {
@@ -100,10 +103,6 @@ struct CommentField<Secondary: View>: View {
                     .foregroundStyle(.secondary)
             } else {
                 Text("Comment…")
-                    .foregroundStyle(Palette.tertiary)
-                Spacer(minLength: 8)
-                Text("⌥⌘M")
-                    .font(.system(size: 11))
                     .foregroundStyle(Palette.tertiary)
             }
         }
@@ -225,6 +224,7 @@ struct CommentTextView: NSViewRepresentable {
         coordinator.seenReset = reset
         coordinator.seenFocusRequest = focusRequest
         textView.onFocusChange = { [weak coordinator] focused in coordinator?.focusChanged(focused) }
+        textView.onPost = { [model, key, isPullRequest] in model.postComment(on: key, isPullRequest: isPullRequest) }
         coordinator.observeFrame()
         coordinator.load(account: account)
         return scrollView
@@ -352,6 +352,8 @@ final class CommentEditor: NSTextView {
     var key: PRKey?
     var isPullRequest = false
     var onFocusChange: ((Bool) -> Void)?
+    /// Posts the text, as ⌘↩ does; VoiceOver's "Post comment" action, since there is no button.
+    var onPost: (() -> Void)?
     private var focusAllowed = false
 
     override var acceptsFirstResponder: Bool { focusAllowed && super.acceptsFirstResponder }
@@ -363,6 +365,15 @@ final class CommentEditor: NSTextView {
     override func accessibilityValue() -> String? {
         if window?.firstResponder !== self, let value = CommentRow.unfocusedValue(of: string) { return value }
         return super.accessibilityValue()
+    }
+
+    override func accessibilityCustomActions() -> [NSAccessibilityCustomAction]? {
+        let post = NSAccessibilityCustomAction(name: "Post comment") { [weak self] in
+            guard let onPost = self?.onPost else { return false }
+            onPost()
+            return true
+        }
+        return [post] + (super.accessibilityCustomActions() ?? [])
     }
 
     func requestFocus() {

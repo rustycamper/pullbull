@@ -129,8 +129,8 @@ Set an issue's board Status, a pull request's reviewers, and the assignees and l
 
 Write a comment on an open, closed or merged issue or pull request from its detail. It goes out only when you post it.
 
-- **Where:** a comment field at the bottom of the detail, on one row with the buttons, so it stays in view while the page scrolls. It reads "Comment…", or shows a pencil and the first line of a waiting draft. Opening a detail or the popover never puts the caret in it: press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>M</kbd>, or click it. While you write, the field grows upward to 8 lines and the **Comment** button takes the place of **Copy branch** (or **View on board**), which comes back when you leave the field. **Open on GitHub** stays at the end of the row throughout
-- **Post:** <kbd>⌘</kbd><kbd>Return</kbd> in the field, or the **Comment** button. Empty text sends nothing
+- **Where:** a comment field at the bottom of the detail, on one row with the buttons, so it stays in view while the page scrolls. It reads "Comment…", or shows a pencil and the first line of a waiting draft. Opening a detail or the popover never puts the caret in it: press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>M</kbd>, or click it. While you write, the field grows upward to 8 lines and shows <kbd>⌘</kbd><kbd>Return</kbd> at its end. The buttons beside it stay as they are
+- **Post:** <kbd>⌘</kbd><kbd>Return</kbd> in the field; the field shows it at its end while you type. VoiceOver users have a **Post comment** action on the field. Empty text sends nothing
 - **Keys in the field:** <kbd>Return</kbd> writes a new line. Outside the field, <kbd>⌘</kbd><kbd>Return</kbd> still opens the item on GitHub
 - **Tagging:** type `@login` (or `@owner/team`) by hand; GitHub turns it into a mention and notifies the person when the comment posts. PullBull doesn't suggest names yet
 - **Esc twice:** the first <kbd>Esc</kbd> leaves the field, the second closes the detail. Nothing you typed is lost

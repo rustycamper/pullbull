@@ -30,7 +30,7 @@ This builds on `2026-10-31-edit-status-assignees-labels-design.md` (the edit spe
 
 The edit specs' anti-goals hold. In addition, the feature fails if:
 
-- a comment goes out by accident, or twice. GitHub emails everyone tagged and subscribed the moment it posts, and no undo takes that back. Only ⌘↩ in the field or the Comment button sends; Return writes a new line; a post whose outcome is unknown is never presented as "not sent";
+- a comment goes out by accident, or twice. GitHub emails everyone tagged and subscribed the moment it posts, and no undo takes that back. Only ⌘↩ in the field, or VoiceOver's "Post comment" action on it, sends; Return writes a new line; a post whose outcome is unknown is never presented as "not sent";
 - text the user typed disappears: on a popover close, on Esc, on a failed post, on moving to another item and back;
 - a keystroke meant for the comment does something to the popover (goes Back, opens a picker, switches tab, starts a search, opens the browser);
 - the field takes the keyboard without being asked: opening a detail, or the popover, never puts the caret in it;
@@ -52,8 +52,8 @@ Nothing else, ever. This replaces the reviewers spec's sentence wherever the pro
 
 - Both detail pages end in one row, 12 pt in from the sides and 8 pt above and below: the comment field, then the item's buttons (Copy branch / Open on GitHub on a PR; View on board / Open on GitHub on an issue). The field takes the width the buttons leave. It is reachable without scrolling past 50 comments and the file list, and sharing the buttons' row costs the scroll area no second row.
 - Unfocused, the field is one line, 24 pt tall like the buttons, so the row is 40 pt. Empty, it reads "Comment…" with ⌥⌘M at its trailing edge, both in the tertiary colour. Holding a draft, it shows a `pencil` symbol and the draft's first line, dimmed, so a waiting draft is visible, and no shortcut; VoiceOver reads its value as "Draft: " and that line. Its border is the separator colour. Its tooltip reads "Comment (⌥⌘M) · ⌘↩ to post".
-- Focused, its border takes the accent colour, so the focus shows, and the Comment button takes the place of the second button (Copy branch or View on board): [field] [Comment] [Open on GitHub]. Open on GitHub stays in the row, last, in both states, so it never moves and stays reachable by mouse and VoiceOver while the field has focus; only Esc or anything else that takes focus leaves the field, and a click elsewhere in the detail doesn't. The field grows upward with the text up to 8 lines, then scrolls inside, and the detail's scroll area shrinks to make room. Leaving the field brings the second button back. It gives way only while the field has focus, never because a draft waits. The field's tooltip shows only while it is unfocused, so it never covers the text being written.
-- The Comment button is labelled "Comment" for VoiceOver, disabled while the text is empty or only whitespace, and reads "Sending…" while a post is in flight. Unfocused, there is no Comment button, except while a post is in flight: then "Sending…" shows between the field and the second button, so the post stays visible after focus moves away.
+- Focused, its border takes the accent colour, so the focus shows, and ⌘↩ shows at its trailing end, in the tertiary colour, beside the last line rather than under the text. The buttons never change, so Open on GitHub never moves and stays reachable by mouse and VoiceOver while the field has focus; only Esc or anything else that takes focus leaves the field, and a click elsewhere in the detail doesn't. The field grows upward with the text up to 8 lines, then scrolls inside, and the detail's scroll area shrinks to make room. The field's tooltip shows only while it is unfocused, so it never covers the text being written.
+- There is no Comment button. Typing a comment needs the keyboard, so ⌘↩ is always to hand, and the hint names it where a button would; a button would also have to take a place in the row, moving the item's buttons as focus comes and goes. While a post is in flight, "Sending…" takes the hint's place, focused or not, so the post stays visible after focus moves away. VoiceOver gets a "Post comment" action on the field, which does what ⌘↩ does.
 - Any detail page takes a comment, including a PR or issue that PullBull holds in no list (opened from linked PRs, Ask, a notification or a pasted link). Posting needs only the repo and number.
 
 ### The text view
@@ -112,7 +112,7 @@ The comment field has its own completion, in PullBullKit, separate from search's
 
 ### Posting
 
-- ⌘↩ or the Comment button posts the trimmed text. Empty or whitespace-only text sends nothing and the key is taken. A second ⌘↩ while one is posting does nothing.
+- ⌘↩ (or VoiceOver's "Post comment" action) posts the trimmed text. Empty or whitespace-only text sends nothing and the key is taken. A second ⌘↩ while one is posting does nothing.
 - While posting, the field is read-only with its text kept, and the comment shows at the end of the Conversation, dimmed, by the viewer, aged "now", marked "Sending…". The Conversation's count goes up by one. VoiceOver announces "Sending comment".
 - **On success** (201):
   - the field empties, the draft is cleared, the field's undo stack is cleared, and focus stays in the field;
@@ -260,7 +260,7 @@ Manual check against real GitHub, on a test repo in an org with a team:
 
 The user asked for comments with @mentions, and noted the app is open source. The rest are the writer's calls:
 
-- The field lives on the detail page only, in the bottom row before the item's buttons; rows don't take comments. Focused, the Comment button takes the second button's place (Copy branch or View on board) and Open on GitHub stays, last, so it is always a click away; the second button comes back when the field is left, and a draft alone never hides it.
+- The field lives on the detail page only, in the bottom row before the item's buttons; rows don't take comments. The row's buttons never change; with no Comment button, ⌘↩ shows inside the field while it has focus, and "Sending…" takes its place while a post is in flight.
 - ⌥⌘M focuses it; ⌘↩ posts while it has focus and opens on GitHub otherwise; Return is a new line; Esc leaves the field and a second Esc closes the detail.
 - While the field has focus it owns the keyboard, except ⌘↩, Esc, ⌘W, ⌘, and ⌘/.
 - An `NSTextView` with plain text and substitutions off.

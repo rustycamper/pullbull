@@ -1,17 +1,15 @@
 import Foundation
 
-/// What a detail's bottom row shows beside the comment field: the Comment button, the item's second
-/// button (Copy branch or View on board), and how the unfocused field reads a draft. Open on GitHub is
-/// always there, last.
-public struct CommentRow: Equatable, Sendable {
-    /// While the field has focus, and while a post is sending, so "Sending…" stays in view.
-    public let showsCommentButton: Bool
-    /// Gives way to the Comment button only while the field has focus, never because a draft waits.
-    public let showsSecondaryButton: Bool
-
-    public init(focused: Bool, sending: Bool) {
-        showsCommentButton = focused || sending
-        showsSecondaryButton = !focused
+/// How a detail's comment field reads at its trailing end, and how the unfocused field reads a draft.
+/// There is no Comment button: typing needs the keyboard, so ⌘↩ is always to hand, and the hint says so.
+public enum CommentRow {
+    /// The hint at the field's trailing end: "Sending…" while a post is in flight, focused or not;
+    /// focused, the shortcut that posts; unfocused and empty, the one that focuses. A waiting draft's
+    /// preview takes the whole field unfocused, so it has none.
+    public static func hint(focused: Bool, sending: Bool, hasDraft: Bool) -> String? {
+        if sending { return "Sending…" }
+        if focused { return "⌘↩" }
+        return hasDraft ? nil : "⌥⌘M"
     }
 
     /// The draft's first line with text in it, which the unfocused field shows; nil when there's none.

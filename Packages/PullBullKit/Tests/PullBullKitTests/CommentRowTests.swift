@@ -2,23 +2,22 @@ import Testing
 @testable import PullBullKit
 
 @Suite struct CommentRowTests {
-    @Test func unfocusedShowsTheSecondaryButtonAndNoCommentButton() {
-        let row = CommentRow(focused: false, sending: false)
-        #expect(!row.showsCommentButton)
-        #expect(row.showsSecondaryButton)
+    @Test func emptyAndUnfocusedTheHintIsTheFocusShortcut() {
+        #expect(CommentRow.hint(focused: false, sending: false, hasDraft: false) == "⌥⌘M")
     }
 
-    @Test func focusedTheCommentButtonTakesTheSecondaryButtonsPlace() {
-        let row = CommentRow(focused: true, sending: false)
-        #expect(row.showsCommentButton)
-        #expect(!row.showsSecondaryButton)
-        #expect(CommentRow(focused: true, sending: true) == row)
+    @Test func aWaitingDraftHasNoHintUnfocused() {
+        #expect(CommentRow.hint(focused: false, sending: false, hasDraft: true) == nil)
     }
 
-    @Test func sendingUnfocusedKeepsBothInView() {
-        let row = CommentRow(focused: false, sending: true)
-        #expect(row.showsCommentButton)
-        #expect(row.showsSecondaryButton)
+    @Test func focusedTheHintIsTheSendShortcut() {
+        #expect(CommentRow.hint(focused: true, sending: false, hasDraft: false) == "⌘↩")
+        #expect(CommentRow.hint(focused: true, sending: false, hasDraft: true) == "⌘↩")
+    }
+
+    @Test func sendingShowsInTheHintFocusedOrNot() {
+        #expect(CommentRow.hint(focused: true, sending: true, hasDraft: true) == "Sending…")
+        #expect(CommentRow.hint(focused: false, sending: true, hasDraft: true) == "Sending…")
     }
 
     @Test func previewIsTheFirstLineWithText() {
