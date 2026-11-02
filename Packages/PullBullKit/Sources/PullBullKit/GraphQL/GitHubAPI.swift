@@ -769,7 +769,7 @@ public struct GitHubAPI: Sendable {
               let created = try? Decoding.date(raw)
         else { return nil }
         let author = (node["author"] as? [String: Any])?["login"] as? String ?? "ghost"
-        return Comment(author: author, body: body, createdAt: created)
+        return Comment(id: node["id"] as? String, author: author, body: body, createdAt: created)
     }
 
     private static func linkedPR(_ node: [String: Any]) -> LinkedPR? {
