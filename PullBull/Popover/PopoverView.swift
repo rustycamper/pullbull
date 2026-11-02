@@ -158,9 +158,15 @@ struct PopoverView: View {
         .frame(width: Self.size.width, height: Self.size.height)
         // An edit or post that didn't stick says why, above the footer, or above the detail's bottom row
         // (the comment field and the item's buttons), following the field as it grows.
+        // The @ list rises over the same spot, so the line steps aside while it is open; kept in place
+        // rather than removed, so it isn't announced again when the list closes.
         .overlayPreferenceValue(DetailBottomInsetKey.self, alignment: .bottom) { insets in
+            let listOpen = model.mention != nil
             EditFailureLine(model: model)
                 .padding(.bottom, failureLineInset(insets))
+                .opacity(listOpen ? 0 : 1)
+                .allowsHitTesting(!listOpen)
+                .accessibilityHidden(listOpen)
         }
         // The edit picker opens at its row, or the detail's field row, over every layer.
         .overlayPreferenceValue(EditPickerAnchorKey.self) { anchor in
