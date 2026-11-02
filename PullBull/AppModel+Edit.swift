@@ -197,8 +197,8 @@ extension AppModel {
         "\(field == .labels ? "labels" : "assignees")|\(key.repo)"
     }
 
-    /// The teams of `key`'s owner.
-    private static func teamCandidatesKey(_ key: PRKey) -> String {
+    /// The teams of `key`'s owner, which the reviewers picker and the @ list share.
+    static func teamCandidatesKey(_ key: PRKey) -> String {
         "teams|\(key.repo.split(separator: "/").first.map(String.init) ?? "")"
     }
 

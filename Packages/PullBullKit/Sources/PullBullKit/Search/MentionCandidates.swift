@@ -36,7 +36,8 @@ public enum MentionCandidates {
 
     /// Rows for "@<prefix>": thread people, then mentionable people, known people and teams, the last
     /// three alphabetical. Each person or team appears once, in its first group; the viewer, `ghost` and
-    /// bots are left out.
+    /// bots are left out. A person with no avatar from `mentionable` or `known` shows their GitHub picture.
+    /// "@<owner>/<rest>" lists only the teams of `owner` (case ignored) that match `rest`.
     public static func rank(
         prefix: String, thread: [String], mentionable: [SetCandidate],
         known: [(login: String, avatarURL: URL?)], teams: [SetCandidate]?, owner: String,
@@ -59,8 +60,8 @@ public enum MentionCandidates {
                 let key = login.lowercased()
                 guard !key.isEmpty, key != "ghost", key != viewerKey, !key.hasSuffix("[bot]"),
                       key.hasPrefix(p), seen.insert(key).inserted else { continue }
-                rows.append(MentionCandidate(
-                    id: key, insertText: login, title: login, avatarURL: avatars[key], isTeam: false))
+                let avatar = avatars[key] ?? URL(string: "https://github.com/\(login).png")
+                rows.append(MentionCandidate(id: key, insertText: login, title: login, avatarURL: avatar, isTeam: false))
             }
             return sorted ? rows.sorted { $0.id < $1.id } : rows
         }
@@ -68,10 +69,17 @@ public enum MentionCandidates {
         var rows = people(thread, sorted: false)
         rows += people(mentionable.map(\.name), sorted: true)
         rows += people(known.map(\.login), sorted: true)
+        // "acme/back": the owner's teams matching "back"; another owner's, none.
+        var teamPrefix = p
+        if let slash = p.firstIndex(of: "/") {
+            teamPrefix = String(p[p.index(after: slash)...])
+            if p[..<slash] != owner.lowercased() { return Array(rows.prefix(limit)) }
+        }
         let matching = (teams ?? []).compactMap { team -> MentionCandidate? in
             guard let slug = team.team else { return nil }
             let words = team.name.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber })
-            guard p.isEmpty || slug.lowercased().hasPrefix(p) || words.contains(where: { $0.hasPrefix(p) }) else {
+            guard teamPrefix.isEmpty || slug.lowercased().hasPrefix(teamPrefix)
+                || words.contains(where: { $0.hasPrefix(teamPrefix) }) else {
                 return nil
             }
             let id = "team:\(owner.lowercased())/\(slug.lowercased())"
@@ -80,5 +88,17 @@ public enum MentionCandidates {
         }
         rows += matching.sorted { $0.title.lowercased() < $1.title.lowercased() }
         return Array(rows.prefix(limit))
+    }
+
+    /// Whether GitHub is asked for people matching `prefix` once typing pauses: a person's prefix (no
+    /// "/"), fewer than 8 rows, and the repo's mentionable people not all read already (nil: not read).
+    public static func wantsRemote(prefix: String, rowCount: Int, mentionableComplete: Bool?) -> Bool {
+        !prefix.isEmpty && !prefix.contains("/") && rowCount < 8 && mentionableComplete != true
+    }
+
+    /// The selection in `new` rows: the row selected in `old` where it still is, else the first.
+    public static func selection(keeping selection: Int, of old: [MentionCandidate], in new: [MentionCandidate]) -> Int {
+        guard old.indices.contains(selection) else { return 0 }
+        return new.firstIndex { $0.id == old[selection].id } ?? 0
     }
 }

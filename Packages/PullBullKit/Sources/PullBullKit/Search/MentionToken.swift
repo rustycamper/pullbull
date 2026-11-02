@@ -29,24 +29,37 @@ public struct MentionToken: Equatable, Sendable {
         return nil
     }
 
-    /// Replaces the token with "@<insert> " and returns the new text and caret.
-    /// A space already after the token is reused rather than doubled.
+    /// Replaces the token, and the rest of its name after the caret ("@da|na"), with "@<insert> " and
+    /// returns the new text and caret. A space already after the name is reused rather than doubled.
     public func inserting(_ insert: String, into text: String) -> (text: String, caret: Int) {
+        let edit = edit(inserting: insert, into: text)
+        var units = Array(text.utf16)
+        units.replaceSubrange(edit.range, with: Array(edit.replacement.utf16))
+        return (String(decoding: units, as: UTF16.self), edit.caret)
+    }
+
+    /// `inserting` as one replacement, for a text view to apply with its undo: the UTF-16 range it
+    /// replaces, the text put there, and the caret after it.
+    public func edit(inserting insert: String, into text: String) -> (range: Range<Int>, replacement: String, caret: Int) {
         let units = Array(text.utf16)
         let lower = min(range.lowerBound, units.count)
-        let upper = min(range.upperBound, units.count)
-        let replacement = Array("@\(insert)".utf16)
-        let hasSpace = upper < units.count && units[upper] == 0x20
-        var out = Array(units[..<lower]) + replacement
-        let caret: Int
-        if hasSpace {
-            caret = out.count + 1
-        } else {
-            out.append(0x20)
-            caret = out.count
+        var upper = min(range.upperBound, units.count)
+        var slashes = units[lower..<upper].filter { $0 == 0x2F }.count
+        while upper < units.count {
+            let u = units[upper]
+            if u == 0x2F, slashes == 0 {
+                slashes = 1
+            } else if !Self.isNameUnit(u) {
+                break
+            }
+            upper += 1
         }
-        out += units[upper...]
-        return (String(decoding: out, as: UTF16.self), caret)
+        let replacement = "@\(insert)"
+        let length = replacement.utf16.count
+        if upper < units.count, units[upper] == 0x20 {
+            return (lower..<upper, replacement, lower + length + 1)
+        }
+        return (lower..<upper, replacement + " ", lower + length + 1)
     }
 
     private static func isNameUnit(_ u: UInt16) -> Bool {

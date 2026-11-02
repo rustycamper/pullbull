@@ -132,8 +132,10 @@ Write a comment on an open, closed or merged issue or pull request from its deta
 - **Where:** a comment field at the bottom of the detail, on one row with the buttons, so it stays in view while the page scrolls. It reads "Comment…", or shows a pencil and the first line of a waiting draft. Opening a detail or the popover never puts the caret in it: press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>M</kbd>, or click it. While you write, the field grows upward to 8 lines and shows <kbd>⌘</kbd><kbd>Return</kbd> at its end. The buttons beside it stay as they are
 - **Post:** <kbd>⌘</kbd><kbd>Return</kbd> in the field; the field shows it at its end while you type. VoiceOver users have a **Post comment** action on the field. Empty text sends nothing
 - **Keys in the field:** <kbd>Return</kbd> writes a new line. Outside the field, <kbd>⌘</kbd><kbd>Return</kbd> still opens the item on GitHub
-- **Tagging:** type `@login` (or `@owner/team`) by hand; GitHub turns it into a mention and notifies the person when the comment posts. PullBull doesn't suggest names yet
-- **Esc twice:** the first <kbd>Esc</kbd> leaves the field, the second closes the detail. Nothing you typed is lost
+- **Tagging:** type `@` and a list opens above the field with people to tag, narrowing as you type the login. First the people in this thread (who commented, newest first, then the author, assignees, requested reviewers and reviewers), then everyone who can be mentioned in the repo, then the people PullBull's lists know, then the organisation's teams. You, `ghost` and bots aren't offered. <kbd>↑</kbd> <kbd>↓</kbd> choose, <kbd>Return</kbd> or <kbd>Tab</kbd> puts in `@login ` (or `@owner/team `), and a click on a row does the same. GitHub turns it into a mention and notifies them when the comment posts
+- **Teams:** on an organisation's repo, the list offers its teams when PullBull can read the team list; type `@acme/` to see only those. A `gh` login without `read:org` gets people only
+- **The list closes** on a space, when the caret leaves the `@` word, or on <kbd>Esc</kbd>, which keeps what you typed. "Loading people…" shows while the repo's people are still on their way and nothing yet matches. A name that matches no one is sent as you typed it
+- **Esc twice:** the first <kbd>Esc</kbd> leaves the field (or closes the `@` list, if it's open), the second closes the detail. Nothing you typed is lost
 - **Drafts:** kept in memory for each account and item, across closing the detail, moving to another item, and closing the popover. They go on quit or sign-out
 - **While posting:** the field is read-only and your comment shows at the end of the Conversation, dimmed, marked "Sending…". When GitHub accepts it, it becomes the real comment, the field empties, the row's comment count goes up, and the item leaves `is:unanswered`. PullBull shows it until GitHub's own reads catch up, for at most 5 minutes
 - **Refused:** a line above the field says "Couldn't comment on #88: …" with GitHub's reason (a locked conversation, an archived repo, issues turned off) and **Open on GitHub**. The text stays in the field
@@ -299,7 +301,7 @@ Settings → Ask AI.
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd> | [Status picker](#editing), on an issue |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>R</kbd> | [Reviewers picker](#editing), on a pull request |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>A</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>L</kbd> | [Assignees or labels picker](#editing), on an issue or pull request |
-| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>M</kbd> | [Comment field](#commenting), on an issue or pull request. <kbd>⌘</kbd><kbd>Return</kbd> posts; <kbd>Esc</kbd> leaves the field, a second <kbd>Esc</kbd> goes back |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>M</kbd> | [Comment field](#commenting), on an issue or pull request. <kbd>⌘</kbd><kbd>Return</kbd> posts; <kbd>@</kbd> opens the list of people to tag (<kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Return</kbd> or <kbd>Tab</kbd> inserts, <kbd>Esc</kbd> closes it); <kbd>Esc</kbd> leaves the field, a second <kbd>Esc</kbd> goes back |
 | <kbd>⌘</kbd><kbd>Z</kbd> | Undo the last edit, for 10 seconds after it. In the comment field, undoes typing |
 
 The order is the one on screen when you opened the first item; a refresh doesn't reshuffle it. An item that has left the lists since is skipped, unless its detail was already loaded.

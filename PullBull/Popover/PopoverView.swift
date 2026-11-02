@@ -866,7 +866,7 @@ struct PopoverView: View {
     private func handleDetailKey(_ event: NSEvent, flags: NSEvent.ModifierFlags, in window: NSWindow) -> Bool {
         if let field = window.firstResponder as? CommentEditor, let key = field.key {
             let action = CommentFieldKeys.route(
-                keyCode: event.keyCode, flags: KeyCombo.Modifiers(flags), mentionsOpen: false,
+                keyCode: event.keyCode, flags: KeyCombo.Modifiers(flags), mentionsOpen: model.mention != nil,
                 composing: field.hasMarkedText())
             switch action {
             case .post:
@@ -875,7 +875,16 @@ struct PopoverView: View {
             case .leaveField:
                 window.makeFirstResponder(nil)
                 return true
-            case .text, .closeMentions, .moveMention, .acceptMention:
+            case .closeMentions:
+                model.closeMentions()
+                return true
+            case .moveMention(let offset):
+                model.moveMention(by: offset)
+                return true
+            case .acceptMention:
+                // With nothing to take yet ("Loading people…"), Return and Tab type as usual.
+                return model.acceptMention()
+            case .text:
                 return false
             }
         }

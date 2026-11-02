@@ -90,6 +90,16 @@ final class AppModel {
     private(set) var commentFieldReset: CommentFieldSignal?
     /// Bumped when a post on `key` was refused: the comment field on `key` takes focus.
     private(set) var commentFieldFocusRequest: CommentFieldSignal?
+    /// The @ list over the focused comment field, or nil (see AppModel+Comment.swift).
+    var mention: MentionState?
+    /// Set when a row of the @ list is taken: the comment field on its key makes the replacement.
+    private(set) var mentionInsertion: MentionInsertion?
+    /// The focused comment field's item, text and caret, which the @ list is read from.
+    @ObservationIgnored var mentionField: MentionField?
+    /// Mentionable people and team fetches under way, by `setCandidates` key.
+    @ObservationIgnored var mentionFetches: [String: Task<Void, Never>] = [:]
+    /// The wait before the @ list asks GitHub for more people.
+    @ObservationIgnored var mentionFilterTask: Task<Void, Never>?
     /// The Status picker on screen, or nil.
     var statusPicker: StatusPicker?
     /// The reviewer, assignee or label picker on screen, or nil.
@@ -164,7 +174,10 @@ final class AppModel {
         case .issues: .issues(selectedIssueTab)
         }
     }
-    var route: Route = .list
+    var route: Route = .list {
+        // Another detail or screen: the @ list belongs to the field that was showing.
+        didSet { if route != oldValue { endMentions() } }
+    }
 
     /// The tab whose sort the filter bar's sort button and Sort By change: the tab search results are laid
     /// out for, else the tab on screen.
@@ -1850,6 +1863,11 @@ final class AppModel {
         setFilterTask?.cancel()
         setFilterTask = nil
         setCandidates.removeAll()
+        mention = nil
+        mentionFilterTask?.cancel()
+        mentionFilterTask = nil
+        mentionFetches.values.forEach { $0.cancel() }
+        mentionFetches.removeAll()
         snapshot = nil
         people = .empty
         labels = .empty
@@ -2679,6 +2697,13 @@ extension AppModel {
     /// Asks the comment field on `key` to take focus.
     func requestCommentFieldFocus(on key: PRKey) {
         commentFieldFocusRequest = CommentFieldSignal(key: key, n: (commentFieldFocusRequest?.n ?? 0) + 1)
+    }
+
+    /// Asks the comment field on `key` to replace `range` (UTF-16) with `replacement` and put the caret
+    /// at `caret`.
+    func requestMentionInsertion(on key: PRKey, range: Range<Int>, replacement: String, caret: Int) {
+        mentionInsertion = MentionInsertion(
+            key: key, range: range, replacement: replacement, caret: caret, n: (mentionInsertion?.n ?? 0) + 1)
     }
 
     /// Fetches the detail of `key` once with `account`, outside `loadDetail`'s cancelling, keeps it as

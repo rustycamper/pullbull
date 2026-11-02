@@ -76,4 +76,44 @@ private func rank(
         #expect(result.allSatisfy { !$0.isTeam })
         #expect(result[0].insertText == "zed")
     }
+    @Test func ownerSlashListsTheOwnersTeamsOnly() {
+        let teams = [
+            SetCandidate(id: "team:backend", name: "Back End", team: "backend"),
+            SetCandidate(id: "team:design", name: "Design", team: "design"),
+        ]
+        let all = rank("acme/", thread: ["acme"], mentionable: ["acmebot"], teams: teams)
+        #expect(all.map(\.insertText) == ["acme/backend", "acme/design"])
+        #expect(rank("ACME/back", teams: teams).map(\.insertText) == ["acme/backend"])
+        #expect(rank("acme/end", teams: teams).map(\.insertText) == ["acme/backend"])
+        #expect(rank("other/back", teams: teams).isEmpty)
+        #expect(rank("acme/back", teams: nil).isEmpty)
+    }
+
+    @Test func aPersonWithNoKnownAvatarGetsTheirGitHubPicture() {
+        let withAvatar = SetCandidate(id: "U_dana", name: "dana", avatarURL: URL(string: "https://avatars.example/dana"))
+        let result = MentionCandidates.rank(
+            prefix: "", thread: ["zed", "dana"], mentionable: [withAvatar], known: [], teams: nil, owner: "acme",
+            viewer: "viewer")
+        #expect(result.map(\.avatarURL) == [
+            URL(string: "https://github.com/zed.png"), URL(string: "https://avatars.example/dana"),
+        ])
+    }
+
+    @Test func remoteQueryWantsAPrefixFewRowsAndAnIncompleteList() {
+        #expect(MentionCandidates.wantsRemote(prefix: "da", rowCount: 3, mentionableComplete: false))
+        #expect(MentionCandidates.wantsRemote(prefix: "da", rowCount: 3, mentionableComplete: nil))
+        #expect(!MentionCandidates.wantsRemote(prefix: "", rowCount: 3, mentionableComplete: false))
+        #expect(!MentionCandidates.wantsRemote(prefix: "da", rowCount: 8, mentionableComplete: false))
+        #expect(!MentionCandidates.wantsRemote(prefix: "da", rowCount: 3, mentionableComplete: true))
+        #expect(!MentionCandidates.wantsRemote(prefix: "acme/", rowCount: 0, mentionableComplete: false))
+    }
+
+    @Test func selectionFollowsTheSameRow() {
+        let old = rank(thread: ["amy", "bob", "cat"])
+        let new = rank(thread: ["zed", "bob", "cat"])
+        #expect(MentionCandidates.selection(keeping: 1, of: old, in: new) == 1)
+        #expect(MentionCandidates.selection(keeping: 2, of: old, in: rank(thread: ["cat"])) == 0)
+        #expect(MentionCandidates.selection(keeping: 0, of: old, in: new) == 0)
+        #expect(MentionCandidates.selection(keeping: 5, of: old, in: new) == 0)
+    }
 }
