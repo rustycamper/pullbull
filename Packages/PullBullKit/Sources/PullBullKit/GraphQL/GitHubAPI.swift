@@ -169,12 +169,15 @@ public struct Comment: Codable, Sendable, Hashable {
     /// The comment's node ID; nil for a comment read before ids were kept.
     public let id: String?
     public let author: String
+    /// Whether the author is a bot; nil for a comment read before the author's type was kept.
+    public let authorIsBot: Bool?
     public let body: String
     public let createdAt: Date
 
-    public init(id: String? = nil, author: String, body: String, createdAt: Date) {
+    public init(id: String? = nil, author: String, authorIsBot: Bool? = nil, body: String, createdAt: Date) {
         self.id = id
         self.author = author
+        self.authorIsBot = authorIsBot
         self.body = body
         self.createdAt = createdAt
     }
@@ -768,8 +771,10 @@ public struct GitHubAPI: Sendable {
               let raw = node["createdAt"] as? String,
               let created = try? Decoding.date(raw)
         else { return nil }
-        let author = (node["author"] as? [String: Any])?["login"] as? String ?? "ghost"
-        return Comment(id: node["id"] as? String, author: author, body: body, createdAt: created)
+        let authorNode = node["author"] as? [String: Any]
+        let author = authorNode?["login"] as? String ?? "ghost"
+        let isBot = (authorNode?["__typename"] as? String).map { $0 == "Bot" }
+        return Comment(id: node["id"] as? String, author: author, authorIsBot: isBot, body: body, createdAt: created)
     }
 
     private static func linkedPR(_ node: [String: Any]) -> LinkedPR? {

@@ -79,7 +79,7 @@ private func tempDir() -> URL {
         #expect(body.contains("fragment issueRowFields on Issue"))
         // The fragment selects comments{totalCount}; an unaliased comments(last:2) is a field conflict.
         #expect(body.contains("lastComments: comments(last:2)"))
-        #expect(body.contains("lastComments: comments(last:2){totalCount nodes{id author{login} body createdAt}}"))
+        #expect(body.contains("lastComments: comments(last:2){totalCount nodes{id author{__typename login} body createdAt}}"))
         #expect(body.contains("\"owner\":\"initech\""))
         #expect(body.contains("\"name\":\"gadgets\""))
         #expect(body.contains("\"n\":231"))
