@@ -166,11 +166,14 @@ public struct Check: Codable, Sendable, Hashable {
 }
 
 public struct Comment: Codable, Sendable, Hashable {
+    /// The comment's node ID; nil for a comment read before ids were kept.
+    public let id: String?
     public let author: String
     public let body: String
     public let createdAt: Date
 
-    public init(author: String, body: String, createdAt: Date) {
+    public init(id: String? = nil, author: String, body: String, createdAt: Date) {
+        self.id = id
         self.author = author
         self.body = body
         self.createdAt = createdAt
@@ -849,6 +852,24 @@ public struct GitHubAPI: Sendable {
             Mutations.labels(adding: !adding.isEmpty, removing: !removing.isEmpty), subject, adding, removing)
     }
 
+    /// Posts `body`, trimmed, as a comment on the issue or PR `key` and returns the comment GitHub made.
+    /// A refusal throws `writeRefused` with GitHub's reason. A timeout or dropped connection throws
+    /// `CommentTransportError`, since the comment may have landed. An answer that lacks a field throws
+    /// `server(201)`: the post was accepted, so it is never a refusal.
+    public func postComment(on key: PRKey, body: String) async throws -> Comment {
+        let path = "/repos/\(key.repo)/issues/\(key.number)/comments"
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        let answer = try await restAnswer("POST", path, ["body": trimmed], keepingTransportFailures: true)
+        guard let node = try? JSONSerialization.jsonObject(with: answer) as? [String: Any],
+              let id = node["node_id"] as? String,
+              let text = node["body"] as? String,
+              let raw = node["created_at"] as? String,
+              let created = try? Decoding.date(raw),
+              let author = (node["user"] as? [String: Any])?["login"] as? String
+        else { throw APIError.server(201) }
+        return Comment(id: id, author: author, body: text, createdAt: created)
+    }
+
     /// Adds and removes assignees (user node IDs) on the issue or PR `subject`, in one request.
     public func changeAssignees(of subject: String, adding: [String], removing: [String]) async throws -> SetChangeResult {
         try await changeSet(
@@ -1158,28 +1179,45 @@ public struct GitHubAPI: Sendable {
     }
 
     /// The error a non-2xx status means; nil for 2xx. `refusing`: a REST write, where a 403 that isn't a
-    /// rate limit, a 404 or a 422 is the write refused, in the body's `message`.
+    /// rate limit, a 404, a 410 or a 422 is the write refused, for the reason in the body: the first of
+    /// `errors` (a validation failure's detail) when it has one, else `message`.
     private func httpError(_ data: Data, _ response: HTTPURLResponse, refusing: Bool = false) -> APIError? {
         if let sso = APIError.ssoRequired(in: response) { return sso }
         let status = response.statusCode
         if (200..<300).contains(status) { return nil }
         if status == 401 { return .unauthorized }
         if let limited = APIError.rateLimited(in: response, body: data, now: now()) { return limited }
-        if refusing, [403, 404, 422].contains(status) {
+        if refusing, [403, 404, 410, 422].contains(status) {
             let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-            return .writeRefused(body?["message"] as? String ?? "GitHub didn't apply the change")
+            let detail = (body?["errors"] as? [[String: Any]])?.first?["message"] as? String
+            let reason = [detail, body?["message"] as? String].compactMap { $0 }.first { !$0.isEmpty }
+            return .writeRefused(reason ?? "GitHub didn't apply the change")
         }
         return status == 403 ? .forbidden : .server(status)
     }
 
     /// Sends one REST write with a JSON body; throws unless the answer is 2xx.
     private func rest(_ method: String, _ path: String, _ body: [String: Any]) async throws {
+        _ = try await restAnswer(method, path, body)
+    }
+
+    /// Sends one REST write with a JSON body and returns the answer's body; throws unless it is 2xx.
+    /// `keepingTransportFailures`: a `URLError` (except a cancellation) reaches the caller as a
+    /// `CommentTransportError` with its code, not as the `APIError` that `sendAuthorized` makes of it.
+    private func restAnswer(
+        _ method: String, _ path: String, _ body: [String: Any], keepingTransportFailures: Bool = false
+    ) async throws -> Data {
         try Task.checkCancellation()
         let data = try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
         let (answer, response) = try await sendAuthorized(with: auth) { token in
-            try await transport.send(method, path: path, body: data, token: token)
+            do {
+                return try await transport.send(method, path: path, body: data, token: token)
+            } catch let error as URLError where keepingTransportFailures && error.code != .cancelled {
+                throw CommentTransportError(code: error.code)
+            }
         }
         if let error = httpError(answer, response, refusing: true) { throw error }
+        return answer
     }
 
     /// `execute`, also returning the errors that came alongside partial data, for callers that tell a
