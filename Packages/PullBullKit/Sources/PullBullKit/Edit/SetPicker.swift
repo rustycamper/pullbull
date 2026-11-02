@@ -154,7 +154,8 @@ public struct SetPicker: Equatable, Sendable {
         switch field {
         case .labels: return .labels(added: added.map(labelRef), removed: removed.map(labelRef))
         case .reviewers: return .reviewers(added: added.map(\.reviewer), removed: removed.map(\.reviewer))
-        case .assignees, .status: return .assignees(added: added.map(personRef), removed: removed.map(personRef))
+        case .assignees, .status, .comment:
+            return .assignees(added: added.map(personRef), removed: removed.map(personRef))
         }
     }
 

@@ -1,8 +1,9 @@
 import Foundation
 
-/// What an edit changes on GitHub.
+/// What an edit changes on GitHub. `comment` posts a comment rather than changing a field, and gates
+/// like the item's other edits.
 public enum EditField: Sendable {
-    case status, labels, assignees, reviewers
+    case status, labels, assignees, reviewers, comment
 }
 
 /// Whether the current account may make an edit, and if not, what it needs.
@@ -43,14 +44,22 @@ public enum EditPermission: Equatable, Sendable {
     }
 
     /// The one line shown in place of the picker; nil when there's nothing to say.
-    public var note: String? {
+    public var note: String? { note(doing: "Editing") }
+
+    /// The one line shown in place of the picker or the comment field for `field`; nil when there's
+    /// nothing to say.
+    public func note(for field: EditField) -> String? {
+        note(doing: field == .comment ? "Commenting" : "Editing")
+    }
+
+    private func note(doing: String) -> String? {
         switch self {
         case .ready, .unavailable:
             nil
         case .needsAppApproval(let owner, let isOrganization, _):
             isOrganization
-                ? "Editing needs PullBull's new permissions for \(owner). An org owner accepts them on GitHub."
-                : "Editing needs PullBull's new permissions. Accept them on GitHub."
+                ? "\(doing) needs PullBull's new permissions for \(owner). An org owner accepts them on GitHub."
+                : "\(doing) needs PullBull's new permissions. Accept them on GitHub."
         case .needsGhScope(let command):
             "Setting Status needs the project scope. Run: \(command)"
         }

@@ -76,6 +76,11 @@ public struct EditSession: Equatable, Sendable {
         undo.take(now: now)
     }
 
+    /// Shows a failure that isn't an edit's, such as a comment's. Leaves ⌘Z and the last edit as they were.
+    public mutating func showFailure(_ failure: EditFailure) {
+        self.failure = failure
+    }
+
     public mutating func dismissFailure() {
         failure = nil
     }
