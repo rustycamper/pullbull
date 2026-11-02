@@ -48,8 +48,12 @@ struct PRDetailView: View {
                 }
             }
             .frame(maxHeight: .infinity)
-            CommentField(model: model, key: key, isPullRequest: true)
-            bottomBar
+            VStack(spacing: 0) {
+                CommentField(model: model, key: key, isPullRequest: true)
+                bottomBar
+            }
+            // The failure line sits on top of these.
+            .detailBottomInset(for: key)
         }
         // Links in PR text are untrusted: only web links open, anything else is dropped.
         .environment(\.openURL, OpenURLAction { url in

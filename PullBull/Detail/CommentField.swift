@@ -121,7 +121,10 @@ struct CommentTextView: NSViewRepresentable {
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
         textView.isAutomaticLinkDetectionEnabled = false
+        // Spelling is checked but never corrected or completed, so code and names arrive as typed.
         textView.isContinuousSpellCheckingEnabled = true
+        textView.isAutomaticSpellingCorrectionEnabled = false
+        textView.isAutomaticTextCompletionEnabled = false
         textView.font = Self.font
         textView.textColor = .labelColor
         textView.drawsBackground = false
@@ -286,8 +289,9 @@ final class CommentEditor: NSTextView {
         if !window.makeFirstResponder(self) { focusAllowed = false }
     }
 
+    /// `makeFirstResponder` doesn't ask `acceptsFirstResponder`, so the refusal is here too.
     override func becomeFirstResponder() -> Bool {
-        guard super.becomeFirstResponder() else { return false }
+        guard focusAllowed, super.becomeFirstResponder() else { return false }
         onFocusChange?(true)
         return true
     }
@@ -295,13 +299,21 @@ final class CommentEditor: NSTextView {
     override func resignFirstResponder() -> Bool {
         guard super.resignFirstResponder() else { return false }
         focusAllowed = false
+        // Unfocused, the field is one line from the top, as its preview is.
+        scroll(.zero)
         onFocusChange?(false)
         return true
     }
 
+    /// A click on the unfocused field focuses it with the caret where it was: the click isn't passed on,
+    /// so the selection the view kept (the draft's caret, from `load` or from before it was left) stays.
+    /// Once focused, clicks place the caret as usual.
     override func mouseDown(with event: NSEvent) {
-        if window?.firstResponder !== self { requestFocus() }
-        super.mouseDown(with: event)
+        if window?.firstResponder === self {
+            super.mouseDown(with: event)
+        } else {
+            requestFocus()
+        }
     }
 
     /// VoiceOver focusing the field asks for it as a click does.

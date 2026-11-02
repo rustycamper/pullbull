@@ -156,10 +156,11 @@ struct PopoverView: View {
         // Skeletons shimmer only while the panel is open.
         .environment(\.skeletonAnimates, shown)
         .frame(width: Self.size.width, height: Self.size.height)
-        // An edit that didn't stick says why, above the footer or the detail's bottom bar.
-        .overlay(alignment: .bottom) {
+        // An edit or post that didn't stick says why, above the footer, or above the detail's comment
+        // field and bottom bar, following the field as it grows.
+        .overlayPreferenceValue(DetailBottomInsetKey.self, alignment: .bottom) { insets in
             EditFailureLine(model: model)
-                .padding(.bottom, Self.isDetail(model.route) ? 45 : 34)
+                .padding(.bottom, failureLineInset(insets))
         }
         // The edit picker opens at its row, or the detail's field row, over every layer.
         .overlayPreferenceValue(EditPickerAnchorKey.self) { anchor in
@@ -461,9 +462,12 @@ struct PopoverView: View {
         let old = layers
         guard new != old else { return }
         // A text view in a leaving detail would keep key focus for the slide, and with it "/" and
-        // type-anywhere.
-        if old.contains(where: { !new.contains($0) }), let window = presence.window, window.firstResponder is NSText {
-            window.makeFirstResponder(nil)
+        // type-anywhere; one in a detail now covered (an issue's comment field under a linked PR) would
+        // take the keys of the detail on top. Only the search field keeps its caret while the search
+        // route owns it.
+        if let window = presence.window, let text = window.firstResponder as? NSText {
+            let searchOwnsIt = searching && (text as? NSTextView)?.isFieldEditor == true
+            if old.contains(where: { !new.contains($0) }) || !searchOwnsIt { window.makeFirstResponder(nil) }
         }
         var animation: Animation?
         // The Ask screen fades in and out in place; details slide (or fade, with Reduce Motion).
@@ -480,6 +484,15 @@ struct PopoverView: View {
         var transaction = Transaction(animation: animation)
         transaction.disablesAnimations = animation == nil
         withTransaction(transaction) { layers = new }
+    }
+
+    /// The failure line's distance from the bottom: the shown detail's comment field and bottom bar, or
+    /// the list's footer.
+    private func failureLineInset(_ insets: [PRKey: CGFloat]) -> CGFloat {
+        switch model.route {
+        case .detail(let key), .issueDetail(let key): insets[key] ?? 45
+        case .list, .search, .ask: 34
+        }
     }
 
     private static func isDetail(_ route: Route) -> Bool {
@@ -853,7 +866,7 @@ struct PopoverView: View {
     private func handleDetailKey(_ event: NSEvent, flags: NSEvent.ModifierFlags, in window: NSWindow) -> Bool {
         if let field = window.firstResponder as? CommentEditor, let key = field.key {
             let action = CommentFieldKeys.route(
-                keyCode: event.keyCode, flags: Self.modifiers(flags), mentionsOpen: false,
+                keyCode: event.keyCode, flags: KeyCombo.Modifiers(flags), mentionsOpen: false,
                 composing: field.hasMarkedText())
             switch action {
             case .post:
@@ -1109,16 +1122,6 @@ struct PopoverView: View {
     /// ⌘Z exactly.
     private static func isCommandZ(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
         flags.subtracting([.capsLock, .numericPad, .function]) == .command && commandKey(event) == "z"
-    }
-
-    /// The flags as `KeyCombo` modifiers: caps lock, numeric pad and function drop out.
-    private static func modifiers(_ flags: NSEvent.ModifierFlags) -> KeyCombo.Modifiers {
-        var modifiers: KeyCombo.Modifiers = []
-        if flags.contains(.control) { modifiers.insert(.control) }
-        if flags.contains(.option) { modifiers.insert(.option) }
-        if flags.contains(.shift) { modifiers.insert(.shift) }
-        if flags.contains(.command) { modifiers.insert(.command) }
-        return modifiers
     }
 
     /// ⌥⌘C exactly: no ⇧ or ⌃.
