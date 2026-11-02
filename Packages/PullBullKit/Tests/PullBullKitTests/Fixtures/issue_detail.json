@@ -24,8 +24,8 @@
         "lastComments": {
           "totalCount": 5,
           "nodes": [
-            { "author": { "login": "devon" }, "body": "Example reply.", "createdAt": "2026-10-25T14:03:11Z" },
-            { "author": { "login": "dev-a" }, "body": "Example comment.", "createdAt": "2026-10-24T10:00:00Z" }
+            { "id": "IC_reply", "author": { "login": "devon" }, "body": "Example reply.", "createdAt": "2026-10-25T14:03:11Z" },
+            { "id": "IC_comment", "author": { "login": "dev-a" }, "body": "Example comment.", "createdAt": "2026-10-24T10:00:00Z" }
           ]
         },
         "closedByPullRequestsReferences": {

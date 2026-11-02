@@ -380,6 +380,13 @@ private func node(_ name: String) throws -> [String: Any] {
 
     /// A PR page shows its newest comments, with the earlier ones counted above, as an issue page does.
     @Test func prDetailAsksForTheNewestComments() {
-        #expect(Queries.detail.contains("comments(last:50){totalCount nodes{author{login} body createdAt}}"))
+        #expect(Queries.detail.contains("comments(last:50){totalCount nodes{id author{login} body createdAt}}"))
+    }
+
+    @Test func cachedCommentWithoutIdDecodes() throws {
+        let json = #"{"author":"a","body":"b","createdAt":0}"#
+        let comment = try JSONDecoder().decode(PullBullKit.Comment.self, from: Data(json.utf8))
+        #expect(comment.id == nil)
+        #expect(comment.author == "a")
     }
 }

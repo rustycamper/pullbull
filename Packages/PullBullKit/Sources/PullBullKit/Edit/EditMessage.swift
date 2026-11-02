@@ -45,6 +45,16 @@ public enum EditMessage {
         return "Couldn't \(what): \(reason)"
     }
 
+    /// A comment GitHub refused; `reason` is GitHub's words, or PullBull's when it never got there.
+    public static func commentRefused(on key: PRKey, reason: String) -> String {
+        "Couldn't comment on #\(key.number): \(reason)"
+    }
+
+    /// A comment whose post had no clear answer, and that a fresh detail doesn't hold.
+    public static func commentUnconfirmed(on key: PRKey) -> String {
+        "Couldn't confirm your comment on #\(key.number). Check the Conversation before sending again."
+    }
+
     /// GitHub's own words when it refused the write; the refresh wording for anything else.
     private static func reason(for error: any Error) -> String {
         if case APIError.writeRefused(let message) = error { return message }

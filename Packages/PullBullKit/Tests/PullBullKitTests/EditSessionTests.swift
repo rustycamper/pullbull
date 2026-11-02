@@ -185,4 +185,62 @@ private func status(_ key: PRKey, _ session: EditSession, in snapshot: Snapshot 
         #expect(change.keeping(removedOnly) == .reviewers(added: [], removed: [.user("bob")]))
         #expect(change.keeping(addedOnly) == .reviewers(added: [.user("alice")], removed: []))
     }
+
+    // MARK: Comment failures
+
+    private let commentFailure = EditFailure(
+        text: EditMessage.commentRefused(on: k412, reason: "Issues are locked"), url: url412)
+
+    @Test func showFailureLeavesAnArmedUndoTakeable() {
+        var s = EditSession()
+        let id = s.begin(move, on: k412, at: t0)
+        let record = EditRecord(key: k412, change: move, madeAt: t0, addedItemId: nil)
+        s.applied(id, record)
+        s.showFailure(commentFailure)
+        #expect(s.failure == commentFailure)
+        #expect(s.canUndo(now: t0 + 5))
+        #expect(s.takeUndo(now: t0 + 5) == record)
+    }
+
+    /// An edit's answer after a comment failure still arms ⌘Z: the comment failure leaves `last` alone.
+    @Test func showFailureLeavesTheLastEditAlone() {
+        var s = EditSession()
+        let id = s.begin(move, on: k412, at: t0)
+        s.showFailure(commentFailure)
+        let record = EditRecord(key: k412, change: move, madeAt: t0, addedItemId: nil)
+        s.applied(id, record)
+        #expect(s.takeUndo(now: t0 + 1) == record)
+    }
+
+    @Test func aLaterEditClearsTheCommentFailure() {
+        var s = EditSession()
+        s.showFailure(commentFailure)
+        _ = s.begin(move, on: k413, at: t0)
+        #expect(s.failure == nil)
+    }
+
+    /// A new post dismisses the failure line; an armed ⌘Z and the edit still waiting keep working.
+    @Test func dismissFailureLeavesUndoAndTheLastEditAlone() {
+        var s = EditSession()
+        let first = s.begin(move, on: k412, at: t0)
+        let record = EditRecord(key: k412, change: move, madeAt: t0, addedItemId: nil)
+        s.applied(first, record)
+        s.showFailure(commentFailure)
+        s.dismissFailure()
+        #expect(s.failure == nil)
+        #expect(s.takeUndo(now: t0 + 5) == record)
+        let second = s.begin(move, on: k413, at: t0 + 6)
+        s.dismissFailure()
+        let later = EditRecord(key: k413, change: move, madeAt: t0 + 6, addedItemId: nil)
+        s.applied(second, later)
+        #expect(s.takeUndo(now: t0 + 7) == later)
+    }
+
+    @Test func commentMessages() {
+        let k88 = editKey(88)
+        #expect(EditMessage.commentRefused(on: k88, reason: "Issue is locked")
+            == "Couldn't comment on #88: Issue is locked")
+        #expect(EditMessage.commentUnconfirmed(on: k88)
+            == "Couldn't confirm your comment on #88. Check the Conversation before sending again.")
+    }
 }

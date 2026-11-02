@@ -3,8 +3,9 @@ import SwiftUI
 import PullBullKit
 
 /// The detail of one PR inside the popover: summary, details (assignees, labels), description, checks,
-/// reviewers, conversation and changed files, with Copy branch and Open on GitHub pinned at the bottom. It
-/// shows the list data and the cached detail at once; `AppModel` refreshes the detail in place.
+/// reviewers, conversation and changed files, with the comment field, Copy branch and Open on GitHub
+/// pinned at the bottom. It shows the list data and the cached detail at once; `AppModel` refreshes the
+/// detail in place.
 struct PRDetailView: View {
     let model: AppModel
     let key: PRKey
@@ -48,6 +49,8 @@ struct PRDetailView: View {
             }
             .frame(maxHeight: .infinity)
             bottomBar
+                // The failure line sits on top of it, following the comment field as it grows.
+                .detailBottomInset(for: key)
         }
         // Links in PR text are untrusted: only web links open, anything else is dropped.
         .environment(\.openURL, OpenURLAction { url in
@@ -305,10 +308,13 @@ struct PRDetailView: View {
     }
 
     private func conversationSection(_ detail: PRDetail, now: Date) -> some View {
-        // The detail's own total, not the row's: a linked PR opened from an issue has no row.
-        ConversationSection(
-            comments: detail.comments, total: detail.commentTotal, earlier: detail.earlierCommentCount,
-            webURL: webURL, now: now)
+        // The detail's own total, not the row's: a linked PR opened from an issue has no row. Comments
+        // posted from here show until the detail holds them.
+        let shown = model.postedComments.conversation(
+            for: key, held: detail.comments, total: detail.commentTotal, keep: nil, now: now)
+        return ConversationSection(
+            comments: shown.comments, total: shown.total, earlier: shown.earlier,
+            sendingIndex: shown.sendingIndex, webURL: webURL, now: now)
     }
 
     private func filesSection(_ detail: PRDetail) -> some View {
@@ -376,17 +382,11 @@ struct PRDetailView: View {
 
     // MARK: Bottom bar
 
+    /// The comment field, Copy branch and Open on GitHub, on one row.
     private var bottomBar: some View {
-        HStack(spacing: 8) {
-            Spacer(minLength: 0)
+        CommentField(model: model, key: key, isPullRequest: true, webURL: webURL) {
             if let pr { CopyBranchButton(pr: pr) }
-            OutlinedIconButton(name: "Open on GitHub", systemImage: "arrow.up.right.square") {
-                NSWorkspace.shared.open(webURL)
-            }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .overlay(alignment: .top) { Hairline() }
     }
 }
 

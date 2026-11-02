@@ -413,6 +413,8 @@ body {
 .comment-body { line-height: 17px; }
 .detail-bar { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 12px; flex: none; }
 .detail-bar::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 0.5px; background: var(--separator); }
+/* CommentField unfocused: Palette.field, a 1 pt separator border, 6 pt corners, 8 pt in from the sides. */
+.comment-field { flex: 1 1 auto; min-width: 0; height: 24px; padding: 0 8px; border-radius: 6px; background: var(--field); box-shadow: inset 0 0 0 1px var(--separator); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .outlined-button { width: 30px; height: 24px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--separator); display: flex; align-items: center; justify-content: center; flex: none; }
 
 /* MarkdownBlocks: blocks 8 apart, list items 3 apart, details summary semibold behind a chevron */

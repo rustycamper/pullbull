@@ -156,10 +156,11 @@ struct PopoverView: View {
         // Skeletons shimmer only while the panel is open.
         .environment(\.skeletonAnimates, shown)
         .frame(width: Self.size.width, height: Self.size.height)
-        // An edit that didn't stick says why, above the footer or the detail's bottom bar.
-        .overlay(alignment: .bottom) {
+        // An edit or post that didn't stick says why, above the footer, or above the detail's bottom row
+        // (the comment field and the item's buttons), following the field as it grows.
+        .overlayPreferenceValue(DetailBottomInsetKey.self, alignment: .bottom) { insets in
             EditFailureLine(model: model)
-                .padding(.bottom, Self.isDetail(model.route) ? 45 : 34)
+                .padding(.bottom, failureLineInset(insets))
         }
         // The edit picker opens at its row, or the detail's field row, over every layer.
         .overlayPreferenceValue(EditPickerAnchorKey.self) { anchor in
@@ -401,9 +402,9 @@ struct PopoverView: View {
         if searching {
             fieldFocused = true
         } else {
-            // Shown, the window puts the caret in its first text field; the list keeps the keys until
-            // the field is picked.
-            if (window.firstResponder as? NSTextView)?.isFieldEditor == true { window.makeFirstResponder(nil) }
+            // Shown, the window puts the caret in its first text field, or keeps it in the comment field it
+            // was closed on; the list or detail keeps the keys until a field is picked.
+            if window.firstResponder is NSText { window.makeFirstResponder(nil) }
             fieldFocused = false
             fieldOpen = false
         }
@@ -461,9 +462,12 @@ struct PopoverView: View {
         let old = layers
         guard new != old else { return }
         // A text view in a leaving detail would keep key focus for the slide, and with it "/" and
-        // type-anywhere.
-        if old.contains(where: { !new.contains($0) }), let window = presence.window, window.firstResponder is NSText {
-            window.makeFirstResponder(nil)
+        // type-anywhere; one in a detail now covered (an issue's comment field under a linked PR) would
+        // take the keys of the detail on top. Only the search field keeps its caret while the search
+        // route owns it.
+        if let window = presence.window, let text = window.firstResponder as? NSText {
+            let searchOwnsIt = searching && (text as? NSTextView)?.isFieldEditor == true
+            if old.contains(where: { !new.contains($0) }) || !searchOwnsIt { window.makeFirstResponder(nil) }
         }
         var animation: Animation?
         // The Ask screen fades in and out in place; details slide (or fade, with Reduce Motion).
@@ -480,6 +484,15 @@ struct PopoverView: View {
         var transaction = Transaction(animation: animation)
         transaction.disablesAnimations = animation == nil
         withTransaction(transaction) { layers = new }
+    }
+
+    /// The failure line's distance from the bottom: the shown detail's bottom row, with the comment field
+    /// as tall as it has grown, or the list's footer.
+    private func failureLineInset(_ insets: [PRKey: CGFloat]) -> CGFloat {
+        switch model.route {
+        case .detail(let key), .issueDetail(let key): insets[key] ?? 45
+        case .list, .search, .ask: 34
+        }
     }
 
     private static func isDetail(_ route: Route) -> Bool {
@@ -569,6 +582,8 @@ struct PopoverView: View {
                 }
                 return true
             }
+            // ⌥⌘M comments only in a detail, where the thread is in view; here it's taken and does nothing.
+            if Self.isOptionCommand(event, flags: flags, letter: "m") { return true }
             // ⌘Z: takes back the last edit while it can be; typing since hands ⌘Z back to the field.
             if Self.isCommandZ(event, flags: flags) {
                 return model.undoLastEdit()
@@ -846,8 +861,24 @@ struct PopoverView: View {
 
     /// The detail views have no search: Esc, ← and ⌘[ go back, ⌥↓ / ⌥↑ step through the list it came
     /// from, ⌘↩ opens the page on GitHub, ⌘C copies its link (unless text is selected), ⌘⇧C its
-    /// reference, ⌥⌘C its Markdown link, ⌘R fetches it again. Every other key passes through.
+    /// reference, ⌥⌘C its Markdown link, ⌘R fetches it again, ⌥⌘M focuses the comment field. Every other
+    /// key passes through. While the comment field has focus it owns the keyboard (`CommentFieldKeys`).
     private func handleDetailKey(_ event: NSEvent, flags: NSEvent.ModifierFlags, in window: NSWindow) -> Bool {
+        if let field = window.firstResponder as? CommentEditor, let key = field.key {
+            let action = CommentFieldKeys.route(
+                keyCode: event.keyCode, flags: KeyCombo.Modifiers(flags), mentionsOpen: false,
+                composing: field.hasMarkedText())
+            switch action {
+            case .post:
+                model.postComment(on: key, isPullRequest: field.isPullRequest)
+                return true
+            case .leaveField:
+                window.makeFirstResponder(nil)
+                return true
+            case .text, .closeMentions, .moveMention, .acceptMention:
+                return false
+            }
+        }
         guard flags.contains(.command) else {
             if event.keyCode == SearchKeyMonitor.upArrow || event.keyCode == SearchKeyMonitor.downArrow {
                 // ⌥ only (arrows carry .numericPad and .function); a repeat steps again. Without a walk the
@@ -876,6 +907,18 @@ struct PopoverView: View {
             return true
         }
         if Self.isOptionCommandC(event, flags: flags) { return model.copyShownDetailMarkdownLink() }
+        // ⌥⌘M: the comment field, where this account can comment.
+        if Self.isOptionCommand(event, flags: flags, letter: "m") {
+            switch model.route {
+            case .detail(let key) where model.isCommentShown(for: key, isPullRequest: true):
+                model.requestCommentFieldFocus(on: key)
+            case .issueDetail(let key) where model.isCommentShown(for: key, isPullRequest: false):
+                model.requestCommentFieldFocus(on: key)
+            default:
+                break
+            }
+            return true
+        }
         if Self.isOptionCommand(event, flags: flags, letter: "s") {
             guard case .issueDetail(let key) = model.route, model.isStatusOffered(for: key) else { return false }
             model.openStatusPicker(for: key)
@@ -1102,6 +1145,7 @@ struct PopoverView: View {
         case SearchKeyMonitor.letterZ: return "z"
         case SearchKeyMonitor.letterA: return "a"
         case SearchKeyMonitor.letterL: return "l"
+        case SearchKeyMonitor.letterM: return "m"
         default: return typed
         }
     }

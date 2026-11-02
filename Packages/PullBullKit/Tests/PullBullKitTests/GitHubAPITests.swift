@@ -522,6 +522,12 @@ private func page(_ nodes: [String], cursor: String, next: Bool) -> String {
         await #expect(throws: APIError.graphQL("boom")) { try await api(stub).searchPRs("q") }
     }
 
+    @Test func prDetailCommentsCarryIds() async throws {
+        let stub = StubTransport([(try fixture("pr_detail"), response(200))])
+        let detail = try await api(stub).detail(PRKey(repo: "initech/gadgets", number: 412))
+        #expect(detail.comments.map(\.id) == ["IC_first", "IC_second"])
+    }
+
     @Test func detailParses() async throws {
         let stub = StubTransport([(try fixture("pr_detail"), response(200))])
         let key = PRKey(repo: "initech/gadgets", number: 412)

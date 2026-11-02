@@ -153,4 +153,54 @@ private func install(
         #expect(GhAccount(login: "me", scopes: ["project"]).canWriteProjects)
         #expect(!GhAccount(login: "me", scopes: ["read:project"]).canWriteProjects)
     }
+
+    // MARK: Comments
+
+    @Test func commentOnAGhLoginIsReady() {
+        let gh = [GhAccount(login: "me", scopes: ["repo", "read:org"], active: true)]
+        #expect(EditPermission.of(.comment, account: ghMe, boardOwner: nil, installation: nil, ghAccounts: gh)
+            == .ready)
+        #expect(EditPermission.of(
+            .comment, account: ghMe, boardOwner: nil, installation: nil, ghAccounts: gh, onPullRequest: true) == .ready)
+    }
+
+    @Test func commentOnAnIssueNeedsIssuesWriteAndOnAPRPullRequestsWrite() {
+        let issuesOnly = install(["issues": "write", "pull_requests": "read"])
+        let prsOnly = install(["issues": "read", "pull_requests": "write"])
+        #expect(EditPermission.of(.comment, account: app, boardOwner: nil, installation: issuesOnly, ghAccounts: [])
+            == .ready)
+        guard case .needsAppApproval = EditPermission.of(
+            .comment, account: app, boardOwner: nil, installation: prsOnly, ghAccounts: [])
+        else { Issue.record("an issue comment needs Issues write"); return }
+        #expect(EditPermission.of(
+            .comment, account: app, boardOwner: nil, installation: prsOnly, ghAccounts: [], onPullRequest: true)
+            == .ready)
+        guard case .needsAppApproval = EditPermission.of(
+            .comment, account: app, boardOwner: nil, installation: issuesOnly, ghAccounts: [], onPullRequest: true)
+        else { Issue.record("a PR comment needs Pull requests write"); return }
+    }
+
+    @Test func commentWithNoInstallationIsUnavailable() {
+        #expect(EditPermission.of(.comment, account: app, boardOwner: nil, installation: nil, ghAccounts: [])
+            == .unavailable)
+        #expect(EditPermission.of(
+            .comment, account: app, boardOwner: nil, installation: nil, ghAccounts: [], onPullRequest: true)
+            == .unavailable)
+    }
+
+    @Test func commentNoteIsWordedForCommenting() {
+        let org = EditPermission.of(
+            .comment, account: app, boardOwner: nil, installation: install(["issues": "read"]), ghAccounts: [])
+        #expect(org.note(for: .comment)
+            == "Commenting needs PullBull's new permissions for acme. An org owner accepts them on GitHub.")
+        #expect(org.note(for: .labels)
+            == "Editing needs PullBull's new permissions for acme. An org owner accepts them on GitHub.")
+        #expect(org.note == "Editing needs PullBull's new permissions for acme. An org owner accepts them on GitHub.")
+        let user = EditPermission.of(
+            .comment, account: app, boardOwner: nil,
+            installation: install(["issues": "read"], org: "me", isOrganization: false), ghAccounts: [])
+        #expect(user.note(for: .comment) == "Commenting needs PullBull's new permissions. Accept them on GitHub.")
+        #expect(EditPermission.unavailable.note(for: .comment) == nil)
+        #expect(EditPermission.ready.note(for: .comment) == nil)
+    }
 }

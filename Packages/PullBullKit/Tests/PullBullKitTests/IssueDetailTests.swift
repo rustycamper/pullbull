@@ -79,10 +79,17 @@ private func tempDir() -> URL {
         #expect(body.contains("fragment issueRowFields on Issue"))
         // The fragment selects comments{totalCount}; an unaliased comments(last:2) is a field conflict.
         #expect(body.contains("lastComments: comments(last:2)"))
+        #expect(body.contains("lastComments: comments(last:2){totalCount nodes{id author{login} body createdAt}}"))
         #expect(body.contains("\"owner\":\"initech\""))
         #expect(body.contains("\"name\":\"gadgets\""))
         #expect(body.contains("\"n\":231"))
         #expect(!body.contains("mutation"))
+    }
+
+    @Test func issueDetailCommentsCarryIds() async throws {
+        let stub = StubTransport([(try fixture("issue_detail"), response(200))])
+        let d = try await api(stub).issueDetail(key)
+        #expect(d.lastComments.map(\.id) == ["IC_comment", "IC_reply"])
     }
 
     @Test func cachedLinkedPRWithoutIsDraftDecodes() throws {

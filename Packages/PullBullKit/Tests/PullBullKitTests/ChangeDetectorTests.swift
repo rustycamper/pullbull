@@ -79,6 +79,29 @@ private func events(_ old: Snapshot?, _ new: Snapshot, toggles: NotificationTogg
         #expect(e.first?.actor == "bob")
     }
 
+    /// A comment PullBull posted comes back in the next poll as the viewer's own: no notification, on a
+    /// PR or an issue.
+    @Test func ownCommentDoesNotNotify() {
+        let reviewed = [Review(author: "me", state: .commented, submittedAt: now.addingTimeInterval(-60))]
+        let old = snap(
+            review: [pr(1, comments: 2, lastCommenter: "alice", reviews: reviewed)],
+            mine: [pr(2, author: "me", comments: 0)])
+        let new = snap(
+            review: [pr(1, comments: 3, lastCommenter: "me", reviews: reviewed)],
+            mine: [pr(2, author: "me", comments: 1, lastCommenter: "me")])
+        var toggles = NotificationToggles()
+        toggles.commentAfterMyReview = true
+        let kinds = events(old, new, toggles: toggles).map(\.kind)
+        #expect(!kinds.contains(.newComment) && !kinds.contains(.commentAfterMyReview))
+        let before = issueSnap(0, assigned: [commented(1, comments: 1)], created: [commented(2, comments: 0)])
+        let after = issueSnap(
+            120, assigned: [commented(1, comments: 2, by: "devon")], created: [commented(2, comments: 1, by: "Devon")])
+        var issueToggles = NotificationToggles()
+        issueToggles.createdIssueComment = true
+        let issueEvents = ChangeDetector.issueEvents(old: before, new: after, me: "devon", toggles: issueToggles)
+        #expect(!issueEvents.contains { $0.kind == .comment })
+    }
+
     @Test func ciFailureTransitionOnly() {
         let passing = snap(mine: [pr(1, author: "me", ci: .success)])
         let failing = snap(mine: [pr(1, author: "me", ci: .failure)])

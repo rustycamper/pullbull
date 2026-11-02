@@ -72,13 +72,24 @@ final class AppModel {
 
     /// As GitHub returned it; notifications compare these. The lists and the detail show `shownSnapshot`.
     private(set) var snapshot: Snapshot? {
-        didSet { shownSnapshot = snapshot.map(edits.overrides.apply(to:)) }
+        didSet { shownSnapshot = snapshot.map { postedComments.apply(to: edits.overrides.apply(to: $0)) } }
     }
-    /// `snapshot` with the edits GitHub hasn't shown yet laid over it.
+    /// `snapshot` with the edits and posted comments GitHub hasn't shown yet laid over it.
     private(set) var shownSnapshot: Snapshot?
     /// Edits shown before GitHub agrees, the one ⌘Z can take back, and the last failure
     /// (see AppModel+Edit.swift).
     var edits = EditSession()
+    /// Unsent comments per account and item (see AppModel+Comment.swift). Account changes keep them.
+    var commentDrafts = CommentDrafts()
+    /// Comments posted from here that GitHub's reads don't show yet.
+    var postedComments = PostedComments()
+    /// Posts whose outcome isn't final, per account and item. `clearAccountData` keeps them, so a post
+    /// can't be sent twice across an account or org switch.
+    var postsInFlight = InFlightPosts()
+    /// Bumped when a post on `key` succeeded: the comment field on `key` clears its text and undo.
+    private(set) var commentFieldReset: CommentFieldSignal?
+    /// Bumped when a post on `key` was refused: the comment field on `key` takes focus.
+    private(set) var commentFieldFocusRequest: CommentFieldSignal?
     /// The Status picker on screen, or nil.
     var statusPicker: StatusPicker?
     /// The reviewer, assignee or label picker on screen, or nil.
@@ -234,7 +245,7 @@ final class AppModel {
     private(set) var searchResults: SearchResults?
     /// The search's answer as it came.
     private var rawSearchResults: SearchResults? {
-        didSet { searchResults = rawSearchResults.map(edits.overrides.apply(to:)) }
+        didSet { searchResults = rawSearchResults.map { postedComments.apply(to: edits.overrides.apply(to: $0)) } }
     }
     /// The tab that was showing when typing anywhere opened the search; nil when opened another way.
     private(set) var searchStartedOnTab: ShownTab?
@@ -382,7 +393,9 @@ final class AppModel {
 
     // PR detail (see the "PR detail" extension below).
     /// Details for the running account, loaded from disk or fetched; keyed by PR.
-    private(set) var details: [PRKey: PRDetail] = [:]
+    private(set) var details: [PRKey: PRDetail] = [:] {
+        didSet { settlePostedComments { details[$0]?.comments } }
+    }
     /// The fetch for the detail on screen; nil once it succeeded.
     private(set) var detailFetch: DetailFetch?
     /// Where Back returns to from the detail view.
@@ -403,7 +416,9 @@ final class AppModel {
 
     // Issue detail (see the "Issue detail" extension below).
     /// Issue details for the running account, loaded from disk or fetched; keyed by issue.
-    private(set) var issueDetails: [PRKey: IssueDetail] = [:]
+    private(set) var issueDetails: [PRKey: IssueDetail] = [:] {
+        didSet { settlePostedComments { issueDetails[$0]?.lastComments } }
+    }
     /// The fetch for the issue detail on screen; nil once it succeeded.
     private(set) var issueDetailFetch: DetailFetch?
     /// Where Back returns to from the issue detail view (`.list` or `.search`).
@@ -1809,6 +1824,7 @@ final class AppModel {
         guard account.source == .gitHubApp, account == running?.ref else { return }
         searchCache.removeAll()
         if snapshot != nil || tabs != nil || searchResults != nil { clearAccountData() }
+        commentDrafts.dropAccount(account.login)
         guard signedOutDropped != account else { return }
         signedOutDropped = account
         let store = snapshotStore
@@ -1825,6 +1841,7 @@ final class AppModel {
         rawSearchResults = nil
         searchCache.removeAll()
         edits = EditSession()
+        postedComments = PostedComments()
         editSelection = EditSelection()
         statusPicker = nil
         setPicker = nil
@@ -1860,12 +1877,16 @@ final class AppModel {
         }
         if status.activity == .unsupported, let account = running?.ref { activityUnsupported.insert(account) }
         notifyChanges(snapshot, status)
-        if let snapshot { edits.reconcile(with: snapshot, now: Date()) }
+        if let snapshot {
+            edits.reconcile(with: snapshot, now: Date())
+            postedComments.reconcile(with: snapshot, now: Date())
+        }
         self.snapshot = snapshot
         var status = status
         if status.lastSuccess == nil, let current = self.snapshot { status.lastSuccess = current.fetchedAt }
         self.status = status
-        rebuildTabs()
+        // Also lays the reconciled posted comments over the search results.
+        refreshShown()
         if route == .search, searchResults == nil, snapshot != nil { updateSearch(searchText) }
         prefetchAfterSuccessfulRefresh(status)
         syncAskAfterRefresh(status)
@@ -1874,10 +1895,11 @@ final class AppModel {
         if snapshot?.boardError == RefreshError(APIError.insufficientScopes).message { reloadAccounts() }
     }
 
-    /// Lays the pending edits over the fetched snapshot and search results again, and rebuilds the tabs.
+    /// Lays the pending edits and posted comments over the fetched snapshot and search results again, and
+    /// rebuilds the tabs.
     func refreshShown() {
-        shownSnapshot = snapshot.map(edits.overrides.apply(to:))
-        searchResults = rawSearchResults.map(edits.overrides.apply(to:))
+        shownSnapshot = snapshot.map { postedComments.apply(to: edits.overrides.apply(to: $0)) }
+        searchResults = rawSearchResults.map { postedComments.apply(to: edits.overrides.apply(to: $0)) }
         rebuildTabs()
     }
 
@@ -1969,10 +1991,10 @@ extension AppModel {
         details[key]
     }
 
-    /// The list data for `key`, with pending edits laid over it: the current lists first, then search
-    /// results, then the PR as opened.
+    /// The list data for `key`, with pending edits and posted comments laid over it: the current lists
+    /// first, then search results, then the PR as opened.
     func pullRequest(for key: PRKey) -> PullRequest? {
-        fetchedPullRequest(for: key).map(edits.overrides.apply(to:))
+        fetchedPullRequest(for: key).map { postedComments.apply(to: edits.overrides.apply(to: $0)) }
     }
 
     /// As GitHub sent it. Reads `rawSearchResults`, not `searchResults`, so `openedPR` never keeps an edit
@@ -2645,6 +2667,45 @@ extension AppModel {
     }
 }
 
+// MARK: - Comment posting
+
+/// The parts of posting that set state this file keeps private (see AppModel+Comment.swift).
+extension AppModel {
+    /// Tells the comment field on `key` to clear its text and undo.
+    func resetCommentField(on key: PRKey) {
+        commentFieldReset = CommentFieldSignal(key: key, n: (commentFieldReset?.n ?? 0) + 1)
+    }
+
+    /// Asks the comment field on `key` to take focus.
+    func requestCommentFieldFocus(on key: PRKey) {
+        commentFieldFocusRequest = CommentFieldSignal(key: key, n: (commentFieldFocusRequest?.n ?? 0) + 1)
+    }
+
+    /// Fetches the detail of `key` once with `account`, outside `loadDetail`'s cancelling, keeps it as
+    /// `loadDetail` does while `account` still runs, and returns the comments it holds.
+    func fetchDetailComments(_ key: PRKey, isPullRequest: Bool, account: AccountRef) async throws -> [Comment] {
+        let api = api(for: account)
+        let store = snapshotStore
+        let login = account.login
+        if isPullRequest {
+            let fresh = try await api.detail(key)
+            if running?.account == login {
+                details[key] = fresh
+                if detailFetch?.key == key { detailFetch = nil }
+                try? await store.saveDetail(fresh, account: login)
+            }
+            return fresh.comments
+        }
+        let fresh = try await api.issueDetail(key)
+        if running?.account == login {
+            issueDetails[key] = fresh
+            if issueDetailFetch?.key == key { issueDetailFetch = nil }
+            try? await store.saveIssueDetail(fresh, account: login)
+        }
+        return fresh.lastComments
+    }
+}
+
 // MARK: - Issue detail
 
 extension AppModel {
@@ -2654,7 +2715,16 @@ extension AppModel {
         // The copy search shows: the newest of board, Assigned and Created, with the board's Status.
         if let snapshot = shownSnapshot, let issue = SearchEngine.cachedIssue(key, in: snapshot) { return issue }
         if let issue = searchResults?.issues.first(where: { $0.key == key }) { return issue }
-        return openedIssue?.key == key ? openedIssue.map(edits.overrides.apply(to:)) : nil
+        guard let opened = openedIssue, opened.key == key else { return nil }
+        return postedComments.apply(to: edits.overrides.apply(to: opened))
+    }
+
+    /// As GitHub sent it: the snapshot's copy (as search shows it), then the search's, then the issue as
+    /// opened.
+    func fetchedIssue(for key: PRKey) -> BoardIssue? {
+        if let snapshot, let issue = SearchEngine.cachedIssue(key, in: snapshot) { return issue }
+        if let issue = rawSearchResults?.issues.first(where: { $0.key == key }) { return issue }
+        return openedIssue?.key == key ? openedIssue : nil
     }
 
     /// A pull request linked from a loaded issue detail, for a PR detail opened from it whose PR is in
@@ -2696,7 +2766,7 @@ extension AppModel {
         case .issueDetail:
             break
         }
-        openedIssue = issue(for: key) ?? issueDetails[key]?.issue
+        openedIssue = fetchedIssue(for: key) ?? issueDetails[key]?.issue
         closeCompletion()
         route = .issueDetail(key)
         loadIssueDetail(key)
@@ -3027,6 +3097,7 @@ extension AppModel {
         installations[account] = nil
         personalRepoReads[account] = nil
         activityUnsupported.remove(account)
+        commentDrafts.dropAccount(account.login)
         searchCache.removeAll()
         let wasCurrent = settings.accountRef == account
         let stopped = wasCurrent ? coordinator : nil

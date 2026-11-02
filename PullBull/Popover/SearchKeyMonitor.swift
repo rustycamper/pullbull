@@ -73,4 +73,10 @@ final class SearchKeyMonitor {
     /// kVK_ANSI_A and kVK_ANSI_L: used for ⌥⌘A and ⌥⌘L only when the layout types no Latin character there.
     static let letterA: UInt16 = 0
     static let letterL: UInt16 = 37
+    /// kVK_ANSI_M: used for ⌥⌘M only when the layout types no Latin character there.
+    static let letterM: UInt16 = 46
+    /// kVK_ANSI_X and kVK_ANSI_V: the comment field's ⌘X and ⌘V when the layout types no Latin
+    /// character there.
+    static let letterX: UInt16 = 7
+    static let letterV: UInt16 = 9
 }

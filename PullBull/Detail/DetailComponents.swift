@@ -87,6 +87,8 @@ struct EmptyLine: View {
 struct CommentLine: View {
     let comment: Comment
     let now: Date
+    /// A comment posted from here that GitHub hasn't answered for yet: dimmed and marked "Sending…".
+    var isSending = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -98,6 +100,11 @@ struct CommentLine: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
+                    if isSending {
+                        Text("· Sending…")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 MarkdownText(comment.body.trimmingCharacters(in: .whitespacesAndNewlines))
                     .lineSpacing(2)
@@ -106,6 +113,7 @@ struct CommentLine: View {
             .font(.system(size: 12))
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .opacity(isSending ? 0.5 : 1)
     }
 }
 
@@ -404,6 +412,8 @@ struct ConversationSection: View {
     /// (`PRDetail` / `IssueDetail`'s `commentTotal` and `earlierCommentCount`).
     let total: Int
     let earlier: Int
+    /// Where in `comments` the post still sending sits (`PostedComments.conversation`), if any.
+    let sendingIndex: Int?
     let webURL: URL
     let now: Date
 
@@ -425,8 +435,8 @@ struct ConversationSection: View {
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(Array(comments.enumerated()), id: \.offset) { _, comment in
-                        CommentLine(comment: comment, now: now)
+                    ForEach(Array(comments.enumerated()), id: \.offset) { index, comment in
+                        CommentLine(comment: comment, now: now, isSending: index == sendingIndex)
                     }
                 }
             }

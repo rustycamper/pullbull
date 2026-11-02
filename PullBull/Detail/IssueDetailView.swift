@@ -4,8 +4,8 @@ import PullBullKit
 
 /// The detail of one issue inside the popover: state and author, a board card (Status, Assignees, Labels,
 /// each changeable where offered), the pull requests that close it, the description and the last two
-/// comments, with View on board and Open on GitHub pinned at the bottom. It shows the list data and the
-/// cached detail at once; `AppModel` refreshes the detail in place.
+/// comments, with the comment field, View on board and Open on GitHub pinned at the bottom. It shows the
+/// list data and the cached detail at once; `AppModel` refreshes the detail in place.
 struct IssueDetailView: View {
     let model: AppModel
     let key: PRKey
@@ -56,6 +56,8 @@ struct IssueDetailView: View {
             }
             .frame(maxHeight: .infinity)
             bottomBar
+                // The failure line sits on top of it, following the comment field as it grows.
+                .detailBottomInset(for: key)
         }
         // Links in issue text are untrusted: only web links open, anything else is dropped.
         .environment(\.openURL, OpenURLAction { url in
@@ -226,9 +228,12 @@ struct IssueDetailView: View {
     }
 
     private func conversationSection(_ detail: IssueDetail, now: Date) -> some View {
-        ConversationSection(
-            comments: detail.lastComments, total: detail.commentTotal, earlier: detail.earlierCommentCount,
-            webURL: webURL, now: now)
+        // The page shows the newest two, comments posted from here included until the detail holds them.
+        let shown = model.postedComments.conversation(
+            for: key, held: detail.lastComments, total: detail.commentTotal, keep: 2, now: now)
+        return ConversationSection(
+            comments: shown.comments, total: shown.total, earlier: shown.earlier,
+            sendingIndex: shown.sendingIndex, webURL: webURL, now: now)
     }
 
     // MARK: Loading and errors
@@ -261,22 +266,16 @@ struct IssueDetailView: View {
 
     // MARK: Bottom bar
 
+    /// The comment field, View on board and Open on GitHub, on one row.
     private var bottomBar: some View {
-        HStack(spacing: 8) {
-            Spacer(minLength: 0)
+        CommentField(model: model, key: key, isPullRequest: false, webURL: webURL) {
             if let boardURL {
                 OutlinedIconButton(
                     name: model.snapshot?.boardTitle.map { "Open in \($0)" } ?? "View on board",
                     systemImage: "rectangle.split.3x1"
                 ) { NSWorkspace.shared.open(boardURL) }
             }
-            OutlinedIconButton(name: "Open on GitHub", systemImage: "arrow.up.right.square") {
-                NSWorkspace.shared.open(webURL)
-            }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .overlay(alignment: .top) { Hairline() }
     }
 }
 

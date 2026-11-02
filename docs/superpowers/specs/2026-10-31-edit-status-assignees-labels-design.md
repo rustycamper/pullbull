@@ -22,7 +22,7 @@ PullBull's pitch is that the browser is slow for a quick look. Triage is the nat
 - Other board fields (Priority, Iteration, Estimate), milestones, issue type.
 - Bulk edits. The lists have no multi-select.
 - Creating labels, editing label colours.
-- Close, reopen, comment, approve, merge, edit titles or bodies. These stay out of scope.
+- Close, reopen, approve, merge, edit titles or bodies. These stay out of scope. Commenting is in the [comments spec](2026-11-02-comments-and-mentions-design.md).
 - Draft items on the board.
 - Ask AI gets no write path. "Ask AI can't write to GitHub or act on anything" stays true.
 

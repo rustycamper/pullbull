@@ -48,7 +48,7 @@ final class KeyRecorder {
     }
 
     private func handle(_ event: NSEvent, onRecord: @MainActor (KeyCombo) -> Void) {
-        let modifiers = Self.modifiers(event.modifierFlags)
+        let modifiers = KeyCombo.Modifiers(event.modifierFlags)
         if event.keyCode == 53, modifiers.isEmpty {  // Esc
             stop()
             return
@@ -61,14 +61,16 @@ final class KeyRecorder {
             hint = invalid.message
         }
     }
+}
 
-    private static func modifiers(_ flags: NSEvent.ModifierFlags) -> KeyCombo.Modifiers {
-        var modifiers: KeyCombo.Modifiers = []
-        if flags.contains(.control) { modifiers.insert(.control) }
-        if flags.contains(.option) { modifiers.insert(.option) }
-        if flags.contains(.shift) { modifiers.insert(.shift) }
-        if flags.contains(.command) { modifiers.insert(.command) }
-        return modifiers
+extension KeyCombo.Modifiers {
+    /// ⌃, ⌥, ⇧ and ⌘ from an event's flags; caps lock, numeric pad and function drop out.
+    init(_ flags: NSEvent.ModifierFlags) {
+        self = []
+        if flags.contains(.control) { insert(.control) }
+        if flags.contains(.option) { insert(.option) }
+        if flags.contains(.shift) { insert(.shift) }
+        if flags.contains(.command) { insert(.command) }
     }
 }
 

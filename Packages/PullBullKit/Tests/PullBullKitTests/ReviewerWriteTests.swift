@@ -2,36 +2,6 @@ import Foundation
 import Testing
 @testable import PullBullKit
 
-/// Answers each REST request in turn with a status and a JSON body, and records what was sent.
-private final class RESTQueue: GraphQLTransport, @unchecked Sendable {
-    struct Sent { let method: String; let path: String; let body: [String: Any] }
-
-    private let lock = NSLock()
-    private var queue: [(Int, String)]
-    private var log: [Sent] = []
-
-    init(_ answers: [(Int, String)]) { queue = answers }
-
-    var sent: [Sent] { lock.withLock { log } }
-
-    func send(_ body: Data, token: String) async throws -> (Data, HTTPURLResponse) {
-        Issue.record("GraphQL request sent")
-        throw APIError.server(500)
-    }
-
-    func send(_ method: String, path: String, body: Data, token: String) async throws -> (Data, HTTPURLResponse) {
-        let (status, json) = lock.withLock {
-            log.append(Sent(
-                method: method, path: path,
-                body: (try? JSONSerialization.jsonObject(with: body) as? [String: Any]) ?? [:]))
-            return queue.removeFirst()
-        }
-        let response = HTTPURLResponse(
-            url: URL(string: "https://api.github.com\(path)")!, statusCode: status, httpVersion: nil, headerFields: nil)!
-        return (Data(json.utf8), response)
-    }
-}
-
 private let k7 = PRKey(repo: "o/r", number: 7)
 private let path = "/repos/o/r/pulls/7/requested_reviewers"
 private let backend = Reviewer.team(slug: "backend", name: "Back End")
@@ -103,6 +73,13 @@ private func api(_ t: RESTQueue) -> GitHubAPI { GitHubAPI(transport: t, auth: St
     @Test func forbiddenKeepsGitHubsMessage() async {
         let t = RESTQueue([(403, #"{"message":"Resource not accessible by integration"}"#)])
         await #expect(throws: APIError.writeRefused("Resource not accessible by integration")) {
+            try await api(t).changeReviewers(of: k7, adding: [.user("alice")], removing: [])
+        }
+    }
+
+    @Test func refusedAddUsesErrorsMessage() async {
+        let t = RESTQueue([(422, #"{"message":"Validation Failed","errors":[{"message":"Reviewer can't be the author"}]}"#)])
+        await #expect(throws: APIError.writeRefused("Reviewer can't be the author")) {
             try await api(t).changeReviewers(of: k7, adding: [.user("alice")], removing: [])
         }
     }
