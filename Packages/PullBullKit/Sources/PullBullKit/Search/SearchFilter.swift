@@ -1,7 +1,7 @@
 import Foundation
 
-/// One side of a filtered search: the `@`, `~`, `is:`, `status:`, `updated:` and `review:`, `repo:` and `size:` terms it includes,
-/// or the ones it excludes. Logins and labels keep the case typed, deduplicated case-insensitively; `me` is always
+/// One side of a filtered search: the `@`, `~`, `is:`, `status:`, `updated:` and `review:`, `repo:`, `size:` and `#123` terms it
+/// includes, or the ones it excludes. Logins and labels keep the case typed, deduplicated case-insensitively; `me` is always
 /// lowercase. States are deduplicated, statuses deduplicated case-insensitively.
 public struct SearchTerms: Equatable, Sendable {
     public var logins: [String]
@@ -17,11 +17,13 @@ public struct SearchTerms: Equatable, Sendable {
     public var repos: [RepoToken]
     /// Pull requests only, matched locally. Included: any of them. Excluded: none of them.
     public var sizes: [SizeFilter]
+    /// `#123` beside other terms. Included only, since a `-` before `#` is a word. Two different numbers match nothing.
+    public var numbers: [Int]
 
     public init(
         logins: [String] = [], labels: [String] = [], states: [StateFilter] = [], statuses: [BoardStatusFilter] = [],
         updated: [UpdatedFilter] = [], conditions: [ItemCondition] = [], reviews: [ReviewFilter] = [],
-        repos: [RepoToken] = [], sizes: [SizeFilter] = []
+        repos: [RepoToken] = [], sizes: [SizeFilter] = [], numbers: [Int] = []
     ) {
         self.logins = logins
         self.labels = labels
@@ -32,20 +34,22 @@ public struct SearchTerms: Equatable, Sendable {
         self.reviews = reviews
         self.repos = repos
         self.sizes = sizes
+        self.numbers = numbers
     }
 
     public var isEmpty: Bool {
         logins.isEmpty && labels.isEmpty && states.isEmpty && statuses.isEmpty && updated.isEmpty
             && conditions.isEmpty && reviews.isEmpty && repos.isEmpty
-            && sizes.isEmpty
+            && sizes.isEmpty && numbers.isEmpty
     }
 
     /// The `@` tokens, then the `~` tokens, then the `is:` tokens (states, then conditions), then the
-    /// `status:` tokens, then the `updated:` tokens, then the `review:` tokens, then the `repo:` tokens.
+    /// `status:` tokens, then the `updated:` tokens, then the `review:` tokens, then the `repo:` tokens, then the
+    /// `size:` tokens, then the `#123` tokens.
     var tokens: [String] {
         logins.map { "@\($0)" } + labels.map(SearchQuery.labelToken) + states.map(\.token) + conditions.map(\.token)
             + statuses.map(\.token) + updated.map(\.token) + reviews.map(\.token)
-            + repos.map(\.token) + sizes.map(\.token)
+            + repos.map(\.token) + sizes.map(\.token) + numbers.map { "#\($0)" }
     }
 
     mutating func add(login: String) {
@@ -76,14 +80,19 @@ public struct SearchTerms: Equatable, Sendable {
         if !sizes.contains(size) { sizes.append(size) }
     }
 
+    mutating func add(number: Int) {
+        if !numbers.contains(number) { numbers.append(number) }
+    }
+
     mutating func add(status: BoardStatusFilter) {
         if !statuses.contains(where: { $0.isSame(as: status) }) { statuses.append(status) }
     }
 
-    /// Whether each login, label, state, condition, review and status term holds for `pr` (`holds` true) or
-    /// fails for it (`holds` false). A pull request has no Status.
+    /// Whether each login, label, state, condition, review, status and number term holds for `pr` (`holds` true)
+    /// or fails for it (`holds` false). A pull request has no Status.
     func every(holds: Bool, _ pr: PullRequest, viewer: String) -> Bool {
-        logins.allSatisfy { !PersonMatch.roles(of: pr, login: $0, viewer: viewer).isEmpty == holds }
+        numbers.allSatisfy { ($0 == pr.key.number) == holds }
+            && logins.allSatisfy { !PersonMatch.roles(of: pr, login: $0, viewer: viewer).isEmpty == holds }
             && labels.allSatisfy { Self.has($0, pr.labels) == holds }
             && states.allSatisfy { $0.matches(pr) == holds }
             && conditions.allSatisfy { $0.matches(pr, viewer: viewer) == holds }
@@ -94,7 +103,8 @@ public struct SearchTerms: Equatable, Sendable {
     }
 
     func every(holds: Bool, _ issue: BoardIssue, viewer: String) -> Bool {
-        logins.allSatisfy { !PersonMatch.roles(of: issue, login: $0, viewer: viewer).isEmpty == holds }
+        numbers.allSatisfy { ($0 == issue.key.number) == holds }
+            && logins.allSatisfy { !PersonMatch.roles(of: issue, login: $0, viewer: viewer).isEmpty == holds }
             && labels.allSatisfy { Self.has($0, issue.labels) == holds }
             && states.allSatisfy { $0.matches(issue) == holds }
             && conditions.allSatisfy { $0.matches(issue, viewer: viewer) == holds }

@@ -972,6 +972,71 @@ private func collect(_ stream: AsyncStream<SearchResults>) async -> [SearchResul
         #expect(nothing.emptyMessage(org: "o", query: .parse("is:draft"), mode: .issues) == "No issues with is:draft")
     }
 
+    // MARK: Numbers with other terms
+
+    /// `#231` among other terms is looked up, not searched as a title word, and the rest filters the answer.
+    @Test func numberWithTermsLooksItUp() async throws {
+        let transport = RecordingTransport(reply: Self.lookupReply(231))
+        let e = SearchEngine(api: GitHubAPI(transport: transport, auth: StaticTokenSource("test-token")))
+        let done = try #require(await collect(e.results(.parse("is:open #231"), snap: snapshot())).last)
+        #expect(done.phase == .done)
+        #expect(done.openPRs.map(\.key) == [PRKey(repo: repo, number: 231)])
+        #expect(transport.bodies.count == 1)
+        let body = try #require(transport.bodies.first)
+        #expect(body.contains("issueOrPullRequest"))
+        #expect(body.contains(#""n":231"#))
+        #expect(!body.contains("search("))
+    }
+
+    @Test func numberWithTermsDropsALookupThatFails() async throws {
+        let e = engine(json(Self.lookupReply(231)))
+        let q = SearchQuery.parse("is:merged #231")
+        let done = try #require(await collect(e.results(q, snap: snapshot())).last)
+        #expect(done.isEmpty)
+        #expect(done.emptyMessage(org: "initech", query: q, mode: .pullRequests)
+            == "No pull requests with is:merged and #231")
+    }
+
+    @Test func numberWithTermsKeepsToTheFocus() async throws {
+        let transport = RecordingTransport(reply: #"{"data":{}}"#)
+        let e = SearchEngine(api: GitHubAPI(transport: transport, auth: StaticTokenSource("test-token")))
+        _ = await collect(e.results(.parse("is:open #231"), snap: snapshot(), focus: Self.ui))
+        let body = try #require(transport.bodies.first)
+        #expect(body.contains(#"name:\"widgets\""#))
+        #expect(!body.contains(#"name:\"gadgets\""#))
+    }
+
+    /// A raw `updated:` value is GitHub's to judge in a title search; a lookup doesn't ask, so it matches nothing.
+    @Test func numberWithRawUpdatedMatchesNothing() async throws {
+        let e = engine(json(Self.lookupReply(231)))
+        let done = try #require(await collect(e.results(.parse("#231 updated:sometime"), snap: snapshot())).last)
+        #expect(done.isEmpty)
+        let dated = try #require(await collect(e.results(.parse("#231 updated:>2026-10-01"), snap: snapshot())).last)
+        #expect(dated.openPRs.map(\.key.number) == [231])
+    }
+
+    @Test func twoNumbersAskNothing() async throws {
+        let transport = RecordingTransport(reply: Self.lookupReply(231))
+        let e = SearchEngine(api: GitHubAPI(transport: transport, auth: StaticTokenSource("test-token")))
+        let done = try #require(await collect(e.results(.parse("#231 #232 is:open"), snap: snapshot())).last)
+        #expect(done.isEmpty)
+        #expect(done.phase == .done)
+        #expect(transport.bodies.isEmpty)
+    }
+
+    @Test func numberWithTermsMatchesTheSnapshot() {
+        let snap = snapshot(mine: [pr(231), pr(232), pr(231, state: .merged, in: "initech/widgets")])
+        let found = engine(json("{}")).local(.parse("is:open #231"), in: snap)
+        #expect(found.openPRs.map(\.key) == [PRKey(repo: repo, number: 231)])
+        #expect(found.closedPRs.isEmpty)
+    }
+
+    @Test func numberWithTermsNamesTheOtherKind() async throws {
+        let q = SearchQuery.parse("is:open #412")
+        let done = try #require(await collect(engine(json(issueLookup(412, title: "Flaky"))).results(q, snap: snapshot())).last)
+        #expect(done.crossModeFallback(mode: .pullRequests, query: q)?.text == "#412 is an issue · ⌘2")
+    }
+
     // MARK: Remote text page cap
 
     @Test func remoteTextAsksForOnePageOfAHundredAndSaysSo() async {

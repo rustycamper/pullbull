@@ -6,8 +6,8 @@ public enum SearchQuery: Equatable, Sendable {
     case item(repo: String, number: Int)
     case text([String])
     /// `@login`, `~label`, `is:`, `status:` and `updated:` terms ANDed with title words, each included or,
-    /// after a `-`, excluded. Two states that contradict match nothing, and so does a term both included and
-    /// excluded. Any included status keeps the search to board issues. An included `updated:` term limits the
+    /// after a `-`, excluded, and `#123` beside them, included only. Two states that contradict match nothing,
+    /// and so does a term both included and excluded, or two different numbers. Any included status keeps the search to board issues. An included `updated:` term limits the
     /// search to recent activity (the last one typed counts).
     case filtered(SearchFilter)
     case empty
@@ -95,11 +95,24 @@ public enum SearchQuery: Equatable, Sendable {
             case .word:
                 // What a pending token leaves of `-@an`.
                 if term.value == "-" { continue }
+                if let number = lookupNumber(term.value) {
+                    filter.include.add(number: number)
+                    continue
+                }
                 filter.words.append(trimmed[term.range].lowercased())
             }
         }
         if !filter.include.isEmpty || !filter.exclude.isEmpty { return .filtered(filter) }
         return filter.words.isEmpty ? .empty : .text(filter.words)
+    }
+
+    /// The number of a `#123` term: `#` and ASCII digits, a number GitHub can look up (1 through `Int32.max`).
+    static func lookupNumber(_ term: Substring) -> Int? {
+        guard term.first == "#" else { return nil }
+        let digits = term.dropFirst()
+        guard !digits.isEmpty, digits.allSatisfy({ $0.isASCII && $0.isNumber }), let n = Int(digits),
+              n > 0, n <= Int(Int32.max) else { return nil }
+        return n
     }
 
     /// A GitHub login: 1 to 39 of `A-Z a-z 0-9 -`, not starting with `-`.
@@ -329,6 +342,7 @@ public struct SearchResults: Equatable, Sendable {
         // `#123` across several repositories is counted instead.
         let number: Int? = switch query {
         case .number(let n) where count == 1: n
+        case .filtered(let filter) where count == 1 && filter.include.numbers.count == 1: filter.include.numbers[0]
         case .item(_, let n): n
         default: nil
         }
@@ -641,6 +655,19 @@ public struct SearchEngine: Sendable {
             return Remote(prs: found.prs.filter { q.names($0.key) }, issues: found.issues.filter { q.names($0.key) })
         case .text(let words):
             return try await searchTitles(q, sent: SearchFilter(words: words), snap: snap, focus: focus, api: api)
+        case .filtered(let filter) where !filter.include.numbers.isEmpty:
+            // `#123` beside other terms is looked up, and the whole filter judges the answer. No title search
+            // runs, so GitHub never judges a raw `updated:` value and it matches nothing, as it does locally.
+            // Two different numbers match nothing, so GitHub isn't asked.
+            guard filter.include.numbers.count == 1 else { return Remote() }
+            let n = filter.include.numbers[0]
+            let (owner, repos) = focus.map(lookupTarget) ?? (snap.org.org, snap.org.repos)
+            let found = try await api.lookup(number: n, org: owner, repos: repos)
+            let viewer = snap.org.viewer
+            func kept(_ key: PRKey) -> Bool { scope.covers(key.repo) && inFocus(key, focus) }
+            return Remote(
+                prs: found.prs.filter { kept($0.key) && q.matches($0, viewer: viewer) },
+                issues: found.issues.filter { kept($0.key) && q.matches($0, viewer: viewer) })
         case .filtered(let filter):
             // An included raw `updated:` value is GitHub's to judge, so the rows it returns aren't checked against
             // it here. An excluded one isn't sent, so it stays and matches nothing, as it does locally.

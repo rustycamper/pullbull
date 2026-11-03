@@ -92,6 +92,10 @@ public enum SearchContext {
         if !terms.repos.isEmpty {
             filters.append((terms.repos.count == 1 ? "repo " : "repos ") + SearchQuery.joinedList(terms.repos.map(\.text)))
         }
+        if !terms.numbers.isEmpty {
+            filters.append(
+                (terms.numbers.count == 1 ? "number " : "numbers ") + SearchQuery.joinedList(terms.numbers.map(String.init)))
+        }
         return filters
     }
 

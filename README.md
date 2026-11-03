@@ -82,7 +82,7 @@ More in the [manual](docs/manual.md#issues).
 | `size:s` `size:m` `size:l` | PRs by lines changed: up to 50, up to 300, more |
 | `repo:widgets` `repo:acme/widgets` | Only that repo; `owner/name` also finds repos PullBull hasn't seen. Save it with the search |
 | `status:prog` `status:"In progress"` | Issues in that Status column on the board |
-| `#123` | That number, in every repo |
+| `#123` | That number, in every repo; add terms to narrow it: `is:open #123` |
 | a GitHub link | Exactly that PR or issue |
 | `updated:today` `updated:3d` `updated:1w` `updated:1m` | Items active since 00:00 today, or 2, 6 or 29 days before; GitHub's date forms (`updated:>2026-10-01`) also filter locally |
 | `-@dependabot` `-~wontfix` | Leave those out: a `-` before any qualifier |
