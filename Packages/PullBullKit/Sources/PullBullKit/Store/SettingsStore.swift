@@ -25,6 +25,8 @@ public enum IssueTab: String, Codable, CaseIterable, Sendable { case assigned, c
 
 public struct NotificationToggles: Codable, Equatable, Sendable {
     public var reviewRequested = true
+    /// Someone else dismissed my approval or requested changes on a pull request.
+    public var reviewDismissed = true
     public var approved = true
     public var changesRequested = true
     public var ciFailed = true
@@ -57,6 +59,7 @@ public struct NotificationToggles: Codable, Equatable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         var d = NotificationToggles()
         d.reviewRequested = c.readable(Bool.self, forKey: .reviewRequested) ?? d.reviewRequested
+        d.reviewDismissed = c.readable(Bool.self, forKey: .reviewDismissed) ?? d.reviewDismissed
         d.approved = c.readable(Bool.self, forKey: .approved) ?? d.approved
         d.changesRequested = c.readable(Bool.self, forKey: .changesRequested) ?? d.changesRequested
         d.ciFailed = c.readable(Bool.self, forKey: .ciFailed) ?? d.ciFailed

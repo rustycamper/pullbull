@@ -4,6 +4,8 @@ public enum PREventKind: String, Sendable, CaseIterable {
     case reviewRequested, approved, changesRequested, ciFailed, newComment, readyToMerge, merged
     /// Someone else commented on a PR I reviewed.
     case commentAfterMyReview
+    /// Someone else dismissed my approval or requested changes on a PR.
+    case reviewDismissed
 }
 
 public struct PREvent: Equatable, Sendable {
@@ -54,11 +56,14 @@ public enum ChangeDetector {
     ) -> [PREvent] {
         guard let old else { return [] }
         var result: [PREvent] = []
+        let dismissed = toggles.reviewDismissed ? dismissedEvents(old: old, new: new, me: me) : []
+        result += dismissed
 
         if toggles.reviewRequested {
             let before = Dictionary(old.reviewCandidates.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
             let since = old.fetchedAt.addingTimeInterval(-reviewRequestLag)
-            for pr in new.reviewCandidates where filters.keeps(pr, now: now) {
+            let said = Set(dismissed.map(\.pr.key))
+            for pr in new.reviewCandidates where filters.keeps(pr, now: now) && !said.contains(pr.key) {
                 guard let reason = ReviewRules.status(of: pr, me: me, myTeams: myTeams).reviewReason else { continue }
                 if let prev = before[pr.key] {
                     if ReviewRules.status(of: prev, me: me, myTeams: myTeams).reviewReason != nil { continue }
@@ -145,6 +150,29 @@ public enum ChangeDetector {
         let pending = Set(pr.reviewRequests.map(\.key))
         let mine = [Reviewer.user(me).key] + myTeams.map { Reviewer.team(slug: $0, name: $0).key }
         return mine.filter(pending.contains).compactMap { pr.reviewRequestTimes[$0] }.max()
+    }
+
+    /// PRs where my approval or requested changes became dismissed since the previous poll, by someone
+    /// else. A PR the previous poll didn't list (the search can drop it for a poll) notifies only for a
+    /// dismissal of my review within `reviewRequestLag` of that poll; one of unknown time stays silent.
+    private static func dismissedEvents(old: Snapshot, new: Snapshot, me: String) -> [PREvent] {
+        let before = Dictionary(old.reviewCandidates.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
+        let since = old.fetchedAt.addingTimeInterval(-reviewRequestLag)
+        let myReview = { (pr: PullRequest) in pr.latestReviews.first { same($0.author, me) } }
+        var seen = Set<PRKey>()
+        var result: [PREvent] = []
+        for pr in new.reviewCandidates
+        where myReview(pr)?.state == .dismissed && !same(pr.author, me) && seen.insert(pr.key).inserted {
+            let dismissal = pr.reviewDismissals.last { same($0.reviewAuthor, me) }
+            if let prev = before[pr.key] {
+                guard let was = myReview(prev)?.state, was == .approved || was == .changesRequested else { continue }
+            } else {
+                guard let at = dismissal?.at, at >= since else { continue }
+            }
+            if let actor = dismissal?.actor, same(actor, me) { continue }
+            result.append(PREvent(kind: .reviewDismissed, pr: pr, actor: dismissal?.actor))
+        }
+        return result
     }
 
     /// How far before the previous poll a merge may be and still count as new when that poll never

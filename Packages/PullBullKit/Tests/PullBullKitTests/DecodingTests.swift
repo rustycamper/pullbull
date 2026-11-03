@@ -68,11 +68,21 @@ private func node(_ name: String) throws -> [String: Any] {
         {"createdAt":"2026-10-22T09:00:00Z","requestedReviewer":{"__typename":"User","login":"Georgi"}},\
         {"createdAt":"2026-10-23T09:00:00Z","requestedReviewer":{"__typename":"User","login":"gone"}},\
         {"createdAt":"2026-10-23T10:00:00Z","requestedReviewer":null}]},\
-        "readyEvent":{"nodes":[{"createdAt":"2026-10-19T12:00:00Z"}]}}
+        "readyEvent":{"nodes":[{"createdAt":"2026-10-19T12:00:00Z"}]},\
+        "reviewDismissals":{"nodes":[\
+        {"createdAt":"2026-10-24T09:00:00Z","actor":{"login":"rado"},"review":{"author":{"login":"Me"}}},\
+        {"createdAt":"2026-10-24T10:00:00Z","actor":null,"review":{"author":{"login":"bob"}}},\
+        {"createdAt":"2026-10-24T11:00:00Z","actor":{"login":"x"},"review":null},\
+        {"actor":{"login":"x"},"review":{"author":{"login":"bob"}}}]}}
         """
         let node = try #require(try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
         let pr = try Decoding.pullRequest(from: node)
         let iso = ISO8601DateFormatter()
+        #expect(pr.reviewDismissals == [
+            ReviewDismissal(reviewAuthor: "Me", actor: "rado", at: iso.date(from: "2026-10-24T09:00:00Z")!),
+            ReviewDismissal(reviewAuthor: "bob", actor: nil, at: iso.date(from: "2026-10-24T10:00:00Z")!),
+        ])
+        #expect(Queries.prFields.contains("timelineItems(itemTypes:[REVIEW_DISMISSED_EVENT], last:5)"))
         #expect(pr.reviewRequestTimes["georgi"] == iso.date(from: "2026-10-22T09:00:00Z"))
         #expect(pr.reviewRequestTimes["team:ios"] == iso.date(from: "2026-10-21T09:00:00Z"))
         #expect(pr.readyForReviewAt == iso.date(from: "2026-10-19T12:00:00Z"))
@@ -82,6 +92,7 @@ private func node(_ name: String) throws -> [String: Any] {
         let pr = try Decoding.pullRequests(fromSearch: fixture("search_page")).prs[0]
         #expect(pr.reviewRequestTimes.isEmpty)
         #expect(pr.readyForReviewAt == nil)
+        #expect(pr.reviewDismissals.isEmpty)
     }
 
     @Test func cachedPRWithoutTimesDecodes() throws {

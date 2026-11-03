@@ -8,14 +8,15 @@ private func pr(
     _ n: Int, author: String = "alice", ci: CIState = .none, comments: Int = 0,
     lastCommenter: String? = nil, reviews: [Review] = [], requests: [Reviewer] = [],
     draft: Bool = false, updated: Date = now, mergeable: Mergeable? = nil,
-    headCommitDate: Date? = nil, requestedAt: [String: Date] = [:]
+    headCommitDate: Date? = nil, requestedAt: [String: Date] = [:], dismissals: [ReviewDismissal] = []
 ) -> PullRequest {
     PullRequest(
         key: PRKey(repo: "r", number: n), title: "t\(n)", url: URL(string: "https://x/\(n)")!,
         author: author, authorAvatarURL: nil, state: .open, isDraft: draft,
         createdAt: now, updatedAt: updated, closedAt: nil, headRef: "h", baseRef: "main", ci: ci,
         headCommitDate: headCommitDate, commentCount: comments, lastCommentAuthor: lastCommenter,
-        latestReviews: reviews, reviewRequests: requests, mergeable: mergeable, reviewRequestTimes: requestedAt)
+        latestReviews: reviews, reviewRequests: requests, mergeable: mergeable, reviewRequestTimes: requestedAt,
+        reviewDismissals: dismissals)
 }
 
 private func snap(review: [PullRequest] = [], mine: [PullRequest] = [], at: Date = now) -> Snapshot {
@@ -237,6 +238,96 @@ private func events(_ old: Snapshot?, _ new: Snapshot, toggles: NotificationTogg
             filters: ReviewFilters(settings), now: now)
         #expect(filtered.map(\.pr.key.number) == [3])
         #expect(events(snap(), s).map(\.pr.key.number) == [1, 2, 3])
+    }
+}
+
+private func mine(_ state: ReviewState, author: String = "me") -> Review {
+    Review(author: author, state: state, submittedAt: now.addingTimeInterval(-7200))
+}
+
+private func dismissedBy(_ actor: String?, ago: TimeInterval = 30, of author: String = "me") -> ReviewDismissal {
+    ReviewDismissal(reviewAuthor: author, actor: actor, at: now.addingTimeInterval(-ago))
+}
+
+@Suite struct ReviewDismissedTests {
+    private let before = now.addingTimeInterval(-60)
+
+    @Test func aDismissedApprovalNotifiesWithWhoDismissedIt() {
+        let old = snap(review: [pr(1, reviews: [mine(.approved)])], at: before)
+        let new = snap(review: [pr(1, reviews: [mine(.dismissed)], dismissals: [dismissedBy("rado")])])
+        let e = events(old, new)
+        #expect(e.map(\.kind) == [.reviewDismissed])
+        #expect(e.first?.actor == "rado")
+    }
+
+    @Test func dismissedRequestedChangesNotify() {
+        let old = snap(review: [pr(1, reviews: [mine(.changesRequested)])], at: before)
+        let new = snap(review: [pr(1, reviews: [mine(.dismissed)], dismissals: [dismissedBy("rado")])])
+        #expect(events(old, new).map(\.kind) == [.reviewDismissed])
+    }
+
+    @Test func aReviewAlreadyDismissedStaysSilent() {
+        let dismissed = pr(1, reviews: [mine(.dismissed)], dismissals: [dismissedBy("rado", ago: 3600)])
+        #expect(events(snap(review: [dismissed], at: before), snap(review: [dismissed])).isEmpty)
+    }
+
+    @Test func someoneElsesDismissedReviewStaysSilent() {
+        let old = snap(review: [pr(1, reviews: [mine(.approved), mine(.approved, author: "bob")])], at: before)
+        let new = snap(review: [pr(1, reviews: [mine(.approved), mine(.dismissed, author: "bob")],
+                                   dismissals: [dismissedBy("rado", of: "bob")])])
+        #expect(events(old, new).isEmpty)
+    }
+
+    @Test func aDismissalOfMyOwnStaysSilent() {
+        let old = snap(review: [pr(1, reviews: [mine(.approved)])], at: before)
+        let new = snap(review: [pr(1, reviews: [mine(.dismissed)], dismissals: [dismissedBy("ME")])])
+        #expect(events(old, new).isEmpty)
+    }
+
+    @Test func anUnknownDismisserStillNotifies() {
+        let old = snap(review: [pr(1, reviews: [mine(.approved)])], at: before)
+        let e = events(old, snap(review: [pr(1, reviews: [mine(.dismissed)])]))
+        #expect(e.map(\.kind) == [.reviewDismissed])
+        #expect(e.first?.actor == nil)
+    }
+
+    @Test func theDismissalSaysItInsteadOfAReviewRequest() {
+        // Dismissed and re-requested in one go: one banner, the dismissal.
+        let old = snap(review: [pr(1, reviews: [mine(.approved)])], at: before)
+        let new = snap(review: [pr(1, reviews: [mine(.dismissed)], requests: [.user("me")],
+                                   requestedAt: ["me": now.addingTimeInterval(-20)], dismissals: [dismissedBy("rado")])])
+        #expect(events(old, new).map(\.kind) == [.reviewDismissed])
+        var off = NotificationToggles()
+        off.reviewDismissed = false
+        #expect(events(old, new, toggles: off).map(\.kind) == [.reviewRequested])
+    }
+
+    @Test func theToggleSilencesIt() {
+        var off = NotificationToggles()
+        off.reviewDismissed = false
+        let old = snap(review: [pr(1, reviews: [mine(.approved)])], at: before)
+        let new = snap(review: [pr(1, reviews: [mine(.dismissed)], dismissals: [dismissedBy("rado")])])
+        #expect(events(old, new, toggles: off).isEmpty)
+    }
+
+    @Test func aPRBackOnTheListNotifiesOnlyForADismissalSinceThePoll() {
+        // Missing from the previous poll's search: the dismissal's time decides.
+        let recent = pr(1, reviews: [mine(.dismissed)], dismissals: [dismissedBy("rado", ago: 30)])
+        #expect(events(snap(at: before), snap(review: [recent])).map(\.kind) == [.reviewDismissed])
+        let lagged = pr(1, reviews: [mine(.dismissed)], dismissals: [dismissedBy("rado", ago: 599)])
+        #expect(events(snap(at: before), snap(review: [lagged])).map(\.kind) == [.reviewDismissed])
+        let old = pr(1, reviews: [mine(.dismissed)], dismissals: [dismissedBy("rado", ago: 3 * 3600)])
+        #expect(events(snap(at: before), snap(review: [old])).isEmpty)
+        let unknown = pr(1, reviews: [mine(.dismissed)])
+        #expect(events(snap(at: before), snap(review: [unknown])).isEmpty)
+    }
+
+    @Test func theNewestDismissalOfMyReviewNamesTheActor() {
+        let old = snap(review: [pr(1, reviews: [mine(.approved)])], at: before)
+        let new = snap(review: [pr(1, reviews: [mine(.dismissed)], dismissals: [
+            dismissedBy("anna", ago: 5000), dismissedBy("rado", ago: 30), dismissedBy("zed", ago: 10, of: "bob"),
+        ])])
+        #expect(events(old, new).first?.actor == "rado")
     }
 }
 

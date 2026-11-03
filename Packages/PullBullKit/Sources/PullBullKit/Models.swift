@@ -63,6 +63,19 @@ public struct Review: Hashable, Codable, Sendable {
     }
 }
 
+/// A ReviewDismissedEvent: whose review was dismissed, by whom (nil for a deleted account), and when.
+public struct ReviewDismissal: Hashable, Codable, Sendable {
+    public let reviewAuthor: String
+    public let actor: String?
+    public let at: Date
+
+    public init(reviewAuthor: String, actor: String?, at: Date) {
+        self.reviewAuthor = reviewAuthor
+        self.actor = actor
+        self.at = at
+    }
+}
+
 /// Someone asked to review: a person by login, or a team by slug with its display name.
 public enum Reviewer: Hashable, Codable, Sendable {
     case user(String)
@@ -162,6 +175,8 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
     public internal(set) var reviewRequestTimes: [String: Date]
     /// The last ReadyForReviewEvent; nil when the PR was never a draft, and in snapshots cached before it.
     public let readyForReviewAt: Date?
+    /// The last few ReviewDismissedEvents, oldest first; empty in snapshots cached before they were stored.
+    public let reviewDismissals: [ReviewDismissal]
 
     public var glyph: PRGlyph { PRGlyph(state: state, isDraft: isDraft) }
     /// The colour of the label at `index`, nil when GitHub gave none or the cache predates it.
@@ -179,7 +194,8 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         latestReviews: [Review], reviewRequests: [Reviewer], headCommitOid: String? = nil, labels: [String] = [],
         labelColors: [String?] = [], mergedBy: String? = nil, mergeable: Mergeable? = nil,
         lastCommentByBot: Bool? = nil, additions: Int? = nil, deletions: Int? = nil, nodeId: String? = nil,
-        assignees: [Assignee] = [], reviewRequestTimes: [String: Date] = [:], readyForReviewAt: Date? = nil
+        assignees: [Assignee] = [], reviewRequestTimes: [String: Date] = [:], readyForReviewAt: Date? = nil,
+        reviewDismissals: [ReviewDismissal] = []
     ) {
         self.key = key
         self.title = title
@@ -211,6 +227,7 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         self.assignees = assignees
         self.reviewRequestTimes = reviewRequestTimes
         self.readyForReviewAt = readyForReviewAt
+        self.reviewDismissals = reviewDismissals
     }
 
     /// Pull requests cached before labels or assignees were stored have none.
@@ -246,6 +263,7 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
         assignees = try c.decodeIfPresent([Assignee].self, forKey: .assignees) ?? []
         reviewRequestTimes = try c.decodeIfPresent([String: Date].self, forKey: .reviewRequestTimes) ?? [:]
         readyForReviewAt = try c.decodeIfPresent(Date.self, forKey: .readyForReviewAt)
+        reviewDismissals = (try? c.decodeIfPresent([ReviewDismissal].self, forKey: .reviewDismissals)) ?? []
     }
 }
 

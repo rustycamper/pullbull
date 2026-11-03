@@ -30,6 +30,9 @@ struct NotificationSettingsTab: View {
                     Toggle(isOn: $model.settings.notify.reviewRequested) {
                         RowLabel("Review requested", note: "Also re-requests, and new commits since your review")
                     }
+                    Toggle(isOn: $model.settings.notify.reviewDismissed) {
+                        RowLabel("Review dismissed", note: "When someone dismisses your approval or requested changes")
+                    }
                     Toggle(isOn: $model.settings.notify.commentAfterMyReview) {
                         RowLabel("New comment", note: "On a pull request you reviewed")
                     }

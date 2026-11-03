@@ -781,6 +781,7 @@ private func sample() -> Snapshot {
         #expect(s.notify.issueAssigned == false)
         #expect(s.notify.merged == true)
         #expect(s.notify.reviewRequested == true)
+        #expect(s.notify.reviewDismissed == true)
         #expect(s.lastTab == .mine)
         #expect(s.grouping == .none)
         #expect(s.toggleHotkey == nil)

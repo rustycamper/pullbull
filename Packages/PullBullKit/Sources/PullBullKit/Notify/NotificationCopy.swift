@@ -45,6 +45,7 @@ extension PREvent {
         case .readyToMerge: "Ready to merge"
         case .merged: "Merged"
         case .commentAfterMyReview: "New comment since your review"
+        case .reviewDismissed: "Your review was dismissed"
         }
     }
 }

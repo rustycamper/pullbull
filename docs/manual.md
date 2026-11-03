@@ -362,6 +362,7 @@ Reopen within a minute and the detail is still there.
 | | Ready to merge: approved, checks green, no conflicts | off |
 | | Merged by someone else | on |
 | Pull requests I review | Review requested, re-requested, or new commits since your review | on |
+| | Your review dismissed: your approval or requested changes, by someone else | on |
 | | New comment on a PR you reviewed | off |
 | Issues assigned to me | Newly assigned by someone else | off |
 | | New comment | on |
@@ -371,7 +372,7 @@ Reopen within a minute and the detail is still there.
 | | Status changed on the board | off |
 | | Closed or reopened | on |
 
-With Settings → General → Check my pending CI more often, CI failed and Ready to merge arrive within about 30 s while your checks run: for up to 5 of your PRs, for 20 minutes each, and not at a 1-minute refresh interval. Your own comments, moves and closes never notify, nor does asking yourself or one of your teams to review. Several comments on one issue between refreshes make one notification ("3 new comments"). Status changes count on the board the Board tab shows, as "In Progress → In Review"; moves the board's automation makes after a close or a merge don't notify, the close does.
+With Settings → General → Check my pending CI more often, CI failed and Ready to merge arrive within about 30 s while your checks run: for up to 5 of your PRs, for 20 minutes each, and not at a 1-minute refresh interval. Your own comments, moves and closes never notify, nor does asking yourself or one of your teams to review. Several comments on one issue between refreshes make one notification ("3 new comments"). A dismissed review that also puts the PR back in Review notifies once, as the dismissal. Status changes count on the board the Board tab shows, as "In Progress → In Review"; moves the board's automation makes after a close or a merge don't notify, the close does.
 
 Click a notification to open the detail.
 
