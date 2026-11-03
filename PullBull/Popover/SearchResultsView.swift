@@ -283,8 +283,9 @@ struct SearchResultsView: View {
     @ViewBuilder private func closedSection<Rows: View>(
         title: String, count: Int, @ViewBuilder rows: () -> Rows
     ) -> some View {
+        // Edge to edge, as the header's material below it is (`pinnedHeaderBackground`).
         Hairline()
-            .padding(.horizontal, 8)
+            .padding(.horizontal, -Metrics.rowInset)
             .padding(.top, 6)
         Section {
             if model.searchExpansion.closed {

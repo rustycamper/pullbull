@@ -117,8 +117,9 @@ struct PRListView: View {
     }
 
     @ViewBuilder private var closedSection: some View {
+        // Edge to edge, as the header's material below it is (`pinnedHeaderBackground`).
         Hairline()
-            .padding(.horizontal, 8)
+            .padding(.horizontal, -Metrics.rowInset)
             .padding(.top, 6)
         Section {
             if closedExpanded {
