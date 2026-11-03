@@ -45,6 +45,14 @@ struct IssueListView: View {
         }
     }
 
+    /// What sits under an empty list: Done, whose header and the list's bottom padding take
+    /// `doneSectionHeight` while it is folded.
+    private var doneBelow: EmptyListFrame.Below {
+        guard done != nil else { return .nothing }
+        return doneExpanded ? .open : .folded(height: Self.doneSectionHeight)
+    }
+    private static let doneSectionHeight = ListSectionHeader.height + 6
+
     /// Board folds what was done lately; Assigned folds what is done on the board but still open.
     private var doneNote: String { tab == .assigned ? "still open" : "last 14 days" }
 
@@ -58,7 +66,7 @@ struct IssueListView: View {
                         IssueEmptyView(model: model, tab: tab, now: now)
                     }
                 }
-                .frame(height: EmptyListFrame.height(sectionBelow: done != nil))
+                .emptyStateFrame(doneBelow)
             } else {
                 let folded = foldedLanes
                 ForEach(listed) { group in

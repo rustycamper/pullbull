@@ -35,7 +35,7 @@ struct SearchResultsView: View {
                         }
                         stateMessage
                             .frame(maxWidth: .infinity)
-                            .frame(height: EmptyListFrame.height(sectionBelow: false))
+                            .emptyStateFrame(.nothing)
                     }
                 }
                 .padding(.horizontal, Metrics.rowInset)

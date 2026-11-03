@@ -3,7 +3,9 @@ import SwiftUI
 /// A list section's header, the same in every list: repo groups, lanes, Done, "Recently closed" and the
 /// search groups. The glyph sits in the rows' icon column, so header and row glyphs share one axis and the
 /// title starts on the row titles' edge; without a glyph the title starts where the row glyphs do. A
-/// header that folds toggles as a whole, its chevron hanging in the leading inset, left of the icon column.
+/// header that folds toggles as a whole, its chevron hanging in the leading inset, left of the icon column;
+/// a folding header without a glyph puts the chevron in the icon column instead, where the inset would
+/// leave it touching the title.
 struct ListSectionHeader: View {
     let glyph: String?
     var glyphColor: Color = .secondary
@@ -42,12 +44,9 @@ struct ListSectionHeader: View {
             Button(action: fold.toggle) {
                 label
                     .overlay(alignment: .leading) {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.secondary)
-                            .rotationEffect(.degrees(fold.isOpen ? 90 : 0))
-                            .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: fold.isOpen)
-                            .frame(width: 8)
+                        if !chevronInColumn {
+                            chevron(fold).frame(width: 8)
+                        }
                     }
                     .contentShape(Rectangle())
             }
@@ -67,6 +66,17 @@ struct ListSectionHeader: View {
         ([title] + [count.map(String.init), note].compactMap { $0 }).joined(separator: ", ")
     }
 
+    /// A folding header with nothing in its icon column.
+    private var chevronInColumn: Bool { fold != nil && glyph == nil && avatar == nil }
+
+    private func chevron(_ fold: Fold) -> some View {
+        Image(systemName: "chevron.right")
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(.secondary)
+            .rotationEffect(.degrees(fold.isOpen ? 90 : 0))
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: fold.isOpen)
+    }
+
     /// At 11pt the SF circle matches the 13pt row glyph's diameter.
     private var label: some View {
         HStack(spacing: compact ? 8 : 10) {
@@ -78,6 +88,8 @@ struct ListSectionHeader: View {
                     .font(.system(size: compact ? 10 : 11))
                     .foregroundStyle(glyphColor)
                     .frame(width: compact ? 16 : 20)
+            } else if chevronInColumn, let fold {
+                chevron(fold).frame(width: compact ? 16 : 20)
             }
             HStack(spacing: 6) {
                 Text(title)

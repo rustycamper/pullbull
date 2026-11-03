@@ -23,6 +23,14 @@ struct PRListView: View {
     private var closedOnly: Bool {
         contents.rows.isEmpty && focus.isActive && tab == .mine && !recentlyClosed.isEmpty && scoped.hiddenCount > 0
     }
+    /// What sits under an empty list: on Mine, Recently closed, whose hairline, header and the list's bottom
+    /// padding take `closedSectionHeight` while it is folded.
+    private var closedBelow: EmptyListFrame.Below {
+        guard tab == .mine && !recentlyClosed.isEmpty else { return .nothing }
+        return closedExpanded ? .open : .folded(height: Self.closedSectionHeight)
+    }
+    private static let closedSectionHeight = 6 + 1 + ListSectionHeader.height + 6
+
     /// The section holds the last 7×24 hours; a step that starts later, the week included, says so.
     private var closedWindow: String {
         guard let step = focus.time?.step, step.daysBack <= 6 else { return "Last 7 days" }
@@ -58,7 +66,7 @@ struct PRListView: View {
                         EmptyTabView(model: model, tab: tab, now: now)
                     }
                 }
-                .frame(height: EmptyListFrame.height(sectionBelow: tab == .mine && !recentlyClosed.isEmpty))
+                .emptyStateFrame(closedBelow)
             } else if grouping == .repository {
                 ForEach(groups, id: \.repo) { group in
                     Section {
