@@ -183,7 +183,7 @@ struct TabBar: View {
         }
     }
 
-        /// What the tab lists, then on a stale count why it didn't update.
+    /// What the tab lists, then on a stale count why it didn't update.
     private static func help(_ summary: String, count: IssueTabCount?) -> String {
         [summary, count.flatMap(staleHelp)].compactMap(\.self).joined(separator: "\n")
     }
