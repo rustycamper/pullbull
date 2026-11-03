@@ -575,7 +575,7 @@ private func sample() -> Snapshot {
         #expect(s.badge == .review)
         #expect(s.grouping == Grouping.none)
         #expect(s.mode == .issues)
-        #expect(s.lastIssueTab == .board)
+        #expect(s.lastIssueScope == .board)
         // An unreadable owner clears the board, so no other owner adopts board 7.
         #expect(s.projectNumber == nil)
         #expect(s.projectOwner == nil)
@@ -674,7 +674,10 @@ private func sample() -> Snapshot {
 
     @Test func emptyObjectDecodesToDefaults() throws {
         let s = try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8))
-        #expect(s == AppSettings())
+        // A file without `issueOpenOn` is an existing user's: Issues opens on Last used.
+        var expected = AppSettings()
+        expected.issueOpenOn = .lastUsed
+        #expect(s == expected)
         let n = try JSONDecoder().decode(NotificationToggles.self, from: Data("{}".utf8))
         #expect(n == NotificationToggles())
     }
@@ -774,7 +777,7 @@ private func sample() -> Snapshot {
             """#
         let s = try JSONDecoder().decode(AppSettings.self, from: Data(old.utf8))
         #expect(s.mode == .pullRequests)
-        #expect(s.lastIssueTab == .assigned)
+        #expect(s.lastIssueScope == .all)
         #expect(s.countAssignedIssues == false)
         #expect(s.notify.issueAssigned == false)
         #expect(s.notify.merged == true)
@@ -789,7 +792,7 @@ private func sample() -> Snapshot {
         let store = SettingsStore(defaults: defaults())
         var s = AppSettings()
         s.mode = .issues
-        s.lastIssueTab = .board
+        s.lastIssueScope = .board
         s.countAssignedIssues = true
         s.notify.issueAssigned = true
         s.notify.merged = false
@@ -797,7 +800,7 @@ private func sample() -> Snapshot {
         let loaded = store.load()
         #expect(loaded == s)
         #expect(loaded.mode == .issues)
-        #expect(loaded.lastIssueTab == .board)
+        #expect(loaded.lastIssueScope == .board)
         #expect(loaded.countAssignedIssues)
         #expect(loaded.notify.issueAssigned)
         #expect(!loaded.notify.merged)
