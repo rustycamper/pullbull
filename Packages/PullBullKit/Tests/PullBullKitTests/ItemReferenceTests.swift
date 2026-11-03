@@ -41,7 +41,7 @@ private func item(_ repo: String, _ number: Int) -> SearchQuery { .item(repo: re
         #expect(SearchQuery.parse("o/r/x#5") == .text(["o/r/x#5"]))
         #expect(SearchQuery.parse("o/#5") == .text(["o/#5"]))
         #expect(SearchQuery.parse("-o/r#5") == .text(["-o/r#5"]))
-        #expect(SearchQuery.parse("o/r #5") == .text(["o/r", "#5"]))
+        #expect(SearchQuery.parse("o/r #5") == .filtered(SearchFilter(include: SearchTerms(numbers: [5]), words: ["o/r"])))
     }
 
     @Test func otherHostsAreNotLinks() {

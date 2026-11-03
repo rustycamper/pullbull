@@ -159,7 +159,7 @@ Write a comment on an open, closed or merged issue or pull request from its deta
 | `repo:widgets` `repo:acme/widgets` | That repo. The name alone matches every owner's; several `repo:` match any of them. An exact `owner/name` goes to GitHub even for a repo PullBull hasn't seen; a name alone goes as the one known repo it names, and filters your lists only when no known repo or several have it. Saved searches keep it |
 | `is:unanswered` | Your open PRs and the issues on your Mine or Created tab whose last comment is someone else's, not a bot's. Searches your lists only |
 | `status:prog` `status:"In progress"` | Status column on the board. Issues only |
-| `#123` | That number, every repo |
+| `#123` | That number, every repo. With other terms, that number if it matches them: `is:open #123`. A bare `123` is a title word |
 | `owner/repo#123` or a link | Exactly that item |
 | `updated:today` `3d` `1w` `1m` | Items active since 00:00 today, or 2, 6 or 29 days before. GitHub's date forms (`updated:>2026-10-01`, `updated:2026-10-01..2026-10-07`) go to GitHub as written and also filter locally; any other value goes to GitHub as written |
 | words | Title |
@@ -169,7 +169,7 @@ Write a comment on an open, closed or merged issue or pull request from its deta
 - `status:` uses the board shown in the Board tab. Unquoted matches part of a Status name, quoted the whole name; case is ignored. Names with spaces need quotes to match exactly
 - With `status:`, PRs and issues not on the board don't match
 - `-status:` keeps PRs and issues not on the board
-- `#123` and links work only on their own
+- Links and `owner/repo#123` work only on their own
 - Results are laid out like the tab you're on, or the one you narrowed to: the same repo, author or Status groups and headers. Merged and closed items follow in **Closed and merged** (issues: **Closed**), open until you fold it for this search. Results span all tabs; click a tab to narrow, or press <kbd>←</kbd> / <kbd>→</kbd> at the field's start / end to narrow to the tab beside the one the results are laid out for (<kbd>←</kbd> from the first tab does nothing). No key goes back to everything; click the narrowed tab again, or **Search everything** in the narrowed empty state
 - The footer says what is searched and how many match, with a spinner while GitHub answers. <kbd>⌥</kbd><kbd>⌘</kbd><kbd>↩</kbd> Ask AI shows there when it fits
 - **Right-click a result:** [Status](#editing) (issues, when a board is shown) · [Reviewers…](#editing) (PRs) · [Assignees…](#editing) · [Labels…](#editing) · copy branch (PRs), link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · search author. The checkout, files and failing check items are on PRs. Search author replaces the query; show only this repo keeps it and searches that repo

@@ -25,7 +25,7 @@ import Testing
         #expect(SearchQuery.parse(#"label:"needs triage label:bug login"#)
             == .filtered(logins: [], labels: ["needs triage", "bug"], words: ["login"]))
         #expect(SearchQuery.parse(#"~"good first #12 fix"#)
-            == .filtered(logins: [], labels: ["good first"], words: ["#12", "fix"]))
+            == .filtered(SearchFilter(include: SearchTerms(labels: ["good first"], numbers: [12]), words: ["fix"])))
     }
 
     @Test func sigilInsideAWordDoesNotEndAnOpenQuote() {
