@@ -619,11 +619,13 @@ final class AppModel {
     }
 
     /// The next open starts on All, reset now so it never shows the old chip for a frame. A detail left
-    /// open keeps its walk, as it shows again on a quick reopen.
+    /// open keeps its walk, as it shows again on a quick reopen. A search kept open no longer goes back
+    /// to the chip typing started on, so its Esc hint stops naming it.
     func popoverDidClose() {
         let walk = detailWalk
         prScope = .all
         detailWalk = walk
+        if case .pullRequests(let scope) = searchStartedOnTab, scope != .all { searchStartedOnTab = nil }
     }
 
     func refresh() {
@@ -739,11 +741,12 @@ final class AppModel {
     }
 
     /// Folds or opens a section of the PR list, for every account. A highlight in the section moves to the
-    /// next row still shown, or clears.
+    /// next row still shown, or clears. One not shown before (another chip's row) stays for when it shows.
     func toggleSection(_ section: PRSection) {
         let old = listKeys(doneExpanded: false)
         settings.sectionFolds.toggle(section)
-        let selection = ListNavigation.selection(listSelection, from: old, to: listKeys(doneExpanded: false))
+        guard let current = listSelection, old.contains(current) else { return }
+        let selection = ListNavigation.selection(current, from: old, to: listKeys(doneExpanded: false))
         if selection != listSelection { listSelection = selection }
     }
 

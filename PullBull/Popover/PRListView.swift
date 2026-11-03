@@ -36,6 +36,8 @@ struct PRListView: View {
         return model.foldedSections.contains(.recentlyClosed) ? .folded(height: Self.closedSectionHeight) : .open
     }
     private static let closedSectionHeight = 6 + 1 + ListSectionHeader.height + 6
+    /// The list's first element, which a chip change with no selection shown scrolls to.
+    private static let top = "PRListView.top"
 
     /// The section holds the last 7×24 hours; a step that starts later, the week included, says so.
     private var closedWindow: String {
@@ -59,16 +61,23 @@ struct PRListView: View {
                 guard let key = model.listSelection else { return }
                 proxy.scrollTo(key)
             }
-            // The selection is shared by every chip: it stays in view across them.
+            // The selection is shared by every chip: it stays in view across them. Without one shown, the
+            // new chip opens at its top, as All does on every open.
             .onChange(of: model.prScope) { _, _ in
-                guard let key = model.listSelection else { return }
-                proxy.scrollTo(key)
+                if let key = ListNavigation.shown(model.listSelection, in: model.listKeys(doneExpanded: false)) {
+                    proxy.scrollTo(key)
+                } else {
+                    proxy.scrollTo(Self.top, anchor: .top)
+                }
             }
         }
     }
 
     private var content: some View {
         LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+            Color.clear
+                .frame(height: 0)
+                .id(Self.top)
             if showsEmptyState {
                 Group {
                     if focus.isActive, total > list.rowCount {
