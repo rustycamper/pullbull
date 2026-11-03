@@ -6,7 +6,8 @@ import PullBullKit
 /// failed or never loaded shows "–", never "0"; a list kept from before its latest search failed shows
 /// its count with a warning triangle. Counts above 99 read "99+". While results are on screen each count
 /// is the tab's matches for the query, and a click narrows the search to the tab (`AppModel.pickSearchScope`):
-/// only the narrowed tab is drawn as selected, none while the search covers everything.
+/// only the narrowed tab is drawn as selected. In Pull Requests mode an Everywhere segment leads while
+/// searching, selected while the search covers everything and counting its results.
 struct TabBar: View {
     @Bindable var model: AppModel
     /// Results are on screen (`Route.search`).
@@ -24,12 +25,10 @@ struct TabBar: View {
         SegmentRow(spacing: 2, padding: crowded ? 6 : 8) {
             switch model.mode {
             case .pullRequests:
-                ForEach(model.prTabs, id: \.self) { tab in
-                    segment(
-                        .pullRequests(tab), title: tab.title, count: count(of: .pullRequests(tab)),
-                        selected: isSelected(.pullRequests(tab))
-                    ) {
-                        pick(.pullRequests(tab))
+                ForEach(prSegments, id: \.self) { scope in
+                    let tab = ShownTab.pullRequests(scope)
+                    segment(tab, title: title(of: scope), count: count(of: tab), selected: isSelected(tab)) {
+                        pick(tab)
                     }
                 }
             case .issues:
@@ -55,12 +54,28 @@ struct TabBar: View {
         .accessibilityLabel(model.mode == .pullRequests ? "Pull request lists" : "Issue lists")
     }
 
-    /// The tab's count: its matches while searching, else its list's count. An empty list shows none;
-    /// a search shows its zeros, which say "no matches here".
+    /// The PR segments: Everywhere while searching, then the tabs shown.
+    private var prSegments: [PRScope] {
+        let tabs = model.prTabs.map(PRScope.init)
+        return searching ? [.all] + tabs : tabs
+    }
+
+    /// All reads "Everywhere": it shows only while searching.
+    private func title(of scope: PRScope) -> String {
+        scope == .all ? "Everywhere" : scope.title
+    }
+
+    /// The tab's count: its matches while searching (Everywhere's is the results'), else its list's count. An
+    /// empty list shows none; a search shows its zeros, which say "no matches here".
     private func count(of tab: ShownTab) -> IssueTabCount? {
-        if searching { return model.searchMatchCounts[SearchScope(tab)] }
+        if searching {
+            if tab == .pullRequests(.all) { return model.everywhereCount }
+            return model.searchMatchCounts[SearchScope(tab)]
+        }
         switch tab {
-        case .pullRequests(let tab): return model.contents(of: tab).flatMap { $0.count == 0 ? nil : .current($0.count) }
+        case .pullRequests(let scope):
+            let contents = model.contents(of: scope.tab ?? model.selectedTab)
+            return contents.flatMap { $0.count == 0 ? nil : .current($0.count) }
         case .issues(let tab): return (model.issueTabs?.count(tab)).flatMap { $0 == .current(0) ? nil : $0 }
         }
     }
@@ -69,10 +84,10 @@ struct TabBar: View {
         searching ? model.shownSearchScope == SearchScope(tab) : model.shownTab == tab
     }
 
-    /// None while a search covers everything.
+    /// None while an issue search covers everything.
     private var hasSelection: Bool {
         switch model.mode {
-        case .pullRequests: model.prTabs.contains { isSelected(.pullRequests($0)) }
+        case .pullRequests: prSegments.contains { isSelected(.pullRequests($0)) }
         case .issues: IssueTab.allCases.contains { isSelected(.issues($0)) }
         }
     }
@@ -90,7 +105,7 @@ struct TabBar: View {
         }
         willSelect()
         switch tab {
-        case .pullRequests(let tab): model.selectedTab = tab
+        case .pullRequests(let scope): if let tab = scope.tab { model.selectedTab = tab }
         case .issues(let tab): model.selectedIssueTab = tab
         }
     }
@@ -99,7 +114,7 @@ struct TabBar: View {
     private var crowded: Bool {
         let counts: [IssueTabCount?] =
             switch model.mode {
-            case .pullRequests: model.prTabs.map { count(of: .pullRequests($0)) }
+            case .pullRequests: prSegments.map { count(of: .pullRequests($0)) }
             case .issues: IssueTab.allCases.map { count(of: .issues($0)) }
             }
         return counts.contains { count in
@@ -152,7 +167,7 @@ struct TabBar: View {
             }
         }
         .layoutValue(key: SegmentSelected.self, value: selected)
-        .help(Self.help(tab, count: count))
+        .help(Self.help(summary(of: tab), count: count))
         .accessibilityAddTraits(selected ? [.isSelected] : [])
         .accessibilityLabel((count.map { "\(title), \(spoken($0))" } ?? title) + filteredSuffix(for: tab))
     }
@@ -203,9 +218,14 @@ struct TabBar: View {
         }
     }
 
+    /// What the tab covers: while searching, Everywhere searches the lists and GitHub.
+    private func summary(of tab: ShownTab) -> String {
+        searching && tab == .pullRequests(.all) ? "Your lists and GitHub" : tab.summary
+    }
+
     /// What the tab lists, then on a stale count why it didn't update.
-    private static func help(_ tab: ShownTab, count: IssueTabCount?) -> String {
-        [tab.summary, count.flatMap(staleHelp)].compactMap(\.self).joined(separator: "\n")
+    private static func help(_ summary: String, count: IssueTabCount?) -> String {
+        [summary, count.flatMap(staleHelp)].compactMap(\.self).joined(separator: "\n")
     }
 
     private static func staleHelp(_ count: IssueTabCount) -> String? {
@@ -312,6 +332,7 @@ extension ShownTab {
     /// and the rules in `TabBuilder` and `IssueTabBuilder`.
     var summary: String {
         switch self {
+        case .pullRequests(.all): "Every pull request list, in sections"
         case .pullRequests(.review): "PRs waiting for your review"
         case .pullRequests(.mine): "Your open PRs · closed last 7 days below"
         case .pullRequests(.team): "Open PRs by your teammates"
@@ -327,7 +348,7 @@ extension AppModel {
     var searchScopeTitle: String? {
         switch shownSearchScope {
         case .everything: nil
-        case .pullRequests(let tab): tab.title
+        case .pullRequests(let tab): PRScope(tab).title
         case .issues(let tab): tab.title
         }
     }

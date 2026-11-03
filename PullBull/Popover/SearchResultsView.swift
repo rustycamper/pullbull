@@ -1,11 +1,11 @@
 import SwiftUI
 import PullBullKit
 
-/// The current mode's search results laid out as the reference tab lays out its list (its repo, author
-/// or Status groups and headers, and Done), then the merged and closed ones under a folding Closed
-/// section, with an explicit state: "Searching…", the line pointing to the other mode when only its kind
-/// matches, the no-match message, or the remote failure. Narrowed to a tab, the footer's summary names it and
-/// the no-match state offers everything instead.
+/// The current mode's search results laid out as the reference tab lays out its list (the list's sections
+/// for Everywhere and Mine; else its repo, author or Status groups and headers, and Done), then the merged
+/// and closed ones under a folding Closed section, with an explicit state: "Searching…", the line pointing
+/// to the other mode when only its kind matches, the no-match message, or the remote failure. Narrowed to
+/// a tab, the footer's summary names it and the no-match state offers everything instead.
 struct SearchResultsView: View {
     let model: AppModel
     let now: Date
@@ -151,13 +151,15 @@ struct SearchResultsView: View {
         token.count > 32 ? token.prefix(31) + "…" : token
     }
 
-    /// No match among the narrowed tab's items, with the way back to everything.
+    /// No match among the narrowed tab's items, with the way back to everything (Everywhere for PRs).
     private func narrowedEmpty(_ tab: String) -> some View {
-        ListStateView(
-            symbol: "magnifyingglass", title: SearchContext.noMatches(inTab: tab),
-            detail: "Search everything to look in every tab.",
+        let pullRequests = model.mode == .pullRequests
+        let detail =
+            pullRequests ? "Search everywhere to look in every list." : "Search everything to look in every tab."
+        return ListStateView(
+            symbol: "magnifyingglass", title: SearchContext.noMatches(inTab: tab), detail: detail,
             detailLink: .init(
-                phrase: "Search everything",
+                phrase: pullRequests ? "Search everywhere" : "Search everything",
                 help: model.mode == .issues
                     ? "Search every issue for this query" : "Search every pull request for this query",
                 perform: { model.searchEverything() }))
@@ -202,19 +204,46 @@ struct SearchResultsView: View {
     @ViewBuilder private var groups: some View {
         switch model.mode {
         case .pullRequests:
-            if let layout = model.searchPRLayout { prGroups(layout) }
+            if let layout = model.searchSectionLayout {
+                sectionGroups(layout)
+            } else if let layout = model.searchPRLayout {
+                prGroups(layout)
+            }
         case .issues:
             if let layout = model.searchIssueLayout { issueGroups(layout) }
         }
     }
 
+    /// The open results in the list's sections, which never fold while searching, then Closed and merged.
+    @ViewBuilder private func sectionGroups(_ layout: SearchSectionLayout) -> some View {
+        ForEach(layout.sections) { section in
+            let s = section.section
+            Section {
+                if let tab = s.rowTab {
+                    prRows(section.contents.rows, on: tab, underRepoHeader: false)
+                }
+            } header: {
+                ListSectionHeader(
+                    glyph: s.glyph, glyphColor: s.glyphColor, title: s.title, count: section.count, fold: nil,
+                    compact: model.settings.compact)
+                    .pinnedHeaderBackground()
+            }
+        }
+        if !layout.ended.isEmpty {
+            closedSection(title: "Closed and merged", count: layout.ended.count) {
+                closedRows(layout.ended)
+            }
+        }
+    }
+
     @ViewBuilder private func prGroups(_ layout: SearchPRLayout) -> some View {
         let rows = layout.contents.rows
+        let underRepoHeader = layout.grouping == .repository
         switch layout.grouping {
         case .repository:
             ForEach(ListNavigation.repoGroups(rows), id: \.repo) { group in
                 Section {
-                    prRows(group.rows, on: layout.tab)
+                    prRows(group.rows, on: layout.tab, underRepoHeader: underRepoHeader)
                 } header: {
                     RepoGroupHeader(model: model, repo: group.repo, rows: group.rows, menus: .search)
                         .pinnedHeaderBackground()
@@ -223,7 +252,7 @@ struct SearchResultsView: View {
         case .author:
             ForEach(ListNavigation.authorGroups(rows), id: \.author) { group in
                 Section {
-                    prRows(group.rows, on: layout.tab)
+                    prRows(group.rows, on: layout.tab, underRepoHeader: underRepoHeader)
                 } header: {
                     AuthorGroupHeader(model: model, author: group.author, rows: group.rows, menus: .search)
                         .pinnedHeaderBackground()
@@ -231,7 +260,7 @@ struct SearchResultsView: View {
             }
         case .none:
             // Ungrouped rows have no header to clear.
-            prRows(rows, on: layout.tab, clearance: 0)
+            prRows(rows, on: layout.tab, underRepoHeader: underRepoHeader, clearance: 0)
                 .padding(.top, 6)
         }
         if !layout.ended.isEmpty {
@@ -301,10 +330,14 @@ struct SearchResultsView: View {
     }
 
     /// The open results as rows of `tab`, which give their review state, dimming and avatars.
-    private func prRows(_ rows: [Row], on tab: PRTab, clearance: CGFloat = PinnedHeader.clearance) -> some View {
+    private func prRows(
+        _ rows: [Row], on tab: PRTab, underRepoHeader: Bool, clearance: CGFloat = PinnedHeader.clearance
+    ) -> some View {
         ForEach(rows) { row in
             PRRow(
-                model: model, row: row, context: .search(tab, SearchMarks(words: words, role: role(of: row.pr))),
+                model: model, row: row,
+                context: .search(
+                    tab, SearchMarks(words: words, role: role(of: row.pr)), underRepoHeader: underRepoHeader),
                 compact: model.settings.compact, now: now,
                 selected: model.searchSelection == row.pr.key, wantedLabels: labels)
             .scrollTarget(row.pr.key, clearance: clearance)

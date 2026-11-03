@@ -10,12 +10,12 @@ enum Route: Equatable {
 
 /// A tab in either mode, such as the one type-anywhere started a search on.
 enum ShownTab: Hashable {
-    case pullRequests(PRTab)
+    case pullRequests(PRScope)
     case issues(IssueTab)
 
     var title: String {
         switch self {
-        case .pullRequests(let tab): tab.title
+        case .pullRequests(let scope): scope.title
         case .issues(let tab): tab.title
         }
     }
@@ -24,17 +24,17 @@ enum ShownTab: Hashable {
     init?(_ scope: SearchScope) {
         switch scope {
         case .everything: return nil
-        case .pullRequests(let tab): self = .pullRequests(tab)
+        case .pullRequests(let tab): self = .pullRequests(PRScope(tab))
         case .issues(let tab): self = .issues(tab)
         }
     }
 }
 
 extension SearchScope {
-    /// The search narrowed to `tab`.
+    /// The search narrowed to `tab`; everything for All.
     init(_ tab: ShownTab) {
         switch tab {
-        case .pullRequests(let tab): self = .pullRequests(tab)
+        case .pullRequests(let scope): self = scope.tab.map(SearchScope.pullRequests) ?? .everything
         case .issues(let tab): self = .issues(tab)
         }
     }
@@ -170,7 +170,7 @@ final class AppModel {
     /// The tab showing in the current mode.
     var shownTab: ShownTab {
         switch mode {
-        case .pullRequests: .pullRequests(selectedTab)
+        case .pullRequests: .pullRequests(PRScope(selectedTab))
         case .issues: .issues(selectedIssueTab)
         }
     }
@@ -186,7 +186,7 @@ final class AppModel {
     /// `sortTab`'s sort.
     var sort: ListSort {
         switch sortTab {
-        case .pullRequests(let tab): settings.sort(for: tab)
+        case .pullRequests(let scope): settings.sort(for: scope)
         case .issues(let tab): settings.sort(for: tab)
         }
     }
@@ -194,7 +194,7 @@ final class AppModel {
     /// The sorts `sortTab` offers, its default first.
     var sortChoices: [ListSort] {
         switch sortTab {
-        case .pullRequests(let tab): ListSort.choices(for: tab)
+        case .pullRequests(let scope): ListSort.choices(for: scope)
         case .issues(let tab): ListSort.choices(for: tab)
         }
     }
@@ -202,7 +202,7 @@ final class AppModel {
     /// Sorts `sortTab` by `sort`, remembered across launches; the lists keep their selection and scroll to it.
     func setSort(_ sort: ListSort) {
         switch sortTab {
-        case .pullRequests(let tab): settings.setSort(sort, for: tab)
+        case .pullRequests(let scope): settings.setSort(sort, for: scope)
         case .issues(let tab): settings.setSort(sort, for: tab)
         }
     }
@@ -1022,11 +1022,11 @@ final class AppModel {
     var shownSearchScope: SearchScope { searchScope.valid(in: mode, prTabs: prTabs) }
 
     /// A tab clicked while results are on screen: the same query narrowed to that tab, which becomes the
-    /// selected tab, or back to everything when it is the narrowed tab already.
+    /// selected tab, or back to everything when it is the narrowed tab already or Everywhere.
     func pickSearchScope(_ tab: ShownTab) {
         searchScope = shownSearchScope.picking(SearchScope(tab))
         switch tab {
-        case .pullRequests(let tab): selectedTab = tab
+        case .pullRequests(let scope): if let tab = scope.tab { selectedTab = tab }
         case .issues(let tab): selectedIssueTab = tab
         }
         runSearch(searchQuery, debounced: false)
@@ -1057,21 +1057,40 @@ final class AppModel {
         searchField.forgetCompletion()
     }
 
-    /// The tab whose layout the results take (`SearchScope.reference`): the narrowed tab, else the tab
-    /// typing started on while it is in this mode, else the tab on screen.
+    /// The tab whose layout the results take. In Pull Requests mode, the narrowed scope, else All, whatever
+    /// tab typing started on. In Issues mode (`SearchScope.reference`), the narrowed tab, else the tab typing
+    /// started on while it is in this mode, else the tab on screen.
     var searchReferenceTab: ShownTab {
+        if mode == .pullRequests { return .pullRequests(shownSearchScope.prScope ?? .all) }
         let reference = SearchScope.reference(
             scope: shownSearchScope, startedOn: searchStartedOnTab.map(SearchScope.init), shown: SearchScope(shownTab))
         return ShownTab(reference) ?? shownTab
     }
 
-    /// The PR results in the reference tab's layout; nil in Issues mode and without results.
+    /// The PR results in Needs you's or Team's layout; nil for Everywhere and Mine (`searchSectionLayout`),
+    /// in Issues mode and without results.
     var searchPRLayout: SearchPRLayout? {
         guard mode == .pullRequests, let results = searchResults, let snapshot,
-              case .pullRequests(let tab) = searchReferenceTab
+              case .pullRequests(let scope) = searchReferenceTab, !scope.showsSectionHeaders, let tab = scope.tab
         else { return nil }
         return SearchLayout.pullRequests(
             results, on: tab, grouping: prGrouping(for: tab), settings: settings, org: snapshot.org, now: Date())
+    }
+
+    /// The PR results in the list's sections, for Everywhere and Mine; nil for Needs you and Team
+    /// (`searchPRLayout`), in Issues mode and without results or lists.
+    var searchSectionLayout: SearchSectionLayout? {
+        guard mode == .pullRequests, let results = searchResults, let snapshot, let tabs,
+              case .pullRequests(let scope) = searchReferenceTab, scope.showsSectionHeaders
+        else { return nil }
+        return SearchLayout.sections(
+            results, scope: scope, tabs: tabs, settings: settings, org: snapshot.org, now: Date())
+    }
+
+    /// The Everywhere segment's count while the search covers everything: the results'. Nil otherwise.
+    var everywhereCount: IssueTabCount? {
+        guard mode == .pullRequests, shownSearchScope == .everything, searchResults != nil else { return nil }
+        return .current(searchMatchCount)
     }
 
     /// The issue results in the reference tab's layout, with edits shown; nil in PR mode and without
@@ -1113,7 +1132,9 @@ final class AppModel {
     /// Closed while expanded.
     var searchItemKeys: [PRKey] {
         switch mode {
-        case .pullRequests: searchPRLayout?.keys(closedExpanded: searchExpansion.closed) ?? []
+        case .pullRequests:
+            searchSectionLayout?.keys(closedExpanded: searchExpansion.closed)
+                ?? searchPRLayout?.keys(closedExpanded: searchExpansion.closed) ?? []
         case .issues:
             searchIssueLayout?.keys(closedExpanded: searchExpansion.closed, doneExpanded: searchExpansion.done) ?? []
         }
@@ -1141,13 +1162,19 @@ final class AppModel {
     }
 
     /// ⌥↓ / ⌥↑: the first row of the next or previous group of the results (or of this one, going up from
-    /// inside it). Nothing when the reference tab's layout has no groups, or past either end.
+    /// inside it). Nothing when the reference tab's layout has no groups, or past either end. Sections are
+    /// always groups.
     func jumpSearchGroup(by offset: Int) {
         let shown: (groups: [[PRKey]], grouped: Bool)
         switch mode {
         case .pullRequests:
-            guard let layout = searchPRLayout else { return }
-            shown = (layout.groups(closedExpanded: searchExpansion.closed), layout.isGrouped)
+            if let layout = searchSectionLayout {
+                shown = (layout.groups(closedExpanded: searchExpansion.closed), true)
+            } else if let layout = searchPRLayout {
+                shown = (layout.groups(closedExpanded: searchExpansion.closed), layout.isGrouped)
+            } else {
+                return
+            }
         case .issues:
             guard let layout = searchIssueLayout else { return }
             shown = (
@@ -1167,22 +1194,27 @@ final class AppModel {
         searchSelection = key
     }
 
-    /// ← / → in the search field: narrows the search to the reference tab's neighbour, which becomes the
-    /// selected tab, and runs it. Unlike a tab click it never toggles back to everything. Nil at either end.
+    /// ← / → in the search field. In Pull Requests mode it moves along Everywhere and the tabs shown; in
+    /// Issues mode it narrows to the reference tab's neighbour, never toggling back to everything. A tab moved
+    /// to becomes the selected tab, and the search runs again. Nil at either end.
     func moveSearchScope(by offset: Int) -> ShownTab? {
-        let tabs: [SearchScope] = switch mode {
-        case .pullRequests: prTabs.map { .pullRequests($0) }
-        case .issues: IssueTab.allCases.map { .issues($0) }
+        switch mode {
+        case .pullRequests:
+            guard let next = shownSearchScope.moved(by: offset, among: SearchScope.prChips(prTabs)),
+                  let scope = next.prScope else { return nil }
+            searchScope = next
+            if let tab = scope.tab { selectedTab = tab }
+            runSearch(searchQuery, debounced: false)
+            return .pullRequests(scope)
+        case .issues:
+            let tabs = IssueTab.allCases.map { SearchScope.issues($0) }
+            guard let next = SearchScope(searchReferenceTab).moved(by: offset, among: tabs),
+                  case .issues(let tab) = next else { return nil }
+            searchScope = next
+            selectedIssueTab = tab
+            runSearch(searchQuery, debounced: false)
+            return .issues(tab)
         }
-        guard let next = SearchScope(searchReferenceTab).moved(by: offset, among: tabs),
-              let tab = ShownTab(next) else { return nil }
-        searchScope = next
-        switch tab {
-        case .pullRequests(let tab): selectedTab = tab
-        case .issues(let tab): selectedIssueTab = tab
-        }
-        runSearch(searchQuery, debounced: false)
-        return tab
     }
 
     /// Return: the selected result's detail view; with no result, the fallback line's mode.
@@ -2339,7 +2371,8 @@ extension AppModel {
     ) -> (groups: [[PRKey]], grouped: Bool) {
         let focus = ListFocus(repo: repoFocus, time: tab == shownTab ? timeFocus : nil)
         switch tab {
-        case .pullRequests(let prTab):
+        case .pullRequests(let scope):
+            let prTab = scope.tab ?? selectedTab
             guard let contents = contents(of: prTab) else { return ([], false) }
             let scoped = focus.isActive ? focus.scope(contents) : ScopedTab(unscoped: contents)
             let closed = tabs?.recentlyClosed ?? []

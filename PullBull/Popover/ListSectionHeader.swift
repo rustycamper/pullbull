@@ -1,4 +1,5 @@
 import SwiftUI
+import PullBullKit
 
 /// A list section's header, the same in every list: repo groups, lanes, Done, "Recently closed" and the
 /// search groups. The glyph sits in the rows' icon column, so header and row glyphs share one axis and the
@@ -84,7 +85,7 @@ struct ListSectionHeader: View {
                 AvatarView(login: avatar.login, url: avatar.url, size: compact ? 14 : 16)
                     .frame(width: compact ? 16 : 20)
             } else if let glyph {
-                Image(systemName: glyph)
+                Image(symbol: glyph)
                     .font(.system(size: compact ? 10 : 11))
                     .foregroundStyle(glyphColor)
                     .frame(width: compact ? 16 : 20)
@@ -116,4 +117,18 @@ struct ListSectionHeader: View {
         .frame(height: Self.height)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+}
+
+extension PRSection {
+    /// The glyph in the section header's icon column; nil leaves the column to a fold chevron, or empty.
+    var glyph: String? {
+        switch self {
+        case .needsReview: "bell"
+        case .yourPRs: "pullbull.pullrequest"
+        case .waiting: "clock"
+        case .recentlyClosed, .team, .otherResults: nil
+        }
+    }
+
+    var glyphColor: Color { self == .needsReview ? .accentColor : .secondary }
 }

@@ -829,7 +829,8 @@ struct PopoverView: View {
                     // As the tab click says it: no count until results have arrived.
                     let matches = model.searchResults.map { $0.orderedKeys(mode: model.mode).count }
                     AccessibilityNotification.Announcement(
-                        SearchContext.scopeAnnouncement(tab: tab.title, matches: matches)
+                        SearchContext.scopeAnnouncement(
+                            tab: SearchScope(tab).isNarrowed ? tab.title : nil, matches: matches)
                     ).post()
                 }
                 return true

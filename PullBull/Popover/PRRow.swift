@@ -10,10 +10,10 @@ struct SearchMarks {
 }
 
 /// Where a PR row sits: on a tab, whose rules give its review state, or in the search results laid out
-/// as that tab lays out its list.
+/// as that tab lays out its list, under a repo header or not.
 enum RowContext {
     case tab(PRTab)
-    case search(PRTab, SearchMarks)
+    case search(PRTab, SearchMarks, underRepoHeader: Bool)
 }
 
 /// One open PR in a list (merged and closed ones draw as `ClosedRow`). Review and Team rows lead with the
@@ -71,13 +71,13 @@ struct PRRow: View {
     /// The tab whose rules draw the row: its own, or the one the search results are laid out for.
     var layoutTab: PRTab {
         switch context {
-        case .tab(let tab), .search(let tab, _): tab
+        case .tab(let tab), .search(let tab, _, _): tab
         }
     }
 
     /// A search result's words and role; nil on a tab.
     var marks: SearchMarks? {
-        if case .search(_, let marks) = context { marks } else { nil }
+        if case .search(_, let marks, _) = context { marks } else { nil }
     }
 
     /// The tab whose chips the row shows, and whether it names the author (`SearchLayout.chipTab`).
@@ -154,9 +154,8 @@ struct PRRow: View {
     /// `repo #num`, or `#num` under a repo header or the focus. A search result outside the focus (a link)
     /// names its repo.
     private var showsRepo: Bool {
-        guard marks != nil else { return model.rowsShowRepo(on: layoutTab) }
-        return SearchLayout.showsRepo(
-            pr.key, underRepoHeader: model.prGrouping(for: layoutTab) == .repository, focus: model.repoFocus)
+        guard case .search(_, _, let underRepoHeader) = context else { return model.rowsShowRepo(on: layoutTab) }
+        return SearchLayout.showsRepo(pr.key, underRepoHeader: underRepoHeader, focus: model.repoFocus)
     }
 
     private var age: String { RelativeAge.short(from: pr.updatedAt, to: now) }
