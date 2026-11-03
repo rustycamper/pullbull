@@ -45,7 +45,7 @@ struct GeneralSettingsTab: View {
             }
             .pickerStyle(.segmented)
             Toggle(isOn: $model.settings.groupTeamByAuthor) {
-                RowLabel("Group Team by author", note: "Team only; other lists follow the setting above")
+                RowLabel("Group Team by author", note: "Team only; Needs you follows the setting above")
             }
             Toggle(isOn: $model.settings.compact) {
                 RowLabel("Compact cards", note: "One line per pull request or issue")
@@ -61,11 +61,11 @@ struct GeneralSettingsTab: View {
             Toggle("Hide pull requests older than 2 months", isOn: $model.settings.hideOlderThanTwoMonths)
             Toggle(isOn: $model.settings.hideApprovedByMe) {
                 RowLabel("Hide pull requests I’ve approved",
-                         note: "When off, they stay in Review dimmed and are not counted")
+                         note: "When off, they stay in Needs your review dimmed and are not counted")
             }
             Toggle("Hide drafts", isOn: $model.settings.hideDrafts)
         } header: {
-            Text("Filters · Review and Team")
+            Text("Filters · Needs you and Team")
         }
     }
 

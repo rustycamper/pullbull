@@ -87,7 +87,7 @@ struct PRListView: View {
                     }
                 }
                 .emptyStateFrame(closedBelow)
-            } else if list.nothingNeedsYou {
+            } else if model.prList?.nothingNeedsYou == true {
                 NothingNeedsYouLine(compact: model.settings.compact)
             }
             if scope.showsSectionHeaders {

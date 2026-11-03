@@ -423,6 +423,9 @@ final class AppModel {
     /// ⌥↓ / ⌥↑ through the list or search results the detail on screen was opened from; nil for a
     /// detail opened from a notification, Ask or a link. An issue walk lasts through a linked PR's detail.
     private(set) var detailWalk: DetailWalk?
+    /// The chip a PR detail left open across a popover close was opened on, which Back names and returns
+    /// to; the list behind it opens on All otherwise. Nil while the popover has stayed open.
+    private(set) var detailBackScope: PRScope?
     /// Done as the popover shows it, so a walk's order is the one on screen.
     @ObservationIgnored var listExpansion = ListExpansion()
     /// A notification opened a detail while the popover was closed; the next open shows it as it is.
@@ -619,10 +622,18 @@ final class AppModel {
     }
 
     /// The next open starts on All, reset now so it never shows the old chip for a frame. A detail left
-    /// open keeps its walk, as it shows again on a quick reopen. A search kept open no longer goes back
-    /// to the chip typing started on, so its Esc hint stops naming it.
+    /// open keeps its walk, as it shows again on a quick reopen, and the chip it was opened on, which Back
+    /// returns to. A search kept open no longer goes back to the chip typing started on, so its Esc hint
+    /// stops naming it.
     func popoverDidClose() {
         let walk = detailWalk
+        var showsPRDetail = false
+        if mode == .pullRequests, case .detail = route { showsPRDetail = true }
+        if !showsPRDetail {
+            detailBackScope = nil
+        } else if detailBackScope == nil {
+            detailBackScope = prScope
+        }
         prScope = .all
         detailWalk = walk
         if case .pullRequests(let scope) = searchStartedOnTab, scope != .all { searchStartedOnTab = nil }
@@ -2216,6 +2227,8 @@ extension AppModel {
         detailTask?.cancel()
         detailTask = nil
         detailFetch = nil
+        let backScope = detailBackScope
+        detailBackScope = nil
         if !askReturn.isEmpty, askReturn.close() == .ask {
             route = .ask
         } else if case .issueDetail(let issue) = detailReturnRoute {
@@ -2225,6 +2238,7 @@ extension AppModel {
             return
         } else {
             route = detailReturnRoute == .search && !searchText.isEmpty ? .search : .list
+            if route == .list, let backScope { prScope = backScope }
             searchAgainIfStale()
         }
         detailWalk = nil

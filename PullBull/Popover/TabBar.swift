@@ -303,10 +303,11 @@ extension AppModel {
         }
     }
 
-    /// The name of the chip or tab on screen in the current mode, for Back buttons.
+    /// The name of the chip or tab on screen in the current mode, for Back buttons; for a PR detail kept
+    /// open across a popover close, the chip it was opened on.
     var selectedTabTitle: String {
         switch mode {
-        case .pullRequests: prScope.title
+        case .pullRequests: (detailBackScope ?? prScope).title
         case .issues: selectedIssueTab.title
         }
     }
