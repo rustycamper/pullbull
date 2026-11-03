@@ -127,8 +127,11 @@ private func shape(_ layout: SearchSectionLayout) -> [String] {
         var s = AppSettings()
         s.setSort(.oldestFirst, for: PRScope.all)
         #expect(shape(sectioned([a, b, c], tabs: tabs, settings: s)) == ["yourPRs [1]", "waiting [3, 2]"])
-        s.setSort(.oldestFirst, for: PRScope.mine)
-        #expect(shape(sectioned([a, b, c], scope: .mine, tabs: tabs, settings: s)) == ["yourPRs [1]", "waiting [3, 2]"])
+        var mineOnly = AppSettings()
+        mineOnly.setSort(.oldestFirst, for: PRScope.mine)
+        #expect(shape(sectioned([a, b, c], tabs: tabs, settings: mineOnly)) == ["yourPRs [1]", "waiting [2, 3]"])
+        #expect(shape(sectioned([a, b, c], scope: .mine, tabs: tabs, settings: mineOnly))
+            == ["yourPRs [1]", "waiting [3, 2]"])
     }
 
     @Test func rowFollowsReviewRules() {
