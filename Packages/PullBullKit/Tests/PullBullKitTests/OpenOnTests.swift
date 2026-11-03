@@ -39,7 +39,9 @@ private func settings(
         #expect(settings(openOn: .mine, chips: false).scopeOnOpen == .all)
         #expect(settings(openOn: .lastUsed, lastScope: .review, chips: false).scopeOnOpen == .all)
         // The choice is kept: the org coming back opens on Team again.
-        #expect(settings(org: nil, openOn: .team).openOn == .team)
+        var back = settings(org: nil, openOn: .team)
+        back.org = "o"
+        #expect(back.scopeOnOpen == .team)
     }
 
     @Test func chipsOffLeaveOnlyAllAndSearchEverywhere() {
