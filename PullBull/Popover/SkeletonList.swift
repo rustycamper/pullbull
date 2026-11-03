@@ -92,11 +92,11 @@ struct SkeletonList: View {
 }
 
 extension SkeletonList {
-    /// The current PR tab before its first snapshot.
+    /// The current PR chip before its first snapshot; All and Mine lead with a section header.
     static func pullRequests(_ model: AppModel) -> SkeletonList {
         SkeletonList(
-            header: ListSkeleton.prLeadsWithHeader(
-                grouping: model.prGrouping(for: model.selectedTab), focused: model.repoFocus != nil),
+            header: model.prScope.showsSectionHeaders
+                || ListSkeleton.prLeadsWithHeader(grouping: model.listGrouping, focused: model.repoFocus != nil),
             compact: model.settings.compact, trailing: 14, metaHeight: 16)
     }
 

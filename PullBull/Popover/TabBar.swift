@@ -1,12 +1,12 @@
 import SwiftUI
 import PullBullKit
 
-/// The segmented tabs of the current mode, with a count per tab: Review / Mine / Team from `BuiltTabs`
-/// (no Team without an org), or Assigned / Created / Board from `BuiltIssueTabs`. An issue list that
-/// failed or never loaded shows "–", never "0"; a list kept from before its latest search failed shows
-/// its count with a warning triangle. Counts above 99 read "99+". While results are on screen each count
-/// is the tab's matches for the query, and a click narrows the search to the tab (`AppModel.pickSearchScope`):
-/// only the narrowed tab is drawn as selected, none while the search covers everything.
+/// The segmented tabs of Issues mode (Assigned / Created / Board from `BuiltIssueTabs`), with a count per
+/// tab. A list that failed or never loaded shows "–", never "0"; a list kept from before its latest search
+/// failed shows its count with a warning triangle. Counts above 99 read "99+". While results are on
+/// screen each count is the tab's matches for the query, and a click narrows the search to the tab
+/// (`AppModel.pickSearchScope`): only the narrowed tab is drawn as selected. Pull Requests mode draws
+/// `ScopeChips` instead.
 struct TabBar: View {
     @Bindable var model: AppModel
     /// Results are on screen (`Route.search`).
@@ -22,23 +22,11 @@ struct TabBar: View {
 
     var body: some View {
         SegmentRow(spacing: 2, padding: crowded ? 6 : 8) {
-            switch model.mode {
-            case .pullRequests:
-                ForEach(model.prTabs, id: \.self) { tab in
-                    segment(
-                        .pullRequests(tab), title: tab.title, count: count(of: .pullRequests(tab)),
-                        selected: isSelected(.pullRequests(tab))
-                    ) {
-                        pick(.pullRequests(tab))
-                    }
-                }
-            case .issues:
-                ForEach(IssueTab.allCases, id: \.self) { tab in
-                    segment(
-                        .issues(tab), title: tab.title, count: count(of: .issues(tab)), selected: isSelected(.issues(tab))
-                    ) {
-                        pick(.issues(tab))
-                    }
+            ForEach(IssueTab.allCases, id: \.self) { tab in
+                segment(
+                    .issues(tab), title: tab.title, count: count(of: .issues(tab)), selected: isSelected(.issues(tab))
+                ) {
+                    pick(.issues(tab))
                 }
             }
         }
@@ -52,15 +40,16 @@ struct TabBar: View {
         }
         .padding(.vertical, 2)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(model.mode == .pullRequests ? "Pull request lists" : "Issue lists")
+        .accessibilityLabel("Issue lists")
     }
 
-    /// The tab's count: its matches while searching, else its list's count. An empty list shows none;
-    /// a search shows its zeros, which say "no matches here".
+    /// The tab's count: its matches while searching, else its list's count. An empty list shows none; a
+    /// search shows its zeros, which say "no matches here".
     private func count(of tab: ShownTab) -> IssueTabCount? {
         if searching { return model.searchMatchCounts[SearchScope(tab)] }
         switch tab {
-        case .pullRequests(let tab): return model.contents(of: tab).flatMap { $0.count == 0 ? nil : .current($0.count) }
+        case .pullRequests(let scope):
+            return (model.tabs?.count(of: scope)).flatMap { $0 == 0 ? nil : .current($0) }
         case .issues(let tab): return (model.issueTabs?.count(tab)).flatMap { $0 == .current(0) ? nil : $0 }
         }
     }
@@ -69,13 +58,8 @@ struct TabBar: View {
         searching ? model.shownSearchScope == SearchScope(tab) : model.shownTab == tab
     }
 
-    /// None while a search covers everything.
-    private var hasSelection: Bool {
-        switch model.mode {
-        case .pullRequests: model.prTabs.contains { isSelected(.pullRequests($0)) }
-        case .issues: IssueTab.allCases.contains { isSelected(.issues($0)) }
-        }
-    }
+    /// None while an issue search covers everything.
+    private var hasSelection: Bool { IssueTab.allCases.contains { isSelected(.issues($0)) } }
 
     private func pick(_ tab: ShownTab) {
         clicks += 1
@@ -90,18 +74,14 @@ struct TabBar: View {
         }
         willSelect()
         switch tab {
-        case .pullRequests(let tab): model.selectedTab = tab
+        case .pullRequests(let scope): model.pickScope(scope)
         case .issues(let tab): model.selectedIssueTab = tab
         }
     }
 
     /// Whether any count on screen reads three or more characters ("99+"), which needs the room.
     private var crowded: Bool {
-        let counts: [IssueTabCount?] =
-            switch model.mode {
-            case .pullRequests: model.prTabs.map { count(of: .pullRequests($0)) }
-            case .issues: IssueTab.allCases.map { count(of: .issues($0)) }
-            }
+        let counts = IssueTab.allCases.map { count(of: .issues($0)) }
         return counts.contains { count in
             switch count {
             case .current(let n), .stale(let n, _, _): TabCountText.header(n).count >= 3
@@ -152,14 +132,14 @@ struct TabBar: View {
             }
         }
         .layoutValue(key: SegmentSelected.self, value: selected)
-        .help(Self.help(tab, count: count))
+        .help(Self.help(tab.summary, count: count))
         .accessibilityAddTraits(selected ? [.isSelected] : [])
         .accessibilityLabel((count.map { "\(title), \(spoken($0))" } ?? title) + filteredSuffix(for: tab))
     }
 
     /// The list counts ignore the repo focus and the time focus; the label says the list doesn't, so the count
-    /// isn't misread. The time focus names only the tab on screen, which it applies to. Match counts follow
-    /// the repo focus, as the results do, and ignore the time focus.
+    /// isn't misread. The time focus names the Issues tab it applies to.
+    /// Match counts follow the repo focus, as the results do, and ignore the time focus.
     private func filteredSuffix(for tab: ShownTab) -> String {
         if searching {
             return model.repoFocus.map { ", in \(model.displayName(of: $0.repo))" } ?? ""
@@ -204,8 +184,8 @@ struct TabBar: View {
     }
 
     /// What the tab lists, then on a stale count why it didn't update.
-    private static func help(_ tab: ShownTab, count: IssueTabCount?) -> String {
-        [tab.summary, count.flatMap(staleHelp)].compactMap(\.self).joined(separator: "\n")
+    private static func help(_ summary: String, count: IssueTabCount?) -> String {
+        [summary, count.flatMap(staleHelp)].compactMap(\.self).joined(separator: "\n")
     }
 
     private static func staleHelp(_ count: IssueTabCount) -> String? {
@@ -287,16 +267,6 @@ private struct SegmentRow: Layout {
     }
 }
 
-extension PRTab {
-    var title: String {
-        switch self {
-        case .review: "Review"
-        case .mine: "Mine"
-        case .team: "Team"
-        }
-    }
-}
-
 extension IssueTab {
     var title: String {
         switch self {
@@ -312,6 +282,7 @@ extension ShownTab {
     /// and the rules in `TabBuilder` and `IssueTabBuilder`.
     var summary: String {
         switch self {
+        case .pullRequests(.all): "Every pull request list, in sections"
         case .pullRequests(.review): "PRs waiting for your review"
         case .pullRequests(.mine): "Your open PRs · closed last 7 days below"
         case .pullRequests(.team): "Open PRs by your teammates"
@@ -327,15 +298,16 @@ extension AppModel {
     var searchScopeTitle: String? {
         switch shownSearchScope {
         case .everything: nil
-        case .pullRequests(let tab): tab.title
+        case .pullRequests(let tab): PRScope(tab).title
         case .issues(let tab): tab.title
         }
     }
 
-    /// The name of the tab on screen in the current mode, for Back buttons.
+    /// The name of the chip or tab on screen in the current mode, for Back buttons; for a PR detail kept
+    /// open across a popover close, the chip it was opened on.
     var selectedTabTitle: String {
         switch mode {
-        case .pullRequests: selectedTab.title
+        case .pullRequests: (detailBackScope ?? prScope).title
         case .issues: selectedIssueTab.title
         }
     }

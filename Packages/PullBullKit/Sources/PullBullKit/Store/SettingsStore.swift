@@ -17,6 +17,13 @@ public enum PRGrouping: Equatable, Sendable {
         if tab == .team && settings.groupTeamByAuthor { return .author }
         return settings.grouping == .repository && !repoFocused ? .repository : .none
     }
+
+    /// All and Mine are grouped by their sections, not by repository; Needs you and Team group as their
+    /// tab does.
+    public static func forScope(_ scope: PRScope, settings: AppSettings, repoFocused: Bool) -> PRGrouping {
+        guard let tab = scope.tab, scope != .mine else { return .none }
+        return forTab(tab, settings: settings, repoFocused: repoFocused)
+    }
 }
 
 public enum PopoverMode: String, Codable, CaseIterable, Sendable { case pullRequests, issues }
@@ -169,6 +176,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var savedSearches = SavedSearches()
     /// The Board tab's folded lanes, per board.
     public var laneFolds = LaneFolds()
+    /// The pull request list's folded sections.
+    public var sectionFolds = SectionFolds()
     /// Ask (AI search over a local index) is on. Off means no index file, no backfill and no key check.
     public var askEnabled = false
     /// The `AskModel` ID Ask uses; an unknown one reads as `AskModel.default`.
@@ -181,7 +190,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case account, org, projectNumber, projectOwner, projectOrg, orgByAccount, boardByOwner, grouping, groupTeamByAuthor, sorts, reviewOldestFirst, compact,
             hideOlderThanTwoMonths, hideApprovedByMe, hideDrafts, badge, notify, refreshMinutes, followPendingCI, lastTab, toggleHotkey, mode, lastIssueTab,
-            countAssignedIssues, solidBackground, accountSource, appAccounts, signedOutByUser, laneFolds,
+            countAssignedIssues, solidBackground, accountSource, appAccounts, signedOutByUser, laneFolds, sectionFolds,
             askEnabled, askModel, askModelChoices, askExcludedRepos
     }
 
@@ -245,6 +254,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         d.appAccounts = c.readableElements(AccountSummary.self, forKey: .appAccounts) ?? d.appAccounts
         d.signedOutByUser = c.readable(Bool.self, forKey: .signedOutByUser) ?? d.signedOutByUser
         d.laneFolds = c.readable(LaneFolds.self, forKey: .laneFolds) ?? d.laneFolds
+        d.sectionFolds = c.readable(SectionFolds.self, forKey: .sectionFolds) ?? d.sectionFolds
         d.askEnabled = c.readable(Bool.self, forKey: .askEnabled) ?? d.askEnabled
         d.askModel = c.readable(String.self, forKey: .askModel) ?? d.askModel
         d.askModelChoices = c.readableElements(AskModel.self, forKey: .askModelChoices) ?? d.askModelChoices
@@ -281,6 +291,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         try c.encode(appAccounts, forKey: .appAccounts)
         try c.encode(signedOutByUser, forKey: .signedOutByUser)
         try c.encode(laneFolds, forKey: .laneFolds)
+        try c.encode(sectionFolds, forKey: .sectionFolds)
         try c.encode(askEnabled, forKey: .askEnabled)
         try c.encode(askModel, forKey: .askModel)
         try c.encode(askModelChoices, forKey: .askModelChoices)

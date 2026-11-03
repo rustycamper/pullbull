@@ -50,7 +50,7 @@ public enum ShortcutCatalog {
                 Shortcut("Previous / next group", [["⌥", "↑"], ["⌥", "↓"]],
                          note: "Repo, author, lane, Done, Closed. Folded lanes are skipped"),
                 Shortcut("First / last row", [["⌘", "↑"], ["⌘", "↓"]]),
-                Shortcut("Previous / next tab", [["←"], ["→"]]),
+                Shortcut("Previous / next chip or tab", [["←"], ["→"]]),
                 Shortcut("Pull Requests", [["⌘", "1"]]),
                 Shortcut("Issues", [["⌘", "2"]]),
                 Shortcut("Open detail", [["↩"]]),
@@ -71,7 +71,7 @@ public enum ShortcutCatalog {
             ShortcutSection("Search", [
                 Shortcut("Search", [["/"], ["⌘", "F"]], note: "Or just start typing"),
                 Shortcut("Saved search 1–9", [["⌃", "1…9"]], note: "In Settings order"),
-                Shortcut("Narrow to the tab beside", [["←"], ["→"]], note: "At the field's start or end"),
+                Shortcut("Narrow to the chip or tab beside", [["←"], ["→"]], note: "At the field's start or end"),
                 Shortcut("Ask AI", [["⌥", "⌘", "↩"]], note: "From the field, once Ask AI is on"),
                 Shortcut("Take the grey suggestion", [["⇥"]], note: "Writes it and opens its list"),
             ]),

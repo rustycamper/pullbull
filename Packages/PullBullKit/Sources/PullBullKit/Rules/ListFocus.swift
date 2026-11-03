@@ -16,6 +16,20 @@ public struct ListFocus: Equatable, Sendable {
         RepoFocus.scopeRows(contents, keeping: keeps)
     }
 
+    /// Each section narrowed to the focus, sections it empties left out.
+    public func scope(_ list: PRList) -> ScopedPRList {
+        var hidden = 0
+        var sections: [ListSection] = []
+        for section in list.sections {
+            let scoped = scope(section.contents)
+            hidden += scoped.hiddenCount
+            if !scoped.contents.rows.isEmpty {
+                sections.append(ListSection(section: section.section, contents: scoped.contents))
+            }
+        }
+        return ScopedPRList(list: PRList(scope: list.scope, sections: sections), hiddenCount: hidden)
+    }
+
     public func scope(_ closed: [PullRequest]) -> [PullRequest] {
         closed.filter(keeps)
     }

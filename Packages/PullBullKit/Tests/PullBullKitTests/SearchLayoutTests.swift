@@ -14,13 +14,13 @@ private let org = OrgContext(org: "o", viewer: "me", members: [], myTeams: ["cor
 
 private func pr(
     _ n: Int, repo: String = "o/a", author: String = "alice", state: PRState = .open, created: Double = 48,
-    updated: Double = 1, closed: Double? = nil, reviews: [Review] = [], requests: [Reviewer] = []
+    updated: Double = 1, closed: Double? = nil, reviews: [Review] = [], requests: [Reviewer] = [], draft: Bool = false, ci: CIState = .none
 ) -> PullRequest {
     PullRequest(
         key: PRKey(repo: repo, number: n), title: "p\(n)", url: URL(string: "https://x/p\(n)")!,
-        author: author, authorAvatarURL: nil, state: state, isDraft: false,
+        author: author, authorAvatarURL: nil, state: state, isDraft: draft,
         createdAt: hoursAgo(created), updatedAt: hoursAgo(updated), closedAt: closed.map(hoursAgo),
-        headRef: "h", baseRef: "main", ci: .none, headCommitDate: nil, commentCount: 0,
+        headRef: "h", baseRef: "main", ci: ci, headCommitDate: nil, commentCount: 0,
         lastCommentAuthor: nil, latestReviews: reviews, reviewRequests: requests)
 }
 
@@ -67,7 +67,73 @@ private func layout(
 
 private func key(_ n: Int, _ repo: String = "o/a") -> PRKey { PRKey(repo: repo, number: n) }
 
+private func prTabs(review: [PullRequest] = [], mine: [PullRequest] = [], team: [PullRequest] = []) -> BuiltTabs {
+    TabBuilder.build(
+        Snapshot(fetchedAt: now, org: org, reviewCandidates: review, mine: mine, team: team, recentlyClosed: [],
+                 boardIssues: []),
+        settings: AppSettings(), now: now)
+}
+private func sectioned(
+    _ prs: [PullRequest], scope: PRScope = .all, tabs: BuiltTabs, settings: AppSettings = AppSettings()
+) -> SearchSectionLayout {
+    SearchLayout.sections(results(prs: prs), scope: scope, tabs: tabs, settings: settings, org: org, now: now)
+}
+private func shape(_ layout: SearchSectionLayout) -> [String] {
+    layout.sections.map { "\($0.section.rawValue) \($0.contents.rows.map(\.id.number))" }
+}
+
 @Suite struct SearchLayoutTests {
+    // MARK: Sections (Everywhere, Mine)
+
+    @Test func everywherePutsEachResultInItsSection() {
+        let requested = pr(1, author: "bob", requests: [.user("me")])
+        let failing = pr(2, author: "me", ci: .failure)
+        let teammate = pr(3, author: "carol")
+        let tabs = prTabs(review: [requested], mine: [failing], team: [teammate, requested])
+        let layout = sectioned(
+            [requested, failing, teammate, pr(4, author: "zed"), pr(6, state: .merged, closed: 2)], tabs: tabs)
+        #expect(shape(layout) == ["needsReview [1]", "yourPRs [2]", "team [3]", "otherResults [4]"])
+        #expect(layout.ended.map(\.key.number) == [6])
+    }
+
+    @Test func aGitHubOnlyResultOfMineIsSplitByTheRule() {
+        let layout = sectioned([pr(7, author: "ME", draft: true), pr(8, author: "me", requests: [.user("bob")])], tabs: prTabs())
+        #expect(shape(layout) == ["yourPRs [7]", "waiting [8]"])
+        #expect(layout.sections.allSatisfy { $0.section.rowTab == .mine })
+    }
+
+    @Test func otherResultsTakeTeamsRows() throws {
+        // Requested from me but not in the list (say, filtered out as old): a Team row, counted, no reason.
+        let layout = sectioned([pr(5, author: "zed", requests: [.user("me")])], tabs: prTabs())
+        let row = try #require(layout.sections.first?.contents.rows.first)
+        #expect(layout.sections.map(\.section) == [.otherResults])
+        #expect(row.reviewReason == nil && row.counted && !row.dimmed)
+    }
+
+    @Test func aFoldedSectionsResultsShowAndAreWalked() {
+        // Team folds by default in the list; in search its results show, and up/down reach them.
+        let tabs = prTabs(team: [pr(3, author: "carol")])
+        let layout = sectioned([pr(3, author: "carol"), pr(9, state: .closed, closed: 1)], tabs: tabs)
+        #expect(layout.keys(closedExpanded: true).map(\.number) == [3, 9])
+        #expect(layout.groups(closedExpanded: false).map { $0.map(\.number) } == [[3]])
+    }
+
+    @Test func sectionedResultsFollowTheScopesSort() {
+        let a = pr(1, author: "me", created: 10, updated: 1, ci: .failure)
+        let b = pr(2, author: "me", created: 50, updated: 2)
+        let c = pr(3, author: "me", created: 90, updated: 3)
+        let tabs = prTabs(mine: [a, b, c])
+        #expect(shape(sectioned([a, b, c], tabs: tabs)) == ["yourPRs [1]", "waiting [2, 3]"])
+        var s = AppSettings()
+        s.setSort(.oldestFirst, for: PRScope.all)
+        #expect(shape(sectioned([a, b, c], tabs: tabs, settings: s)) == ["yourPRs [1]", "waiting [3, 2]"])
+        var mineOnly = AppSettings()
+        mineOnly.setSort(.oldestFirst, for: PRScope.mine)
+        #expect(shape(sectioned([a, b, c], tabs: tabs, settings: mineOnly)) == ["yourPRs [1]", "waiting [2, 3]"])
+        #expect(shape(sectioned([a, b, c], scope: .mine, tabs: tabs, settings: mineOnly))
+            == ["yourPRs [1]", "waiting [3, 2]"])
+    }
+
     @Test func rowFollowsReviewRules() {
         let again = pr(1, reviews: [Review(author: "me", state: .commented, submittedAt: hoursAgo(5))],
                        requests: [.user("me")])

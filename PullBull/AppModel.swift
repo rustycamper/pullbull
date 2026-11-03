@@ -10,12 +10,12 @@ enum Route: Equatable {
 
 /// A tab in either mode, such as the one type-anywhere started a search on.
 enum ShownTab: Hashable {
-    case pullRequests(PRTab)
+    case pullRequests(PRScope)
     case issues(IssueTab)
 
     var title: String {
         switch self {
-        case .pullRequests(let tab): tab.title
+        case .pullRequests(let scope): scope.title
         case .issues(let tab): tab.title
         }
     }
@@ -24,24 +24,24 @@ enum ShownTab: Hashable {
     init?(_ scope: SearchScope) {
         switch scope {
         case .everything: return nil
-        case .pullRequests(let tab): self = .pullRequests(tab)
+        case .pullRequests(let tab): self = .pullRequests(PRScope(tab))
         case .issues(let tab): self = .issues(tab)
         }
     }
 }
 
 extension SearchScope {
-    /// The search narrowed to `tab`.
+    /// The search narrowed to `tab`; everything for All.
     init(_ tab: ShownTab) {
         switch tab {
-        case .pullRequests(let tab): self = .pullRequests(tab)
+        case .pullRequests(let scope): self = scope.tab.map(SearchScope.pullRequests) ?? .everything
         case .issues(let tab): self = .issues(tab)
         }
     }
 }
 
-/// Whether the shown tab's Recently closed (PRs) and Done (issues) groups are expanded; the popover keeps
-/// it in step with what it shows.
+/// Whether search's Closed section and an Issues tab's Done group are expanded; the popover keeps the
+/// list's in step with what it shows.
 struct ListExpansion: Equatable {
     var closed = false
     var done = false
@@ -56,10 +56,10 @@ final class AppModel {
             let boardCleared = reconciled.reconcileBoard()
             reconciled.rememberOrg()
             reconciled.rememberBoard()
-            reconciled.reconcileTab()
             if reconciled != settings { settings = reconciled }
             settingsStore.save(settings)
-            if selectedTab != settings.lastTab { selectedTab = settings.lastTab }
+            // A chip no longer shown (Team without an org) goes back to All.
+            if !prScopes.contains(prScope) { prScope = .all }
             if mode != settings.mode { mode = settings.mode }
             if selectedIssueTab != settings.lastIssueTab { selectedIssueTab = settings.lastIssueTab }
             rebuildTabs()
@@ -115,8 +115,13 @@ final class AppModel {
     /// Where the selection went when an edit moved its row out of the list.
     var editSelection = EditSelection()
     private(set) var tabs: BuiltTabs? {
-        didSet { refreshRepoChoices() }
+        didSet {
+            refreshRepoChoices()
+            rebuildPRList()
+        }
     }
+    /// The sections `prScope` shows, before the focus; nil before the first snapshot.
+    private(set) var prList: PRList?
     /// The Issues tabs, built from the same snapshot as `tabs`.
     private(set) var issueTabs: BuiltIssueTabs? {
         didSet { refreshRepoChoices() }
@@ -130,13 +135,13 @@ final class AppModel {
     /// What the mode not on screen has for me since it last was: the dot on its glyph.
     private(set) var modeNews = ModeNews()
 
-    var selectedTab: PRTab {
+    /// The chip on screen in Pull Requests mode. Never persisted: the popover opens on All
+    /// (`popoverDidClose`). The time focus stays across chips.
+    var prScope: PRScope = .all {
         didSet {
-            if settings.lastTab != selectedTab { settings.lastTab = selectedTab }
-            if selectedTab != oldValue {
-                timeFocus = nil
-                detailWalk = nil
-            }
+            guard prScope != oldValue else { return }
+            detailWalk = nil
+            rebuildPRList()
         }
     }
     /// Pull Requests or Issues; remembered across launches, as is the tab of each mode.
@@ -170,7 +175,7 @@ final class AppModel {
     /// The tab showing in the current mode.
     var shownTab: ShownTab {
         switch mode {
-        case .pullRequests: .pullRequests(selectedTab)
+        case .pullRequests: .pullRequests(prScope)
         case .issues: .issues(selectedIssueTab)
         }
     }
@@ -186,7 +191,7 @@ final class AppModel {
     /// `sortTab`'s sort.
     var sort: ListSort {
         switch sortTab {
-        case .pullRequests(let tab): settings.sort(for: tab)
+        case .pullRequests(let scope): settings.sort(for: scope)
         case .issues(let tab): settings.sort(for: tab)
         }
     }
@@ -194,7 +199,7 @@ final class AppModel {
     /// The sorts `sortTab` offers, its default first.
     var sortChoices: [ListSort] {
         switch sortTab {
-        case .pullRequests(let tab): ListSort.choices(for: tab)
+        case .pullRequests(let scope): ListSort.choices(for: scope)
         case .issues(let tab): ListSort.choices(for: tab)
         }
     }
@@ -202,7 +207,7 @@ final class AppModel {
     /// Sorts `sortTab` by `sort`, remembered across launches; the lists keep their selection and scroll to it.
     func setSort(_ sort: ListSort) {
         switch sortTab {
-        case .pullRequests(let tab): settings.setSort(sort, for: tab)
+        case .pullRequests(let scope): settings.setSort(sort, for: scope)
         case .issues(let tab): settings.setSort(sort, for: tab)
         }
     }
@@ -214,20 +219,21 @@ final class AppModel {
             guard repoFocus != oldValue else { return }
             refreshRepoChoices()
             listSelections = listSelections.filter { tab, key in
-                navigationKeys(for: tab, closedExpanded: true, doneExpanded: true).contains(key)
+                navigationKeys(for: tab, unfolded: true, doneExpanded: true).contains(key)
             }
             if route == .search { runSearch(searchQuery, debounced: false) }
         }
     }
-    /// How recently the items of the tab on screen were updated; narrows that tab's list only (search has
-    /// its own `updated:` token), and counts, the badge and notifications ignore it. Never persisted, and
-    /// switching tab or mode clears it. The shown tab's selection is dropped if the new focus hides it.
+    /// How recently the items of the list on screen were updated; narrows every PR chip, or the Issues tab
+    /// on screen (search has its own `updated:` token), and counts, the badge and notifications ignore it.
+    /// Never persisted; switching mode or Issues tab clears it. The selection is dropped if the new focus
+    /// hides it.
     private(set) var timeFocus: TimeFocus? {
         didSet {
             guard timeFocus != oldValue else { return }
-            let tab = shownTab
+            let tab = selectionKey
             if let key = listSelections[tab],
-                !navigationKeys(for: tab, closedExpanded: true, doneExpanded: true).contains(key)
+                !navigationKeys(for: tab, unfolded: true, doneExpanded: true).contains(key)
             {
                 listSelections[tab] = nil
             }
@@ -273,7 +279,8 @@ final class AppModel {
     /// Whether the results' Closed section and Done group are expanded; both start so, and stay as set
     /// through query edits, scope and mode changes and a detail, until the field empties.
     private(set) var searchExpansion = ListExpansion(closed: true, done: true)
-    /// The highlighted row of each list tab (↑/↓; Return opens it), kept while switching tabs.
+    /// The highlighted row of the PR list, one for every chip, and of each Issues tab (↑/↓; Return opens
+    /// it), kept while switching (`selectionKey`).
     private(set) var listSelections: [ShownTab: PRKey] = [:]
     /// The list or search row chosen to open, highlighted for a moment before its detail opens.
     private(set) var rowFlash = RowFlash<RowFlashContext>()
@@ -416,7 +423,10 @@ final class AppModel {
     /// ⌥↓ / ⌥↑ through the list or search results the detail on screen was opened from; nil for a
     /// detail opened from a notification, Ask or a link. An issue walk lasts through a linked PR's detail.
     private(set) var detailWalk: DetailWalk?
-    /// Recently closed and Done as the popover shows them, so a walk's order is the one on screen.
+    /// The chip a PR detail left open across a popover close was opened on, which Back names and returns
+    /// to; the list behind it opens on All otherwise. Nil while the popover has stayed open.
+    private(set) var detailBackScope: PRScope?
+    /// Done as the popover shows it, so a walk's order is the one on screen.
     @ObservationIgnored var listExpansion = ListExpansion()
     /// A notification opened a detail while the popover was closed; the next open shows it as it is.
     @ObservationIgnored var detailOpenedWhileClosed = false
@@ -502,14 +512,12 @@ final class AppModel {
             deviceFlow: DeviceFlowClient(clientID: config?.clientID ?? "", transport: httpTransport),
             gh: gh)
         var loaded = settingsStore.load()
-        loaded.reconcileTab()
         // Settings saved before boards were remembered: the board in use is remembered for its owner
         // before the first switch moves away from it.
         loaded.rememberBoard()
         // Settings saved in no-org mode before personal boards have a board number with no owner.
         _ = loaded.reconcileBoard()
         self.settings = loaded
-        self.selectedTab = loaded.lastTab
         self.mode = loaded.mode
         self.selectedIssueTab = loaded.lastIssueTab
 
@@ -565,7 +573,6 @@ final class AppModel {
         resolvingAccount = false
         storageAvailable = false
         self.settings = settings
-        self.selectedTab = settings.lastTab
         self.mode = settings.mode
         self.selectedIssueTab = settings.lastIssueTab
         self.snapshot = snapshot
@@ -614,6 +621,24 @@ final class AppModel {
         Task { await coordinator.refreshIfOlderThan(.seconds(30)) }
     }
 
+    /// The next open starts on All, reset now so it never shows the old chip for a frame. A detail left
+    /// open keeps its walk, as it shows again on a quick reopen, and the chip it was opened on, which Back
+    /// returns to. A search kept open no longer goes back to the chip typing started on, so its Esc hint
+    /// stops naming it.
+    func popoverDidClose() {
+        let walk = detailWalk
+        var showsPRDetail = false
+        if mode == .pullRequests, case .detail = route { showsPRDetail = true }
+        if !showsPRDetail {
+            detailBackScope = nil
+        } else if detailBackScope == nil {
+            detailBackScope = prScope
+        }
+        prScope = .all
+        detailWalk = walk
+        if case .pullRequests(let scope) = searchStartedOnTab, scope != .all { searchStartedOnTab = nil }
+    }
+
     func refresh() {
         guard let coordinator else {
             bootstrap()
@@ -638,16 +663,15 @@ final class AppModel {
         Badge.issuesIncomplete(issues: issueTabs, settings: settings)
     }
 
-    /// The PR tabs shown: Team needs an org.
+    /// The PR tabs shown: Team needs an org. Search narrows to these.
     var prTabs: [PRTab] { settings.scope.map(PRTab.shown) ?? PRTab.allCases }
 
-    func contents(of tab: PRTab) -> TabContents? {
-        guard let tabs else { return nil }
-        switch tab {
-        case .review: return tabs.review
-        case .mine: return tabs.mine
-        case .team: return tabs.team
-        }
+    /// The chips shown: All, then the PR tabs shown.
+    var prScopes: [PRScope] { settings.scope.map(PRScope.shown) ?? PRScope.allCases }
+
+    /// A chip clicked outside search: its scope, or All when it is the one on screen.
+    func pickScope(_ scope: PRScope) {
+        prScope = prScope.picking(scope)
     }
 
     /// Nil before the first snapshot, and for Board while the board is unavailable.
@@ -683,10 +707,21 @@ final class AppModel {
         timeFocus = nil
     }
 
-    /// `contents(of:)` narrowed to the focus; unchanged, with nothing in other repositories, without one.
-    func scopedContents(of tab: PRTab) -> ScopedTab? {
-        guard let contents = contents(of: tab) else { return nil }
-        return listFocus.isActive ? listFocus.scope(contents) : ScopedTab(unscoped: contents)
+    /// `prList` narrowed to the focus; unchanged, with nothing hidden, without one.
+    var scopedPRList: ScopedPRList? {
+        guard let prList else { return nil }
+        return listFocus.isActive ? listFocus.scope(prList) : ScopedPRList(unscoped: prList)
+    }
+
+    /// `scope`'s sections from the current lists; nil before the first snapshot.
+    private func buildPRList(_ scope: PRScope) -> PRList? {
+        guard let tabs, let snapshot = shownSnapshot else { return nil }
+        return PRList.build(
+            tabs, scope: scope, teamShown: prTabs.contains(.team), settings: settings, org: snapshot.org, now: Date())
+    }
+
+    private func rebuildPRList() {
+        prList = buildPRList(prScope)
     }
 
     func scopedContents(of tab: IssueTab) -> ScopedIssueTab? {
@@ -694,19 +729,37 @@ final class AppModel {
         return listFocus.isActive ? listFocus.scope(contents) : ScopedIssueTab(unscoped: contents)
     }
 
-    var scopedRecentlyClosed: [PullRequest] {
-        let closed = tabs?.recentlyClosed ?? []
-        return listFocus.isActive ? listFocus.scope(closed) : closed
-    }
-
     /// How `tab` groups its rows: by repository when Group by Repository is on and no focus merges them,
-    /// and for Team by author when that is on.
+    /// and for Team by author when that is on. Search narrowed to `tab` lays out this way.
     func prGrouping(for tab: PRTab) -> PRGrouping {
         PRGrouping.forTab(tab, settings: settings, repoFocused: repoFocus != nil)
     }
 
-    /// Rows name their repository (`repo #num`) unless a repo header or the focus already does.
-    func rowsShowRepo(on tab: PRTab) -> Bool { prGrouping(for: tab) != .repository && repoFocus == nil }
+    /// How the list on screen groups its rows: All and Mine by their sections, Needs you and Team as
+    /// their tab (`prGrouping(for:)`).
+    var listGrouping: PRGrouping {
+        PRGrouping.forScope(prScope, settings: settings, repoFocused: repoFocus != nil)
+    }
+
+    /// The list's rows name their repository (`repo #num`) unless a repo header or the focus already does.
+    var rowsShowRepo: Bool { listGrouping != .repository && repoFocus == nil }
+
+    /// The sections of the list on screen shown folded; none while searching or in a single-section scope.
+    var foldedSections: Set<PRSection> { foldedSections(in: prScope) }
+
+    private func foldedSections(in scope: PRScope) -> Set<PRSection> {
+        settings.sectionFolds.shownFolded(in: scope, searching: route == .search)
+    }
+
+    /// Folds or opens a section of the PR list, for every account. A highlight in the section moves to the
+    /// next row still shown, or clears. One not shown before (another chip's row) stays for when it shows.
+    func toggleSection(_ section: PRSection) {
+        let old = listKeys(doneExpanded: false)
+        settings.sectionFolds.toggle(section)
+        guard let current = listSelection, old.contains(current) else { return }
+        let selection = ListNavigation.selection(current, from: old, to: listKeys(doneExpanded: false))
+        if selection != listSelection { listSelection = selection }
+    }
 
     /// The focus menu's repositories; empty before the first snapshot. Kept current as the tabs and the
     /// focus change, as every row's context menu names its repository from them.
@@ -1022,11 +1075,11 @@ final class AppModel {
     var shownSearchScope: SearchScope { searchScope.valid(in: mode, prTabs: prTabs) }
 
     /// A tab clicked while results are on screen: the same query narrowed to that tab, which becomes the
-    /// selected tab, or back to everything when it is the narrowed tab already.
+    /// selected tab, or back to everything when it is the narrowed tab already or Everywhere.
     func pickSearchScope(_ tab: ShownTab) {
         searchScope = shownSearchScope.picking(SearchScope(tab))
         switch tab {
-        case .pullRequests(let tab): selectedTab = tab
+        case .pullRequests(let scope): prScope = scope
         case .issues(let tab): selectedIssueTab = tab
         }
         runSearch(searchQuery, debounced: false)
@@ -1057,21 +1110,40 @@ final class AppModel {
         searchField.forgetCompletion()
     }
 
-    /// The tab whose layout the results take (`SearchScope.reference`): the narrowed tab, else the tab
-    /// typing started on while it is in this mode, else the tab on screen.
+    /// The tab whose layout the results take. In Pull Requests mode, the narrowed scope, else All, whatever
+    /// tab typing started on. In Issues mode (`SearchScope.reference`), the narrowed tab, else the tab typing
+    /// started on while it is in this mode, else the tab on screen.
     var searchReferenceTab: ShownTab {
+        if mode == .pullRequests { return .pullRequests(shownSearchScope.prScope ?? .all) }
         let reference = SearchScope.reference(
             scope: shownSearchScope, startedOn: searchStartedOnTab.map(SearchScope.init), shown: SearchScope(shownTab))
         return ShownTab(reference) ?? shownTab
     }
 
-    /// The PR results in the reference tab's layout; nil in Issues mode and without results.
+    /// The PR results in Needs you's or Team's layout; nil for Everywhere and Mine (`searchSectionLayout`),
+    /// in Issues mode and without results.
     var searchPRLayout: SearchPRLayout? {
         guard mode == .pullRequests, let results = searchResults, let snapshot,
-              case .pullRequests(let tab) = searchReferenceTab
+              case .pullRequests(let scope) = searchReferenceTab, !scope.showsSectionHeaders, let tab = scope.tab
         else { return nil }
         return SearchLayout.pullRequests(
             results, on: tab, grouping: prGrouping(for: tab), settings: settings, org: snapshot.org, now: Date())
+    }
+
+    /// The PR results in the list's sections, for Everywhere and Mine; nil for Needs you and Team
+    /// (`searchPRLayout`), in Issues mode and without results or lists.
+    var searchSectionLayout: SearchSectionLayout? {
+        guard mode == .pullRequests, let results = searchResults, let snapshot, let tabs,
+              case .pullRequests(let scope) = searchReferenceTab, scope.showsSectionHeaders
+        else { return nil }
+        return SearchLayout.sections(
+            results, scope: scope, tabs: tabs, settings: settings, org: snapshot.org, now: Date())
+    }
+
+    /// The Everywhere segment's count while the search covers everything: the results'. Nil otherwise.
+    var everywhereCount: IssueTabCount? {
+        guard mode == .pullRequests, shownSearchScope == .everything, searchResults != nil else { return nil }
+        return .current(searchMatchCount)
     }
 
     /// The issue results in the reference tab's layout, with edits shown; nil in PR mode and without
@@ -1113,7 +1185,9 @@ final class AppModel {
     /// Closed while expanded.
     var searchItemKeys: [PRKey] {
         switch mode {
-        case .pullRequests: searchPRLayout?.keys(closedExpanded: searchExpansion.closed) ?? []
+        case .pullRequests:
+            searchSectionLayout?.keys(closedExpanded: searchExpansion.closed)
+                ?? searchPRLayout?.keys(closedExpanded: searchExpansion.closed) ?? []
         case .issues:
             searchIssueLayout?.keys(closedExpanded: searchExpansion.closed, doneExpanded: searchExpansion.done) ?? []
         }
@@ -1141,13 +1215,19 @@ final class AppModel {
     }
 
     /// ⌥↓ / ⌥↑: the first row of the next or previous group of the results (or of this one, going up from
-    /// inside it). Nothing when the reference tab's layout has no groups, or past either end.
+    /// inside it). Nothing when the reference tab's layout has no groups, or past either end. Sections are
+    /// always groups.
     func jumpSearchGroup(by offset: Int) {
         let shown: (groups: [[PRKey]], grouped: Bool)
         switch mode {
         case .pullRequests:
-            guard let layout = searchPRLayout else { return }
-            shown = (layout.groups(closedExpanded: searchExpansion.closed), layout.isGrouped)
+            if let layout = searchSectionLayout {
+                shown = (layout.groups(closedExpanded: searchExpansion.closed), true)
+            } else if let layout = searchPRLayout {
+                shown = (layout.groups(closedExpanded: searchExpansion.closed), layout.isGrouped)
+            } else {
+                return
+            }
         case .issues:
             guard let layout = searchIssueLayout else { return }
             shown = (
@@ -1167,22 +1247,27 @@ final class AppModel {
         searchSelection = key
     }
 
-    /// ← / → in the search field: narrows the search to the reference tab's neighbour, which becomes the
-    /// selected tab, and runs it. Unlike a tab click it never toggles back to everything. Nil at either end.
+    /// ← / → in the search field. In Pull Requests mode it moves along Everywhere and the tabs shown; in
+    /// Issues mode it narrows to the reference tab's neighbour, never toggling back to everything. A tab moved
+    /// to becomes the selected tab, and the search runs again. Nil at either end.
     func moveSearchScope(by offset: Int) -> ShownTab? {
-        let tabs: [SearchScope] = switch mode {
-        case .pullRequests: prTabs.map { .pullRequests($0) }
-        case .issues: IssueTab.allCases.map { .issues($0) }
+        switch mode {
+        case .pullRequests:
+            guard let next = shownSearchScope.moved(by: offset, among: SearchScope.prChips(prTabs)),
+                  let scope = next.prScope else { return nil }
+            searchScope = next
+            prScope = scope
+            runSearch(searchQuery, debounced: false)
+            return .pullRequests(scope)
+        case .issues:
+            let tabs = IssueTab.allCases.map { SearchScope.issues($0) }
+            guard let next = SearchScope(searchReferenceTab).moved(by: offset, among: tabs),
+                  case .issues(let tab) = next else { return nil }
+            searchScope = next
+            selectedIssueTab = tab
+            runSearch(searchQuery, debounced: false)
+            return .issues(tab)
         }
-        guard let next = SearchScope(searchReferenceTab).moved(by: offset, among: tabs),
-              let tab = ShownTab(next) else { return nil }
-        searchScope = next
-        switch tab {
-        case .pullRequests(let tab): selectedTab = tab
-        case .issues(let tab): selectedIssueTab = tab
-        }
-        runSearch(searchQuery, debounced: false)
-        return tab
     }
 
     /// Return: the selected result's detail view; with no result, the fallback line's mode.
@@ -2054,7 +2139,7 @@ extension AppModel {
     /// The rows a walk steps through: the search results while searching, else the tab's list as shown.
     private var walkKeys: [PRKey] {
         route == .search
-            ? searchItemKeys : listKeys(closedExpanded: listExpansion.closed, doneExpanded: listExpansion.done)
+            ? searchItemKeys : listKeys(doneExpanded: listExpansion.done)
     }
 
     /// "2 of 6" for the detail on screen; nil when it has no walk.
@@ -2128,7 +2213,11 @@ extension AppModel {
         case .list, .search: leaveAsk()
         case .detail: break
         }
-        if case .detail = route {} else { detailReturnRoute = route }
+        if case .detail = route {} else {
+            detailReturnRoute = route
+            // A detail opened afresh returns to the chip on screen, not one an earlier detail kept.
+            detailBackScope = nil
+        }
         openedPR = fetchedPullRequest(for: key)
         closeCompletion()
         route = .detail(key)
@@ -2142,6 +2231,8 @@ extension AppModel {
         detailTask?.cancel()
         detailTask = nil
         detailFetch = nil
+        let backScope = detailBackScope
+        detailBackScope = nil
         if !askReturn.isEmpty, askReturn.close() == .ask {
             route = .ask
         } else if case .issueDetail(let issue) = detailReturnRoute {
@@ -2151,6 +2242,7 @@ extension AppModel {
             return
         } else {
             route = detailReturnRoute == .search && !searchText.isEmpty ? .search : .list
+            if route == .list, let backScope { prScope = backScope }
             searchAgainIfStale()
         }
         detailWalk = nil
@@ -2317,37 +2409,49 @@ extension AppModel {
 // MARK: - List keyboard
 
 extension AppModel {
-    /// The highlighted row of the tab on screen; it may be in a folded group or have left the list.
+    /// Where the highlighted row is kept: one for every PR chip, so it stays across them; one per Issues tab.
+    private var selectionKey: ShownTab {
+        switch mode {
+        case .pullRequests: .pullRequests(.all)
+        case .issues: .issues(selectedIssueTab)
+        }
+    }
+
+    /// The highlighted row of the list on screen; it may be in a folded group or have left the list.
     var listSelection: PRKey? {
-        get { listSelections[shownTab] }
-        set { listSelections[shownTab] = newValue }
+        get { listSelections[selectionKey] }
+        set { listSelections[selectionKey] = newValue }
     }
 
-    /// The rows of the tab on screen that ↑/↓ visit, in display order; none while it shows no list.
-    func listKeys(closedExpanded: Bool, doneExpanded: Bool) -> [PRKey] {
-        navigationKeys(for: shownTab, closedExpanded: closedExpanded, doneExpanded: doneExpanded)
+    /// The rows of the list on screen that ↑/↓ visit, in display order; none while it shows no list.
+    func listKeys(doneExpanded: Bool) -> [PRKey] {
+        navigationKeys(for: shownTab, unfolded: false, doneExpanded: doneExpanded)
     }
 
-    private func navigationKeys(for tab: ShownTab, closedExpanded: Bool, doneExpanded: Bool) -> [PRKey] {
-        navigationGroups(for: tab, closedExpanded: closedExpanded, doneExpanded: doneExpanded).groups.flatMap { $0 }
+    /// With `unfolded`, every PR section counts as open: whether a row is still listed at all.
+    private func navigationKeys(for tab: ShownTab, unfolded: Bool, doneExpanded: Bool) -> [PRKey] {
+        navigationGroups(for: tab, unfolded: unfolded, doneExpanded: doneExpanded).groups.flatMap { $0 }
     }
 
     /// The shown groups of `tab`'s rows, in display order, and whether it shows group headers. The time
-    /// focus narrows only the shown tab, so another tab's rows are scoped by the repository alone.
+    /// focus narrows the mode on screen only, and there only the Issues tab on screen, so another tab's
+    /// rows are scoped by the repository alone.
     private func navigationGroups(
-        for tab: ShownTab, closedExpanded: Bool, doneExpanded: Bool
+        for tab: ShownTab, unfolded: Bool, doneExpanded: Bool
     ) -> (groups: [[PRKey]], grouped: Bool) {
-        let focus = ListFocus(repo: repoFocus, time: tab == shownTab ? timeFocus : nil)
+        let timed = switch tab {
+        case .pullRequests: mode == .pullRequests
+        case .issues: tab == shownTab
+        }
+        let focus = ListFocus(repo: repoFocus, time: timed ? timeFocus : nil)
         switch tab {
-        case .pullRequests(let prTab):
-            guard let contents = contents(of: prTab) else { return ([], false) }
-            let scoped = focus.isActive ? focus.scope(contents) : ScopedTab(unscoped: contents)
-            let closed = tabs?.recentlyClosed ?? []
-            let grouping = prGrouping(for: prTab)
+        case .pullRequests(let scope):
+            guard let list = scope == prScope ? prList : buildPRList(scope) else { return ([], false) }
+            let scoped = focus.isActive ? focus.scope(list) : ScopedPRList(unscoped: list)
+            let grouping = PRGrouping.forScope(scope, settings: settings, repoFocused: repoFocus != nil)
             let groups = ListNavigation.prGroups(
-                tab: prTab, contents: scoped.contents, grouping: grouping,
-                recentlyClosed: focus.isActive ? focus.scope(closed) : closed, closedExpanded: closedExpanded)
-            return (groups, ListNavigation.isGrouped(prGrouping: grouping))
+                scoped.list, grouping: grouping, folded: unfolded ? [] : foldedSections(in: scope))
+            return (groups, ListNavigation.isGrouped(scoped.list, grouping: grouping))
         case .issues(let issueTab):
             guard let issueTabs, issueTabs.isLoaded(issueTab), let contents = contents(of: issueTab) else {
                 return ([], false)
@@ -2368,10 +2472,9 @@ extension AppModel {
     /// still shown, or clears.
     func toggleLane(_ kind: IssueGroupKind, on tab: IssueTab, doneExpanded: Bool) {
         guard let board = settings.board else { return }
-        let old = listKeys(closedExpanded: false, doneExpanded: doneExpanded)
+        let old = listKeys(doneExpanded: doneExpanded)
         settings.laneFolds.toggle(kind, on: board, in: tab)
-        let selection = ListNavigation.selection(
-            listSelection, from: old, to: listKeys(closedExpanded: false, doneExpanded: doneExpanded))
+        let selection = ListNavigation.selection(listSelection, from: old, to: listKeys(doneExpanded: doneExpanded))
         if selection != listSelection { listSelection = selection }
     }
 
@@ -2381,8 +2484,8 @@ extension AppModel {
 
     /// ⌥↓ / ⌥↑: the first row of the next or previous group (or of this one, going up from inside it).
     /// Nothing in a list without groups, or past either end.
-    func jumpListGroup(by offset: Int, closedExpanded: Bool, doneExpanded: Bool) {
-        let shown = navigationGroups(for: shownTab, closedExpanded: closedExpanded, doneExpanded: doneExpanded)
+    func jumpListGroup(by offset: Int, doneExpanded: Bool) {
+        let shown = navigationGroups(for: shownTab, unfolded: false, doneExpanded: doneExpanded)
         guard shown.grouped, let key = ListNavigation.jump(listSelection, by: offset, in: shown.groups) else { return }
         listSelection = key
     }
@@ -2393,10 +2496,10 @@ extension AppModel {
         listSelection = key
     }
 
-    /// ←/→: the neighboring sub-tab of the current mode.
+    /// ←/→: the neighboring chip or sub-tab of the current mode.
     func moveTab(by offset: Int) {
         switch mode {
-        case .pullRequests: selectedTab = ListNavigation.tab(selectedTab, movedBy: offset, among: prTabs)
+        case .pullRequests: prScope = ListNavigation.tab(prScope, movedBy: offset, among: prScopes)
         case .issues: selectedIssueTab = ListNavigation.tab(selectedIssueTab, movedBy: offset)
         }
     }

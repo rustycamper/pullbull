@@ -45,7 +45,7 @@ Without `read:project`: Board shows the command to add it, Mine groups by repo.
 ### No organization
 
 - Pick repos on GitHub (all or some). The window closes once GitHub confirms
-- Your own repos only, no Team tab
+- Your own repos only, no Team chip or section
 - Board: your first personal board, needs a `gh` login with `read:project`
 - Change repos: Settings → Account → **Change Repositories…**
 
@@ -68,15 +68,35 @@ Without `read:project`: Board shows the command to add it, Mine groups by repo.
 
 <kbd>⌘</kbd><kbd>1</kbd>
 
-| Tab | Shows |
+One list in sections, scoped by chips above it. It opens on All every time; a chip you pick lasts until the popover closes.
+
+| Chip | Shows |
 |---|---|
-| Review | PRs waiting on you or your team. Icon says why: requested, team, re-requested, new commits. Lines added and removed (`+120 −30`), not in compact cards. Oldest first: [Sort](#sorting) |
-| Mine | Your PRs, review pills, checks, **Ready to merge**. Folded "Recently closed": yours closed or merged in the last 7 days |
-| Team | Other open PRs in the org. Group by author: Settings → General |
+| All | Needs your review, Your PRs, Waiting on others, then Recently closed and Team, folded. No count |
+| Needs you | PRs waiting on you or your team. Icon says why: requested, team, re-requested, new commits. Lines added and removed (`+120 −30`), not in compact cards. Oldest first: [Sort](#sorting) |
+| Mine | Your PRs, Waiting on others, folded Recently closed: yours closed or merged in the last 7 days. Review pills, checks, **Ready to merge** |
+| Team | Other open PRs in the org, not the ones in Needs you. Group by author: Settings → General. No chip without an org |
 
-A PR with merge conflicts shows a **Conflicts** note on every tab.
+- **Chips:** click one to scope the list, click it again for All, or press <kbd>←</kbd> <kbd>→</kbd>. Each shows its count (Needs you in the accent colour when above zero); the counts ignore the repo and time focus
+- **Not grouped by repo:** All and Mine are grouped by their sections, and each row names its repo (`widgets #1305`). Needs you and Team group by repo, or by author for Team, as before
 
-A PR waiting on review shows who it waits on and for how long (🕒 @dana 3d, "+1" when more are asked). One nobody was asked to review shows 🕒 No reviewer 5d, counted from when it was ready for review. On Review it's just 🕒 2d. Hover for every reviewer's wait. Not in compact rows.
+| Section | Rows | Header |
+|---|---|---|
+| Needs your review | The Needs you rows, including "You approved" rows when Hide approved is off | 🔔 in the accent colour |
+| Your PRs | Your open PRs that need you: ready to merge, changes requested, failing checks, conflicts, or a draft | PR glyph |
+| Waiting on others | Your other open PRs: waiting on review, or on checks still running | 🕒 |
+| Recently closed | Yours closed or merged in the last 7 days | chevron |
+| Team | Team's rows | chevron |
+
+- **The split:** a PR of yours is in Your PRs when it is ready to merge, a latest review requests changes, its checks failed, it has conflicts or it's a draft. Any other is in Waiting on others. A run that was only cancelled reads as failed in GitHub's rollup, so that PR is in Your PRs
+- **Once only:** a PR in Needs your review isn't repeated in Team, a dimmed one included. With Hide approved on, an approved PR isn't in Needs your review, so it stays in Team
+- **Empty sections** hide. A section of only dimmed rows still shows, with a count of 0. When nothing is waiting on your review and Your PRs is empty, All starts with "Nothing needs you" and the sections that have rows follow
+- **Folds:** click a header on All or Mine. Needs your review, Your PRs and Waiting on others start open, Recently closed and Team folded. Kept across relaunches, the same for every account. Needs you and Team have no header and no fold. The selected row stays selected through folds and chip changes
+- **All's footer link** goes to your PRs on GitHub
+
+A PR with merge conflicts shows a **Conflicts** note in every section.
+
+A PR waiting on review shows who it waits on and for how long (🕒 @dana 3d, "+1" when more are asked). One nobody was asked to review shows 🕒 No reviewer 5d, counted from when it was ready for review. In Needs your review it's just 🕒 2d. Hover for every reviewer's wait. Not in compact rows.
 
 > [!NOTE]
 > Ready to merge = approved, no changes requested, checks green or none, no conflicts, not a draft. It doesn't see branch protection (required review count).
@@ -85,7 +105,7 @@ A PR waiting on review shows who it waits on and for how long (🕒 @dana 3d, "+
 - **Detail:** who opened it and when it was last updated (the row's age), or when it was merged or closed · assignees, labels and reviewers (click to change) · checks (a cancelled run reads cancelled, not failed, though GitHub still marks the PR failed) · description (long ones fold) · the newest comments, with earlier ones counted above · files. A [comment field](#commenting) is pinned at the bottom. Markdown incl. `<details>`. **Open Failing Check** beside failed checks
 - **Labels:** up to two chips per row (none in compact cards), each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail's Details card lists them all
 - **Right-click a row:** [Reviewers…](#editing) · [Assignees…](#editing) · [Labels…](#editing) · copy branch, link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · show only updated · search author
-- **Right-click a group header** (repo, author): **Open All *N* on GitHub**, from two PRs up; above 8 it asks first. An author header's menu also offers **Search @*login*** and **Show Only Updated**. Headers in search results get the tab's menus, without Show Only Updated
+- **Right-click a group header** (repo, author): **Open All *N* on GitHub**, from two PRs up; above 8 it asks first. An author header's menu also offers **Search @*login*** and **Show Only Updated**. Headers in search results get their section's or tab's menus, without Show Only Updated
 - **Footer:** account · refresh · open on GitHub · the gear, a menu with Settings, Keyboard Shortcuts, About PullBull, Check for Updates (release builds) and Quit. Turns amber with **Retry** when a refresh fails
 - **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Lists your signed-in accounts, then GitHub CLI logins, each with the org it opens in; then Add Account… and Account Settings…. Each account comes back with its last org, and each org with its last board
 
@@ -170,11 +190,11 @@ Write a comment on an open, closed or merged issue or pull request from its deta
 - With `status:`, PRs and issues not on the board don't match
 - `-status:` keeps PRs and issues not on the board
 - Links and `owner/repo#123` work only on their own
-- Results are laid out like the tab you're on, or the one you narrowed to: the same repo, author or Status groups and headers. Merged and closed items follow in **Closed and merged** (issues: **Closed**), open until you fold it for this search. Results span all tabs; click a tab to narrow, or press <kbd>←</kbd> / <kbd>→</kbd> at the field's start / end to narrow to the tab beside the one the results are laid out for (<kbd>←</kbd> from the first tab does nothing). No key goes back to everything; click the narrowed tab again, or **Search everything** in the narrowed empty state
+- Pull request results start in Everywhere, laid out in the list's sections: a PR the list holds sits in its section, one of yours it doesn't hold in Your PRs or Waiting on others, any other open one in **Other results**, after Team. Nothing is folded while you search. Merged and closed PRs follow in **Closed and merged** (issues: **Closed**), open until you fold it for this search. Click a chip, or press <kbd>←</kbd> / <kbd>→</kbd> at the field's start / end, to narrow to Needs you, Mine or Team; <kbd>←</kbd> from Needs you goes back to Everywhere, and <kbd>→</kbd> from Team does nothing. Click the narrowed chip again, or **Search everywhere** in the narrowed empty state, for Everywhere. Mine narrowed is laid out in its sections, Needs you and Team in their lists; Team leaves out what is in Needs you. Everywhere shows the results' count, a narrowed search none. Issues keep their tabs: click one to narrow
 - The footer says what is searched and how many match, with a spinner while GitHub answers. <kbd>⌥</kbd><kbd>⌘</kbd><kbd>↩</kbd> Ask AI shows there when it fits
 - **Right-click a result:** [Status](#editing) (issues, when a board is shown) · [Reviewers…](#editing) (PRs) · [Assignees…](#editing) · [Labels…](#editing) · copy branch (PRs), link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · search author. The checkout, files and failing check items are on PRs. Search author replaces the query; show only this repo keeps it and searches that repo
-- Each result looks as it does in that tab: avatars on Review and Team, the review notes and counts the tab shows, assignees on issues. A soft yellow highlight marks the words that matched, and `· author` (or reviewer, assignee) after the age says why an `@` matched. Merged and closed PRs and closed issues carry their pill (an issue's: purple when completed, gray when not planned). Compact cards drop the pill and show only how long ago it ended (`2d`); the glyph says merged or closed, and hovering spells it out
-- Compact cards (Settings → General) apply to results too, as in the tabs
+- Each result looks as it does in its section or tab: avatars in Needs your review and Team, the review notes and counts the tab shows, assignees on issues. A soft yellow highlight marks the words that matched, and `· author` (or reviewer, assignee) after the age says why an `@` matched. Merged and closed PRs and closed issues carry their pill (an issue's: purple when completed, gray when not planned). Compact cards drop the pill and show only how long ago it ended (`2d`); the glyph says merged or closed, and hovering spells it out
+- Compact cards (Settings → General) apply to results too, as in the lists
 - Matches in the other mode show a hint: <kbd>⌘</kbd><kbd>1</kbd> / <kbd>⌘</kbd><kbd>2</kbd>
 - Empty field shows saved searches, the first nine with their ⌃ key, and two lines of token hints: `#` `@` `~` `is:` `status:`, then `updated:` `review:` `repo:` `size:` `-`. <kbd>↓</kbd> to walk them; picking a token types it, and all but `#` and `-` open their list. After `-`, the next token joins it (`-@`, `-size:`), with the mouse or the keyboard
 - Typing `@`, `~`, `label:`, `is:`, `status:`, `updated:`, `review:`, `repo:` or `size:` opens a completion list. `status:` lists the board's Status columns with their open counts; picking one writes the full name in quotes. `updated:` lists the four steps; `review:` lists `changes` and `none`; `size:` lists `s`, `m` and `l` with their line limits; `repo:` lists the repos in your lists. Also after `-`
@@ -264,7 +284,7 @@ Settings → Ask AI.
 | <kbd>↑</kbd> <kbd>↓</kbd> | Select |
 | <kbd>⌥</kbd><kbd>↑</kbd> <kbd>⌥</kbd><kbd>↓</kbd> | Previous / next group (repo, author, lane, Done, Closed). Folded lanes are skipped; nothing without groups. Search results too |
 | <kbd>⌘</kbd><kbd>↑</kbd> <kbd>⌘</kbd><kbd>↓</kbd> | First / last row, in search results too |
-| <kbd>←</kbd> <kbd>→</kbd> | Previous / next tab. In search: narrow to the tab beside the one the results follow (nothing from the first tab with <kbd>←</kbd>, or the last with <kbd>→</kbd>), with the caret at the start (<kbd>←</kbd>) or end (<kbd>→</kbd>) of the field |
+| <kbd>←</kbd> <kbd>→</kbd> | Previous / next chip (tab in Issues). In search: narrow to the chip beside the one the results are laid out for (nothing from Everywhere with <kbd>←</kbd>, or from the last chip with <kbd>→</kbd>), with the caret at the start (<kbd>←</kbd>) or end (<kbd>→</kbd>) of the field |
 | <kbd>Return</kbd> | Detail |
 | <kbd>⌘</kbd><kbd>Return</kbd> | Open on GitHub (in a detail's comment field it posts, see [Commenting](#commenting)) |
 | <kbd>⌘</kbd><kbd>C</kbd> | Copy link |
@@ -313,7 +333,7 @@ Reopen within a minute and the detail is still there.
 - Right-click a row or a repo header → **Show Only *repo***
 - Or the repo menu: <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd>, or the repo name in the filter row. Each repo shows its counts
 - Back to all: ✕ in the filter row, **Show all**, **Show All Repositories**, or <kbd>Esc</kbd>
-- Applies to every tab; search stays inside it
+- Applies to every chip and tab; search stays inside it
 - To keep a repo in a saved search, use `repo:` instead
 - Counts and notifications still cover all repos
 - Cleared on relaunch
@@ -322,9 +342,9 @@ Reopen within a minute and the detail is still there.
 
 - Right-click a row, a repo header, an author header or the list → **Show Only Updated** → Today, In the Last 3 Days, In the Last Week or In the Last Month
 - A strip above the list names the step: *Today*, *Last 3 days*, *Last week*, *Last month*; hover for the full line and start date
-- On Mine, the Recently closed header names the step too; under the month it stays *Last 7 days*
+- On All and Mine, the Recently closed header names the step too; under the month it stays *Last 7 days*
 - Back to all: ✕ in the strip, **Show All**, or <kbd>Esc</kbd>. <kbd>Esc</kbd> clears this and Show Only *repo* together
-- Also cleared when the popover closes, or the tab or mode changes
+- Kept across chip changes. Cleared when the popover closes, the mode changes or the Issues tab changes
 - Judged by last activity: when an open item last changed, or when a closed one ended
 - Counts and notifications still cover everything
 - Combines with Show Only *repo*
@@ -333,12 +353,12 @@ Reopen within a minute and the detail is still there.
 ## Sorting
 
 - Click ⇅ at the right of the strip above the list, or right-click a row, a header or the list → **Sort By**
-- Pull request tabs: **Recently updated** (default) · **Waiting longest** (the 🕒 review wait, longest first; PRs not waiting follow) · **Oldest first** (by when opened)
+- Pull request chips: **Recently updated** (default) · **Waiting longest** (the 🕒 review wait, longest first; PRs not waiting follow) · **Oldest first** (by when opened)
 - Issue tabs: **Recently updated** (default) · **Newest first** · **Oldest first** (by when opened)
-- Each tab keeps its own, across relaunches. Off the default, the strip names it in the accent colour
+- Each chip and Issues tab keeps its own, across relaunches. In All the sort orders the rows within each section; the sections keep their order. Off the default, the strip names it in the accent colour
 - Repo groups follow their first row; author groups stay by name; Board lanes keep the board's order and sort inside
 - Done, Recently closed and search's Closed keep their own order (most recently ended first)
-- Search results follow the sort of the tab they're laid out like
+- Search results follow the sort of the chip or tab they're laid out for; Everywhere uses All's
 - The selected row stays selected and in view
 
 ## Settings
@@ -347,7 +367,7 @@ Reopen within a minute and the detail is still there.
 
 | Tab | |
 |---|---|
-| General | Grouping, Team by author, compact cards, background, filters (Review and Team), menu bar count, refresh interval, pending CI checks, shortcut, Keyboard Shortcuts window, launch at login, updates |
+| General | Grouping, Team by author, compact cards, background, filters (Needs you and Team), menu bar count, refresh interval, pending CI checks, shortcut, Keyboard Shortcuts window, launch at login, updates |
 | Account | Account, org, board, access notices |
 | Notifications | One toggle per event, grouped: my pull requests · pull requests I review · issues assigned to me · issues I created |
 | Search | Saved searches: rename, edit the query, drag to reorder, **+** and **−**. Apply one from the empty search field; the first nine have ⌃1–⌃9 |

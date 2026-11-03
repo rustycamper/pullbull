@@ -41,6 +41,24 @@ public enum ListNavigation {
         return groups
     }
 
+    /// The sectioned PR list's shown groups of rows, in display order: each section not in `folded`, split
+    /// by `grouping`. An ungrouped section is one group.
+    public static func prGroups(_ list: PRList, grouping: PRGrouping, folded: Set<PRSection>) -> [[PRKey]] {
+        list.sections.filter { !folded.contains($0.section) }.flatMap { listed -> [[PRKey]] in
+            let rows = listed.contents.rows
+            switch grouping {
+            case .repository: return repoGroups(rows).map { $0.rows.map(\.pr.key) }
+            case .author: return authorGroups(rows).map { $0.rows.map(\.pr.key) }
+            case .none: return [rows.map(\.pr.key)]
+            }
+        }
+    }
+
+    /// Whether a sectioned PR list has group headers to jump between: its section headers or its grouping.
+    public static func isGrouped(_ list: PRList, grouping: PRGrouping) -> Bool {
+        list.scope.showsSectionHeaders || grouping != .none
+    }
+
     /// The PR list's rows as shown, `prGroups` flattened.
     public static func prKeys(
         tab: PRTab, contents: TabContents, grouping: PRGrouping, recentlyClosed: [PullRequest],

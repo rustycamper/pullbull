@@ -21,20 +21,24 @@ public enum ListSort: String, Codable, CaseIterable, Sendable {
         }
     }
 
-    public static func choices(for tab: PRTab) -> [ListSort] { [.recentlyUpdated, .waitingLongest, .oldestFirst] }
+    public static func choices(for scope: PRScope) -> [ListSort] { [.recentlyUpdated, .waitingLongest, .oldestFirst] }
+    public static func choices(for tab: PRTab) -> [ListSort] { choices(for: PRScope(tab)) }
     public static func choices(for tab: IssueTab) -> [ListSort] { [.recentlyUpdated, .newestFirst, .oldestFirst] }
 }
 
 extension AppSettings {
-    /// `tab`'s sort: the stored one when the tab offers it, else Recently updated.
-    public func sort(for tab: PRTab) -> ListSort {
-        sorts[tab.rawValue].flatMap { ListSort.choices(for: tab).contains($0) ? $0 : nil } ?? .recentlyUpdated
+    /// `scope`'s sort: the stored one when the scope offers it, else Recently updated.
+    public func sort(for scope: PRScope) -> ListSort {
+        sorts[scope.rawValue].flatMap { ListSort.choices(for: scope).contains($0) ? $0 : nil } ?? .recentlyUpdated
     }
+
+    public func sort(for tab: PRTab) -> ListSort { sort(for: PRScope(tab)) }
 
     public func sort(for tab: IssueTab) -> ListSort {
         sorts[tab.rawValue].flatMap { ListSort.choices(for: tab).contains($0) ? $0 : nil } ?? .recentlyUpdated
     }
 
-    public mutating func setSort(_ sort: ListSort, for tab: PRTab) { sorts[tab.rawValue] = sort }
+    public mutating func setSort(_ sort: ListSort, for scope: PRScope) { sorts[scope.rawValue] = sort }
+    public mutating func setSort(_ sort: ListSort, for tab: PRTab) { setSort(sort, for: PRScope(tab)) }
     public mutating func setSort(_ sort: ListSort, for tab: IssueTab) { sorts[tab.rawValue] = sort }
 }

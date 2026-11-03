@@ -85,6 +85,10 @@ Mockups: https://claude.ai/artifact/EpgpsFBW6hyLMHocJFmdBC (2a is the chosen hea
   - **All** shows no count.
 - Clicking the selected chip (other than All) goes back to All.
 - ←/→ moves between the chips, as it moved between tabs.
+- The popover opens on All every time. A chip picked while it's open lasts until the popover closes, and the reset to All happens as it closes, so the next open never shows the old chip for a frame. A reopen that was already on All keeps its scroll offset, as a reopen keeps its selection; only a reset from another chip scrolls the list to the top. A detail left open keeps its walk through the reset.
+- When a settings change hides the Team chip (the account loses its org) while it is selected, the scope goes back to All.
+- One selection is shared by every chip. It stays selected through chip changes and folds; a fold that hides the selected row moves it to the next row shown, and a selection in another chip's row is left alone. A chip change with no selection shown opens the new chip at its top.
+- A detail opened from the list names the chip it was opened on in its Back button ("All", "Needs you").
 - What each scope shows:
 
 | Scope | Sections shown |
@@ -94,7 +98,8 @@ Mockups: https://claude.ai/artifact/EpgpsFBW6hyLMHocJFmdBC (2a is the chosen hea
 | Mine | Your PRs, Waiting on others, Recently closed (folded) |
 | Team | Team |
 
-- In a single-section scope (Needs you, Team) the section header is hidden and the list looks like today's tab.
+- In a single-section scope (Needs you, Team) the section header is hidden, the section never folds, and the list looks like today's tab.
+- The chips show their counts as they stand; a pull request count is never stale outside a search, so the chips draw no stale-warning glyph.
 
 ### Sections
 
@@ -116,18 +121,23 @@ Mockups: https://claude.ai/artifact/EpgpsFBW6hyLMHocJFmdBC (2a is the chosen hea
   Everything else goes in Waiting on others.
 - **A cancelled run counts as a failure here.** GitHub's rollup reads a cancelled run as a failure (`CIState`, Models.swift:33-35), and the list has no per-check data, so a PR whose only problem is a cancelled run lands in Your PRs. Fetching per-check data for the list is out of scope. The row's CI glyph is unchanged.
 - **De-duplication:** a PR in Needs your review is not repeated in Team, dimmed rows included. The badge already de-duplicates by `PRKey` (`BuiltTabs.badgeCount`); the list now does too. With Hide approved on, an approved PR isn't in Needs your review, so it stays in Team.
-- **Empty sections hide themselves.** A section with only dimmed rows is not empty: it shows, with a count of zero. If Needs your review has no counted rows and Your PRs is empty in All, a one-line "Nothing needs you" sits at the top, and the sections that have rows follow, including any dimmed rows. If the whole list is empty, today's empty state applies (#42).
+- **Empty sections hide themselves.** A section with only dimmed rows is not empty: it shows, with a count of zero. If Needs your review has no counted rows and Your PRs is empty in All, a one-line "Nothing needs you" sits at the top, and the sections that have rows follow, including any dimmed rows. If the whole list is empty, today's empty state applies (#42): on All it reads as Needs you's does ("Nothing needs your review"). On Mine with no open rows, the empty state sits above Recently closed.
 - **Folding:** every header folds on click. Fold state is kept per section in a new settings map (for example `sectionFolds`), the same for every account. It is not per account: the sections are the same for everyone. The defaults:
   - open: Needs your review, Your PRs, Waiting on others;
   - folded: Recently closed and Team.
+- **Recently closed's fold is part of the same map**, so it is kept across relaunches. It was session state on Mine before.
+- **Single-section scopes** (Needs you, Team) show no header and never fold. Nothing shows folded while searching; the stored state returns when the search ends.
+- **Hairlines:** an edge-to-edge hairline parts each section from the one above it, and Mine's Recently closed from the empty state above it. The first section has none.
+- **Footer link:** All links to Mine's page on GitHub ("PRs on GitHub"), since the footer's pages are per fetched list.
 - **Grouping:**
-  - In All, rows aren't grouped by repository. Sections are the grouping, and each row names its repo (`repo #num`).
-  - In a single-scope chip, today's grouping applies: by repository unless turned off or merged by a repo focus. Team groups by author when `groupTeamByAuthor` is on.
+  - In All and Mine, rows aren't grouped by repository. Sections are the grouping, and each row names its repo (`repo #num`). This was the owner's ruling for Mine.
+  - On Needs you and Team, today's grouping applies: by repository unless turned off or merged by a repo focus. Team groups by author when `groupTeamByAuthor` is on.
 
 ### Sorting
 
 - Each scope has one sort, kept in `settings.sorts` under its key: `all` is new, while `review`, `mine` and `team` are today's keys and carry over unchanged.
 - In All, the sort orders rows within each section, and the sections keep their fixed order.
+- Search follows the sort of the chip its results are laid out for; Everywhere uses All's.
 - The choices are today's PR choices: Recently updated · Waiting longest · Oldest first.
 
 ### Review reasons on rows
@@ -143,7 +153,7 @@ Mockups: https://claude.ai/artifact/EpgpsFBW6hyLMHocJFmdBC (2a is the chosen hea
 
 ### Search
 
-- While the field holds a query, the chip row becomes the scope picker: **Everywhere · Needs you · Mine · Team**. Each chip shows its match count, and Everywhere is the default.
+- While the field holds a query, the chip row becomes the scope picker: **Everywhere · Needs you · Mine · Team**. Each chip shows its match count, and Everywhere is the default. Everywhere shows the count of the results on screen; while the search is narrowed it shows none, because a narrowed search never asks GitHub, so there is no Everywhere count to give.
   - The narrowing is today's `SearchScope`, moved from the tab bar to the chips.
   - The Everywhere chip is new. Today `.everything` is the state where no tab is selected. Clicking a selected chip goes back to Everywhere, as clicking a selected tab clears the scope today.
 - Results narrowed to a scope are matched locally, as now (`SearchNarrowing`).
@@ -153,6 +163,12 @@ Mockups: https://claude.ai/artifact/EpgpsFBW6hyLMHocJFmdBC (2a is the chosen hea
   - Every other open result goes in a new **Other results** section, after Team. Its rows take Team's chips.
   - "Closed and merged" follows last, as now.
   - Folded sections open while a search is on, as `LaneFolds.shownFolded` opens lanes today, and fold back when the field clears.
+- A search narrowed to a chip is laid out for that chip:
+  - **Needs you** and **Team** take that list's layout, grouped as the list is, with Closed and merged after it.
+  - **Mine** takes the sections: Your PRs and Waiting on others, then Closed and merged. Recently closed PRs that match are closed results, so they sit in Closed and merged.
+  - Narrowing to **Team** searches the de-duplicated Team, so it leaves out what is in Needs you, as the chip's count does.
+  - Each layout follows its own chip's sort, and Everywhere follows All's.
+- A search kept open when the popover closes stays narrowed; the list under it resets to All. Its Esc hint stops naming a chip it started on ("Started typing on …") when that chip was not All, because returning there is no longer what Esc does.
 - In Issues mode, search scoping stays on the Issues tabs, as today.
 
 ### Settings (Settings → General)
@@ -170,6 +186,7 @@ Mockups: https://claude.ai/artifact/EpgpsFBW6hyLMHocJFmdBC (2a is the chosen hea
 
 ### Settings migration
 
+- The app no longer reads or writes `lastTab`; the popover opens on All. `AppSettings.lastTab` and its coding stay in Kit, so a saved value round-trips, until step 4 replaces it with the open-on choice.
 - `lastTab` is replaced by the open-on choice. Every existing user opens on All, so the change is visible at first launch. `AppSettings` decodes each field on its own, so the old key is just ignored.
 - `sorts["review"/"mine"/"team"]` keep working as scope sorts, and `sorts["all"]` starts at Recently updated.
 - `groupTeamByAuthor`, the hide filters, the badge and notification settings don't change.
@@ -184,9 +201,23 @@ Mockups: https://claude.ai/artifact/EpgpsFBW6hyLMHocJFmdBC (2a is the chosen hea
 
 ## Left to the builder
 
-- Type names: whether `PRTab` is renamed (for example to `PRScope`) or kept as the internal name for the review, mine and team lists. It is used in about 15 files, including `SearchScope`, `ListSort`, `ListNavigation`, `RowChips`, `ReviewWait`, `PRRow` and `FetchScope`.
-- How `TabBuilder.build` returns sections, for example a `BuiltList` holding the three lists plus the Mine split. `ListNavigation` must flatten sections in display order, skipping folded ones.
-- Exact spacing and fonts, within the mockup's proportions: chips 22pt tall, and the search row at the field's current 24pt height.
+These were settled while building:
+
+- **Type names.** `PRTab` (review, mine, team) stays as the internal name for the three fetched lists and their row rules (`RowChips`, `ReviewWait`, `TabBuilder.row`, `SearchScope.pullRequests`, `RowContext`). New types:
+  - `PRScope` (`all`, `review`, `mine`, `team`) is the chip. Its raw values are the `settings.sorts` keys.
+  - `PRSection` names a section, and `ListSection` holds a section's rows.
+  - `PRList` is the sections a scope shows, and `ScopedPRList` the same narrowed to the focus.
+  - `SectionFolds` is the fold map, `settings.sectionFolds`.
+  - `SearchSectionLayout` lays out sectioned search results.
+- **`BuiltTabs.review`, `.mine` and `.team` don't change.** The badge, `ModeNews`, notifications, the repo menu and `reviewCleared` keep reading them. The de-duplication and the Mine split are derived (`teamSection`, `yourPRs`, `waitingOnOthers`), and only the list, the chip counts and search narrowing read them.
+- **Sizes.** Chips are 22pt tall and sit in the row the tabs used to; Issues mode keeps `TabBar` there. A section header is 28pt, like every list header.
+- **Reasoning on the open calls above.**
+  - Mine has no repo grouping by the owner's ruling: its sections are the grouping, as in All, and rows name their repo. This replaces the draft's "a single-scope chip keeps today's grouping".
+  - A narrowed search never asks GitHub, which is why Everywhere's count has nothing to show.
+  - The reset to All happens when the popover closes, not when it opens, so the old chip is never on screen.
+  - A scope reset scrolls to the top because a reopen mid-list would hide Needs your review; a reopen already on All keeps its offset, matching the rule that reopening restores selection and scroll.
+  - `searchStartedOnTab` is cleared, not set to All, because "Started typing on All" would be false.
+  - A cancelled-only run lands in Your PRs because the list sees only GitHub's rollup.
 
 ## Delivery
 
@@ -225,7 +256,7 @@ The README (Tabs section, table rows and screenshots in `docs/media`) and `docs/
 These were my decisions, not the owner's. They are worth checking:
 
 - **Mine splits** into Your PRs and Waiting on others, with no overlap, on the rule above.
-- **Rows aren't grouped by repository in All**; the repo name moves onto the row.
+- **Rows aren't grouped by repository in All or Mine**; the repo name moves onto the row.
 - **One sort per scope**, applied within sections in All.
 - **Req stays gray**, like the other reasons. Only the header bell uses the accent colour.
 - **The mode switch gets a shared track**, replacing the free-standing chips and divider.

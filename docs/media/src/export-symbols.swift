@@ -16,6 +16,9 @@ func w(_ s: String) -> NSFont.Weight {
 // name, point size, weight: every symbol the popover views reference at the size they use it.
 let list: [(String, CGFloat, String)] = [
     ("magnifyingglass", 11, "regular"),
+    ("bell", 11, "regular"),
+    ("clock", 11, "regular"),
+    ("pullbull.pullrequest", 11, "regular"),
     ("line.3.horizontal.decrease", 10, "medium"),
     ("rectangle.split.3x1", 10, "medium"),
     ("xmark", 10, "medium"),

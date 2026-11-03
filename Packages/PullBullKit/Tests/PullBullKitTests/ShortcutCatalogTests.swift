@@ -11,6 +11,15 @@ private let modifierOrder = ["⌃", "⌥", "⇧", "⌘"]
                 "Commenting", "Ask AI answers"])
     }
 
+    @Test func arrowShortcutsNameChipsAndTabs() throws {
+        let sections = ShortcutCatalog.sections(toggle: nil)
+        let lists = try #require(sections.first { $0.title == "Lists" })
+        #expect(lists.shortcuts.contains(Shortcut("Previous / next chip or tab", [["←"], ["→"]])))
+        let search = try #require(sections.first { $0.title == "Search" })
+        #expect(search.shortcuts.contains(
+            Shortcut("Narrow to the chip or tab beside", [["←"], ["→"]], note: "At the field's start or end")))
+    }
+
     @Test func commentingShortcuts() throws {
         let commenting = try #require(ShortcutCatalog.sections(toggle: nil).first { $0.title == "Commenting" })
         #expect(commenting.shortcuts == [

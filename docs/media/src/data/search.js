@@ -1,29 +1,38 @@
-// Demo data for search: Pull Requests mode, opened with / on Team and "test" typed, caret at the end. The
-// results are laid out like Team. Tab counts are each tab's matches; no tab is selected (search spans all tabs).
+// Demo data for search: Pull Requests mode, "test" typed on All with the caret at the end. The results are
+// laid out in the list's sections, and the chips are the scope picker: Everywhere is selected and counts the
+// results, each other chip counts its own matches. Nothing folds in search; Closed and merged follows.
 // SearchFooter: coverage and match count, then Open and Clear. No Ask AI: with it the line outgrows the popover.
 window.SCENES = window.SCENES || {};
 window.SCENES.search = {
   view: "search",
   viewer: { login: "devon", org: "initech" },
-  menuBar: { count: 6, open: true },
+  menuBar: { count: 3, open: true },
   mode: "pullRequests",
-  tabs: [
-    { id: "review", title: "Review", count: 1 },
+  chips: [
+    { id: "all", title: "All", count: 5 },
+    { id: "review", title: "Needs you", count: 1 },
     { id: "mine", title: "Mine", count: 0 },
-    { id: "team", title: "Team", count: 3 },
+    { id: "team", title: "Team", count: 2 },
   ],
-  selectedTab: null,
+  selectedChip: "all",
   search: { text: "test", focused: true },
   filter: { repoTitle: "All repos" },
   searchResults: {
     words: ["test"],
     coverage: "Titles in all of initech",
     count: 5,
-    // Laid out as the Team tab is, grouped by repo (newest group first) with Team's rows; no context line.
-    groups: [
-      { repo: "widgets", rows: [{ title: "Fix flaky checkout test on CI", number: 1291, author: "bob", age: "1h", ci: "success", info: [{ wait: "You 1h" }] }] },
-      { repo: "api", rows: [{ title: "Add contract tests for webhook retries", number: 484, author: "erin", age: "3h", ci: "pending", info: [{ wait: "@initech/platform +1 5h" }] }] },
-      { repo: "gadgets", rows: [{ title: "Run the e2e test suite in the merge queue", number: 79, author: "frank", age: "1d", ci: "failure", info: [{ wait: "No reviewer 1d" }] }] },
+    sections: [
+      {
+        id: "needsReview", title: "Needs your review", rowTab: "review",
+        rows: [{ title: "Fix flaky checkout test on CI", repo: "widgets", number: 1291, author: "bob", age: "1h", ci: "success", info: ["reRequested", { wait: "1h" }], comments: 4 }],
+      },
+      {
+        id: "team", title: "Team", rowTab: "team",
+        rows: [
+          { title: "Add contract tests for webhook retries", repo: "api", number: 484, author: "erin", age: "3h", ci: "pending", info: [{ wait: "@initech/platform +1 5h" }] },
+          { title: "Run the e2e test suite in the merge queue", repo: "gadgets", number: 79, author: "frank", age: "1d", ci: "failure", info: [{ wait: "No reviewer 1d" }] },
+        ],
+      },
     ],
     closed: [
       { title: "Retry flaky tests once before failing", repo: "widgets", number: 1270, state: "merged", when: "Oct 21" },
