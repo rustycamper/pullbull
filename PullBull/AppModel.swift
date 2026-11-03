@@ -684,8 +684,8 @@ final class AppModel {
     /// The PR tabs shown: Team needs an org. Search narrows to these.
     var prTabs: [PRTab] { settings.scope.map(PRTab.shown) ?? PRTab.allCases }
 
-    /// The chips shown: All, then the PR tabs shown.
-    var prScopes: [PRScope] { settings.scope.map(PRScope.shown) ?? PRScope.allCases }
+    /// The chips shown: All, then the PR tabs shown; only All with the chips off.
+    var prScopes: [PRScope] { settings.prChips }
 
     /// A chip clicked outside search: its scope, or All when it is the one on screen.
     func pickScope(_ scope: PRScope) {
@@ -1089,8 +1089,8 @@ final class AppModel {
         }
     }
 
-    /// The search's scope in the current mode; a tab no longer shown is everything.
-    var shownSearchScope: SearchScope { searchScope.valid(in: mode, prTabs: prTabs) }
+    /// The search's scope in the current mode; a tab no longer shown, or any tab with the chips off, is everything.
+    var shownSearchScope: SearchScope { searchScope.valid(in: mode, prTabs: settings.prSearchTabs) }
 
     /// A tab clicked while results are on screen: the same query narrowed to that tab, which becomes the
     /// selected tab, or back to everything when it is the narrowed tab already or Everywhere.
@@ -1271,7 +1271,7 @@ final class AppModel {
     func moveSearchScope(by offset: Int) -> ShownTab? {
         switch mode {
         case .pullRequests:
-            guard let next = shownSearchScope.moved(by: offset, among: SearchScope.prChips(prTabs)),
+            guard let next = shownSearchScope.moved(by: offset, among: SearchScope.prChips(settings.prSearchTabs)),
                   let scope = next.prScope else { return nil }
             searchScope = next
             prScope = scope
