@@ -230,31 +230,6 @@ body {
 .mode-button { width: 24px; height: 20px; display: flex; align-items: center; justify-content: center; color: var(--secondary); border-radius: 5px; }
 .mode-button.selected { color: var(--accent); background: var(--strong-fill); }
 
-/* TabBar: equal segments 2 apart, 22 tall, inside 2 pt of vertical padding. */
-.tab-bar { flex: 1 1 auto; padding: 2px 0; display: flex; gap: 2px; }
-.segment {
-  flex: 1 1 0;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  white-space: nowrap;
-}
-/* HStack(alignment: .firstTextBaseline, spacing: 3) */
-.segment .label-run { display: flex; align-items: baseline; gap: 3px; }
-.segment.selected {
-  background: var(--strong-fill);
-  box-shadow: inset 0 0 0 0.5px var(--separator);
-}
-.segment .title { display: inline-grid; color: var(--secondary-text); }
-/* The semibold width is always reserved, so selecting changes the weight, never the position. */
-.segment .title::before { content: attr(data-title); font-weight: 600; visibility: hidden; grid-area: 1 / 1; }
-.segment .title > span { grid-area: 1 / 1; text-align: center; }
-.segment.selected .title { color: var(--label); font-weight: 600; }
-.segment .count { color: var(--secondary-text); }
-.segment.selected .count { color: var(--label); }
-
 /* ScopeChips: capsule chips 4 apart, 22 tall, 9 pt of padding (6 when a count reads "99+"). The selected chip is on Palette.strongFill. */
 .scope-chips { flex: 1 1 auto; display: flex; gap: 4px; }
 .chip { height: 22px; padding: 0 9px; display: flex; align-items: center; border-radius: 11px; white-space: nowrap; }

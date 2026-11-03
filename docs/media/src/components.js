@@ -78,18 +78,8 @@
     return `<div class="hstack mode-toggle">${btn("pullRequests", "pullbull.pullrequest")}${btn("issues", "pullbull.issue")}</div>`;
   }
 
-  function tabBar(tabs, selectedId) {
-    const segs = tabs.map((t) => {
-      const selected = t.id === selectedId;
-      const count = t.count == null ? "" : `<span class="count f11 mono">${t.count > 99 ? "99+" : t.count}</span>`;
-      return `<div class="segment${selected ? " selected" : ""}"><span class="label-run">` +
-        `<span class="title f12" data-title="${esc(t.title)}"><span>${esc(t.title)}</span></span>${count}</span></div>`;
-    });
-    return `<div class="tab-bar">${segs.join("")}</div>`;
-  }
-
   /**
-   * ScopeChips: the Pull Requests scopes as capsules, 22 tall; the selected one on Palette.strongFill. While searching,
+   * ScopeChips: the scopes of either mode (PRs: All, Needs you, Mine, Team; Issues: All, Assigned, Created, Board) as capsules, 22 tall; the selected one on Palette.strongFill. While searching,
    * All reads "Everywhere". Needs you's count takes the accent colour (`hot`) outside search; counts above 99 read "99+".
    */
   function scopeChips(chips, selectedId, searching) {
@@ -123,10 +113,10 @@
 
   function header(d) {
     return `<div class="search-row">${modeToggle(d.mode)}${searchField(d.search, d.mode)}</div>` +
-      `<div class="tab-row">${d.mode === "pullRequests" ? scopeChips(d.chips, d.selectedChip, d.view === "search") : tabBar(d.tabs, d.selectedTab)}</div>`;
+      `<div class="tab-row">${scopeChips(d.chips, d.selectedChip, d.view === "search")}</div>`;
   }
 
-  /** FilterBar: "▦ Roadmap ▾ · ▤ All repos ▾" on the Board tab, "▤ All repos ▾" elsewhere. */
+  /** FilterBar: "▦ Roadmap ▾ · ▤ All repos ▾" on the Board chip, "▤ All repos ▾" elsewhere. */
   function filterBar(filter) {
     const board = filter.boardTitle
       ? `<span class="hstack" style="gap:6px">${sym("rectangle.split.3x1", 10, "medium")}<span class="nowrap">${esc(filter.boardTitle)} ▾</span></span><span class="c-tertiary">·</span>`
@@ -411,7 +401,7 @@
     let html = "";
     for (const lane of d.lanes) {
       html += laneHeader(lane);
-      if (!lane.folded) html += lane.issues.map((i) => issueRow(i, d.selectedTab, scheme)).join("");
+      if (!lane.folded) html += lane.issues.map((i) => issueRow(i, d.selectedChip, scheme)).join("");
     }
     if (d.done) html += doneSection(d.done, scheme);
     return `<div class="list">${html}</div>`;
@@ -486,5 +476,5 @@
     if (d.hover) placeHover(root, d.hover);
   }
 
-  window.PullBull = { esc, sym, avatar, identicon, modeToggle, tabBar, scopeChips, sectionHeader, sectionList, searchField, header, filterBar, prRow, groupHeader, closedRow, closedSection, list, issueRow, laneHeader, doneSection, labelChip, assigneeStack, issueList, tunedLabelColor, footer, popover, menuBarItem, renderScene };
+  window.PullBull = { esc, sym, avatar, identicon, modeToggle, scopeChips, sectionHeader, sectionList, searchField, header, filterBar, prRow, groupHeader, closedRow, closedSection, list, issueRow, laneHeader, doneSection, labelChip, assigneeStack, issueList, tunedLabelColor, footer, popover, menuBarItem, renderScene };
 })();

@@ -1186,7 +1186,7 @@ final class AppModel {
         runSearch(searchQuery, debounced: false)
     }
 
-    /// "Search everything" from a narrowed search's empty state: the same query over everything.
+    /// "Search everywhere" from a narrowed search's empty state: the same query over everything.
     func searchEverything() {
         guard shownSearchScope.isNarrowed else { return }
         searchScope = .everything

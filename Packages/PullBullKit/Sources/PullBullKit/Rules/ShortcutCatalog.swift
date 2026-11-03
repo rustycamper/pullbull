@@ -48,7 +48,7 @@ public enum ShortcutCatalog {
             ShortcutSection("Lists", [
                 Shortcut("Select", [["↑"], ["↓"]]),
                 Shortcut("Previous / next group", [["⌥", "↑"], ["⌥", "↓"]],
-                         note: "Repo, author, lane, Done, Closed. Folded lanes are skipped"),
+                         note: "Section, repo, author, lane, Done, Closed. Folded lanes are skipped"),
                 Shortcut("First / last row", [["⌘", "↑"], ["⌘", "↓"]]),
                 Shortcut("Previous / next chip", [["←"], ["→"]]),
                 Shortcut("Pull Requests", [["⌘", "1"]]),
