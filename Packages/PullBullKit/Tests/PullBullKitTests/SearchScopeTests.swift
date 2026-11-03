@@ -261,4 +261,16 @@ private let issueTabs = BuiltIssueTabs(
         #expect(SearchScope.pullRequests(.review).moved(by: -1, among: all) == nil)
         #expect(SearchScope.pullRequests(.mine).moved(by: 1, among: Array(all.prefix(2))) == nil)
     }
+
+    @Test func issueChipsAreEverywhereThenTheTabs() {
+        #expect(SearchScope.issueChips() == [.everything, .issues(.assigned), .issues(.created), .issues(.board)])
+    }
+
+    @Test func issueScopeOfASearchScope() {
+        #expect(SearchScope.everything.issueScope == .all)
+        #expect(SearchScope.issues(.assigned).issueScope == .assigned)
+        #expect(SearchScope.issues(.created).issueScope == .created)
+        #expect(SearchScope.issues(.board).issueScope == .board)
+        #expect(SearchScope.pullRequests(.mine).issueScope == nil)
+    }
 }

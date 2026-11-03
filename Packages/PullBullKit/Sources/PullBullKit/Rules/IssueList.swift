@@ -76,21 +76,29 @@ public struct IssueList: Equatable, Sendable {
         return Set(snap.boardIssues.filter(IssueTabBuilder.isDone).map(\.key))
     }
 
-    public static func build(_ tabs: BuiltIssueTabs, snap: Snapshot, settings: AppSettings) -> IssueList {
-        let done = doneKeys(in: snap)
-        let sort = settings.sort(for: .all, boardAvailable: tabs.board != nil)
-        let options = snap.boardStatusOptions ?? []
-
+    /// Each issue's shown Status, read from its board copy; nil without one.
+    static func shownStatus(in snap: Snapshot) -> (BoardIssue) -> BoardStatusValue? {
         var copies: [PRKey: BoardIssue] = [:]
         for item in snap.boardIssues where copies[item.key] == nil { copies[item.key] = item }
-        let shown = { (issue: BoardIssue) -> BoardStatusValue? in
-            copies[issue.key].flatMap { IssueTabBuilder.shownStatus($0.status, in: snap) }
-        }
-        let ordered = { (issues: [BoardIssue]) -> [BoardIssue] in
+        return { issue in copies[issue.key].flatMap { IssueTabBuilder.shownStatus($0.status, in: snap) } }
+    }
+
+    /// All's order for a list of issues under `sort`, Board status included.
+    static func ordering(_ sort: ListSort, snap: Snapshot) -> ([BoardIssue]) -> [BoardIssue] {
+        let shown = shownStatus(in: snap)
+        let options = snap.boardStatusOptions ?? []
+        return { issues in
             sort == .boardStatus
                 ? statusSorted(issues, options: options, shown: shown)
                 : IssueTabBuilder.sorted(issues, by: sort)
         }
+    }
+
+    public static func build(_ tabs: BuiltIssueTabs, snap: Snapshot, settings: AppSettings) -> IssueList {
+        let done = doneKeys(in: snap)
+        let sort = settings.sort(for: .all, boardAvailable: tabs.board != nil)
+        let shown = shownStatus(in: snap)
+        let ordered = ordering(sort, snap: snap)
 
         var seen = done
         var sections: [IssueListSection] = []

@@ -75,6 +75,33 @@ public struct SearchIssueLayout: Sendable {
     }
 }
 
+/// Issue results laid out in All's sections (Everywhere): the open ones in the section the list holds
+/// them in, the rest in Other results, those done on the board in Done, then the closed ones.
+public struct SearchIssueSectionLayout: Sendable {
+    /// The open results: non-empty sections in `IssueSection` order, each in `.rows` state. Nothing folds in search.
+    public let sections: [IssueListSection]
+    /// Open results whose board copy is done, in All's order.
+    public let done: [BoardIssue]
+    /// Closed results, the most recently closed (or, without a close date, updated) first.
+    public let ended: [BoardIssue]
+    /// The shown Status of each result that has one, for the row chip.
+    public let status: [PRKey: BoardStatusValue]
+
+    /// The shown groups of rows, in display order: one per section, Done when expanded, then Closed when
+    /// expanded. Empty groups are left out.
+    public func groups(closedExpanded: Bool, doneExpanded: Bool) -> [[PRKey]] {
+        var groups = sections.map { $0.issues.map(\.key) }
+        if doneExpanded && !done.isEmpty { groups.append(done.map(\.key)) }
+        if closedExpanded && !ended.isEmpty { groups.append(ended.map(\.key)) }
+        return groups
+    }
+
+    /// The rows as shown, `groups` flattened.
+    public func keys(closedExpanded: Bool, doneExpanded: Bool) -> [PRKey] {
+        groups(closedExpanded: closedExpanded, doneExpanded: doneExpanded).flatMap { $0 }
+    }
+}
+
 /// Search results in the reference tab's layout (`SearchScope.reference`).
 public enum SearchLayout {
     /// The pull request results as `tab`, grouped by `grouping` (`PRGrouping.forTab`), shows them: its
@@ -129,12 +156,41 @@ public enum SearchLayout {
         if focus != nil {
             contents = RepoFocus.scopeIssues(contents, keeping: { _ in true }, mergeRepoGroups: true).contents
         }
-        let ended = results.closedIssues.sorted { a, b in
-            let da = a.closedAt ?? a.updatedAt ?? .distantPast, db = b.closedAt ?? b.updatedAt ?? .distantPast
-            if da != db { return da > db }
-            return tieBreak(a.key, b.key)
+        return SearchIssueLayout(tab: tab, contents: contents, ended: endedIssues(results.closedIssues))
+    }
+
+    /// The issue results in All's sections. A result done on the board goes to Done; else it sits in the
+    /// section the list holds it in; else, assigned to `viewer`, in Assigned to you; else, opened by
+    /// `viewer`, in You opened; else in Other results. Each section follows All's sort.
+    public static func issueSections(
+        _ results: SearchResults, tabs: BuiltIssueTabs, snap: Snapshot, settings: AppSettings, viewer: String
+    ) -> SearchIssueSectionLayout {
+        let list = IssueList.build(tabs, snap: snap, settings: settings)
+        let done = IssueList.doneKeys(in: snap)
+        let held = Dictionary(
+            list.sections.flatMap { section in section.issues.map { ($0.key, section.section) } },
+            uniquingKeysWith: { first, _ in first })
+        func matches(_ login: String?) -> Bool {
+            login.map { $0.caseInsensitiveCompare(viewer) == .orderedSame } ?? false
         }
-        return SearchIssueLayout(tab: tab, contents: contents, ended: ended)
+        func section(of issue: BoardIssue) -> IssueSection {
+            if let found = held[issue.key] { return found }
+            if issue.assignees.contains(where: { matches($0.login) }) { return .assignedToYou }
+            return matches(issue.author) ? .youOpened : .otherResults
+        }
+        let ordered = IssueList.ordering(settings.sort(for: .all, boardAvailable: tabs.board != nil), snap: snap)
+        let doneResults = results.openIssues.filter { done.contains($0.key) }
+        let bySection = Dictionary(
+            grouping: results.openIssues.filter { !done.contains($0.key) }, by: section(of:))
+        let built = IssueSection.allCases.compactMap { section -> IssueListSection? in
+            guard section != .doneStillOpen, let issues = bySection[section] else { return nil }
+            return IssueListSection(section: section, issues: ordered(issues), state: .rows)
+        }
+        let shown = IssueList.shownStatus(in: snap)
+        var status: [PRKey: BoardStatusValue] = [:]
+        for issue in results.openIssues + results.closedIssues { status[issue.key] = shown(issue) }
+        return SearchIssueSectionLayout(
+            sections: built, done: ordered(doneResults), ended: endedIssues(results.closedIssues), status: status)
     }
 
     /// The tab whose chips a result's row shows: Team's for someone else's PR on Mine, which hides the
@@ -147,6 +203,14 @@ public enum SearchLayout {
     /// link or `owner/repo#123` can bring a result from outside the focus.
     public static func showsRepo(_ key: PRKey, underRepoHeader: Bool, focus: RepoFocus?) -> Bool {
         !underRepoHeader && !(focus?.matches(key) ?? false)
+    }
+
+    private static func endedIssues(_ issues: [BoardIssue]) -> [BoardIssue] {
+        issues.sorted { a, b in
+            let da = a.closedAt ?? a.updatedAt ?? .distantPast, db = b.closedAt ?? b.updatedAt ?? .distantPast
+            if da != db { return da > db }
+            return tieBreak(a.key, b.key)
+        }
     }
 
     private static func closed(_ prs: [PullRequest]) -> [PullRequest] {
