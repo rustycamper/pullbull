@@ -33,4 +33,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Updater.shared.start()
         LaunchAtLogin.followInstalledCopy()
     }
+
+    /// A quit with the popover open doesn't close it, so the chip on screen is recorded here.
+    func applicationWillTerminate(_ notification: Notification) {
+        if MenuBarPopover.isShown { model.recordLastScope() }
+    }
 }

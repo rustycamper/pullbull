@@ -14,6 +14,12 @@ struct GeneralSettingsTab: View {
     private static let refreshChoices = [1, 2, 5, 10]
     private static let activityRefreshNote = "Also refreshes on new activity, and on open if data is older than 30s"
 
+    private static let chipsOffOpenOnNote = "Scope chips are off, so it opens on All"
+
+    private var openOnNote: String {
+        model.settings.scopeChips ? "Each time the popover opens" : Self.chipsOffOpenOnNote
+    }
+
     /// Names new activity only while the activity check works for this sign-in.
     private var refreshNote: String {
         model.status.activity == .active
@@ -37,6 +43,24 @@ struct GeneralSettingsTab: View {
 
     private var overviewSection: some View {
         Section("Overview") {
+            LabeledContent {
+                Picker("Pull requests open on", selection: $model.settings.openOn) {
+                    ForEach(model.settings.openOnChoices, id: \.self) { choice in
+                        Text(choice.title).tag(choice)
+                    }
+                }
+                .labelsHidden()
+                .disabled(!model.settings.scopeChips)
+                .accessibilityHint(openOnNote)
+            } label: {
+                // The longer note reserves its height, so the row doesn't move when the chips turn off.
+                RowLabel("Pull requests open on", note: Self.chipsOffOpenOnNote)
+                    .hidden()
+                    .overlay(alignment: .topLeading) { RowLabel("Pull requests open on", note: openOnNote) }
+            }
+            Toggle(isOn: $model.settings.scopeChips) {
+                RowLabel("Scope chips", note: "Off: the list shows All, in sections, and search looks everywhere")
+            }
             Picker(selection: $model.settings.grouping) {
                 Text("Repository").tag(Grouping.repository)
                 Text("None").tag(Grouping.none)
@@ -72,12 +96,9 @@ struct GeneralSettingsTab: View {
     private var menuBarSection: some View {
         Section("Menu bar") {
             Picker(selection: $model.settings.badge) {
-                Text("Needs my review").tag(BadgeSource.review)
-                Text("Mine").tag(BadgeSource.mine)
-                Text("Review + Mine").tag(BadgeSource.reviewAndMine)
-                Text("All").tag(BadgeSource.all)
+                ForEach(BadgeSource.allCases, id: \.self) { Text($0.title).tag($0) }
             } label: {
-                RowLabel("Count shows", note: "The badge uses the same filters as the tab it counts")
+                RowLabel("Count shows", note: "The badge uses the same filters as the lists it counts")
             }
             Toggle(isOn: $model.settings.countAssignedIssues) {
                 RowLabel("Also count assigned issues", note: "Adds open issues assigned to you")

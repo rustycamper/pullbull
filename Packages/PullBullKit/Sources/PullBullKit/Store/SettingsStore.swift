@@ -4,6 +4,18 @@ public enum PRTab: String, Codable, CaseIterable, Sendable { case review, mine, 
 
 public enum BadgeSource: String, Codable, CaseIterable, Sendable { case review, mine, reviewAndMine, all }
 
+extension BadgeSource {
+    /// The picker label, named after the list and its chips: `.mine` counts all my open PRs, as the Mine chip does.
+    public var title: String {
+        switch self {
+        case .review: "Needs your review"
+        case .mine: "Mine"
+        case .reviewAndMine: "Needs your review + mine"
+        case .all: "All"
+        }
+    }
+}
+
 public enum Grouping: String, Codable, Sendable { case repository, none }
 
 /// How a PR tab's rows are grouped on screen: the setting, narrowed by the repo focus, and for Team the
@@ -153,7 +165,12 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var refreshMinutes = 2
     /// Between refreshes, my pull requests with pending CI are checked every 30 s (`CIFollow`).
     public var followPendingCI = true
-    public var lastTab: PRTab = .review
+    /// Where the pull request list opens each time the popover opens.
+    public var openOn: OpenOn = .all
+    /// The chip showing when the popover last closed, which Last used opens on.
+    public var lastScope: PRScope = .all
+    /// Off leaves the list on All, with no chip row, and every search covers Everywhere.
+    public var scopeChips = true
     /// The global shortcut that shows and hides the popover; nil when turned off.
     public var toggleHotkey: KeyCombo? = .togglePopoverDefault
     /// The popover mode last shown.
@@ -189,7 +206,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case account, org, projectNumber, projectOwner, projectOrg, orgByAccount, boardByOwner, grouping, groupTeamByAuthor, sorts, reviewOldestFirst, compact,
-            hideOlderThanTwoMonths, hideApprovedByMe, hideDrafts, badge, notify, refreshMinutes, followPendingCI, lastTab, toggleHotkey, mode, lastIssueTab,
+            hideOlderThanTwoMonths, hideApprovedByMe, hideDrafts, badge, notify, refreshMinutes, followPendingCI, openOn, lastScope, scopeChips, toggleHotkey, mode, lastIssueTab,
             countAssignedIssues, solidBackground, accountSource, appAccounts, signedOutByUser, laneFolds, sectionFolds,
             askEnabled, askModel, askModelChoices, askExcludedRepos
     }
@@ -236,7 +253,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         d.notify = c.readable(NotificationToggles.self, forKey: .notify) ?? d.notify
         d.refreshMinutes = c.readable(Int.self, forKey: .refreshMinutes) ?? d.refreshMinutes
         d.followPendingCI = c.readable(Bool.self, forKey: .followPendingCI) ?? d.followPendingCI
-        d.lastTab = c.readable(PRTab.self, forKey: .lastTab) ?? d.lastTab
+        d.openOn = c.readable(OpenOn.self, forKey: .openOn) ?? d.openOn
+        d.lastScope = c.readable(PRScope.self, forKey: .lastScope) ?? d.lastScope
+        d.scopeChips = c.readable(Bool.self, forKey: .scopeChips) ?? d.scopeChips
         // A saved null is "turned off"; a missing key (settings saved before the shortcut) is the default.
         if let hotkey = c.readableOrNull(KeyCombo.self, forKey: .toggleHotkey) { d.toggleHotkey = hotkey }
         d.mode = c.readable(PopoverMode.self, forKey: .mode) ?? d.mode
@@ -281,7 +300,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         try c.encode(notify, forKey: .notify)
         try c.encode(refreshMinutes, forKey: .refreshMinutes)
         try c.encode(followPendingCI, forKey: .followPendingCI)
-        try c.encode(lastTab, forKey: .lastTab)
+        try c.encode(openOn, forKey: .openOn)
+        try c.encode(lastScope, forKey: .lastScope)
+        try c.encode(scopeChips, forKey: .scopeChips)
         try c.encode(toggleHotkey, forKey: .toggleHotkey)
         try c.encode(mode, forKey: .mode)
         try c.encode(lastIssueTab, forKey: .lastIssueTab)
@@ -307,12 +328,6 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// mode); nil when no account is chosen.
     public var scope: FetchScope? {
         account.map { login in org.map(FetchScope.org) ?? .personal(login: login) }
-    }
-
-    /// A PR tab the scope doesn't show (Team without an org) gives way to Review.
-    public mutating func reconcileTab() {
-        guard let scope, !PRTab.shown(in: scope).contains(lastTab) else { return }
-        lastTab = .review
     }
 
     /// Adds `summary`, replacing any summary with the same user ID (the login can change on GitHub).
