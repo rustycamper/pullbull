@@ -118,7 +118,7 @@ Full list in the [manual](docs/manual.md#keyboard).
 
 ## Settings
 
-<kbd>⌘</kbd><kbd>,</kbd> or the footer gear.
+<kbd>⌘</kbd><kbd>,</kbd>, or the footer gear → Settings….
 
 | Tab | |
 |---|---|

@@ -2,7 +2,7 @@ import SwiftUI
 import PullBullKit
 
 /// The account, then the age (only once stale), refresh (a spinner while refreshing), the link for the tab on
-/// screen and Settings; or the amber error state with Retry.
+/// screen and the gear's app menu; or the amber error state with Retry.
 /// In the first-run and signed-out layout, only the gear. A muted line above it says when a renewed
 /// sign-in couldn't be saved to the Keychain.
 struct FooterView: View {
@@ -50,7 +50,7 @@ struct FooterView: View {
     private var gearOnlyBody: some View {
         HStack {
             Spacer()
-            SettingsGearButton()
+            AppMenuButton(model: model)
         }
         .padding(.horizontal, 8)
         .frame(height: 34)
@@ -88,7 +88,7 @@ struct FooterView: View {
                 NSWorkspace.shared.open(link.url)
             }
             .accessibilityLabel("Open \(link.title)")
-            SettingsGearButton()
+            AppMenuButton(model: model)
         }
         .font(.system(size: 11))
         .foregroundStyle(.secondary)
@@ -147,8 +147,8 @@ struct FooterView: View {
                 .buttonStyle(FooterButtonStyle())
                 .help("Retry (⌘R)")
                 .disabled(model.status.isRefreshing)
-            // The header has no gear, so Settings stays reachable while the bar shows an error.
-            SettingsGearButton()
+            // The header has no gear, so the app menu stays reachable while the bar shows an error.
+            AppMenuButton(model: model)
         }
         .font(.system(size: 11))
         .foregroundStyle(.secondary)

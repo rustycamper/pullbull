@@ -186,69 +186,19 @@ final class PopoverController: NSObject {
         layer.backgroundColor = color
     }
 
-    /// The right-click menu. It is attached to the status item for this one click only: a permanent
-    /// `statusItem.menu` would swallow the left-click toggle. `performClick` blocks until the menu
-    /// closes, and the system highlights the item for exactly that long.
+    /// The right-click menu, the footer gear's (`AppMenu`). It is attached to the status item for this one
+    /// click only: a permanent `statusItem.menu` would swallow the left-click toggle. `performClick` blocks
+    /// until the menu closes, and the system highlights the item for exactly that long; a pick runs after.
     private func showMenu() {
         close()
         guard let button = statusItem.button else { return }
-        let menu = NSMenu()
-        let about = NSMenuItem(title: "About PullBull", action: #selector(openAbout), keyEquivalent: "")
-        about.target = self
-        menu.addItem(about)
-        menu.addItem(.separator())
-        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
-        settings.target = self
-        menu.addItem(settings)
-        if Updater.shared.isAvailable {
-            // No action while Sparkle is busy, which the menu's auto-enabling shows as disabled.
-            let action = Updater.shared.canCheckForUpdates ? #selector(checkForUpdates) : nil
-            let updates = NSMenuItem(title: "Check for Updates…", action: action, keyEquivalent: "")
-            updates.target = self
-            menu.addItem(updates)
+        let appMenu = AppMenu(model: model)
+        AppMenu.track(appMenu) {
+            statusItem.menu = appMenu.menu
+            button.performClick(nil)
+            statusItem.menu = nil
+            button.highlight(false)
         }
-        menu.addItem(.separator())
-        let quit = NSMenuItem(title: "Quit PullBull", action: #selector(quit), keyEquivalent: "q")
-        quit.target = self
-        menu.addItem(quit)
-        statusItem.menu = menu
-        aboutChosen = false
-        settingsChosen = false
-        updatesChosen = false
-        button.performClick(nil)
-        statusItem.menu = nil
-        button.highlight(false)
-        // Opened only now: the menu has closed, so its closing can't take focus back from Settings.
-        if aboutChosen {
-            // As for Settings: a plain activate() is refused, and the panel would open behind the front app.
-            SettingsOpener.forceActivate()
-            NSApp.orderFrontStandardAboutPanel(nil)
-        }
-        if settingsChosen { SettingsOpener.open() }
-        if updatesChosen { Updater.shared.checkForUpdates() }
-    }
-
-    /// Set by the menu's About item while the menu is still up, like Settings below.
-    private var aboutChosen = false
-    /// Set by the menu's Settings item while the menu is still up; `showMenu()` acts on it.
-    private var settingsChosen = false
-    /// The same for Check for Updates…, whose window would otherwise open under the closing menu.
-    private var updatesChosen = false
-
-    @objc private func openAbout() {
-        aboutChosen = true
-    }
-
-    @objc private func openSettings() {
-        settingsChosen = true
-    }
-
-    @objc private func checkForUpdates() {
-        updatesChosen = true
-    }
-
-    @objc private func quit() {
-        NSApp.terminate(nil)
     }
 
     private func observeWindowsAndApps() {
