@@ -60,6 +60,10 @@ final class AppModel {
             settingsStore.save(settings)
             // A chip no longer shown (Team without an org) goes back to All.
             if !prScopes.contains(prScope) { prScope = .all }
+            if !MenuBarPopover.isShown,
+               settings.scopeOnOpen != oldValue.scopeOnOpen || settings.scopeChips != oldValue.scopeChips {
+                openOnScope()
+            }
             if mode != settings.mode { mode = settings.mode }
             if selectedIssueTab != settings.lastIssueTab { selectedIssueTab = settings.lastIssueTab }
             rebuildTabs()
@@ -135,8 +139,9 @@ final class AppModel {
     /// What the mode not on screen has for me since it last was: the dot on its glyph.
     private(set) var modeNews = ModeNews()
 
-    /// The chip on screen in Pull Requests mode. Never persisted: the popover opens on All
-    /// (`popoverDidClose`). The time focus stays across chips.
+    /// The chip on screen in Pull Requests mode. Not persisted itself: the popover opens on the scope
+    /// Settings chooses (`popoverDidClose`), and `lastScope` keeps the one last shown. The time focus
+    /// stays across chips.
     var prScope: PRScope = .all {
         didSet {
             guard prScope != oldValue else { return }
@@ -424,7 +429,7 @@ final class AppModel {
     /// detail opened from a notification, Ask or a link. An issue walk lasts through a linked PR's detail.
     private(set) var detailWalk: DetailWalk?
     /// The chip a PR detail left open across a popover close was opened on, which Back names and returns
-    /// to; the list behind it opens on All otherwise. Nil while the popover has stayed open.
+    /// to; the list behind it opens on the open-on scope otherwise. Nil while the popover has stayed open.
     private(set) var detailBackScope: PRScope?
     /// Done as the popover shows it, so a walk's order is the one on screen.
     @ObservationIgnored var listExpansion = ListExpansion()
@@ -520,6 +525,7 @@ final class AppModel {
         self.settings = loaded
         self.mode = loaded.mode
         self.selectedIssueTab = loaded.lastIssueTab
+        self.prScope = loaded.scopeOnOpen
 
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
@@ -575,6 +581,7 @@ final class AppModel {
         self.settings = settings
         self.mode = settings.mode
         self.selectedIssueTab = settings.lastIssueTab
+        self.prScope = settings.scopeOnOpen
         self.snapshot = snapshot
         self.status = status ?? RefreshStatus(lastSuccess: snapshot.fetchedAt, error: nil, isRefreshing: false)
         rebuildTabs()
@@ -621,12 +628,11 @@ final class AppModel {
         Task { await coordinator.refreshIfOlderThan(.seconds(30)) }
     }
 
-    /// The next open starts on All, reset now so it never shows the old chip for a frame. A detail left
-    /// open keeps its walk, as it shows again on a quick reopen, and the chip it was opened on, which Back
-    /// returns to. A search kept open no longer goes back to the chip typing started on, so its Esc hint
-    /// stops naming it.
+    /// The next open starts on the open-on scope, reset now so it never shows the old chip for a frame. A
+    /// detail left open keeps its walk, as it shows again on a quick reopen, and the chip it was opened
+    /// on, which Back returns to. A search kept open no longer goes back to the chip typing started on
+    /// unless that is the scope it opens on, so its Esc hint stops naming it.
     func popoverDidClose() {
-        let walk = detailWalk
         var showsPRDetail = false
         if mode == .pullRequests, case .detail = route { showsPRDetail = true }
         if !showsPRDetail {
@@ -634,9 +640,21 @@ final class AppModel {
         } else if detailBackScope == nil {
             detailBackScope = prScope
         }
-        prScope = .all
+        recordLastScope()
+        openOnScope()
+    }
+
+    /// Remembers the chip on screen for Last used; the settings rule decides whether it applies.
+    func recordLastScope() {
+        settings.recordLastScope(prScope)
+    }
+
+    /// Puts the list on the scope Settings chooses, keeping a detail's walk, which a scope change clears.
+    private func openOnScope() {
+        let walk = detailWalk
+        prScope = settings.scopeOnOpen
         detailWalk = walk
-        if case .pullRequests(let scope) = searchStartedOnTab, scope != .all { searchStartedOnTab = nil }
+        if case .pullRequests(let scope) = searchStartedOnTab, scope != prScope { searchStartedOnTab = nil }
     }
 
     func refresh() {

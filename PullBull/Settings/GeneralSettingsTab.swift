@@ -37,6 +37,17 @@ struct GeneralSettingsTab: View {
 
     private var overviewSection: some View {
         Section("Overview") {
+            LabeledContent {
+                Picker("Pull requests open on", selection: $model.settings.openOn) {
+                    ForEach(model.settings.openOnChoices, id: \.self) { choice in
+                        Text(choice.title).tag(choice)
+                    }
+                }
+                .labelsHidden()
+            } label: {
+                RowLabel("Pull requests open on",
+                         note: model.settings.scopeChips ? "Each time the popover opens" : "Scope chips are off, so it opens on All")
+            }
             Picker(selection: $model.settings.grouping) {
                 Text("Repository").tag(Grouping.repository)
                 Text("None").tag(Grouping.none)
