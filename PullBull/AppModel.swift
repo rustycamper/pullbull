@@ -60,6 +60,9 @@ final class AppModel {
             settingsStore.save(settings)
             // A chip no longer shown (Team without an org) goes back to All.
             if !prScopes.contains(prScope) { prScope = .all }
+            if case .pullRequests(let started) = searchStartedOnTab, !prScopes.contains(started) {
+                searchStartedOnTab = nil
+            }
             if !MenuBarPopover.isShown,
                settings.scopeOnOpen != oldValue.scopeOnOpen || settings.scopeChips != oldValue.scopeChips {
                 openOnScope()
@@ -2260,7 +2263,8 @@ extension AppModel {
             return
         } else {
             route = detailReturnRoute == .search && !searchText.isEmpty ? .search : .list
-            if route == .list, let backScope { prScope = backScope }
+            // A chip hidden since (chips off, Team without an org) falls back to All.
+            if route == .list, let backScope { prScope = prScopes.contains(backScope) ? backScope : .all }
             searchAgainIfStale()
         }
         detailWalk = nil
