@@ -1,6 +1,6 @@
 import Foundation
 
-/// The row at the top of every list: "▦ Roadmap ▾ · ▤ All repos ▾" on the Board tab, "▤ All repos ▾"
+/// The row at the top of every list: "▦ Roadmap ▾ · ▤ All repos ▾" on the Board scope, "▤ All repos ▾"
 /// elsewhere, "▤ widgets ▾ ✕" with a repo focus. Each part opens its menu; a time focus adds a plain label
 /// ("◷ Last 3 days") after the repo part.
 public struct FilterRow: Equatable, Sendable {

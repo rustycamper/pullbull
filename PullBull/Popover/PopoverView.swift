@@ -80,7 +80,7 @@ struct PopoverView: View {
     /// The Ask screen is the top layer, with no detail over it.
     private var askShownAlone: Bool { layers == [.ask] }
     private var slides: Bool { !reduceMotion }
-    /// The Board tab is on screen and its filter row names the board.
+    /// The Board scope is on screen and its filter row names the board.
     private var boardPartShown: Bool {
         model.mode == .issues && model.issueScope == .board && model.issueTabs != nil && model.offersBoardMenu
     }
@@ -97,7 +97,7 @@ struct PopoverView: View {
             timeTitle: model.timeFocus?.stripText(now: Date()),
             boardTitle: boardPartShown ? model.boardMenuTitle : nil)
     }
-    /// The Done group of the Issues tab on screen is unfolded.
+    /// The Done group of the Issues list on screen is unfolded.
     private var doneExpanded: Bool { model.issueScope.tab.map(doneExpandedTabs.contains) ?? false }
     private var listExpansion: ListExpansion { ListExpansion(done: doneExpanded) }
 

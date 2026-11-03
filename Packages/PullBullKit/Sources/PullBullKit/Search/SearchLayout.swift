@@ -102,7 +102,7 @@ public struct SearchIssueSectionLayout: Sendable {
     }
 }
 
-/// Search results in the reference tab's layout (`SearchScope.reference`).
+/// Search results in the layout of the tab or list they are shown as.
 public enum SearchLayout {
     /// The pull request results as `tab`, grouped by `grouping` (`PRGrouping.forTab`), shows them: its
     /// row rule for each open result and its sort (`settings.sort(for: tab)`). Closed results stay newest-closed first.
@@ -161,11 +161,12 @@ public enum SearchLayout {
 
     /// The issue results in All's sections. A result done on the board goes to Done; else it sits in the
     /// section the list holds it in; else, assigned to `viewer`, in Assigned to you; else, opened by
-    /// `viewer`, in You opened; else in Other results. Each section follows All's sort.
+    /// `viewer`, in You opened; else in Other results. Each section follows All's sort. `list` is the built
+    /// All list for `tabs`.
     public static func issueSections(
-        _ results: SearchResults, tabs: BuiltIssueTabs, snap: Snapshot, settings: AppSettings, viewer: String
+        _ results: SearchResults, list: IssueList, tabs: BuiltIssueTabs, snap: Snapshot, settings: AppSettings,
+        viewer: String
     ) -> SearchIssueSectionLayout {
-        let list = IssueList.build(tabs, snap: snap, settings: settings)
         let done = IssueList.doneKeys(in: snap)
         let held = Dictionary(
             list.sections.flatMap { section in section.issues.map { ($0.key, section.section) } },
@@ -178,7 +179,7 @@ public enum SearchLayout {
             if issue.assignees.contains(where: { matches($0.login) }) { return .assignedToYou }
             return matches(issue.author) ? .youOpened : .otherResults
         }
-        let ordered = IssueList.ordering(settings.sort(for: .all, boardAvailable: tabs.board != nil), snap: snap)
+        let ordered = IssueList.ordering(settings.sort(for: .all, boardAvailable: tabs.statusKnown), snap: snap)
         let doneResults = results.openIssues.filter { done.contains($0.key) }
         let bySection = Dictionary(
             grouping: results.openIssues.filter { !done.contains($0.key) }, by: section(of:))

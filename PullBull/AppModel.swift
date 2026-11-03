@@ -234,7 +234,7 @@ final class AppModel {
     }
 
     /// The board can be read, so All offers and follows the Board status sort.
-    private var boardAvailable: Bool { issueTabs?.board != nil }
+    private var boardAvailable: Bool { issueTabs?.statusKnown ?? false }
     /// The repository every list and search is narrowed to; counts, the badge and notifications ignore
     /// it. Never persisted. A selection the new focus hides is dropped, and search results on screen are
     /// searched again.
@@ -882,11 +882,11 @@ final class AppModel {
 
     // MARK: Board menu
 
-    /// The boards the Board tab's menu lists, per account and owner: loaded when the menu opens, and
+    /// The boards the Board scope's menu lists, per account and owner: loaded when the menu opens, and
     /// warmed by every other boards fetch. This session only; dropped with the account's data.
     private(set) var boardList = BoardList()
 
-    /// The Board tab's filter row names the board: there is a scope with boards, and the tab isn't explaining
+    /// The Board scope's filter row names the board: there is a scope with boards, and the scope isn't explaining
     /// missing access instead.
     var offersBoardMenu: Bool {
         settings.accountRef != nil && settings.boardOwner != nil && BoardPicker.isOffered(
@@ -1258,10 +1258,11 @@ final class AppModel {
     /// (`searchIssueLayout`), in PR mode and without results, lists or a snapshot.
     var searchIssueSectionLayout: SearchIssueSectionLayout? {
         guard mode == .issues, let results = searchResults, let snapshot = shownSnapshot, let issueTabs,
-              searchReferenceTab == .issues(.all)
+              let issueList, searchReferenceTab == .issues(.all)
         else { return nil }
         return SearchLayout.issueSections(
-            results, tabs: issueTabs, snap: snapshot, settings: settings, viewer: snapshot.org.viewer)
+            results, list: issueList, tabs: issueTabs, snap: snapshot, settings: settings,
+            viewer: snapshot.org.viewer)
     }
 
     /// Folds or unfolds the results' Closed section; a selection it hides moves to the next row shown.
@@ -2590,7 +2591,7 @@ extension AppModel {
         settings.laneFolds.shownFolded(groups, tab: tab, board: settings.board, searching: route == .search)
     }
 
-    /// Folds or opens a lane of the Issues tab on screen. A highlight in the lane moves to the next row
+    /// Folds or opens a lane of the Issues list on screen. A highlight in the lane moves to the next row
     /// still shown, or clears.
     func toggleLane(_ kind: IssueGroupKind, on tab: IssueTab, doneExpanded: Bool) {
         guard let board = settings.board else { return }

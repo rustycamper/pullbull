@@ -47,7 +47,7 @@ struct IssueScopeChips: View {
             guard let tab = scope.tab else { return model.everywhereCount }
             return model.searchMatchCounts[.issues(tab)]
         }
-        return (model.issueTabs?.count(of: scope)).flatMap { $0 == .current(0) ? nil : $0 }
+        return model.issueTabs?.chipCount(of: scope)
     }
 
     /// The lists All reads that didn't update, outside search; empty for the other chips, whose own count

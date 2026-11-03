@@ -383,7 +383,9 @@ private func shape(_ layout: SearchSectionLayout) -> [String] {
             mine(4, assignedToMe: true), mine(5, author: "Me"), mine(6, author: "bob"),
             issue(7, open: false, closed: 3), issue(8, open: false, closed: 9),
         ])
-        let shown = SearchLayout.issueSections(found, tabs: tabs, snap: s, settings: AppSettings(), viewer: "me")
+        let shown = SearchLayout.issueSections(
+            found, list: IssueList.build(tabs, snap: s, settings: AppSettings()), tabs: tabs, snap: s,
+            settings: AppSettings(), viewer: "me")
         #expect(shown.sections.map(\.section) == [.assignedToYou, .youOpened, .restOfBoard, .otherResults])
         #expect(shown.sections.allSatisfy { $0.state == .rows })
         #expect(shown.sections.map { $0.issues.map(\.key.number).sorted() } == [[1, 4], [2, 5], [3], [6]])
@@ -394,10 +396,22 @@ private func shape(_ layout: SearchSectionLayout) -> [String] {
         #expect(shown.keys(closedExpanded: true, doneExpanded: false).suffix(2).map(\.number) == [7, 8])
     }
 
+    @Test func anIssueAssignedSinceTheLastPollStaysInRestOfTheBoard() {
+        let (s, tabs) = issueSnap(board: [mine(1, assignedToMe: true, status: "opt1")])
+        let found = results(issues: [mine(1, assignedToMe: true, status: "opt1")])
+        let shown = SearchLayout.issueSections(
+            found, list: IssueList.build(tabs, snap: s, settings: AppSettings()), tabs: tabs, snap: s,
+            settings: AppSettings(), viewer: "me")
+        #expect(shown.sections.map(\.section) == [.restOfBoard])
+        #expect(shown.sections.flatMap(\.issues).map(\.key.number) == [1])
+    }
+
     @Test func aDoneOnTheBoardResultGoesToDone() {
         let (s, tabs) = issueSnap(board: [issue(1, status: "opt3"), issue(2, status: "opt3", updated: 5)])
         let found = results(issues: [mine(1, assignedToMe: true, status: "opt3"), issue(2), issue(3, status: "opt1")])
-        let shown = SearchLayout.issueSections(found, tabs: tabs, snap: s, settings: AppSettings(), viewer: "me")
+        let shown = SearchLayout.issueSections(
+            found, list: IssueList.build(tabs, snap: s, settings: AppSettings()), tabs: tabs, snap: s,
+            settings: AppSettings(), viewer: "me")
         #expect(shown.done.map(\.key.number) == [1, 2])
         #expect(shown.sections.flatMap(\.issues).map(\.key.number) == [3])
         #expect(!shown.sections.contains { $0.section == .doneStillOpen })

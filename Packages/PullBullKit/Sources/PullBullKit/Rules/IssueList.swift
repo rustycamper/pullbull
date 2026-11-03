@@ -96,7 +96,7 @@ public struct IssueList: Equatable, Sendable {
 
     public static func build(_ tabs: BuiltIssueTabs, snap: Snapshot, settings: AppSettings) -> IssueList {
         let done = doneKeys(in: snap)
-        let sort = settings.sort(for: .all, boardAvailable: tabs.board != nil)
+        let sort = settings.sort(for: .all, boardAvailable: tabs.statusKnown)
         let shown = shownStatus(in: snap)
         let ordered = ordering(sort, snap: snap)
 
@@ -163,6 +163,12 @@ extension BuiltIssueTabs {
     /// The chip's count; nil for All.
     public func count(of scope: IssueScope) -> IssueTabCount? {
         scope.tab.map(count)
+    }
+
+    /// The count a chip shows outside search: nil for All and for a list that holds nothing; a stale or
+    /// unreadable list still shows.
+    public func chipCount(of scope: IssueScope) -> IssueTabCount? {
+        count(of: scope).flatMap { $0 == .current(0) ? nil : $0 }
     }
 
     /// Assigned and Created, in that order, whose latest search failed with a list kept.

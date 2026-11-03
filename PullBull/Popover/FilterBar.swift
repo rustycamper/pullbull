@@ -1,7 +1,7 @@
 import SwiftUI
 import PullBullKit
 
-/// The slim row at the top of every list: "▦ Roadmap ▾ · ▤ All repos ▾" on the Board tab, "▤ All repos ▾"
+/// The slim row at the top of every list: "▦ Roadmap ▾ · ▤ All repos ▾" on the Board scope, "▤ All repos ▾"
 /// elsewhere, "▤ widgets ▾ ✕" with a repo focus, plus "◷ Last 3 days" with a time focus. The board name opens
 /// the board menu (⌘⇧B), the repo name the repository menu (⌘⇧F); ✕ clears both focuses. The sort button
 /// sits at the right end.

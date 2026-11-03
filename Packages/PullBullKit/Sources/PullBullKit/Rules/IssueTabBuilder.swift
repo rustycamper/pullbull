@@ -144,7 +144,7 @@ public struct BuiltIssueTabs: Sendable {
     }
 }
 
-/// A tab's count as the tab bar shows it.
+/// A tab's count as the chips and the footer show it.
 public enum IssueTabCount: Equatable, Sendable {
     /// The list's latest fetch succeeded.
     case current(Int)

@@ -55,7 +55,8 @@ public struct ListFocus: Equatable, Sendable {
                 }
             }
         }
-        let status = list.status.filter { key, _ in sections.contains { $0.issues.contains { $0.key == key } } }
+        let shownKeys = Set(sections.flatMap { $0.issues.map(\.key) })
+        let status = list.status.filter { shownKeys.contains($0.key) }
         return ScopedIssueList(
             list: IssueList(
                 sections: sections, status: status, nothingAssigned: list.nothingAssigned, isEmpty: list.isEmpty),

@@ -34,8 +34,8 @@ struct FooterView: View {
             gearOnlyBody
         } else if let error = model.status.error, model.snapshot != nil {
             errorBody(error)
-        } else if let issuesError, let staleTab {
-            let title = "\(IssueScope(staleTab).title) didn't update"
+        } else if let issuesError, !staleTabs.isEmpty {
+            let title = "\(ListFormatter.localizedString(byJoining: staleTabs.map { IssueScope($0).title })) didn't update"
             warningBody(
                 symbol: "exclamationmark.triangle",
                 message: Text(title).fontWeight(.semibold).foregroundColor(.primary)
@@ -108,24 +108,25 @@ struct FooterView: View {
             focus: model.repoFocus, choices: model.repoChoices)
     }
 
-    /// The poll succeeded but the search of the Assigned or Created tab on screen did not (its list is
+    /// The poll succeeded but the search of the Assigned or Created list on screen did not (its list is
     /// the previous one); never on Board, which has its own state. Not while the list is empty or never
-    /// loaded: the list itself then shows the error with Retry. All names the first of its lists so kept.
+    /// loaded: the list itself then shows the error with Retry. The reason is the first such list's.
     private var issuesError: String? {
-        guard model.mode == .issues, let issueTabs = model.issueTabs, let tab = staleTab else { return nil }
+        guard model.mode == .issues, let issueTabs = model.issueTabs, let tab = staleTabs.first else { return nil }
         guard issueTabs.isLoaded(tab), issueTabs.contents(tab)?.groups.isEmpty == false else { return nil }
         return model.snapshot?.issuesError(for: tab)
     }
 
-    /// The list the stale line is about: the tab on screen, or for All the first of its stale lists.
-    private var staleTab: IssueTab? {
-        model.issueScope.tab ?? model.issueTabs?.staleTabs.first
+    /// The lists the stale line is about: the tab on screen, or for All its stale lists, Assigned first.
+    private var staleTabs: [IssueTab] {
+        model.issueScope.tab.map { [$0] } ?? model.issueTabs?.staleTabs ?? []
     }
 
-    /// "showing results from 12m ago" for the list the line is about, when its fetch time is known.
+    /// "showing results from 12m ago" for the oldest list the line is about, when its fetch time is known.
     private var issuesStaleDetail: String? {
-        guard let tab = staleTab, let fetched = model.snapshot?.issuesFetchedAt(for: tab) else { return nil }
-        return "showing results from \(RelativeAge.ago(fetched, now: now))"
+        let fetched = staleTabs.compactMap { model.snapshot?.issuesFetchedAt(for: $0) }
+        guard let oldest = fetched.min() else { return nil }
+        return "showing results from \(RelativeAge.ago(oldest, now: now))"
     }
 
     private func errorBody(_ error: RefreshError) -> some View {

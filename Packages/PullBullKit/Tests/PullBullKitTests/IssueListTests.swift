@@ -42,6 +42,13 @@ private func numbers(_ list: IssueList, _ section: IssueSection) -> [Int]? {
     list.sections.first { $0.section == section }?.issues.map(\.key.number)
 }
 
+private extension IssueSectionState {
+    var isStaleForTest: Bool {
+        if case .stale = self { return true }
+        return false
+    }
+}
+
 @Suite struct IssueListTests {
     @Test func anIssueAssignedAndCreatedShowsOnceUnderAssigned() {
         let mine = issue(1)
@@ -135,6 +142,61 @@ private func numbers(_ list: IssueList, _ section: IssueSection) -> [Int]? {
         #expect(Set(IssueSection.allCases.map(\.rawValue)).isDisjoint(with: PRSection.allCases.map(\.rawValue)))
         #expect(IssueSection.doneStillOpen.title == "Done")
         #expect(IssueSection.allCases.map(\.rowTab) == [.assigned, .created, .board, .board, .board])
+    }
+
+    @Test func aChipShowsNoCountForAnEmptyListOrAll() {
+        let (empty, _) = built(snap(assigned: [], created: [issue(1)], board: [issue(2, status: todo)]))
+        #expect(empty.chipCount(of: .all) == nil)
+        #expect(empty.chipCount(of: .assigned) == nil)
+        #expect(empty.chipCount(of: .created) == .current(1))
+        #expect(empty.chipCount(of: .board) == .current(1))
+
+        let (never, _) = built(snap(assigned: nil, created: []))
+        #expect(never.chipCount(of: .assigned) == .unavailable)
+
+        let (stale, _) = built(snap(created: [issue(1)], createdError: "boom"))
+        #expect(stale.chipCount(of: .created) == stale.count(of: .created))
+        #expect(stale.chipCount(of: .created)?.value == 1)
+
+        let (failed, _) = built(snap(created: [], createdError: "boom"))
+        #expect(failed.chipCount(of: .created) == .unavailable)
+    }
+
+    @Test func aStaleSectionSurvivesATimeFocus() {
+        let mixed = [issue(1, status: todo, updated: now), issue(2, status: todo, updated: ago(30))]
+        let (_, list) = built(snap(assigned: mixed, board: mixed, assignedError: "boom"))
+        #expect(list.status.count == 2)
+        #expect(list.sections.first?.state.isStaleForTest == true)
+        let time = TimeFocus(step: .today, now: now, calendar: Calendar(identifier: .gregorian))
+        let scoped = ListFocus(repo: nil, time: time).scope(list)
+        #expect(numbers(scoped.list, .assignedToYou) == [1])
+        #expect(scoped.list.sections.first?.state == list.sections.first?.state)
+        #expect(scoped.list.status.keys.sorted { $0.number < $1.number } == [PRKey(repo: "o/r", number: 1)])
+        #expect(scoped.hiddenCount == 1)
+    }
+
+    @Test func boardStatusNeedsAStatusFieldOnTheBoard() {
+        var settings = AppSettings()
+        settings.setSort(.boardStatus, for: IssueScope.all)
+        let board = [issue(1, updated: ago(3), open: true), issue(2, updated: ago(1))]
+        let noStatus = Snapshot(
+            fetchedAt: now, org: OrgContext(org: "o", viewer: "me", members: [], myTeams: [], repos: []),
+            reviewCandidates: [], mine: [], team: [], recentlyClosed: [], boardIssues: board, boardProject: 3,
+            assignedIssues: [], createdIssues: [], boardStatusOptions: [])
+        let tabs = IssueTabBuilder.build(noStatus, settings: settings, now: now)
+        #expect(tabs.board != nil)
+        #expect(!tabs.statusKnown)
+        #expect(settings.sort(for: IssueScope.all, boardAvailable: tabs.statusKnown) == .recentlyUpdated)
+        let list = IssueList.build(tabs, snap: noStatus, settings: settings)
+        #expect(numbers(list, .restOfBoard) == [2, 1])
+    }
+
+    @Test func aStoredBoardStatusReadsAsRecentlyUpdatedOnATabScope() {
+        var settings = AppSettings()
+        for scope in [IssueScope.assigned, .created, .board] { settings.setSort(.boardStatus, for: scope) }
+        for scope in [IssueScope.assigned, .created, .board] {
+            #expect(settings.sort(for: scope, boardAvailable: true) == .recentlyUpdated)
+        }
     }
 
     @Test func staleTabsNamesAssignedAndCreated() {
