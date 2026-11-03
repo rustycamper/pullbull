@@ -36,6 +36,10 @@ struct PRDetailView: View {
                         if let detail {
                             if let error = fetch?.error { RefreshFailedNote(message: error) { model.reloadDetail() } }
                             sections(detail, now: context.date)
+                        } else if let pr, pr.state == .open, fetch?.error == nil {
+                            // Reviewers, from the list data, sit above the Checks placeholder as in the loaded detail.
+                            reviewersSection(reviews: pr.latestReviews, pr: pr)
+                            placeholder
                         } else {
                             placeholder
                             if let pr { reviewersSection(reviews: pr.latestReviews, pr: pr) }
@@ -180,7 +184,7 @@ struct PRDetailView: View {
 
     // MARK: Sections
 
-    /// Open PRs lead with status (checks, reviewers); merged and closed ones keep the description first.
+    /// Open PRs lead with status (reviewers, checks); merged and closed ones keep the description first.
     @ViewBuilder private func sections(_ detail: PRDetail, now: Date) -> some View {
         if pr?.state == .open {
             statusSections(detail)
@@ -194,12 +198,12 @@ struct PRDetailView: View {
     }
 
     @ViewBuilder private func statusSections(_ detail: PRDetail) -> some View {
-        checksSection(detail)
         if let pr {
             reviewersSection(reviews: detail.reviews, pr: pr, detail: detail)
         } else if !detail.reviews.isEmpty || detail.requests?.isEmpty == false {
             reviewersSection(reviews: detail.reviews, pr: nil, detail: detail)
         }
+        checksSection(detail)
     }
 
     private func checksSection(_ detail: PRDetail) -> some View {
