@@ -184,12 +184,12 @@ final class AppModel {
         }
     }
     /// The chip on screen in Issues mode. Not persisted itself: the popover opens on the scope Settings
-    /// chooses (`popoverDidClose`), and `lastIssueScope` keeps the one last shown. A change clears the time
-    /// focus.
+    /// chooses (`popoverDidClose`), and `lastIssueScope` keeps the one last shown. A change on screen clears
+    /// the time focus; one made off screen (the reset at close in Pull Requests mode) leaves the PR list's.
     var issueScope: IssueScope = .all {
         didSet {
             guard issueScope != oldValue else { return }
-            timeFocus = nil
+            if mode == .issues { timeFocus = nil }
             detailWalk = nil
         }
     }
