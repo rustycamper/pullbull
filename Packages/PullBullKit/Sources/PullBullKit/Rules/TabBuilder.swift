@@ -267,9 +267,9 @@ public enum TabBuilder {
             .sorted { ($0.closedAt ?? .distantPast) > ($1.closedAt ?? .distantPast) }
 
         return BuiltTabs(
-            review: contents(review, sort: settings.sort(for: .review), on: .review, me: me, myTeams: myTeams, now: now),
-            mine: contents(mine, sort: settings.sort(for: .mine), on: .mine, me: me, myTeams: myTeams, now: now),
-            team: contents(team, sort: settings.sort(for: .team), on: .team, me: me, myTeams: myTeams, now: now),
+            review: contents(review, sort: settings.sort(for: PRTab.review), on: .review, me: me, myTeams: myTeams, now: now),
+            mine: contents(mine, sort: settings.sort(for: PRTab.mine), on: .mine, me: me, myTeams: myTeams, now: now),
+            team: contents(team, sort: settings.sort(for: PRTab.team), on: .team, me: me, myTeams: myTeams, now: now),
             recentlyClosed: closed, hiddenApprovedCount: hiddenApproved.count
         )
     }
