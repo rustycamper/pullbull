@@ -99,7 +99,7 @@ import Testing
         #expect(review.info == [.reRequested, .conflicts])
         let viaTeam = Self.chips(Self.row(reason: .teamRequested("core"), mergeable: .conflicting), .review)
         #expect(viaTeam.info == [.viaTeam("org/core"), .conflicts])
-        #expect(Self.chips(Self.row(reason: .requested, mergeable: .conflicting), .review).info == [.conflicts])
+        #expect(Self.chips(Self.row(reason: .requested, mergeable: .conflicting), .review).info == [.requested, .conflicts])
         let dimmed = Self.chips(Self.row(reviews: [("me", .approved)], dimmed: true, mergeable: .conflicting), .review)
         #expect(dimmed == RowChips(action: nil, info: [.youApprovedNotCounted, .conflicts]))
     }
@@ -136,9 +136,18 @@ import Testing
 
     // MARK: Review
 
-    @Test func reviewFirstRequestShowsNothing() {
-        #expect(Self.chips(Self.row(reason: .requested), .review) == RowChips(action: nil, info: []))
+    @Test func reviewFirstRequestShowsReq() {
+        #expect(Self.chips(Self.row(reason: .requested), .review) == RowChips(action: nil, info: [.requested]))
         #expect(Self.chips(Self.row(), .review) == RowChips(action: nil, info: []))
+    }
+
+    @Test func reviewDimmedRequestShowsApprovedNotReq() {
+        #expect(Self.chips(Self.row(dimmed: true, reason: .requested), .review).info == [.youApprovedNotCounted])
+    }
+
+    @Test func reviewReqComesBeforeTheWaitAndConflicts() {
+        let row = Self.row(requests: [(.user("me"), Self.t0 + 3 * 86_400)], reason: .requested, mergeable: .conflicting)
+        #expect(Self.chips(row, .review).info == [.requested, Self.wait(row, .review), .conflicts])
     }
 
     @Test func reviewReasonsAreInfo() {
@@ -187,7 +196,13 @@ import Testing
         #expect(!RowChips.Info.conflicts.isReviewWait)
         #expect(RowChips.Info.newCommits.label == "New commits since your review")
         #expect(RowChips.Info.viaTeam("org/web").text == "via @org/web")
-        #expect(RowChips.Info.reRequested.label == "Re-requested")
+        #expect(RowChips.Info.reRequested.text == "Re-req")
+        #expect(RowChips.Info.reRequested.label == "Review re-requested from you")
+        #expect(RowChips.Info.requested.text == "Req")
+        #expect(RowChips.Info.requested.label == "Review requested from you")
+        #expect(RowChips.Info.requested.symbol == "bell")
+        #expect(!RowChips.Info.requested.isWarning)
+        #expect(!RowChips.Info.requested.isCount)
         #expect(RowChips.Info.approvals(2).isCount)
         #expect(!RowChips.Info.reviewWait(wait).isCount)
         #expect(RowChips.Info.conflicts.text == "Conflicts")
