@@ -245,7 +245,7 @@ The README (Tabs section, table rows and screenshots in `docs/media`) and `docs/
 - **Search layout:** an Everywhere result in each section, my own PR from GitHub split by the rule, Other results, and folded sections opening during a search.
 - **Chip counts:** focus doesn't change them, and Mine is the sum of its two sections.
 - **`RowChips`:** Req and Re-req text and labels, and that no chip shows for a dimmed row.
-- **Settings decoding:** an old file with `lastTab` loads and opens on All; old sort keys carry over; the open-on and chips settings round-trip.
+- **Settings decoding:** an old file with `lastTab` loads and opens on All; old sort keys carry over; the open-on setting and `lastScope` round-trip; a saved `scopeChips` is ignored and not written back.
 - **`ListNavigation`:** keyboard order across sections, and skipping folded ones.
 - **`SearchScope`:** scope picking with chips, and Team hidden without an org.
 - **In the app**, with an org account and with a personal one:

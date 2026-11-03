@@ -651,7 +651,7 @@ final class AppModel {
         openOnScope()
     }
 
-    /// Remembers the chip on screen for Last used; the settings rule decides whether it applies.
+    /// Remembers the chip on screen for Last used.
     func recordLastScope() {
         settings.recordLastScope(prScope)
     }

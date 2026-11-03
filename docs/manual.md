@@ -77,7 +77,7 @@ One list in sections, scoped by chips above it. It opens on All, or on the choic
 | Mine | Your PRs, Waiting on others, folded Recently closed: yours closed or merged in the last 7 days. Review pills, checks, **Ready to merge** |
 | Team | Other open PRs in the org, not the ones in Needs you. Group by author: Settings → General. No chip without an org |
 
-- **Chips:** click one to scope the list, click it again for All, or press <kbd>←</kbd> <kbd>→</kbd>. Each shows its count (Needs you in the accent colour when above zero); the counts ignore the repo and time focus.
+- **Chips:** click one to scope the list, click it again for All, or press <kbd>←</kbd> <kbd>→</kbd>. Each shows its count (Needs you in the accent colour when above zero); the counts ignore the repo and time focus
 - **Not grouped by repo:** All and Mine are grouped by their sections, and each row names its repo (`widgets #1305`). Needs you and Team group by repo, or by author for Team, as before
 
 | Section | Rows | Header |
@@ -367,7 +367,7 @@ Reopen within a minute and the detail is still there.
 
 | Tab | |
 |---|---|
-| General | Grouping, Team by author, compact cards, where pull requests open, scope chips, background, filters (Needs you and Team), menu bar count, refresh interval, pending CI checks, shortcut, Keyboard Shortcuts window, launch at login, updates |
+| General | Grouping, Team by author, compact cards, where pull requests open, background, filters (Needs you and Team), menu bar count, refresh interval, pending CI checks, shortcut, Keyboard Shortcuts window, launch at login, updates |
 | Account | Account, org, board, access notices |
 | Notifications | One toggle per event, grouped: my pull requests · pull requests I review · issues assigned to me · issues I created |
 | Search | Saved searches: rename, edit the query, drag to reorder, **+** and **−**. Apply one from the empty search field; the first nine have ⌃1–⌃9 |

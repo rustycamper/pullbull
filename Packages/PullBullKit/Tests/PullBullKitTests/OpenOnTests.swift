@@ -78,6 +78,14 @@ private func settings(
         #expect(!saved.contains("lastTab"))
     }
 
+    @Test func aSavedScopeChipsSettingIsIgnoredAndDropped() throws {
+        let old = try decode(#"{"account":"me","org":"o","scopeChips":false,"openOn":"mine"}"#)
+        #expect(old.prChips == [.all, .review, .mine, .team])
+        #expect(old.scopeOnOpen == .mine)
+        let saved = try #require(String(data: JSONEncoder().encode(old), encoding: .utf8))
+        #expect(!saved.contains("scopeChips"))
+    }
+
     @Test func theOpenOnChoiceAndTheLastScopeRoundTrip() throws {
         var s = settings(openOn: .lastUsed, lastScope: .team)
         s.projectOwner = .org("o")

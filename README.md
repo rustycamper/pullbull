@@ -125,7 +125,7 @@ Full list in the [manual](docs/manual.md#keyboard).
 
 | Tab | |
 |---|---|
-| General | Grouping, Team by author, compact cards, where pull requests open, scope chips, filters, menu bar count, refresh interval, shortcut, all keyboard shortcuts, launch at login, updates |
+| General | Grouping, Team by author, compact cards, where pull requests open, filters, menu bar count, refresh interval, shortcut, all keyboard shortcuts, launch at login, updates |
 | Account | Account, org, board |
 | Notifications | A separate toggle for each event on your PRs, PRs you review, issues assigned to you and issues you created: reviews, dismissed reviews, CI, comments, ready to merge, merged, assigned, status changes, closed or reopened |
 | Search | Saved searches: rename, edit, reorder, delete |
