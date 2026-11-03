@@ -2,7 +2,7 @@ import AppKit
 import PullBullKit
 import SwiftUI
 
-/// The Keyboard Shortcuts window: ⌘/ in the popover, or Settings → General. A window rather than
+/// The Keyboard Shortcuts window: ⌘/ in the popover, the app menu (`AppMenu`), or Settings → General. A window rather than
 /// the popover, so it stays up beside it.
 @MainActor
 final class ShortcutsWindowController: NSObject, NSWindowDelegate {

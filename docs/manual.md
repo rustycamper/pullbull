@@ -62,7 +62,7 @@ Without `read:project`: Board shows the command to add it, Mine groups by repo.
 | | |
 |---|---|
 | Click · <kbd>⌃</kbd><kbd>⌥</kbd><kbd>P</kbd> | Open or close (shortcut: Settings → General) |
-| Right-click | About PullBull · Settings · Check for Updates (release builds) · Quit |
+| Right-click | Settings · Keyboard Shortcuts · About PullBull · Check for Updates (release builds) · Quit. The same menu as the footer gear |
 
 ## Pull Requests
 
@@ -86,7 +86,7 @@ A PR waiting on review shows who it waits on and for how long (🕒 @dana 3d, "+
 - **Labels:** up to two chips per row (none in compact cards), each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail's Details card lists them all
 - **Right-click a row:** [Reviewers…](#editing) · [Assignees…](#editing) · [Labels…](#editing) · copy branch, link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · show only updated · search author
 - **Right-click a group header** (repo, author): **Open All *N* on GitHub**, from two PRs up; above 8 it asks first. An author header's menu also offers **Search @*login*** and **Show Only Updated**. Headers in search results get the tab's menus, without Show Only Updated
-- **Footer:** account · refresh · open on GitHub · settings. Turns amber with **Retry** when a refresh fails
+- **Footer:** account · refresh · open on GitHub · the gear, a menu with Settings, Keyboard Shortcuts, About PullBull, Check for Updates (release builds) and Quit. Turns amber with **Retry** when a refresh fails
 - **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Lists your signed-in accounts, then GitHub CLI logins, each with the org it opens in; then Add Account… and Account Settings…. Each account comes back with its last org, and each org with its last board
 
 ## Issues
@@ -280,7 +280,7 @@ Settings → Ask AI.
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd> | Account menu |
 | <kbd>⌘</kbd><kbd>R</kbd> | Refresh |
 | <kbd>⌘</kbd><kbd>,</kbd> | Settings |
-| <kbd>⌘</kbd><kbd>/</kbd> | Keyboard Shortcuts window: every shortcut by section, with a filter. <kbd>Esc</kbd> clears the filter, then closes; <kbd>⌘</kbd><kbd>W</kbd> or <kbd>⌘</kbd><kbd>/</kbd> closes. Also Settings → General → Keyboard shortcuts |
+| <kbd>⌘</kbd><kbd>/</kbd> | Keyboard Shortcuts window: every shortcut by section, with a filter. <kbd>Esc</kbd> clears the filter, then closes; <kbd>⌘</kbd><kbd>W</kbd> or <kbd>⌘</kbd><kbd>/</kbd> closes. Also the footer gear, and Settings → General → Keyboard shortcuts |
 | <kbd>Esc</kbd> | Clear search → clear repo → close |
 | <kbd>⌘</kbd><kbd>W</kbd> | Close |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd> | [Status picker](#editing) on the selected issue, when a board is shown. In search results too |
@@ -343,7 +343,7 @@ Reopen within a minute and the detail is still there.
 
 ## Settings
 
-<kbd>⌘</kbd><kbd>,</kbd> or the footer gear.
+<kbd>⌘</kbd><kbd>,</kbd>, or the footer gear → Settings….
 
 | Tab | |
 |---|---|
