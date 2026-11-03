@@ -208,9 +208,10 @@ struct PRDetailView: View {
 
     private func checksSection(_ detail: PRDetail) -> some View {
         let checks = detail.checks
-        let order: [CIState] = [.failure, .pending, .success, .skipped, .none]
+        let order: [CIState] = [.failure, .pending, .cancelled, .success, .skipped, .none]
         let sorted = order.flatMap { state in checks.filter { $0.state == state } }
-        // On an open PR a green run folds to its summary; anything failed or running stays open.
+        // On an open PR a green run folds to its summary; anything failed, running or cancelled stays open,
+        // so a cancelled run that GitHub's rollup counts as a failure shows why the row is red.
         let folded = pr?.state == .open && !checksExpanded && !checks.isEmpty
             && checks.allSatisfy { [.success, .skipped, .none].contains($0.state) }
         // A folded list that never passed anything (all skipped) keeps the skipped glyph, not a check mark.
@@ -261,7 +262,8 @@ struct PRDetailView: View {
 
     static func checksSummary(_ checks: [Check]) -> String? {
         let parts: [(CIState, String)] = [
-            (.failure, "failed"), (.pending, "running"), (.success, "passed"), (.skipped, "skipped"),
+            (.failure, "failed"), (.pending, "running"), (.cancelled, "cancelled"), (.success, "passed"),
+            (.skipped, "skipped"),
         ]
         let text = parts.compactMap { state, word -> String? in
             let n = checks.filter { $0.state == state }.count
@@ -573,6 +575,7 @@ private struct CheckLine: View {
         case .failure: "failed"
         case .pending: "running"
         case .skipped: "skipped"
+        case .cancelled: "cancelled"
         case .none: "no result"
         }
     }

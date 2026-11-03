@@ -18,14 +18,18 @@ extension PREvent {
         }
     }
 
-    /// The failing checks by name: one is named, several are counted. Nil when none are known.
+    /// The failing checks by name: one is named, several are counted. With none failed, the cancelled ones,
+    /// which GitHub's rollup counts as failures. Nil when neither is known.
     public static func ciSubtitle(_ checks: [Check]) -> String? {
-        let failed = checks.filter { $0.state == .failure }.map(\.name)
-        switch failed.count {
-        case 0: return nil
-        case 1: return "\(failed[0]) failed"
-        default: return "\(failed.count) checks failed"
+        for (state, word) in [(CIState.failure, "failed"), (.cancelled, "cancelled")] {
+            let names = checks.filter { $0.state == state }.map(\.name)
+            switch names.count {
+            case 0: continue
+            case 1: return "\(names[0]) \(word)"
+            default: return "\(names.count) checks \(word)"
+            }
         }
+        return nil
     }
 
     /// The PR title.

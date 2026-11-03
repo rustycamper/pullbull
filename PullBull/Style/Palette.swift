@@ -10,6 +10,7 @@ enum Palette {
         case .failure: ("xmark.circle.fill", .red)
         case .pending: ("clock", .secondary)
         case .skipped: ("minus.circle", .secondary)
+        case .cancelled: ("stop.circle", .secondary)
         case .none: ("minus", tertiary)
         }
     }
@@ -20,6 +21,7 @@ enum Palette {
         case .failure: "Checks failed"
         case .pending: "Checks running"
         case .skipped: "Checks skipped"
+        case .cancelled: "Checks cancelled"
         case .none: "No checks"
         }
     }

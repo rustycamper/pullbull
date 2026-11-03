@@ -30,7 +30,9 @@ public enum PRGlyph: Sendable {
 public enum CIState: String, Codable, Sendable, Hashable {
     /// `skipped`: every check run ended skipped or neutral, so nothing ran to pass; as a check's state,
     /// that one run did. It passes for Ready to merge, like `none`, but never shows as passed.
-    case success, failure, pending, skipped, none
+    /// `cancelled`: only a check's state, a run stopped before it ended (often one a newer run of the same
+    /// workflow replaced). A PR's rollup never reads it: GitHub counts a cancelled run as a failure.
+    case success, failure, pending, skipped, cancelled, none
 }
 
 /// Whether GitHub can merge the PR without conflicts, from GraphQL's `MergeableState`. `unknown`

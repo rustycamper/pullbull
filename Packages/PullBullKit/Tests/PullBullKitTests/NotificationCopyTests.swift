@@ -38,6 +38,14 @@ private func event(_ kind: PREventKind, actor: String?) -> PREvent {
             == "2 checks failed")
     }
 
+    @Test func ciSubtitleNamesCancelledRunsOnlyWhenNothingFailed() {
+        func check(_ name: String, _ state: CIState) -> Check { Check(name: name, state: state, url: nil) }
+        #expect(PREvent.ciSubtitle([check("description", .cancelled), check("lint", .success)])
+            == "description cancelled")
+        #expect(PREvent.ciSubtitle([check("a", .cancelled), check("b", .cancelled)]) == "2 checks cancelled")
+        #expect(PREvent.ciSubtitle([check("description", .cancelled), check("test", .failure)]) == "test failed")
+    }
+
     @Test func missingActorHasNoSubtitle() {
         #expect(event(.reviewRequested, actor: nil).notificationSubtitle == nil)
         #expect(event(.approved, actor: nil).notificationSubtitle == nil)
