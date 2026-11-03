@@ -98,10 +98,12 @@ struct FooterView: View {
         .overlay(alignment: .top) { Hairline() }
     }
 
-    /// The focused repo's PRs or issues, else the tab's page on GitHub (`GitHubLinks.footer`).
+    /// The focused repo's PRs or issues, else the tab's page on GitHub (`GitHubLinks.footer`); All links
+    /// to Mine's, "PRs on GitHub".
     private var footerLink: (title: String, url: URL) {
         GitHubLinks.footer(
-            mode: model.mode, prTab: model.selectedTab, issueTab: model.selectedIssueTab, org: model.settings.org,
+            mode: model.mode, prTab: model.prScope.tab ?? .mine, issueTab: model.selectedIssueTab,
+            org: model.settings.org,
             board: model.settings.board, boardTitle: model.snapshot?.boardTitle,
             focus: model.repoFocus, choices: model.repoChoices)
     }

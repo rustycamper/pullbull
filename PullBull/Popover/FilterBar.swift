@@ -114,7 +114,7 @@ struct FilterBar: View {
         .accessibilityAction(named: "Change Repository") { showRepoMenu() }
     }
 
-    /// "2 of 4 in Review": the focused and all counted items of the tab on screen. On an issue tab m is
+    /// "2 of 4 in Mine": the focused and all counted items of the chip or tab on screen. On an issue tab m is
     /// the tab's own count (the stale one after a failed fetch); nil without a focus and while it reads
     /// "–" (not loaded, failed with nothing kept, Board unavailable), whose own states show instead.
     private var tally: String? {
@@ -122,9 +122,8 @@ struct FilterBar: View {
         guard focus.isActive else { return nil }
         switch model.mode {
         case .pullRequests:
-            let tab = model.selectedTab
-            guard let contents = model.contents(of: tab) else { return nil }
-            return FilterRow.tally(focus.scope(contents).contents.count, of: contents.count, in: tab.title)
+            guard let prList = model.prList else { return nil }
+            return FilterRow.tally(focus.scope(prList).list.count, of: prList.count, in: model.prScope.title)
         case .issues:
             let tab = model.selectedIssueTab
             guard let issueTabs = model.issueTabs, issueTabs.isLoaded(tab), let contents = issueTabs.contents(tab),

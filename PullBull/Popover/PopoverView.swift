@@ -5,8 +5,6 @@ import PullBullKit
 struct PopoverView: View {
     @Bindable var model: AppModel
     let presence: PopoverPresence
-    /// Folded on every launch; not persisted.
-    @State private var closedExpanded: Bool
     /// The Issues tabs whose Done group is unfolded (Board's and Assigned's fold separately); folded on
     /// every launch, not persisted.
     @State private var doneExpandedTabs: Set<IssueTab> = []
@@ -47,10 +45,9 @@ struct PopoverView: View {
     @State private var fadePane: ListPane?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(model: AppModel, presence: PopoverPresence = PopoverPresence(), closedExpanded: Bool = false) {
+    init(model: AppModel, presence: PopoverPresence = PopoverPresence()) {
         self.model = model
         self.presence = presence
-        _closedExpanded = State(initialValue: closedExpanded)
         _layers = State(initialValue: DetailLayer.stack(for: model))
     }
 
@@ -91,7 +88,7 @@ struct PopoverView: View {
     private var filterRow: FilterRow? {
         let listsBuilt = switch (searchShown, model.mode) {
         case (true, _): model.tabs != nil
-        case (false, .pullRequests): model.contents(of: model.selectedTab) != nil
+        case (false, .pullRequests): model.prList != nil
         case (false, .issues): model.issueTabs != nil
         }
         return FilterRow.make(
@@ -102,7 +99,7 @@ struct PopoverView: View {
     }
     /// The Done group of the Issues tab on screen is unfolded.
     private var doneExpanded: Bool { doneExpandedTabs.contains(model.selectedIssueTab) }
-    private var listExpansion: ListExpansion { ListExpansion(closed: closedExpanded, done: doneExpanded) }
+    private var listExpansion: ListExpansion { ListExpansion(done: doneExpanded) }
 
     private func doneExpanded(_ tab: IssueTab) -> Binding<Bool> {
         Binding {
@@ -218,9 +215,8 @@ struct PopoverView: View {
             }
         }
         // Folding a group drops a highlight on one of its rows, so it doesn't come back on the next unfold.
-        .onChange(of: closedExpanded) { _, expanded in if !expanded { dropHiddenListSelection() } }
         .onChange(of: doneExpandedTabs) { old, new in if !old.isSubset(of: new) { dropHiddenListSelection() } }
-        // A detail's walk snapshots the rows as shown, Recently closed and Done included when expanded.
+        // A detail's walk snapshots the rows as shown, Done included when expanded.
         .onChange(of: listExpansion, initial: true) { _, new in model.listExpansion = new }
         .onChange(of: fieldFocused) { _, focused in
             // The picker opened from the list keeps the focus; the search field doesn't open under it.
@@ -429,6 +425,7 @@ struct PopoverView: View {
         model.closeSetPicker(apply: true)
         // A time focus is transient: it ends with the popover, so the next open starts from a fresh "now".
         model.focus(time: nil)
+        model.popoverDidClose()
         pendingCaret = nil
         hintSelection = nil
         savedExpanded = false
@@ -570,7 +567,7 @@ struct PopoverView: View {
         if model.route == .ask { return handleAskKey(event, flags: flags) }
         // The list's own keys work while no search is open and no text field has focus.
         let listKeys = !searchOpen && !(window.firstResponder is NSText)
-            ? model.listKeys(closedExpanded: closedExpanded, doneExpanded: doneExpanded) : nil
+            ? model.listKeys(doneExpanded: doneExpanded) : nil
         // ⌘-chords are commands and never reach type-anywhere.
         if flags.contains(.command) {
             // ⌥⌘S: the Status picker on the selected issue result or the highlighted issue row.
@@ -805,7 +802,7 @@ struct PopoverView: View {
                 }
             } else if listKeys != nil, flags.subtracting([.capsLock, .numericPad, .function]) == .option {
                 // ⌥↑ / ⌥↓: the next or previous group; nothing in a list without groups.
-                model.jumpListGroup(by: offset, closedExpanded: closedExpanded, doneExpanded: doneExpanded)
+                model.jumpListGroup(by: offset, doneExpanded: doneExpanded)
             } else if let listKeys {
                 model.moveListSelection(by: offset, in: listKeys)
             } else {
@@ -1171,7 +1168,7 @@ struct PopoverView: View {
     }
 
     private func dropHiddenListSelection() {
-        let keys = model.listKeys(closedExpanded: closedExpanded, doneExpanded: doneExpanded)
+        let keys = model.listKeys(doneExpanded: doneExpanded)
         if ListNavigation.shown(model.listSelection, in: keys) == nil { model.listSelection = nil }
     }
 
@@ -1305,10 +1302,10 @@ struct PopoverView: View {
         AccessibilityNotification.Announcement(speech).post()
     }
 
-    /// The tab on screen, PR or issue.
+    /// The chip or tab on screen, PR or issue.
     private var pane: ListPane {
         switch model.mode {
-        case .pullRequests: .pullRequests(model.selectedTab)
+        case .pullRequests: .pullRequests(model.prScope)
         case .issues: .issues(model.selectedIssueTab)
         }
     }
@@ -1317,7 +1314,7 @@ struct PopoverView: View {
     private var paneHasRows: Bool {
         switch model.mode {
         case .pullRequests:
-            model.scopedContents(of: model.selectedTab) != nil
+            model.prList != nil
         case .issues:
             model.issueTabs?.isLoaded(model.selectedIssueTab) == true
                 && model.scopedContents(of: model.selectedIssueTab) != nil
@@ -1334,12 +1331,9 @@ struct PopoverView: View {
         ZStack {
             switch model.mode {
             case .pullRequests:
-                if let scoped = model.scopedContents(of: model.selectedTab) {
-                    PRListView(
-                        model: model, tab: model.selectedTab, scoped: scoped, total: total(of: model.selectedTab),
-                        recentlyClosed: model.scopedRecentlyClosed, now: now,
-                        closedExpanded: $closedExpanded)
-                    .transition(.opacity)
+                if let scoped = model.scopedPRList {
+                    PRListView(model: model, scoped: scoped, total: model.prList?.rowCount ?? 0, now: now)
+                        .transition(.opacity)
                 } else {
                     // While it fades out under the arriving rows, it takes no clicks.
                     emptyState
@@ -1374,13 +1368,6 @@ struct PopoverView: View {
             BoardUnavailableView(model: model)
                 .transition(.opacity)
         }
-    }
-
-    /// Everything the tab holds across repositories; on Mine the recently closed PRs count too, as a focus
-    /// can hide only those.
-    private func total(of tab: PRTab) -> Int {
-        let rows = model.contents(of: tab)?.rows.count ?? 0
-        return tab == .mine ? rows + (model.tabs?.recentlyClosed.count ?? 0) : rows
     }
 
     /// No snapshot yet: the install on the user's own account or the org approval an app account waits
@@ -1712,9 +1699,9 @@ private struct GhSplitButton: View {
     }
 }
 
-/// The list tab on screen, for telling rows arriving apart from a tab switch.
+/// The list chip or tab on screen, for telling rows arriving apart from a switch.
 private enum ListPane: Equatable {
-    case pullRequests(PRTab), issues(IssueTab)
+    case pullRequests(PRScope), issues(IssueTab)
 }
 
 /// A detail view, or the Ask screen, stacked over the list.
@@ -1811,38 +1798,34 @@ enum PreviewData {
 }
 
 #Preview("Team") {
-    var settings = AppSettings()
-    settings.lastTab = .team
-    return PopoverView(model: AppModel(preview: PreviewData.snapshot, settings: settings))
+    let model = AppModel(preview: PreviewData.snapshot)
+    model.pickScope(.team)
+    return PopoverView(model: model)
 }
 
 #Preview("Team, focused") {
-    var settings = AppSettings()
-    settings.lastTab = .team
-    let model = AppModel(preview: PreviewData.snapshot, settings: settings)
+    let model = AppModel(preview: PreviewData.snapshot)
+    model.pickScope(.team)
     model.focus(on: "initech/widgets")
     return PopoverView(model: model)
 }
 
 #Preview("Mine, compact") {
     var settings = AppSettings()
-    settings.lastTab = .mine
     settings.compact = true
-    return PopoverView(model: AppModel(preview: PreviewData.snapshot, settings: settings))
+    let model = AppModel(preview: PreviewData.snapshot, settings: settings)
+    model.pickScope(.mine)
+    return PopoverView(model: model)
 }
 
 #Preview("Search, people list") {
-    var settings = AppSettings()
-    settings.lastTab = .team
-    let model = AppModel(preview: PreviewData.snapshot, settings: settings)
+    let model = AppModel(preview: PreviewData.snapshot)
     model.updateSearch("login @a", caret: 8)
     return PopoverView(model: model)
 }
 
 #Preview("Search, @alice") {
-    var settings = AppSettings()
-    settings.lastTab = .team
-    let model = AppModel(preview: PreviewData.snapshot, settings: settings)
+    let model = AppModel(preview: PreviewData.snapshot)
     model.updateSearch("@alice login")
     return PopoverView(model: model)
 }
@@ -1856,10 +1839,8 @@ enum PreviewData {
 
 #Preview("Offline") {
     let snap = PreviewData.snapshot
-    var settings = AppSettings()
-    settings.lastTab = .team
     return PopoverView(model: AppModel(
-        preview: snap, settings: settings,
+        preview: snap,
         status: RefreshStatus(lastSuccess: snap.fetchedAt.addingTimeInterval(-660), error: .offline, isRefreshing: false)))
 }
 #endif

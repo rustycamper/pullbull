@@ -154,7 +154,7 @@ struct PRRow: View {
     /// `repo #num`, or `#num` under a repo header or the focus. A search result outside the focus (a link)
     /// names its repo.
     private var showsRepo: Bool {
-        guard case .search(_, _, let underRepoHeader) = context else { return model.rowsShowRepo(on: layoutTab) }
+        guard case .search(_, _, let underRepoHeader) = context else { return model.rowsShowRepo }
         return SearchLayout.showsRepo(pr.key, underRepoHeader: underRepoHeader, focus: model.repoFocus)
     }
 

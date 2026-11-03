@@ -317,7 +317,7 @@ extension AppModel {
     }
 
     private func shownListKeys() -> [PRKey] {
-        listKeys(closedExpanded: listExpansion.closed, doneExpanded: listExpansion.done)
+        listKeys(doneExpanded: listExpansion.done)
     }
 
     static func allows(_ permission: EditPermission) -> Bool {
