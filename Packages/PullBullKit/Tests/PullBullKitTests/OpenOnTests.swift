@@ -6,14 +6,13 @@ private func decode(_ json: String) throws -> AppSettings {
     try JSONDecoder().decode(AppSettings.self, from: Data(json.utf8))
 }
 private func settings(
-    org: String? = "o", openOn: OpenOn = .all, lastScope: PRScope = .all, chips: Bool = true
+    org: String? = "o", openOn: OpenOn = .all, lastScope: PRScope = .all
 ) -> AppSettings {
     var s = AppSettings()
     s.account = "me"
     s.org = org
     s.openOn = openOn
     s.lastScope = lastScope
-    s.scopeChips = chips
     return s
 }
 
@@ -21,7 +20,6 @@ private func settings(
     @Test func theChoicesAreAllLastUsedNeedsYouMineTeam() {
         #expect(OpenOn.allCases.map(\.title) == ["All", "Last used", "Needs you", "Mine", "Team"])
         #expect(AppSettings().openOn == .all)
-        #expect(AppSettings().scopeChips)
     }
 
     @Test func eachChoiceOpensOnItsScope() {
@@ -36,21 +34,13 @@ private func settings(
     @Test func aScopeWhoseChipIsntShownOpensOnAll() {
         #expect(settings(org: nil, openOn: .team).scopeOnOpen == .all)
         #expect(settings(org: nil, openOn: .lastUsed, lastScope: .team).scopeOnOpen == .all)
-        #expect(settings(openOn: .mine, chips: false).scopeOnOpen == .all)
-        #expect(settings(openOn: .lastUsed, lastScope: .review, chips: false).scopeOnOpen == .all)
         // The choice is kept: the org coming back opens on Team again.
         var back = settings(org: nil, openOn: .team)
         back.org = "o"
         #expect(back.scopeOnOpen == .team)
     }
 
-    @Test func chipsOffLeaveOnlyAllAndSearchEverywhere() {
-        let off = settings(chips: false)
-        #expect(off.prChips == [.all])
-        #expect(off.prSearchTabs.isEmpty)
-        #expect(SearchScope.pullRequests(.mine).valid(in: .pullRequests, prTabs: off.prSearchTabs) == .everything)
-        #expect(SearchScope.everything.moved(by: 1, among: SearchScope.prChips(off.prSearchTabs)) == nil)
-        #expect(SearchScope.issues(.board).valid(in: .issues, prTabs: off.prSearchTabs) == .issues(.board))
+    @Test func theChipsFollowTheAccountsScope() {
         #expect(settings().prChips == [.all, .review, .mine, .team])
         #expect(settings().prSearchTabs == [.review, .mine, .team])
         #expect(settings(org: nil).prChips == [.all, .review, .mine])
@@ -73,41 +63,40 @@ private func settings(
         #expect(lastUsed.scopeOnOpen == .team)
     }
 
-    @Test func chipsOffKeepTheLastScope() {
-        var s = settings(openOn: .lastUsed, lastScope: .team, chips: false)
-        s.recordLastScope(.all)
-        #expect(s.lastScope == .team)
-        s.scopeChips = true
-        #expect(s.scopeOnOpen == .team)
-    }
-
     @Test func withNoAccountTeamIsOffered() {
-        var s = AppSettings()
-        s.scopeChips = false
+        let s = AppSettings()
         #expect(s.openOnChoices == OpenOn.allCases)
-        #expect(s.prChips == [.all])
+        #expect(s.prChips == PRScope.allCases)
     }
 
     @Test func settingsWithLastTabOpenOnAllAndDropIt() throws {
         let old = try decode(#"{"account":"me","org":"o","lastTab":"team","sorts":{"mine":"oldestFirst"}}"#)
-        #expect(old.openOn == .all && old.lastScope == .all && old.scopeChips)
+        #expect(old.openOn == .all && old.lastScope == .all)
         #expect(old.scopeOnOpen == .all)
         #expect(old.sort(for: PRScope.mine) == .oldestFirst)
         let saved = try #require(String(data: JSONEncoder().encode(old), encoding: .utf8))
         #expect(!saved.contains("lastTab"))
     }
 
-    @Test func theTwoSettingsAndTheLastScopeRoundTrip() throws {
-        var s = settings(openOn: .lastUsed, lastScope: .team, chips: false)
+    @Test func aSavedScopeChipsSettingIsIgnoredAndDropped() throws {
+        let old = try decode(#"{"account":"me","org":"o","scopeChips":false,"openOn":"mine"}"#)
+        #expect(old.prChips == [.all, .review, .mine, .team])
+        #expect(old.scopeOnOpen == .mine)
+        let saved = try #require(String(data: JSONEncoder().encode(old), encoding: .utf8))
+        #expect(!saved.contains("scopeChips"))
+    }
+
+    @Test func theOpenOnChoiceAndTheLastScopeRoundTrip() throws {
+        var s = settings(openOn: .lastUsed, lastScope: .team)
         s.projectOwner = .org("o")
         let loaded = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(s))
         #expect(loaded == s)
-        #expect(loaded.openOn == .lastUsed && loaded.lastScope == .team && !loaded.scopeChips)
+        #expect(loaded.openOn == .lastUsed && loaded.lastScope == .team)
     }
 
     @Test func anUnreadableValueFallsBackForThatFieldOnly() throws {
-        let s = try decode(#"{"account":"me","openOn":"inbox","lastScope":"board","scopeChips":"no","compact":true}"#)
-        #expect(s.openOn == .all && s.lastScope == .all && s.scopeChips)
+        let s = try decode(#"{"account":"me","openOn":"inbox","lastScope":"board","compact":true}"#)
+        #expect(s.openOn == .all && s.lastScope == .all)
         #expect(s.account == "me" && s.compact)
     }
 }

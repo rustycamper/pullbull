@@ -14,12 +14,6 @@ struct GeneralSettingsTab: View {
     private static let refreshChoices = [1, 2, 5, 10]
     private static let activityRefreshNote = "Also refreshes on new activity, and on open if data is older than 30s"
 
-    private static let chipsOffOpenOnNote = "Scope chips are off, so it opens on All"
-
-    private var openOnNote: String {
-        model.settings.scopeChips ? "Each time the popover opens" : Self.chipsOffOpenOnNote
-    }
-
     /// Names new activity only while the activity check works for this sign-in.
     private var refreshNote: String {
         model.status.activity == .active
@@ -50,16 +44,9 @@ struct GeneralSettingsTab: View {
                     }
                 }
                 .labelsHidden()
-                .disabled(!model.settings.scopeChips)
-                .accessibilityHint(openOnNote)
+                .accessibilityHint("Each time the popover opens")
             } label: {
-                // The longer note reserves its height, so the row doesn't move when the chips turn off.
-                RowLabel("Pull requests open on", note: Self.chipsOffOpenOnNote)
-                    .hidden()
-                    .overlay(alignment: .topLeading) { RowLabel("Pull requests open on", note: openOnNote) }
-            }
-            Toggle(isOn: $model.settings.scopeChips) {
-                RowLabel("Scope chips", note: "Off: the list shows All, in sections, and search looks everywhere")
+                RowLabel("Pull requests open on", note: "Each time the popover opens")
             }
             Picker(selection: $model.settings.grouping) {
                 Text("Repository").tag(Grouping.repository)

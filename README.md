@@ -60,7 +60,7 @@ Keyboard-first · Native SwiftUI · Edits only what you pick
 | | | Created | Issues you opened |
 | | | Board | All open issues on the board, by Status. Folded *Done*: last 14 days |
 
-- **Chips:** Pull Requests opens on All, or on the chip set in Settings → General → Pull requests open on (Last used reopens the one you left). Click a chip or press <kbd>←</kbd> <kbd>→</kbd> to scope the list, and click the chip again for All. Scope chips can be turned off there too
+- **Chips:** Pull Requests opens on All, or on the chip set in Settings → General → Pull requests open on (Last used reopens the one you left). Click a chip or press <kbd>←</kbd> <kbd>→</kbd> to scope the list, and click the chip again for All
 - **Fold a section:** click its header on All or Mine. Folds are kept across relaunches
 - **Fold a lane:** click a Status header on Board or Mine. Folds are kept per tab and board
 - **Labels:** chips with the label's colour dot on each row (not in compact cards), all of them in the detail
@@ -125,7 +125,7 @@ Full list in the [manual](docs/manual.md#keyboard).
 
 | Tab | |
 |---|---|
-| General | Grouping, Team by author, compact cards, where pull requests open, scope chips, filters, menu bar count, refresh interval, shortcut, all keyboard shortcuts, launch at login, updates |
+| General | Grouping, Team by author, compact cards, where pull requests open, filters, menu bar count, refresh interval, shortcut, all keyboard shortcuts, launch at login, updates |
 | Account | Account, org, board |
 | Notifications | A separate toggle for each event on your PRs, PRs you review, issues assigned to you and issues you created: reviews, dismissed reviews, CI, comments, ready to merge, merged, assigned, status changes, closed or reopened |
 | Search | Saved searches: rename, edit, reorder, delete |

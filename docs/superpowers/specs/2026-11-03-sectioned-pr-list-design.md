@@ -41,7 +41,7 @@ Mockups: https://claude.ai/artifact/EpgpsFBW6hyLMHocJFmdBC (2a is the chosen hea
 
 - A list that hides urgent things below the fold. "Needs your review" and the PRs I have to act on always come before anything I'm only waiting on.
 - Losing a slice someone relied on. A Team-only or Mine-only view must stay one click away for anyone who used that tab.
-- Settings sprawl. This adds two settings and no more.
+- Settings sprawl. This adds one setting and no more.
 - Moving rows under the pointer. Selection and keyboard navigation keep the selected row when sections fold or chips change, as sorting does today.
 
 ## The popover, top to bottom
@@ -89,8 +89,8 @@ Mockups: https://claude.ai/artifact/EpgpsFBW6hyLMHocJFmdBC (2a is the chosen hea
 - When a settings change hides the Team chip (the account loses its org) while it is selected, the scope goes back to All.
 - The opening rules (`AppSettings.scopeOnOpen`, over `OpenOn` and `prChips`):
   - A scope whose chip isn't shown opens on All. A saved Team choice or Last used + Team therefore opens on All without an org, and on Team again when the org comes back.
-  - `lastScope` is recorded at every close and at a quit with the popover shown, whatever the open-on choice, so switching to Last used finds the chip last used. It records the chip actually used (All, Needs you or Mine), also on a personal account, because that is what "last used" means. It is not recorded while chips are off, so the last chip survives a chips-off spell.
-  - A change to the open-on choice or the chips setting while the popover is closed applies at once. The settings `didSet` reapplies the opening chip whenever `scopeOnOpen` or `scopeChips` changes, which also covers an org switched back. While the popover is shown the chip on screen stays.
+  - `lastScope` is recorded at every close and at a quit with the popover shown, whatever the open-on choice, so switching to Last used finds the chip last used. It records the chip actually used (All, Needs you or Mine), also on a personal account, because that is what "last used" means.
+  - A change to the open-on choice while the popover is closed applies at once. The settings `didSet` reapplies the opening chip whenever `scopeOnOpen` changes, which also covers an org switched back. While the popover is shown the chip on screen stays.
   - Back from a detail, and the Esc hint, never name a chip that is no longer shown. Back goes to the chip the detail was opened from when that chip is still shown, else to All. The Esc hint is cleared unless it names the chip the list reopens on.
 - One selection is shared by every chip. It stays selected through chip changes and folds; a fold that hides the selected row moves it to the next row shown, and a selection in another chip's row is left alone. A chip change with no selection shown opens the new chip at its top.
 - A detail opened from the list names the chip it was opened on in its Back button ("All", "Needs you").
@@ -182,7 +182,7 @@ Mockups: https://claude.ai/artifact/EpgpsFBW6hyLMHocJFmdBC (2a is the chosen hea
   - The chosen scope applies every time the popover opens, not only at launch. A chip picked while it's open lasts until it closes. The goal is that each open lands on what needs me with no click.
   - With Last used, the scope at close is restored on the next open and across launches.
   - Someone who wants an inbox-first popover picks Needs you and can fold Your PRs.
-- **Scope chips:** on by default. With chips off, the list is always All and the sections are the only navigation (mockup variant 4). The picker above is disabled, keeps its choice, and its note reads "Scope chips are off, so it opens on All"; the toggle's note reads "Off: the list shows All, in sections, and search looks everywhere". The chip row is hidden in and out of search, every search covers Everywhere, and ←/→ don't narrow (`prChips` is All alone and `prSearchTabs` is empty).
+- **There is no setting to turn the chips off.** One shipped in #49 (mockup variant 4: the list always All, no chip row) and was removed before release (owner). With chips on, All already gives the no-chips experience to anyone who never clicks a chip; the toggle bought one row of height for a disabled picker, its own Last used, search and Back rules, and in Issues mode it would have hidden the Board, the only way to the lanes.
 - **Badge** (`BadgeSource`): the values and their meaning don't change. `.mine` still counts all my open PRs (Your PRs plus Waiting on others), so it's labelled after the Mine chip, not the narrower Your PRs section. The picker's note says the badge uses the same filters as the lists it counts, and the status tooltip's text is unchanged:
   - Needs your review
   - Mine
@@ -192,7 +192,7 @@ Mockups: https://claude.ai/artifact/EpgpsFBW6hyLMHocJFmdBC (2a is the chosen hea
 ### Settings migration
 
 - `AppSettings.lastTab`, its coding and `reconcileTab()` are gone. An old `lastTab` key is ignored, so every existing user opens on All and the change is visible at first launch.
-- The new keys are `openOn`, `lastScope` and `scopeChips`. `AppSettings` decodes each field on its own, so an unreadable value takes its default and leaves the others alone. `lastScope` is stored state, not a setting, and has no row.
+- The new keys are `openOn` and `lastScope`. `AppSettings` decodes each field on its own, so an unreadable value takes its default and leaves the others alone. `lastScope` is stored state, not a setting, and has no row.
 - `sorts["review"/"mine"/"team"]` keep working as scope sorts, and `sorts["all"]` starts at Recently updated.
 - `groupTeamByAuthor`, the hide filters, the badge and notification settings don't change.
 
@@ -232,7 +232,7 @@ Four PRs, each shippable alone:
 1. **Review-reason labels:** Req and Re-req, and the new `RowChips.Info.requested`.
 2. **The mode switch in the search row**, with the Issues tabs moving to the second row. The PR tabs move with them, still as tabs, until step 3.
 3. **The sectioned list and scope chips:** sections, de-duplication, chips, search scoping, ←/→, sorts and fold state.
-4. **The two settings and the badge labels.**
+4. **The open-on setting and the badge labels.**
 
 The README (Tabs section, table rows and screenshots in `docs/media`) and `docs/manual.md` change with step 3. The list-sort and PR/issue parity specs name tabs; update them where they describe tabs, in the step 3 PR.
 
@@ -245,9 +245,9 @@ The README (Tabs section, table rows and screenshots in `docs/media`) and `docs/
 - **Search layout:** an Everywhere result in each section, my own PR from GitHub split by the rule, Other results, and folded sections opening during a search.
 - **Chip counts:** focus doesn't change them, and Mine is the sum of its two sections.
 - **`RowChips`:** Req and Re-req text and labels, and that no chip shows for a dimmed row.
-- **Settings decoding:** an old file with `lastTab` loads and opens on All; old sort keys carry over; the open-on and chips settings round-trip.
+- **Settings decoding:** an old file with `lastTab` loads and opens on All; old sort keys carry over; the open-on setting and `lastScope` round-trip; a saved `scopeChips` is ignored and not written back.
 - **`ListNavigation`:** keyboard order across sections, and skipping folded ones.
-- **`SearchScope`:** scope picking with chips, Team hidden without an org, and chips off falling back to Everywhere.
+- **`SearchScope`:** scope picking with chips, and Team hidden without an org.
 - **In the app**, with an org account and with a personal one:
   - landing state;
   - each chip;
@@ -268,7 +268,7 @@ These were my decisions, not the owner's. They are worth checking:
 - **The mode switch gets a shared track**, replacing the free-standing chips and divider.
 - **The Issues tabs move to the chip row**, so both modes have the same two-row header.
 - **Every existing user opens on All**, not on their last tab, so the change is visible.
-- **Two settings ship** (open-on and chips on/off). Section reordering and presets wait for the walkthrough task.
+- **One setting ships** (open-on). Section reordering and presets wait for the walkthrough task.
 - **The time focus persists** across chip changes.
 - **Delivery is in four PRs.**
 - **A cancelled-only PR lands in Your PRs**, because the list sees only GitHub's rollup.
@@ -276,7 +276,7 @@ These were my decisions, not the owner's. They are worth checking:
 - **Fold state is one map for all accounts.**
 - **Everywhere search adds an Other results section**, and folded sections open during a search.
 - **The badge's `.mine` option is labelled Mine**, not Your PRs.
-- **Last used records the chip actually used**, also on a personal account, and not while chips are off.
-- **Chips off hides the chip row in and out of search**; every search covers Everywhere and ←/→ don't narrow (owner).
+- **Last used records the chip actually used**, also on a personal account.
+- **No chips on/off setting**: added in #49, removed before release (owner).
 - **The tooltip's text is unchanged**, and the badge picker's note says "lists" (owner).
 - **The mode switch matches the field's 24pt height**; the mockup's 28pt was a guess.

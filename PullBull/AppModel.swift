@@ -61,10 +61,10 @@ final class AppModel {
             // With the popover closed, a new opening scope applies now; it is always a shown chip, and a
             // detail kept open keeps its walk. Run first, so the fallback below doesn't clear the walk.
             if !MenuBarPopover.isShown,
-               settings.scopeOnOpen != oldValue.scopeOnOpen || settings.scopeChips != oldValue.scopeChips {
+               settings.scopeOnOpen != oldValue.scopeOnOpen {
                 openOnScope()
             }
-            // A chip no longer shown (chips off, Team without an org) goes back to All, and neither Back nor
+            // A chip no longer shown (Team without an org) goes back to All, and neither Back nor
             // the Esc hint names it.
             if !prScopes.contains(prScope) { prScope = .all }
             if case .pullRequests(let started) = searchStartedOnTab, !prScopes.contains(started) {
@@ -651,7 +651,7 @@ final class AppModel {
         openOnScope()
     }
 
-    /// Remembers the chip on screen for Last used; the settings rule decides whether it applies.
+    /// Remembers the chip on screen for Last used.
     func recordLastScope() {
         settings.recordLastScope(prScope)
     }
@@ -691,7 +691,7 @@ final class AppModel {
     /// The PR tabs shown: Team needs an org. Search narrows to these.
     var prTabs: [PRTab] { settings.scope.map(PRTab.shown) ?? PRTab.allCases }
 
-    /// The chips shown: All, then the PR tabs shown; only All with the chips off.
+    /// The chips shown: All, then the PR tabs shown.
     var prScopes: [PRScope] { settings.prChips }
 
     /// A chip clicked outside search: its scope, or All when it is the one on screen.
@@ -1096,7 +1096,7 @@ final class AppModel {
         }
     }
 
-    /// The search's scope in the current mode; a tab no longer shown, or any tab with the chips off, is everything.
+    /// The search's scope in the current mode; a tab no longer shown is everything.
     var shownSearchScope: SearchScope { searchScope.valid(in: mode, prTabs: settings.prSearchTabs) }
 
     /// A tab clicked while results are on screen: the same query narrowed to that tab, which becomes the
@@ -2267,7 +2267,7 @@ extension AppModel {
             return
         } else {
             route = detailReturnRoute == .search && !searchText.isEmpty ? .search : .list
-            // A chip hidden since (chips off, Team without an org) falls back to All.
+            // A chip hidden since (Team without an org) falls back to All.
             if route == .list, let backScope { prScope = prScopes.contains(backScope) ? backScope : .all }
             searchAgainIfStale()
         }
