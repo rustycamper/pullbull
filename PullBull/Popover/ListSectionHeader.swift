@@ -3,9 +3,9 @@ import PullBullKit
 
 /// A list section's header, the same in every list: repo groups, lanes, Done, "Recently closed" and the
 /// search groups. The glyph sits in the rows' icon column, so header and row glyphs share one axis and the
-/// title starts on the row titles' edge; without a glyph the title starts where the row glyphs do. A
-/// header that folds toggles as a whole, its chevron hanging in the leading inset, left of the icon column,
-/// so every fold's chevron sits on one line and every title on another.
+/// title starts on the row titles' edge; an author group shows an avatar there instead. A header that
+/// folds toggles as a whole, its chevron hanging in the leading inset, left of the icon column, so every
+/// fold's chevron sits on one line and every title on another.
 struct ListSectionHeader: View {
     let glyph: String?
     var glyphColor: Color = .secondary
