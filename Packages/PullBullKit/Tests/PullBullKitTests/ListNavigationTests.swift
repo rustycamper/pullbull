@@ -301,4 +301,36 @@ extension ListNavigationTests {
         #expect(!ListNavigation.isGrouped(team, grouping: .none))
         #expect(ListNavigation.isGrouped(allList, grouping: .none))
     }
+
+    // MARK: Issue sections
+
+    private func issueList() -> IssueList {
+        func issue(_ n: Int) -> BoardIssue {
+            BoardIssue(key: key(n), title: "i", url: URL(string: "https://x/\(n)")!, isOpen: true)
+        }
+        return IssueList(
+            sections: [
+                IssueListSection(section: .assignedToYou, issues: [issue(1), issue(2)], state: .rows),
+                IssueListSection(section: .youOpened, issues: [], state: .loading),
+                IssueListSection(section: .restOfBoard, issues: [], state: .failed("x")),
+                IssueListSection(section: .otherResults, issues: [issue(7)], state: .stale("x", since: nil)),
+                IssueListSection(section: .doneStillOpen, issues: [issue(9)], state: .rows),
+            ],
+            status: [:], nothingAssigned: false, isEmpty: false)
+    }
+
+    @Test func keysSkipFoldedAndUnloadedSections() {
+        let list = issueList()
+        #expect(ListNavigation.issueGroups(list, folded: []).map { $0.map(\.number) } == [[1, 2], [7], [9]])
+        #expect(ListNavigation.issueKeys(list, folded: [.otherResults]).map(\.number) == [1, 2, 9])
+        #expect(ListNavigation.issueKeys(list, folded: [.assignedToYou, .doneStillOpen]).map(\.number) == [7])
+    }
+
+    @Test func aFoldOfTheSelectedRowsSectionMovesSelection() {
+        let list = issueList()
+        let open = ListNavigation.issueKeys(list, folded: [])
+        let folded = ListNavigation.issueKeys(list, folded: [.assignedToYou])
+        #expect(ListNavigation.selection(key(2), from: open, to: folded) == key(7))
+        #expect(ListNavigation.selection(key(9), from: open, to: folded) == key(9))
+    }
 }
