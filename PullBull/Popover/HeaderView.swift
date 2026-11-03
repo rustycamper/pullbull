@@ -32,11 +32,20 @@ struct HeaderView<UnderField: View>: View {
         }
     }
 
-    /// The mode's tabs filling the width. While results are on screen the tabs narrow them instead of
+    /// The Pull Requests chips or the Issues tabs. While results are on screen they narrow them instead of
     /// showing their lists.
     private var tabRow: some View {
-        TabBar(model: model, searching: searching) {
-            if searchOpen { onCancelSearch() }
+        Group {
+            switch model.mode {
+            case .pullRequests:
+                ScopeChips(model: model, searching: searching) {
+                    if searchOpen { onCancelSearch() }
+                }
+            case .issues:
+                TabBar(model: model, searching: searching) {
+                    if searchOpen { onCancelSearch() }
+                }
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 8)
