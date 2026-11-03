@@ -4,7 +4,7 @@ import PullBullKit
 
 /// The header: the mode switch and the search field in one row, the mode's tabs under them. Both rows
 /// stay put while searching; only the list below changes.
-struct HeaderView: View {
+struct HeaderView<UnderField: View>: View {
     let model: AppModel
     /// Results are on screen (`Route.search`).
     let searching: Bool
@@ -21,10 +21,13 @@ struct HeaderView: View {
     let onSwitchMode: (PopoverMode) -> Void
     /// The bookmark in the field: opens the save row under it.
     let onSaveSearch: () -> Void
+    /// What opens right under the field, above the tabs: the save row, next to the bookmark that opened it.
+    @ViewBuilder let underField: () -> UnderField
 
     var body: some View {
         VStack(spacing: 0) {
             searchRow
+            underField()
             tabRow
         }
     }

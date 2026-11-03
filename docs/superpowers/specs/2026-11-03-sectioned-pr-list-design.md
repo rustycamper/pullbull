@@ -69,7 +69,10 @@ Mockups: https://claude.ai/artifact/EpgpsFBW6hyLMHocJFmdBC (2a is the chosen hea
   - the news dot on the other mode (`ModeNews`);
   - the help text and VoiceOver labels ("Pull requests ⌘1", "Issues ⌘2", plus the news note);
   - ⌘1 / ⌘2.
+- An unselected segment's hover takes `Palette.strongFill`. The track itself is `Palette.fill`, so the usual hover fill wouldn't show on it.
 - The search field fills the rest of the row. Its placeholder still follows the mode.
+- The save-search row (opened by the field's bookmark) opens directly under the search row and above the tabs, so it sits next to the bookmark that opened it.
+- The empty-field hints and search results still open below the tabs, which stay visible and narrow a search.
 - **Issues mode:** Assigned / Created / Board take the second row, where the PR chips sit, styled as today's tab bar. Their counts, stale-warning glyph and ←/→ behaviour don't change.
 
 ### Scope chips (Pull Requests mode)
