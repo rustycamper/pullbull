@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 import PullBullKit
 
-/// The header: the mode switch, tabs and settings, and under them the search field. Both rows stay put
-/// while searching; only the list below changes.
+/// The header: the mode switch and the search field in one row, the mode's tabs under them. Both rows
+/// stay put while searching; only the list below changes.
 struct HeaderView: View {
     let model: AppModel
     /// Results are on screen (`Route.search`).
@@ -24,27 +24,35 @@ struct HeaderView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            titleRow
             searchRow
+            tabRow
         }
     }
 
-    /// The mode switch, then the mode's tabs filling the width. While results are on screen
-    /// the tabs narrow them instead of showing their lists.
-    private var titleRow: some View {
-        HStack(spacing: 4) {
-            ModeToggle(model: model, select: onSwitchMode)
-            TabBar(model: model, searching: searching) {
-                if searchOpen { onCancelSearch() }
-            }
-            .frame(maxWidth: .infinity)
+    /// The mode's tabs filling the width. While results are on screen the tabs narrow them instead of
+    /// showing their lists.
+    private var tabRow: some View {
+        TabBar(model: model, searching: searching) {
+            if searchOpen { onCancelSearch() }
         }
-        .padding(.leading, 8)
-        .padding(.trailing, 8)
-        .frame(height: 40)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 8)
+        .padding(.bottom, 4)
     }
 
+    /// The mode switch, then the search field filling the rest of the row.
     private var searchRow: some View {
+        HStack(spacing: 6) {
+            ModeToggle(model: model, select: onSwitchMode)
+            searchField
+                .frame(maxWidth: .infinity)
+        }
+        .padding(.horizontal, Metrics.rowInset)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
+    }
+
+    private var searchField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 11))
@@ -106,8 +114,6 @@ struct HeaderView: View {
                 .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 3.5)
                 .padding(-3.5)
                 .opacity(fieldFocused.wrappedValue ? 1 : 0))
-        .padding(.horizontal, Metrics.rowInset)
-        .padding(.bottom, 6)
     }
 
     /// Search follows the mode; the field's label reads the same.
