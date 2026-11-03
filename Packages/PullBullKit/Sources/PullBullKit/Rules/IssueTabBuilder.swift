@@ -318,12 +318,12 @@ public enum IssueTabBuilder {
     }
 
     /// By `sort`'s date (last update, or when opened), issues without that date after the rest, then by
-    /// repo and number. Waiting longest doesn't apply to issues and reads as Recently updated.
+    /// repo and number. Waiting longest and Board status don't apply here and read as Recently updated.
     private static func sorted(_ issues: [BoardIssue], by sort: ListSort) -> [BoardIssue] {
         let date: (BoardIssue) -> Date?
         let newestFirst: Bool
         switch sort {
-        case .recentlyUpdated, .waitingLongest: (date, newestFirst) = ({ $0.updatedAt }, true)
+        case .recentlyUpdated, .waitingLongest, .boardStatus: (date, newestFirst) = ({ $0.updatedAt }, true)
         case .newestFirst: (date, newestFirst) = ({ $0.createdAt }, true)
         case .oldestFirst: (date, newestFirst) = ({ $0.createdAt }, false)
         }

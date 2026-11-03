@@ -311,7 +311,7 @@ public enum TabBuilder {
                 case (nil, .some): return false
                 case (nil, nil): if a.pr.updatedAt != b.pr.updatedAt { return a.pr.updatedAt > b.pr.updatedAt }
                 }
-            case .recentlyUpdated, .newestFirst:
+            case .recentlyUpdated, .newestFirst, .boardStatus:
                 if a.pr.updatedAt != b.pr.updatedAt { return a.pr.updatedAt > b.pr.updatedAt }
             }
             if a.id.repo != b.id.repo { return a.id.repo < b.id.repo }
