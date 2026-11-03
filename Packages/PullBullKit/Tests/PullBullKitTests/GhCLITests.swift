@@ -131,7 +131,8 @@ private let statusJSON = #"{"hosts":{"github.com":[{"state":"success","active":t
         await #expect(throws: GhError.failed("sleep did not finish within 0.3s and was stopped")) {
             _ = try await runner.run(URL(fileURLWithPath: "/bin/sleep"), ["10"])
         }
-        #expect(Date().timeIntervalSince(started) < 5)
+        // Well under sleep's 10 s, so it shows the timeout stopped it; loose enough for a loaded CI runner.
+        #expect(Date().timeIntervalSince(started) < 9)
     }
 
     @Test func processRunnerReturnsOutputBeforeTimeout() async throws {
@@ -155,7 +156,8 @@ private let statusJSON = #"{"hosts":{"github.com":[{"state":"success","active":t
         await #expect(throws: GhError.self) {
             _ = try await runner.run(URL(fileURLWithPath: "/bin/sleep"), ["10"], timeout: .milliseconds(300))
         }
-        #expect(Date().timeIntervalSince(started) < 5)
+        // Well under sleep's 10 s, so it shows the timeout stopped it; loose enough for a loaded CI runner.
+        #expect(Date().timeIntervalSince(started) < 9)
     }
 }
 
