@@ -21,6 +21,14 @@ private func issue(_ n: Int) -> BoardIssue {
     BoardIssue(key: key(n), title: "i\(n)", url: URL(string: "https://x/\(n)")!, isOpen: true)
 }
 
+private func section(_ s: PRSection, _ rows: [Row]) -> ListSection {
+    ListSection(section: s, contents: TabContents(rows: rows))
+}
+private let allList = PRList(scope: .all, sections: [
+    section(.needsReview, [row(1)]), section(.yourPRs, [row(2)]), section(.waiting, [row(3), row(5, repo: "o/b")]),
+    section(.recentlyClosed, [row(9)]), section(.team, [row(4)]),
+])
+
 @Suite struct ListNavigationTests {
     // MARK: Rows shown
 
@@ -257,5 +265,40 @@ extension ListNavigationTests {
         #expect(ListNavigation.edge(last: true, in: [a, b, c]) == c)
         #expect(ListNavigation.edge(last: true, in: []) == nil)
         #expect(ListNavigation.edge(last: false, in: []) == nil)
+    }
+
+    // MARK: Sections
+
+    @Test func sectionsAreGroupsInDisplayOrderAndFoldedOnesAreSkipped() {
+        let groups = { (folded: Set<PRSection>) in
+            ListNavigation.prGroups(allList, grouping: .none, folded: folded).map { $0.map(\.number) }
+        }
+        #expect(groups([]) == [[1], [2], [3, 5], [9], [4]])
+        #expect(groups([.recentlyClosed, .team]) == [[1], [2], [3, 5]])
+        #expect(groups([.yourPRs]) == [[1], [3, 5], [9], [4]])
+    }
+
+    @Test func arrowsAndOptionArrowsSkipAFoldedSection() {
+        let groups = ListNavigation.prGroups(allList, grouping: .none, folded: [.yourPRs, .recentlyClosed, .team])
+        let keys = groups.flatMap { $0 }
+        #expect(ListNavigation.move(key(1), by: 1, in: keys) == key(3))
+        #expect(ListNavigation.jump(key(1), by: 1, in: groups) == key(3))
+        #expect(ListNavigation.jump(key(3), by: -1, in: groups) == key(1))
+        #expect(ListNavigation.jump(key(5, repo: "o/b"), by: 1, in: groups) == nil)
+    }
+
+    @Test func foldingTheSelectionsSectionMovesItToTheNextRowShown() {
+        let open = ListNavigation.prGroups(allList, grouping: .none, folded: []).flatMap { $0 }
+        let folded = ListNavigation.prGroups(allList, grouping: .none, folded: [.waiting]).flatMap { $0 }
+        #expect(ListNavigation.selection(key(3), from: open, to: folded) == key(9))
+        #expect(ListNavigation.selection(key(2), from: open, to: folded) == key(2))
+    }
+
+    @Test func aSingleSectionScopeGroupsAsItsTabAndNeverFolds() {
+        let team = PRList(scope: .team, sections: [section(.team, [row(4, repo: "o/b"), row(6), row(7, repo: "o/b")])])
+        let folded = SectionFolds().shownFolded(in: .team, searching: false)
+        #expect(ListNavigation.prGroups(team, grouping: .repository, folded: folded).map { $0.map(\.number) } == [[4, 7], [6]])
+        #expect(!ListNavigation.isGrouped(team, grouping: .none))
+        #expect(ListNavigation.isGrouped(allList, grouping: .none))
     }
 }
