@@ -1,44 +1,46 @@
-// Demo data for the README hero: the Review tab with six PRs waiting on devon, grouped by repo (the
-// group with the most recently updated PR first, rows newest first, as TabBuilder and
-// ListNavigation.repoGroups order them). Default settings: drafts shown, PRs devon approved hidden, badge
-// counts Review, so the menu bar reads the Review count.
+// Demo data for the README hero: the pull request list on All, as the popover opens. Needs your review
+// holds three PRs waiting on devon, Your PRs the two that need him, Waiting on others one that waits on
+// bob; Recently closed and Team are folded. Rows are not grouped by repo and name theirs. Default settings:
+// drafts shown, PRs devon approved hidden, badge counts Review, so the menu bar reads the Review count.
 window.SCENES = window.SCENES || {};
 window.SCENES.review = {
   viewer: { login: "devon", org: "initech" },
-  menuBar: { count: 6, open: true },
+  menuBar: { count: 3, open: true },
   mode: "pullRequests",
-  tabs: [
-    { id: "review", title: "Review", count: 6 },
-    { id: "mine", title: "Mine", count: 4 },
+  chips: [
+    { id: "all", title: "All" },
+    { id: "review", title: "Needs you", count: 3, hot: true },
+    { id: "mine", title: "Mine", count: 3 },
     { id: "team", title: "Team", count: 12 },
   ],
-  selectedTab: "review",
+  selectedChip: "all",
   search: { text: "", focused: false },
   filter: { repoTitle: "All repos" },
-  groupByRepo: true,
   // The pointer on frank's failing CI glyph: its .help text, Palette.ciLabel(.failure), as the native tooltip.
   hover: { number: 479, on: "ci", tooltip: "Checks failed" },
-  groups: [
+  sections: [
     {
-      repo: "api",
+      id: "needsReview", title: "Needs your review", rowTab: "review",
       rows: [
-        { title: "Add rate limiting to the public API", number: 482, author: "alice", age: "12m", ci: "pending", info: ["requested", { wait: "1h" }], comments: 2 },
-        { title: "Return 404 instead of 500 for unknown webhook IDs", number: 479, author: "frank", age: "3h", ci: "failure", info: [{ viaTeam: "initech/platform" }, { wait: "1d" }] },
+        { title: "Add rate limiting to the public API", repo: "api", number: 482, author: "alice", age: "12m", ci: "pending", info: ["requested", { wait: "1h" }], comments: 2 },
+        { title: "Return 404 for unknown webhook IDs", repo: "api", number: 479, author: "frank", age: "3h", ci: "failure", info: [{ viaTeam: "initech/platform" }, { wait: "1d" }] },
+        { title: "Fix flaky checkout test on CI", repo: "widgets", number: 1291, author: "bob", age: "1h", ci: "success", info: ["reRequested", { wait: "1h" }], comments: 4 },
       ],
     },
     {
-      repo: "widgets",
+      id: "yourPRs", title: "Your PRs", rowTab: "mine",
       rows: [
-        { title: "Fix flaky checkout test on CI", number: 1291, author: "bob", age: "1h", ci: "success", info: ["reRequested", { wait: "1h" }], comments: 4 },
-        { title: "Virtualize the long widget list", number: 1287, author: "erin", age: "5h", ci: "none", draft: true, info: ["requested"] },
+        { title: "Add a retry budget to webhook delivery", repo: "widgets", number: 1302, author: "devon", age: "2h", ci: "success", info: [{ approvals: 2 }], action: "readyToMerge" },
+        { title: "Paginate the audit log endpoint", repo: "api", number: 471, author: "devon", age: "1d", ci: "failure", info: [{ approvals: 1 }], action: { changesRequested: ["bob"] } },
       ],
     },
     {
-      repo: "gadgets",
+      id: "waiting", title: "Waiting on others", rowTab: "mine",
       rows: [
-        { title: "Migrate settings to the new store", number: 77, author: "carol", age: "4h", ci: "success", info: ["newCommits"] },
-        { title: "Bump the image library to 4.2", number: 75, author: "erin", age: "1d", ci: "skipped", info: ["requested", { wait: "2d" }], comments: 1 },
+        { title: "Add retries to the export job", repo: "widgets", number: 1305, author: "devon", age: "5h", ci: "success", info: [{ wait: "@bob 1d" }] },
       ],
     },
+    { id: "recentlyClosed", title: "Recently closed", count: 3, trailing: "Last 7 days", folded: true, rows: [] },
+    { id: "team", title: "Team", count: 12, folded: true, rows: [] },
   ],
 };

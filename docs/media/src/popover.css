@@ -255,6 +255,20 @@ body {
 .segment .count { color: var(--secondary-text); }
 .segment.selected .count { color: var(--label); }
 
+/* ScopeChips: capsule chips 4 apart, 22 tall, 9 pt of padding (6 when a count reads "99+"). The selected chip is on Palette.strongFill. */
+.scope-chips { flex: 1 1 auto; display: flex; gap: 4px; }
+.chip { height: 22px; padding: 0 9px; display: flex; align-items: center; border-radius: 11px; white-space: nowrap; }
+.chip.crowded { padding: 0 6px; }
+.chip.selected { background: var(--strong-fill); }
+.chip .label-run { display: flex; align-items: baseline; gap: 3px; }
+.chip .title { display: inline-grid; color: var(--secondary-text); }
+.chip .title::before { content: attr(data-title); font-weight: 600; visibility: hidden; grid-area: 1 / 1; }
+.chip .title > span { grid-area: 1 / 1; text-align: center; }
+.chip.selected .title { color: var(--label); font-weight: 600; }
+.chip .count { color: var(--secondary-text); }
+.chip.selected .count { color: var(--label); }
+.chip .count.hot { color: var(--accent); }
+
 /* Search row: the mode switch, 6 apart from the field; 24 tall, inset 6 (Metrics.rowInset), 8 above, 6 below. */
 .search-row { padding: 8px 6px 6px; flex: none; display: flex; gap: 6px; align-items: center; }
 .search-field {
@@ -325,6 +339,11 @@ body {
 /* ReadyToMergePill: gray on Palette.fill; the changes-requested Pill: amber at 0.12 */
 .pill.ready { color: var(--pill-text); background: var(--fill); }
 .pill.changes { color: var(--changes-requested); background: var(--changes-fill); }
+
+/* ListSectionHeader of the sectioned list: 28 tall, glyph in the icon column; the hairline above a section is edge to edge. */
+.section-header { position: relative; height: 28px; padding: 0 8px; gap: 10px; color: var(--secondary); }
+.section-header .lane-chevron { position: absolute; left: 0; top: 0; bottom: 0; }
+.section-rule { margin: 6px -6px 0; }
 
 /* Mine's folded "Recently closed" section */
 .closed-rule { margin: 6px 8px 0; }

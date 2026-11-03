@@ -24,14 +24,11 @@
       `${s.ask ? '<span class="nowrap">⌥⌘↩ Ask AI</span>' : ""}${keyHint(["↩"], "Open")}${keyHint(["esc"], s.startedOn ? `Back to ${s.startedOn}` : "Clear")}</div>`;
   }
 
-  /** SearchResultsView: the open results as the Team tab lays them out (repo groups, Team rows), then the ended ones under "Closed and merged". */
+  /** SearchResultsView: the open results in the list's sections (nothing folds), then the ended ones under "Closed and merged". */
   function searchBody(d) {
     const s = d.searchResults;
-    let html = "";
-    for (const group of s.groups) {
-      html += P.groupHeader(group.repo, group.rows.length);
-      html += group.rows.map((pr) => P.prRow(pr, "team", { words: s.words })).join("");
-    }
+    const sections = s.sections.map((sec) => ({ ...sec, words: s.words }));
+    let html = P.sectionList(sections);
     if (s.closed.length) html += P.closedSection({ title: "Closed and merged", count: s.closed.length, expanded: true, rows: s.closed, words: s.words });
     return `<div class="list">${html}</div>`;
   }

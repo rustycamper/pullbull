@@ -88,6 +88,23 @@
     return `<div class="tab-bar">${segs.join("")}</div>`;
   }
 
+  /**
+   * ScopeChips: the Pull Requests scopes as capsules, 22 tall; the selected one on Palette.strongFill. While searching,
+   * All reads "Everywhere". Needs you's count takes the accent colour (`hot`) outside search; counts above 99 read "99+".
+   */
+  function scopeChips(chips, selectedId, searching) {
+    const crowded = chips.some((c) => c.count != null && c.count > 99);
+    const html = chips.map((c) => {
+      const selected = c.id === selectedId;
+      const title = searching && c.id === "all" ? "Everywhere" : c.title;
+      const hot = !searching && c.hot && c.count > 0;
+      const count = c.count == null ? "" : `<span class="count f11 mono${hot ? " hot" : ""}">${c.count > 99 ? "99+" : c.count}</span>`;
+      return `<div class="chip${selected ? " selected" : ""}${crowded ? " crowded" : ""}"><span class="label-run">` +
+        `<span class="title f12" data-title="${esc(title)}"><span>${esc(title)}</span></span>${count}</span></div>`;
+    });
+    return `<div class="scope-chips">${html.join("")}</div>`;
+  }
+
   function searchField(search, mode) {
     const placeholder = mode === "issues" ? "Search issues" : "Search pull requests";
     // The typed text with the insertion point at its end while focused.
@@ -106,7 +123,7 @@
 
   function header(d) {
     return `<div class="search-row">${modeToggle(d.mode)}${searchField(d.search, d.mode)}</div>` +
-      `<div class="tab-row">${tabBar(d.tabs, d.selectedTab)}</div>`;
+      `<div class="tab-row">${d.mode === "pullRequests" ? scopeChips(d.chips, d.selectedChip, d.view === "search") : tabBar(d.tabs, d.selectedTab)}</div>`;
   }
 
   /** FilterBar: "▦ Roadmap ▾ · ▤ All repos ▾" on the Board tab, "▤ All repos ▾" elsewhere. */
@@ -189,6 +206,49 @@
     return `<div class="hstack group-header f11 w-semibold"><span class="icon-col">${sym("book.closed", 11)}</span>` +
       `<span class="hstack"><span>${esc(repo)}</span>` +
       (count > 0 ? `<span class="w-medium mono">${count}</span>` : "") + `</span></div>`;
+  }
+
+  // PRSection.glyph: Needs your review's bell in the accent colour, Your PRs' pull request, Waiting on others' clock; none for the rest.
+  const SECTION_GLYPH = {
+    needsReview: ["bell", "var(--accent)"],
+    yourPRs: ["pullbull.pullrequest", null],
+    waiting: ["clock", null],
+  };
+
+  /**
+   * ListSectionHeader with a fold: the glyph in the icon column; a section without one (Recently closed, Team, Other results)
+   * puts the chevron there, the others hang it in the leading inset. `trailing` is quiet text at the trailing edge.
+   */
+  function sectionHeader({ title, glyph, accent, count, folded, trailing }) {
+    const hasFold = folded !== undefined;
+    const rotated = `transform:rotate(${folded ? 0 : 90}deg)`;
+    const chevron = `<span class="lane-chevron" style="${rotated}">${sym("chevron.right", 9, "bold")}</span>`;
+    let lead = "", inset = "";
+    if (glyph) {
+      lead = `<span class="icon-col">${sym(glyph, 11, "regular", accent ? { color: accent } : {})}</span>`;
+      if (hasFold) inset = chevron;
+    } else if (hasFold) {
+      lead = `<span class="icon-col"><span style="${rotated};display:flex">${sym("chevron.right", 9, "bold")}</span></span>`;
+    }
+    return `<div class="hstack section-header f11 w-semibold">${inset}${lead}` +
+      `<span class="hstack" style="gap:6px"><span>${esc(title)}</span>${count == null ? "" : `<span class="w-medium mono">${count}</span>`}</span>` +
+      `<span class="spacer"></span>${trailing ? `<span style="font-weight:400">${esc(trailing)}</span>` : ""}</div>`;
+  }
+
+  /** PRListView.sections: a hairline parts each section from the one above; a folded section is its header alone. */
+  function sectionList(sections) {
+    return sections.map((sec, i) => {
+      const glyph = SECTION_GLYPH[sec.id] || [];
+      const header = sectionHeader({ title: sec.title, glyph: glyph[0], accent: glyph[1], count: sec.count ?? sec.rows.length, folded: sec.folded, trailing: sec.trailing });
+      const rule = i ? `<div class="hairline section-rule"></div>` : "";
+      let rows = "";
+      if (!sec.folded) {
+        rows = sec.rows.map((pr) => sec.id === "recentlyClosed"
+          ? closedRow(pr, sec.words)
+          : prRow(pr, sec.rowTab, { showsRepo: true, words: sec.words })).join("");
+      }
+      return rule + header + rows;
+    }).join("");
   }
 
   /** ClosedRow; a search's `words` are bold in the title. */
@@ -376,13 +436,7 @@
   }
 
   function list(d) {
-    let html = "";
-    for (const group of d.groups) {
-      if (d.groupByRepo) html += groupHeader(group.repo, group.count ?? group.rows.length);
-      html += group.rows.map((pr) => prRow(pr, d.selectedTab, { showsRepo: !d.groupByRepo })).join("");
-    }
-    if (d.selectedTab === "mine" && d.recentlyClosed) html += closedSection(d.recentlyClosed);
-    return `<div class="list">${html}</div>`;
+    return `<div class="list">${sectionList(d.sections)}</div>`;
   }
 
   // ---------- Footer ----------
@@ -432,5 +486,5 @@
     if (d.hover) placeHover(root, d.hover);
   }
 
-  window.PullBull = { esc, sym, avatar, identicon, modeToggle, tabBar, searchField, header, filterBar, prRow, groupHeader, closedRow, closedSection, list, issueRow, laneHeader, doneSection, labelChip, assigneeStack, issueList, tunedLabelColor, footer, popover, menuBarItem, renderScene };
+  window.PullBull = { esc, sym, avatar, identicon, modeToggle, tabBar, scopeChips, sectionHeader, sectionList, searchField, header, filterBar, prRow, groupHeader, closedRow, closedSection, list, issueRow, laneHeader, doneSection, labelChip, assigneeStack, issueList, tunedLabelColor, footer, popover, menuBarItem, renderScene };
 })();

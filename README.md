@@ -14,11 +14,11 @@ Keyboard-first · Native SwiftUI · Edits only what you pick
 [![Homebrew](https://img.shields.io/badge/brew-rustycamper%2Ftap-141518?style=flat-square&logo=homebrew&logoColor=white)](#install)
 [![License: MIT](https://img.shields.io/badge/license-MIT-141518?style=flat-square)](LICENSE)
 
-[Install](#install) · [Tabs](#tabs) · [Search](#search) · [Keys](#keys) · [Settings](#settings) · [Privacy](#privacy) · [Manual](docs/manual.md)
+[Install](#install) · [Lists](#lists) · [Search](#search) · [Keys](#keys) · [Settings](#settings) · [Privacy](#privacy) · [Manual](docs/manual.md)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/media/popover-dark.png">
-  <img src="docs/media/popover-light.png" width="360" alt="PullBull Review tab in the menu bar popover">
+  <img src="docs/media/popover-light.png" width="360" alt="PullBull pull request list in sections, with the All chip selected">
 </picture>
 
 </div>
@@ -27,10 +27,10 @@ Keyboard-first · Native SwiftUI · Edits only what you pick
 
 | &emsp;&emsp; | Problem | PullBull |
 |:-:|---|---|
-| <img src="docs/media/icons/bell-badge.png" width="22" height="22" alt=""> | Review requests get lost among CI, mentions and bot comments | **Review** tab with only PRs waiting on you or your team. Count in the menu bar |
+| <img src="docs/media/icons/bell-badge.png" width="22" height="22" alt=""> | Review requests get lost among CI, mentions and bot comments | **Needs your review**, first in the list, with only PRs waiting on you or your team. Count in the menu bar |
 | <img src="docs/media/icons/text-magnifyingglass.png" width="22" height="22" alt=""> | You remember what a PR or issue was about, not its title or number; a chat mentions one loosely | **Ask AI**: describe it in your own words (<kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd>), answered by Anthropic with your own API key. Off by default |
-| <img src="docs/media/icons/sparkles.png" width="22" height="22" alt=""> | Agents open PRs faster than you can track them | **Mine** tab: review state, checks, *Ready to merge* when approved and green |
-| <img src="docs/media/icons/arrow-triangle-2-circlepath.png" width="22" height="22" alt=""> | Re-requests and new commits after your review go unnoticed | Both land back in **Review**, marked with why |
+| <img src="docs/media/icons/sparkles.png" width="22" height="22" alt=""> | Agents open PRs faster than you can track them | **Your PRs**: what needs you, apart from what waits on others. Review state, checks, *Ready to merge* when approved and green |
+| <img src="docs/media/icons/arrow-triangle-2-circlepath.png" width="22" height="22" alt=""> | Re-requests and new commits after your review go unnoticed | Both land back in **Needs your review**, marked with why |
 | <img src="docs/media/icons/rectangle-split-3x1.png" width="22" height="22" alt=""> | The Projects board is slow for a quick look | **Mine** and **Board** issue tabs, grouped by board Status |
 | <img src="docs/media/icons/link.png" width="22" height="22" alt=""> | Finding the PR that closes an issue takes clicks | Issue detail lists its linked PRs. Open one, <kbd>Esc</kbd> returns |
 | <img src="docs/media/icons/bubble-left.png" width="22" height="22" alt=""> | Answering a question in a thread means opening the browser | **Comment** from the detail, <kbd>⌥</kbd><kbd>⌘</kbd><kbd>M</kbd>, `@` to tag people, <kbd>⌘</kbd><kbd>Return</kbd> to send |
@@ -46,24 +46,27 @@ Keyboard-first · Native SwiftUI · Edits only what you pick
 |:-:|:-:|
 | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/pr-detail-dark.png"><img src="docs/media/pr-detail-light.png" width="360" alt="Pull request detail, Ready to merge"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/issue-detail-dark.png"><img src="docs/media/issue-detail-light.png" width="360" alt="Issue detail with board card and linked PRs"></picture> |
 | **Board** | **Search** |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/board-dark.png"><img src="docs/media/board-light.png" width="360" alt="Board tab grouped by Status"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/search-dark.png"><img src="docs/media/search-light.png" width="360" alt="Search results laid out like the Team tab"></picture> |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/board-dark.png"><img src="docs/media/board-light.png" width="360" alt="Board tab grouped by Status"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/search-dark.png"><img src="docs/media/search-light.png" width="360" alt="Search results in the list's sections, Everywhere"></picture> |
 
-## Tabs
+## Lists
 
-| &emsp;&emsp;&emsp; | Mode | Tab | Shows |
+| &emsp;&emsp;&emsp; | Mode | List | Shows |
 |:-:|---|---|---|
-| <kbd>⌘</kbd><kbd>1</kbd> | **Pull Requests** | Review | PRs requesting your or your team's review, re-requests, new commits since your review, with lines changed |
-| | | Mine | Your open PRs, review pills, checks, *Ready to merge*, checked every 30 s while CI runs. Folded *Recently closed*: last 7 days |
-| | | Team | Other open PRs in the org, by repo or by author |
+| <kbd>⌘</kbd><kbd>1</kbd> | **Pull Requests** | All | **Needs your review**, **Your PRs**, **Waiting on others**, then folded *Recently closed* (last 7 days) and *Team* |
+| | | Needs you | PRs requesting your or your team's review, re-requests, new commits since your review, with lines changed |
+| | | Mine | **Your PRs** (ready to merge, changes requested, failing checks, conflicts, drafts), **Waiting on others**, folded *Recently closed*. Checked every 30 s while CI runs |
+| | | Team | Other open PRs in the org, by repo or by author; not the ones in Needs you |
 | <kbd>⌘</kbd><kbd>2</kbd> | **Issues** | Mine | Issues assigned to you, grouped by board Status (by repo without a board). Folded *Done*: done on the board, still open |
 | | | Created | Issues you opened |
 | | | Board | All open issues on the board, by Status. Folded *Done*: last 14 days |
 
+- **Chips:** Pull Requests opens on All every time. Click a chip or press <kbd>←</kbd> <kbd>→</kbd> to scope the list, and click the chip again for All
+- **Fold a section:** click its header on All or Mine. Folds are kept across relaunches
 - **Fold a lane:** click a Status header on Board or Mine. Folds are kept per tab and board
 - **Labels:** chips with the label's colour dot on each row (not in compact cards), all of them in the detail
 - **One repo:** right-click a repo header or row → **Show Only *repo***, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd>
 - **Recent activity:** right-click a row, a repo header or the list → **Show Only Updated**: today, 3 days, a week or a month
-- **Sort:** each tab by recently updated · waiting longest for review (PRs) · newest first (issues) · oldest first: ⇅ above the list
+- **Sort:** each chip and tab by recently updated · waiting longest for review (PRs) · newest first (issues) · oldest first: ⇅ above the list
 - **Right-click a row:** Status (issues) · Reviewers… (PRs) · Assignees… · Labels… · copy branch (PRs), link or Markdown link · checkout command · open on GitHub · failing check · search the author
 - **Switch board:** <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> on the Board tab
 - **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Each account keeps its org and board
@@ -87,7 +90,7 @@ More in the [manual](docs/manual.md#issues).
 | `updated:today` `updated:3d` `updated:1w` `updated:1m` | Items active since 00:00 today, or 2, 6 or 29 days before; GitHub's date forms (`updated:>2026-10-01`) also filter locally |
 | `-@dependabot` `-~wontfix` | Leave those out: a `-` before any qualifier |
 
-Results are laid out like the tab you search from, with the same groups and rows; merged and closed ones follow under Closed and merged.
+Results land in the list's sections, then **Other results** for the rest, then Closed and merged. Click a chip, or press <kbd>←</kbd> <kbd>→</kbd> at the field's start or end, to search only Needs you, Mine or Team.
 
 Combine `@`, `~`, `is:`, `status:`, `updated:`, `review:`, `repo:`, `size:` and words. Type `st`, `la` or `up` and press <kbd>Tab</kbd> for `status:`, `label:` or `updated:`, with suggestions. Save the searches you repeat with the bookmark icon, apply one with ⌃1–⌃9; manage them in Settings → Search.
 

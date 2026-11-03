@@ -1,6 +1,6 @@
 # Sorting the lists
 
-Each list tab gets a Sort choice: what's new, what's stuck, or what's old. The default stays "Recently updated", so nothing changes for anyone who never opens the menu.
+Each pull request scope and issue tab gets a Sort choice: what's new, what's stuck, or what's old. The default stays "Recently updated", so nothing changes for anyone who never opens the menu.
 
 ## Why
 
@@ -10,10 +10,10 @@ Each list tab gets a Sort choice: what's new, what's stuck, or what's old. The d
 
 ## Goals
 
-- Every list tab (Review, Mine, Team, Assigned, Created, Board) has its own sort, remembered across launches.
-- PR tabs can be ordered by the review wait.
+- Every pull request scope (All, Needs you, Mine, Team) and issue tab (Assigned, Created, Board) has its own sort, remembered across launches.
+- PR scopes can be ordered by the review wait.
 - A changed sort is always visible, so a list that "looks wrong" explains itself.
-- Search results follow the sort of the tab they're laid out like.
+- Search results follow the sort of the scope or tab they're laid out for.
 
 ## Non-goals
 
@@ -31,9 +31,9 @@ Each list tab gets a Sort choice: what's new, what's stuck, or what's old. The d
 
 ## The choices
 
-| Tabs | Choices, default first |
+| Scopes and tabs | Choices, default first |
 |---|---|
-| Review, Mine, Team | Recently updated · Waiting longest · Oldest first |
+| All, Needs you, Mine, Team | Recently updated · Waiting longest · Oldest first |
 | Assigned, Created, Board | Recently updated · Newest first · Oldest first |
 
 - **Recently updated:** by last update, newest first. This is today's order.
@@ -58,18 +58,18 @@ Each list tab gets a Sort choice: what's new, what's stuck, or what's old. The d
 
 ## What the sort applies to
 
-- **Rows** in every group of the tab.
+- **Rows** in every group of the scope or tab. In All, the sort orders rows within each section, and the sections keep their fixed order.
 - **Repo groups** are ordered by their first row under the chosen sort. Today they go by their newest update, which is the same thing for Recently updated.
 - **Author groups** (Team by author) stay alphabetical under every sort, as today. A person is looked up by name. Moving authors around would also change the default order, which the anti-goals rule out. *(Builder-check call.)*
 - **Board lanes** keep the board's own column order. The sort applies inside each lane.
 - **These are left alone:** Done, Mine's Recently closed, and search's "Closed and merged" / "Closed". They stay ordered by when the item ended, because that's what those sections are for.
-- **Search** uses the sort of the tab the results are laid out for: the search's reference tab when it has one, otherwise the current tab.
+- **Search** uses the sort of the scope or tab the results are laid out for: the search's reference scope or tab when it has one, otherwise the current one. Everywhere uses All's.
 - **Keyboard navigation** (↑/↓, ⌥↑/⌥↓, the detail's ⌥↓ next-item order) already follows the on-screen order. That order is captured when the first detail opens, and changing the sort doesn't reshuffle an open detail's sequence, as a refresh doesn't.
 - **Selection:** changing the sort keeps the selected row selected and scrolls it into view. A row in a folded group or lane stays folded away, and nothing scrolls.
 
 ## Settings and migration
 
-- The sort is stored globally per tab in `SettingsStore` (`[tab: ListSort]`), not per account, org or board.
+- The sort is stored globally per scope or tab in `SettingsStore` (`[key: ListSort]`), not per account, org or board. The `all` key is new and defaults to Recently updated; `review`, `mine` and `team` are the old keys and carry over unchanged.
 - "Oldest review request first" is removed from Settings → General. The old `reviewOldestFirst` key is read only when the stored settings have no sort key yet. `true` then becomes Review's sort = Oldest first. Once the sort key exists it wins, and the old key is no longer written.
 - The manual's Review row ("Oldest first: Settings → General") and the Settings table entry change to describe the Sort menu.
 
