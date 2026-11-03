@@ -57,11 +57,13 @@ public enum ChangeDetector {
 
         if toggles.reviewRequested {
             let before = Dictionary(old.reviewCandidates.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
-            for pr in new.reviewCandidates
-            where filters.keeps(pr, now: now) && ReviewRules.status(of: pr, me: me, myTeams: myTeams).reviewReason != nil {
-                if let prev = before[pr.key],
-                    ReviewRules.status(of: prev, me: me, myTeams: myTeams).reviewReason != nil
-                {
+            let since = old.fetchedAt.addingTimeInterval(-reviewRequestLag)
+            for pr in new.reviewCandidates where filters.keeps(pr, now: now) {
+                guard let reason = ReviewRules.status(of: pr, me: me, myTeams: myTeams).reviewReason else { continue }
+                if let prev = before[pr.key] {
+                    if ReviewRules.status(of: prev, me: me, myTeams: myTeams).reviewReason != nil { continue }
+                } else if let at = reasonTime(reason, of: pr, me: me, myTeams: myTeams), at < since {
+                    // Back on the list (reopened, or missed by a search) for a reason older than the poll.
                     continue
                 }
                 result.append(PREvent(kind: .reviewRequested, pr: pr, actor: pr.author))
@@ -126,6 +128,23 @@ public enum ChangeDetector {
     /// were ever set up rather than a new head commit's checks that haven't started.
     private static func settledReady(_ pr: PullRequest, prev: PullRequest) -> Bool {
         ReviewRules.isReadyToMerge(pr) && pr.mergeable != .unknown && (pr.ci != .none || prev.ci == .none)
+    }
+
+    /// How long before the previous poll a review request may have been made and still notify when its
+    /// PR first shows up: the search index can lag the request. A PR that comes back with an older
+    /// request (closed and reopened, or missing from one poll) stays silent; so does a first-time request
+    /// the search shows more than this late.
+    public static let reviewRequestLag: TimeInterval = 600
+
+    /// When the reason `pr` needs my review arose: the newest pending request to me or to a team of mine,
+    /// or the head commit for new commits since my review. Nil when unknown, which notifies as before.
+    private static func reasonTime(
+        _ reason: ReviewReason, of pr: PullRequest, me: String, myTeams: Set<String>
+    ) -> Date? {
+        if case .newCommitsSinceReview = reason { return pr.headCommitDate }
+        let pending = Set(pr.reviewRequests.map(\.key))
+        let mine = [Reviewer.user(me).key] + myTeams.map { Reviewer.team(slug: $0, name: $0).key }
+        return mine.filter(pending.contains).compactMap { pr.reviewRequestTimes[$0] }.max()
     }
 
     /// How far before the previous poll a merge may be and still count as new when that poll never
