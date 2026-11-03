@@ -2213,7 +2213,11 @@ extension AppModel {
         case .list, .search: leaveAsk()
         case .detail: break
         }
-        if case .detail = route {} else { detailReturnRoute = route }
+        if case .detail = route {} else {
+            detailReturnRoute = route
+            // A detail opened afresh returns to the chip on screen, not one an earlier detail kept.
+            detailBackScope = nil
+        }
         openedPR = fetchedPullRequest(for: key)
         closeCompletion()
         route = .detail(key)
