@@ -173,8 +173,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var toggleHotkey: KeyCombo? = .togglePopoverDefault
     /// The popover mode last shown.
     public var mode: PopoverMode = .pullRequests
-    /// The Issues tab last shown.
-    public var lastIssueTab: IssueTab = .assigned
+    /// Where the issue list opens each time the popover opens.
+    public var issueOpenOn: IssueOpenOn = .all
+    /// The issue chip showing when the popover last closed, which Last used opens on.
+    public var lastIssueScope: IssueScope = .all
     /// Adds the Assigned issues count to the menu bar badge.
     public var countAssignedIssues = false
     /// Draws the popover on an opaque window background instead of the translucent material.
@@ -204,7 +206,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case account, org, projectNumber, projectOwner, projectOrg, orgByAccount, boardByOwner, grouping, groupTeamByAuthor, sorts, reviewOldestFirst, compact,
-            hideOlderThanTwoMonths, hideApprovedByMe, hideDrafts, badge, notify, refreshMinutes, followPendingCI, openOn, lastScope, toggleHotkey, mode, lastIssueTab,
+            hideOlderThanTwoMonths, hideApprovedByMe, hideDrafts, badge, notify, refreshMinutes, followPendingCI, openOn, lastScope, toggleHotkey, mode, issueOpenOn, lastIssueScope, lastIssueTab,
             countAssignedIssues, solidBackground, accountSource, appAccounts, signedOutByUser, laneFolds, sectionFolds,
             askEnabled, askModel, askModelChoices, askExcludedRepos
     }
@@ -256,7 +258,14 @@ public struct AppSettings: Codable, Equatable, Sendable {
         // A saved null is "turned off"; a missing key (settings saved before the shortcut) is the default.
         if let hotkey = c.readableOrNull(KeyCombo.self, forKey: .toggleHotkey) { d.toggleHotkey = hotkey }
         d.mode = c.readable(PopoverMode.self, forKey: .mode) ?? d.mode
-        d.lastIssueTab = c.readable(IssueTab.self, forKey: .lastIssueTab) ?? d.lastIssueTab
+        // A file saved before the choice existed keeps its last tab: Last used. An unreadable choice is All.
+        d.issueOpenOn = c.contains(.issueOpenOn)
+            ? c.readable(IssueOpenOn.self, forKey: .issueOpenOn) ?? .all : .lastUsed
+        if let scope = c.readable(IssueScope.self, forKey: .lastIssueScope) {
+            d.lastIssueScope = scope
+        } else if let tab = c.readable(IssueTab.self, forKey: .lastIssueTab) {
+            d.lastIssueScope = IssueScope(tab)
+        }
         d.countAssignedIssues = c.readable(Bool.self, forKey: .countAssignedIssues) ?? d.countAssignedIssues
         d.solidBackground = c.readable(Bool.self, forKey: .solidBackground) ?? d.solidBackground
         // A missing source means `gh` (settings saved before sign-in). One saved but unreadable (a
@@ -301,7 +310,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         try c.encode(lastScope, forKey: .lastScope)
         try c.encode(toggleHotkey, forKey: .toggleHotkey)
         try c.encode(mode, forKey: .mode)
-        try c.encode(lastIssueTab, forKey: .lastIssueTab)
+        try c.encode(issueOpenOn, forKey: .issueOpenOn)
+        try c.encode(lastIssueScope, forKey: .lastIssueScope)
         try c.encode(countAssignedIssues, forKey: .countAssignedIssues)
         try c.encode(solidBackground, forKey: .solidBackground)
         try c.encodeIfPresent(accountSource, forKey: .accountSource)

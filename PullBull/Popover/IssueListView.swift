@@ -61,7 +61,7 @@ struct IssueListView: View {
             if listed.isEmpty {
                 Group {
                     if focus.isActive, total > contents.issues.count {
-                        FocusedEmptyView(model: model, tabTitle: tab.title, hiddenCount: scoped.hiddenCount)
+                        FocusedEmptyView(model: model, tabTitle: IssueScope(tab).title, hiddenCount: scoped.hiddenCount)
                     } else {
                         IssueEmptyView(model: model, tab: tab, now: now)
                     }
@@ -160,7 +160,7 @@ private struct IssueEmptyView: View {
             return .init(title: "Retry", help: "Retry (⌘R)", disabled: model.status.isRefreshing) { model.refresh() }
         }
         if tab == .assigned, model.settings.org != nil {
-            return .init(title: "Browse \(boardTitle)", symbol: "rectangle.split.3x1") { model.selectedIssueTab = .board }
+            return .init(title: "Browse \(boardTitle)", symbol: "rectangle.split.3x1") { model.issueScope = .board }
         }
         return nil
     }
@@ -286,7 +286,7 @@ struct BoardUnavailableView: View {
             .padding(.top, 6)
             personalAction(access)
                 .padding(.top, 14)
-            Text("Mine and Created still work.")
+            Text("Assigned and Created still work.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -357,7 +357,7 @@ struct BoardUnavailableView: View {
             .buttonStyle(IssueStateButtonStyle())
             .disabled(model.checkingAccess || model.status.isRefreshing)
             .padding(.top, 14)
-            Text("Mine and Created still work. Board status is hidden until access is granted.")
+            Text("Assigned and Created still work. Board status is hidden until access is granted.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

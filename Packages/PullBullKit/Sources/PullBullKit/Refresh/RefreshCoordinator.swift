@@ -263,7 +263,7 @@ public struct LiveSnapshotFetcher: SnapshotFetching {
     /// `closedLookups`, is `pending`, tried again next poll with `previous`'s pending ones. Nil
     /// without a previous snapshot of this org.
     private func closedIssues(
-        previous: Snapshot?, assigned: IssueList, created: IssueList
+        previous: Snapshot?, assigned: FetchedIssues, created: FetchedIssues
     ) async -> (found: [BoardIssue], pending: [BoardIssue])? {
         guard let previous else { return nil }
         let pairs = [
@@ -306,7 +306,7 @@ public struct LiveSnapshotFetcher: SnapshotFetching {
     /// the time that list was fetched (`previousAt`, or the previous `fetchedAt` for a cache from
     /// before it was stored).
     private static func fetchedAt(
-        _ list: IssueList, started: Date, previous: Snapshot?, previousAt: Date?
+        _ list: FetchedIssues, started: Date, previous: Snapshot?, previousAt: Date?
     ) -> Date? {
         guard list.error != nil else { return started }
         guard list.issues != nil, let previous else { return nil }
@@ -321,7 +321,7 @@ public struct LiveSnapshotFetcher: SnapshotFetching {
     /// when a PR search hits them.
     private func issues(
         _ query: String, list: String, assignmentFor viewer: String? = nil, previous: [BoardIssue]?
-    ) async throws -> IssueList {
+    ) async throws -> FetchedIssues {
         do {
             // Assigned and Created carry what issue notifications read.
             let found = try await api.searchIssues(
@@ -406,11 +406,11 @@ public struct LiveSnapshotFetcher: SnapshotFetching {
 private enum FetchPart: Sendable {
     case context(OrgContext, team: [PullRequest])
     case requested([PullRequest]), reviewed([PullRequest]), mine([PullRequest]), closed([PullRequest])
-    case assigned(IssueList), created(IssueList)
+    case assigned(FetchedIssues), created(FetchedIssues)
     case board(BoardResult)
 }
 
-private typealias IssueList = (issues: [BoardIssue]?, error: String?)
+private typealias FetchedIssues = (issues: [BoardIssue]?, error: String?)
 private typealias BoardResult = (
     title: String?, statusOptions: [StatusOption]?, issues: [BoardIssue], error: String?, ids: BoardIds?
 )
@@ -423,8 +423,8 @@ private struct FetchParts {
     var reviewed: [PullRequest] = []
     var mine: [PullRequest] = []
     var closed: [PullRequest] = []
-    var assigned: IssueList = (nil, nil)
-    var created: IssueList = (nil, nil)
+    var assigned: FetchedIssues = (nil, nil)
+    var created: FetchedIssues = (nil, nil)
     var board: BoardResult = (nil, nil, [], nil, nil)
 
     mutating func add(_ part: FetchPart) {

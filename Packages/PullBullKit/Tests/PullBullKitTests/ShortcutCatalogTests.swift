@@ -11,13 +11,13 @@ private let modifierOrder = ["⌃", "⌥", "⇧", "⌘"]
                 "Commenting", "Ask AI answers"])
     }
 
-    @Test func arrowShortcutsNameChipsAndTabs() throws {
+    @Test func arrowShortcutsNameChips() throws {
         let sections = ShortcutCatalog.sections(toggle: nil)
         let lists = try #require(sections.first { $0.title == "Lists" })
-        #expect(lists.shortcuts.contains(Shortcut("Previous / next chip or tab", [["←"], ["→"]])))
+        #expect(lists.shortcuts.contains(Shortcut("Previous / next chip", [["←"], ["→"]])))
         let search = try #require(sections.first { $0.title == "Search" })
         #expect(search.shortcuts.contains(
-            Shortcut("Narrow to the chip or tab beside", [["←"], ["→"]], note: "At the field's start or end")))
+            Shortcut("Narrow to the chip beside", [["←"], ["→"]], note: "At the field's start or end")))
     }
 
     @Test func commentingShortcuts() throws {
@@ -115,7 +115,7 @@ private let modifierOrder = ["⌃", "⌥", "⇧", "⌘"]
     }
 
     @Test func matchesNotes() {
-        let found = ShortcutCatalog.filter(all, query: "board tab")
+        let found = ShortcutCatalog.filter(all, query: "board chip")
         #expect(found.flatMap(\.shortcuts).map(\.action) == ["Board menu"])
     }
 

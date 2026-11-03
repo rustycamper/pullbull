@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import PullBullKit
 
-/// The header: the mode switch and the search field in one row, the mode's tabs under them. Both rows
+/// The header: the mode switch and the search field in one row, the mode's chips under them. Both rows
 /// stay put while searching; only the list below changes.
 struct HeaderView<UnderField: View>: View {
     let model: AppModel
@@ -32,8 +32,8 @@ struct HeaderView<UnderField: View>: View {
         }
     }
 
-    /// The Pull Requests chips or the Issues tabs. While results are on screen they narrow them instead of
-    /// showing their lists.
+    /// The Pull Requests or Issues chips. While results are on screen they narrow them instead of showing
+    /// their lists.
     private var tabRow: some View {
         Group {
             switch model.mode {
@@ -42,7 +42,7 @@ struct HeaderView<UnderField: View>: View {
                     if searchOpen { onCancelSearch() }
                 }
             case .issues:
-                TabBar(model: model, searching: searching) {
+                IssueScopeChips(model: model, searching: searching) {
                     if searchOpen { onCancelSearch() }
                 }
             }

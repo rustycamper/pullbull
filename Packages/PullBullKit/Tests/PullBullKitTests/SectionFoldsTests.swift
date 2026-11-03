@@ -42,4 +42,33 @@ import Testing
         #expect(PRGrouping.forScope(.team, settings: s, repoFocused: true) == .author)
         #expect(PRGrouping.forScope(.all, settings: s, repoFocused: false) == .none)
     }
+
+    @Test func restOfTheBoardStartsFolded() {
+        let folds = SectionFolds()
+        #expect(IssueSection.allCases.filter(folds.isFolded) == [.restOfBoard])
+        var toggled = folds
+        toggled.toggle(.restOfBoard)
+        #expect(!toggled.isFolded(.restOfBoard))
+        #expect(toggled.isFolded(PRSection.team))
+        toggled.toggle(.assignedToYou)
+        #expect(toggled.isFolded(.assignedToYou))
+        #expect(!toggled.isFolded(PRSection.needsReview))
+    }
+
+    @Test func nothingFoldsWhileSearching() {
+        let issue = BoardIssue(key: PRKey(repo: "o/a", number: 1), title: "i", url: URL(string: "https://x/1")!, isOpen: true)
+        let list = IssueList(
+            sections: [
+                IssueListSection(section: .assignedToYou, issues: [issue], state: .rows),
+                IssueListSection(section: .restOfBoard, issues: [issue], state: .rows),
+            ],
+            status: [:], nothingAssigned: false, isEmpty: false)
+        let folds = SectionFolds()
+        #expect(folds.shownFolded(issues: list, searching: false) == [.restOfBoard])
+        #expect(folds.shownFolded(issues: list, searching: true) == [])
+        var open = folds
+        open.toggle(.restOfBoard)
+        open.toggle(.youOpened)
+        #expect(open.shownFolded(issues: list, searching: false) == [])
+    }
 }

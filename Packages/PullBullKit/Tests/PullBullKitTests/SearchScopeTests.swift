@@ -79,19 +79,6 @@ private let issueTabs = BuiltIssueTabs(
         #expect(SearchScope.issues(.created).isNarrowed)
     }
 
-    /// The scope tab, else the tab typing started on when it is in the shown mode, else the shown tab.
-    @Test func reference() {
-        #expect(SearchScope.reference(
-            scope: .pullRequests(.mine), startedOn: .pullRequests(.review), shown: .pullRequests(.review))
-            == .pullRequests(.mine))
-        #expect(SearchScope.reference(
-            scope: .everything, startedOn: .pullRequests(.review), shown: .pullRequests(.mine))
-            == .pullRequests(.review))
-        #expect(SearchScope.reference(scope: .everything, startedOn: .issues(.board), shown: .pullRequests(.team))
-            == .pullRequests(.team))
-        #expect(SearchScope.reference(scope: .everything, startedOn: nil, shown: .issues(.created)) == .issues(.created))
-    }
-
     // MARK: Items and results
 
     @Test func aPRTabListsEveryRowAndMineItsRecentlyClosed() {
@@ -260,5 +247,17 @@ private let issueTabs = BuiltIssueTabs(
         #expect(SearchScope.pullRequests(.team).moved(by: 1, among: all) == nil)
         #expect(SearchScope.pullRequests(.review).moved(by: -1, among: all) == nil)
         #expect(SearchScope.pullRequests(.mine).moved(by: 1, among: Array(all.prefix(2))) == nil)
+    }
+
+    @Test func issueChipsAreEverywhereThenTheTabs() {
+        #expect(SearchScope.issueChips() == [.everything, .issues(.assigned), .issues(.created), .issues(.board)])
+    }
+
+    @Test func issueScopeOfASearchScope() {
+        #expect(SearchScope.everything.issueScope == .all)
+        #expect(SearchScope.issues(.assigned).issueScope == .assigned)
+        #expect(SearchScope.issues(.created).issueScope == .created)
+        #expect(SearchScope.issues(.board).issueScope == .board)
+        #expect(SearchScope.pullRequests(.mine).issueScope == nil)
     }
 }

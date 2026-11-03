@@ -97,6 +97,17 @@ public enum ListNavigation {
         return (listed + done).map { $0.issues.map(\.key) }.filter { !$0.isEmpty }
     }
 
+    /// The Issues All list's rows as shown, `issueGroups` flattened.
+    public static func issueKeys(_ list: IssueList, folded: Set<IssueSection>) -> [PRKey] {
+        issueGroups(list, folded: folded).flatMap { $0 }
+    }
+
+    /// The Issues All list's shown groups of rows, in display order: one per section not in `folded`.
+    /// Sections without rows (loading, failed) and empty ones add none.
+    public static func issueGroups(_ list: IssueList, folded: Set<IssueSection>) -> [[PRKey]] {
+        list.sections.filter { !folded.contains($0.section) }.map { $0.issues.map(\.key) }.filter { !$0.isEmpty }
+    }
+
     /// Whether a PR list grouped this way shows group headers to jump between.
     public static func isGrouped(prGrouping: PRGrouping) -> Bool { prGrouping != .none }
 

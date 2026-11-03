@@ -352,4 +352,70 @@ private func shape(_ layout: SearchSectionLayout) -> [String] {
             #expect(groups == tabs.contents(tab)?.groups)
         }
     }
+
+    // MARK: Issue sections
+
+    private func mine(_ n: Int, author: String? = nil, assignedToMe: Bool = false, status: String? = nil,
+                      updated: Double = 1) -> BoardIssue {
+        let base = issue(n, status: status, updated: updated)
+        return BoardIssue(
+            key: base.key, title: base.title, url: base.url, isOpen: true, author: author,
+            updatedAt: base.updatedAt, assignees: assignedToMe ? [Assignee(login: "ME", avatarURL: nil)] : [],
+            status: base.status)
+    }
+
+    private func issueSnap(
+        assigned: [BoardIssue] = [], created: [BoardIssue] = [], board: [BoardIssue] = []
+    ) -> (Snapshot, BuiltIssueTabs) {
+        let s = Snapshot(
+            fetchedAt: now, org: org, reviewCandidates: [], mine: [], team: [], recentlyClosed: [],
+            boardIssues: board, boardProject: 3, assignedIssues: assigned, createdIssues: created,
+            boardStatusOptions: options)
+        return (s, IssueTabBuilder.build(s, settings: AppSettings(), now: now))
+    }
+
+    @Test func everywhereIssueResultsTakeAllsSections() {
+        let (s, tabs) = issueSnap(
+            assigned: [mine(1, assignedToMe: true)], created: [mine(2, author: "me")],
+            board: [issue(3, status: "opt1")])
+        let found = results(issues: [
+            issue(3, status: "opt1"), mine(1, assignedToMe: true), mine(2, author: "me"),
+            mine(4, assignedToMe: true), mine(5, author: "Me"), mine(6, author: "bob"),
+            issue(7, open: false, closed: 3), issue(8, open: false, closed: 9),
+        ])
+        let shown = SearchLayout.issueSections(
+            found, list: IssueList.build(tabs, snap: s, settings: AppSettings()), tabs: tabs, snap: s,
+            settings: AppSettings(), viewer: "me")
+        #expect(shown.sections.map(\.section) == [.assignedToYou, .youOpened, .restOfBoard, .otherResults])
+        #expect(shown.sections.allSatisfy { $0.state == .rows })
+        #expect(shown.sections.map { $0.issues.map(\.key.number).sorted() } == [[1, 4], [2, 5], [3], [6]])
+        #expect(shown.done.isEmpty)
+        #expect(shown.ended.map(\.key.number) == [7, 8])
+        #expect(shown.status[key(3)]?.optionId == "opt1")
+        #expect(shown.keys(closedExpanded: false, doneExpanded: false).count == 6)
+        #expect(shown.keys(closedExpanded: true, doneExpanded: false).suffix(2).map(\.number) == [7, 8])
+    }
+
+    @Test func anIssueAssignedSinceTheLastPollStaysInRestOfTheBoard() {
+        let (s, tabs) = issueSnap(board: [mine(1, assignedToMe: true, status: "opt1")])
+        let found = results(issues: [mine(1, assignedToMe: true, status: "opt1")])
+        let shown = SearchLayout.issueSections(
+            found, list: IssueList.build(tabs, snap: s, settings: AppSettings()), tabs: tabs, snap: s,
+            settings: AppSettings(), viewer: "me")
+        #expect(shown.sections.map(\.section) == [.restOfBoard])
+        #expect(shown.sections.flatMap(\.issues).map(\.key.number) == [1])
+    }
+
+    @Test func aDoneOnTheBoardResultGoesToDone() {
+        let (s, tabs) = issueSnap(board: [issue(1, status: "opt3"), issue(2, status: "opt3", updated: 5)])
+        let found = results(issues: [mine(1, assignedToMe: true, status: "opt3"), issue(2), issue(3, status: "opt1")])
+        let shown = SearchLayout.issueSections(
+            found, list: IssueList.build(tabs, snap: s, settings: AppSettings()), tabs: tabs, snap: s,
+            settings: AppSettings(), viewer: "me")
+        #expect(shown.done.map(\.key.number) == [1, 2])
+        #expect(shown.sections.flatMap(\.issues).map(\.key.number) == [3])
+        #expect(!shown.sections.contains { $0.section == .doneStillOpen })
+        #expect(shown.keys(closedExpanded: false, doneExpanded: false).map(\.number) == [3])
+        #expect(shown.keys(closedExpanded: false, doneExpanded: true).map(\.number) == [3, 1, 2])
+    }
 }

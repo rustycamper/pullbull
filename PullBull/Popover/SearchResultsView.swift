@@ -2,10 +2,11 @@ import SwiftUI
 import PullBullKit
 
 /// The current mode's search results laid out as the reference tab lays out its list (the list's sections
-/// for Everywhere and Mine; else its repo, author or Status groups and headers, and Done), then the merged
-/// and closed ones under a folding Closed section, with an explicit state: "Searching…", the line pointing
-/// to the other mode when only its kind matches, the no-match message, or the remote failure. Narrowed to
-/// a tab, the footer's summary names it and the no-match state offers everything instead.
+/// for Everywhere and Mine, Issues' with Other results and Done; else its repo, author or Status groups and
+/// headers, and Done), then the merged and closed ones under a folding Closed section, with an explicit
+/// state: "Searching…", the line pointing to the other mode when only its kind matches, the no-match
+/// message, or the remote failure. Narrowed to a chip, the footer's summary names it and the no-match state
+/// offers Everywhere instead.
 struct SearchResultsView: View {
     let model: AppModel
     let now: Date
@@ -151,15 +152,13 @@ struct SearchResultsView: View {
         token.count > 32 ? token.prefix(31) + "…" : token
     }
 
-    /// No match among the narrowed tab's items, with the way back to everything (Everywhere for PRs).
+    /// No match among the narrowed chip's items, with the way back to Everywhere.
     private func narrowedEmpty(_ tab: String) -> some View {
-        let pullRequests = model.mode == .pullRequests
-        let detail =
-            pullRequests ? "Search everywhere to look in every list." : "Search everything to look in every tab."
-        return ListStateView(
-            symbol: "magnifyingglass", title: SearchContext.noMatches(inTab: tab), detail: detail,
+        ListStateView(
+            symbol: "magnifyingglass", title: SearchContext.noMatches(inTab: tab),
+            detail: "Search everywhere to look in every list.",
             detailLink: .init(
-                phrase: pullRequests ? "Search everywhere" : "Search everything",
+                phrase: "Search everywhere",
                 help: model.mode == .issues
                     ? "Search every issue for this query" : "Search every pull request for this query",
                 perform: { model.searchEverything() }))
@@ -210,7 +209,11 @@ struct SearchResultsView: View {
                 prGroups(layout)
             }
         case .issues:
-            if let layout = model.searchIssueLayout { issueGroups(layout) }
+            if let layout = model.searchIssueSectionLayout {
+                issueSectionGroups(layout)
+            } else if let layout = model.searchIssueLayout {
+                issueGroups(layout)
+            }
         }
     }
 
@@ -266,6 +269,41 @@ struct SearchResultsView: View {
         if !layout.ended.isEmpty {
             closedSection(title: "Closed and merged", count: layout.ended.count) {
                 closedRows(layout.ended)
+            }
+        }
+    }
+
+    /// The open results in All's sections and Other results, which never fold while searching, then those
+    /// done on the board under a folding Done, then Closed. Each row shows its board Status.
+    @ViewBuilder private func issueSectionGroups(_ layout: SearchIssueSectionLayout) -> some View {
+        ForEach(layout.sections) { section in
+            let s = section.section
+            Section {
+                issueRows(section.issues, on: s.rowTab, status: layout.status)
+            } header: {
+                ListSectionHeader(
+                    glyph: s.glyph, title: s.title, count: section.issues.count, fold: nil,
+                    compact: model.settings.compact)
+                    .pinnedHeaderBackground()
+            }
+        }
+        if !layout.done.isEmpty {
+            let done = IssueSection.doneStillOpen
+            Section {
+                if model.searchExpansion.done {
+                    issueRows(layout.done, on: done.rowTab, status: layout.status)
+                }
+            } header: {
+                ListSectionHeader(
+                    glyph: done.glyph, title: done.title, count: layout.done.count, note: "still open",
+                    fold: .init(isOpen: model.searchExpansion.done) { model.toggleSearchDone() },
+                    compact: model.settings.compact)
+                    .pinnedHeaderBackground()
+            }
+        }
+        if !layout.ended.isEmpty {
+            closedSection(title: "Closed", count: layout.ended.count) {
+                issueRows(layout.ended, on: IssueSection.otherResults.rowTab, status: layout.status)
             }
         }
     }
@@ -354,16 +392,18 @@ struct SearchResultsView: View {
         }
     }
 
+    /// `status`: each row's Status chip, for rows not under a Status lane.
     private func issueRows(
         _ issues: [BoardIssue], on tab: IssueTab, underRepoHeader: Bool = false,
-        clearance: CGFloat = PinnedHeader.clearance
+        clearance: CGFloat = PinnedHeader.clearance, status: [PRKey: BoardStatusValue] = [:]
     ) -> some View {
         ForEach(issues) { issue in
             IssueRow(
                 model: model, issue: issue, tab: tab, now: now, selected: model.searchSelection == issue.key,
                 inRepoGroup: !SearchLayout.showsRepo(
                     issue.key, underRepoHeader: underRepoHeader, focus: model.repoFocus),
-                wantedLabels: labels, search: SearchMarks(words: words, role: role(of: issue)))
+                wantedLabels: labels, search: SearchMarks(words: words, role: role(of: issue)),
+                status: status[issue.key])
             .scrollTarget(issue.key, clearance: clearance)
         }
     }

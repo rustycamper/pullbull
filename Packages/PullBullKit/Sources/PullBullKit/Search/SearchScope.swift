@@ -27,17 +27,23 @@ public enum SearchScope: Hashable, Sendable {
         }
     }
 
+    /// How the list lays this scope out; nil for pull requests.
+    public var issueScope: IssueScope? {
+        switch self {
+        case .everything: .all
+        case .pullRequests: nil
+        case .issues(let tab): IssueScope(tab)
+        }
+    }
+
+    /// The issue chips: Everywhere, then the tabs.
+    public static func issueChips() -> [SearchScope] {
+        [.everything] + IssueTab.allCases.map(SearchScope.issues)
+    }
+
     /// The pull request chips: Everywhere, then the tabs shown.
     public static func prChips(_ tabs: [PRTab]) -> [SearchScope] {
         [.everything] + tabs.map(SearchScope.pullRequests)
-    }
-
-    /// The tab whose layout the results take: the `scope` tab when narrowed, else the tab typing started
-    /// on when it is in `shown`'s mode, else `shown`, the current mode's selected tab.
-    public static func reference(scope: SearchScope, startedOn: SearchScope?, shown: SearchScope) -> SearchScope {
-        if scope.isNarrowed { return scope }
-        if let startedOn, startedOn.mode == shown.mode { return startedOn }
-        return shown
     }
 
     /// A tab clicked during a search: narrows to it, or back to everything when it is the scope already.

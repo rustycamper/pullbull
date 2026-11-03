@@ -48,11 +48,22 @@ struct GeneralSettingsTab: View {
             } label: {
                 RowLabel("Pull requests open on", note: "Each time the popover opens")
             }
+            LabeledContent {
+                Picker("Issues open on", selection: $model.settings.issueOpenOn) {
+                    ForEach(IssueOpenOn.allCases, id: \.self) { choice in
+                        Text(choice.title).tag(choice)
+                    }
+                }
+                .labelsHidden()
+                .accessibilityHint("Each time the popover opens")
+            } label: {
+                RowLabel("Issues open on", note: "Each time the popover opens")
+            }
             Picker(selection: $model.settings.grouping) {
                 Text("Repository").tag(Grouping.repository)
                 Text("None").tag(Grouping.none)
             } label: {
-                RowLabel("Group pull requests and created issues by", note: "Board, and issues on Mine, group by board Status")
+                RowLabel("Group pull requests and created issues by", note: "Board, and issues on Assigned, group by board Status")
             }
             .pickerStyle(.segmented)
             Toggle(isOn: $model.settings.groupTeamByAuthor) {

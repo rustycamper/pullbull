@@ -40,7 +40,7 @@ gh auth login --web -s read:project     # new login
 gh auth refresh -s read:project         # existing login
 ```
 
-Without `read:project`: Board shows the command to add it, Mine groups by repo.
+Without `read:project`: Board shows the command to add it, Assigned groups by repo, and All has no Rest of the board or Status chips.
 
 ### No organization
 
@@ -113,21 +113,27 @@ A PR waiting on review shows who it waits on and for how long (🕒 @dana 3d, "+
 
 <kbd>⌘</kbd><kbd>2</kbd>
 
-| Tab | Shows | Grouped by |
+One list scoped by chips, as on [Pull Requests](#pull-requests). It opens on All, or on the choice in Settings → General → Issues open on: All · Last used · Assigned · Created · Board. A chip you pick lasts until the popover closes. Last used reopens the last chip you left, also after a relaunch. The Board chip is always shown: it is where a board is chosen and missing access is explained. Click the selected chip, other than All, to go back to All.
+
+| Chip | Shows | Grouped by |
 |---|---|---|
-| Mine | Issues assigned to you | Board Status, then "Not on board". Done folded: done on the board, still open. Repo without a board |
+| All | Assigned to you, You opened, Rest of the board | Flat sections; each row shows its repo and, on the board, its Status as a chip |
+| Assigned | Issues assigned to you | Board Status, then "Not on board". Done folded: done on the board, still open. Repo without a board |
 | Created | Issues you opened | Repo, or none (Settings → General) |
 | Board | All open issues on the board | Board Status. Done folded, last 14 days |
 
-- **Status lanes:** the glyph takes the Status colour set on the board, on Board and Mine
+- **Sections on All:** **Assigned to you**, **You opened** (Created without the issues assigned to you) and **Rest of the board** (open board items in neither section, folded, only while a board is readable). An issue sits in the first section that holds it. Issues done on the board are in none; they stay on Assigned's Done, Board's Done and Created. Without a readable board nothing is left out as done and Rest of the board is absent
+- **Counts:** the chips count what the tabs did: Assigned and Board without their Done groups, Created its open issues. An empty list shows no count; a failed refresh keeps the count with a warning, and an unreadable board reads "–". All has no count. Created can count more than You opened, since it keeps issues also assigned to you; its tooltip says so
+- **Loading and failures:** a list still loading shows its header with placeholder rows. One that failed with nothing kept shows "Couldn't load assigned issues" (or created) with the error in its tooltip. One that failed with rows kept shows them with a warning on its header, and All's chip carries the warning too ("Didn't update · Assigned, Created"). All reads "Nothing assigned to you" above the other sections when Assigned is loaded and empty, and "No open issues assigned to you or opened by you" when every section is
+- **Status lanes:** the glyph takes the Status colour set on the board, on Board and Assigned
 - **Fold a lane:** click its header. Status, "No status" and "Not on board" fold; repo groups don't. Needs a board
-- **Folds:** kept per tab and per board, across relaunches. Folding on Board leaves Mine as it is
-- **Searching:** every lane shows open; folds come back when the search ends; open issues done on the board show under Done only when the results are laid out like Mine or Board, not on Created; closed ones go under Closed
+- **Folds:** kept per tab and per board, across relaunches. Folding on Board leaves Assigned as it is. All's section folds are kept apart from the lanes': You opened and Assigned to you start open, Rest of the board folded
+- **Searching:** every lane shows open; folds come back when the search ends; open issues done on the board show under Done only when the results are laid out like Assigned or Board, not on Created; closed ones go under Closed
 - **Done:** click its header to unfold. Never counted
 - **Labels:** chips as on [pull requests](#pull-requests). The board card lists them all
-- **Switch board:** on the Board tab, click its name in the filter row, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd>
+- **Switch board:** on the Board chip, click its name in the filter row, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd>
 - **Right-click a row:** [Status](#editing) (when a board is shown) · [Assignees…](#editing) · [Labels…](#editing) · copy link or Markdown link · open on GitHub · show only this repo · show only updated · search author
-- **Right-click a group header** (a Status lane, No status, Not on board or a repo): **Open All *N* on GitHub**, from two issues up; above 8 it asks first. Done has none. Headers in search results get the tab's menus, without Show Only Updated
+- **Right-click a group header** (a Status lane, No status, Not on board or a repo): **Open All *N* on GitHub**, from two issues up; above 8 it asks first. Done has none. Headers in search results get the chip's menus, without Show Only Updated
 - **Detail:** who opened it and when it was last updated (the row's age), or when it was closed · board card (incl. labels) · linked PRs (<kbd>Esc</kbd> returns) · description (long ones fold) · the last two comments, with earlier ones counted above. Markdown incl. `<details>`. A [comment field](#commenting) is pinned at the bottom
 
 ## Editing
@@ -177,7 +183,7 @@ Write a comment on an open, closed or merged issue or pull request from its deta
 | `review:changes` `review:none` | Changes requested · no reviews yet. PRs only |
 | `size:s` `size:m` `size:l` | Lines changed: up to 50, up to 300, more. PRs only |
 | `repo:widgets` `repo:acme/widgets` | That repo. The name alone matches every owner's; several `repo:` match any of them. An exact `owner/name` goes to GitHub even for a repo PullBull hasn't seen; a name alone goes as the one known repo it names, and filters your lists only when no known repo or several have it. Saved searches keep it |
-| `is:unanswered` | Your open PRs and the issues on your Mine or Created tab whose last comment is someone else's, not a bot's. Searches your lists only |
+| `is:unanswered` | Your open PRs and the issues on your Assigned or Created chip whose last comment is someone else's, not a bot's. Searches your lists only |
 | `status:prog` `status:"In progress"` | Status column on the board. Issues only |
 | `#123` | That number, every repo. With other terms, that number if it matches them: `is:open #123`. A bare `123` is a title word |
 | `owner/repo#123` or a link | Exactly that item |
@@ -186,11 +192,11 @@ Write a comment on an open, closed or merged issue or pull request from its deta
 | `-@bot` `-~wontfix` `-is:draft` `-status:done` `-updated:1w` | Not that. Works on every qualifier; a bare `-word` is a word. `-is:draft` and the other states still go to GitHub. These filter locally only and send nothing to GitHub: `-status:`, `-updated:`, `-is:ready`, `-is:conflict`, `-is:failing`, `-is:approved`, `-is:unanswered`, `-review:`, `size:` and `-size:`, and positive `is:ready`, `is:conflict`, `is:approved` and `review:changes`. A `repo:` or `-repo:` name alone that matches no known repo, or several, filters locally only too; an exact `-repo:owner/name` is sent. The rest of the search still goes to GitHub, except with `is:unanswered` or `-is:unanswered`, which keep the whole search in your lists |
 
 - `@`, `~`, `is:`, `status:`, `updated:`, `review:`, `repo:`, `size:` and words combine; everything must match; a leading `-` excludes
-- `status:` uses the board shown in the Board tab. Unquoted matches part of a Status name, quoted the whole name; case is ignored. Names with spaces need quotes to match exactly
+- `status:` uses the board shown on the Board chip. Unquoted matches part of a Status name, quoted the whole name; case is ignored. Names with spaces need quotes to match exactly
 - With `status:`, PRs and issues not on the board don't match
 - `-status:` keeps PRs and issues not on the board
 - Links and `owner/repo#123` work only on their own
-- Pull request results start in Everywhere, laid out in the list's sections: a PR the list holds sits in its section, one of yours it doesn't hold in Your PRs or Waiting on others, any other open one in **Other results**, after Team. Nothing is folded while you search. Merged and closed PRs follow in **Closed and merged** (issues: **Closed**), open until you fold it for this search. Click a chip, or press <kbd>←</kbd> / <kbd>→</kbd> at the field's start / end, to narrow to Needs you, Mine or Team; <kbd>←</kbd> from Needs you goes back to Everywhere, and <kbd>→</kbd> from Team does nothing. Click the narrowed chip again, or **Search everywhere** in the narrowed empty state, for Everywhere. Mine narrowed is laid out in its sections, Needs you and Team in their lists; Team leaves out what is in Needs you. Everywhere shows the results' count, a narrowed search none. Issues keep their tabs: click one to narrow
+- Pull request results start in Everywhere, laid out in the list's sections: a PR the list holds sits in its section, one of yours it doesn't hold in Your PRs or Waiting on others, any other open one in **Other results**, after Team. Nothing is folded while you search. Merged and closed PRs follow in **Closed and merged** (issues: **Closed**), open until you fold it for this search. Click a chip, or press <kbd>←</kbd> / <kbd>→</kbd> at the field's start / end, to narrow to Needs you, Mine or Team; <kbd>←</kbd> from Needs you goes back to Everywhere, and <kbd>→</kbd> from Team does nothing. Click the narrowed chip again, or **Search everywhere** in the narrowed empty state, for Everywhere. Mine narrowed is laid out in its sections, Needs you and Team in their lists; Team leaves out what is in Needs you. Everywhere shows the results' count, a narrowed search none. Issue results take All's sections the same way: Assigned to you, You opened, Rest of the board, then **Other results**; an open result done on the board goes under **Done · still open**, dimmed, after Other results. Narrowing to Assigned, Created or Board lays results out as that chip does
 - The footer says what is searched and how many match, with a spinner while GitHub answers. <kbd>⌥</kbd><kbd>⌘</kbd><kbd>↩</kbd> Ask AI shows there when it fits
 - **Right-click a result:** [Status](#editing) (issues, when a board is shown) · [Reviewers…](#editing) (PRs) · [Assignees…](#editing) · [Labels…](#editing) · copy branch (PRs), link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · search author. The checkout, files and failing check items are on PRs. Search author replaces the query; show only this repo keeps it and searches that repo
 - Each result looks as it does in its section or tab: avatars in Needs your review and Team, the review notes and counts the tab shows, assignees on issues. A soft yellow highlight marks the words that matched, and `· author` (or reviewer, assignee) after the age says why an `@` matched. Merged and closed PRs and closed issues carry their pill (an issue's: purple when completed, gray when not planned). Compact cards drop the pill and show only how long ago it ended (`2d`); the glyph says merged or closed, and hovering spells it out
@@ -282,9 +288,9 @@ Settings → Ask AI.
 | List | |
 |---|---|
 | <kbd>↑</kbd> <kbd>↓</kbd> | Select |
-| <kbd>⌥</kbd><kbd>↑</kbd> <kbd>⌥</kbd><kbd>↓</kbd> | Previous / next group (repo, author, lane, Done, Closed). Folded lanes are skipped; nothing without groups. Search results too |
+| <kbd>⌥</kbd><kbd>↑</kbd> <kbd>⌥</kbd><kbd>↓</kbd> | Previous / next group (section, repo, author, lane, Done, Closed). Folded lanes are skipped; nothing without groups. Search results too |
 | <kbd>⌘</kbd><kbd>↑</kbd> <kbd>⌘</kbd><kbd>↓</kbd> | First / last row, in search results too |
-| <kbd>←</kbd> <kbd>→</kbd> | Previous / next chip (tab in Issues). In search: narrow to the chip beside the one the results are laid out for (nothing from Everywhere with <kbd>←</kbd>, or from the last chip with <kbd>→</kbd>), with the caret at the start (<kbd>←</kbd>) or end (<kbd>→</kbd>) of the field |
+| <kbd>←</kbd> <kbd>→</kbd> | Previous / next chip. In search: narrow to the chip beside the one the results are laid out for (nothing from Everywhere with <kbd>←</kbd>, or from the last chip with <kbd>→</kbd>), with the caret at the start (<kbd>←</kbd>) or end (<kbd>→</kbd>) of the field |
 | <kbd>Return</kbd> | Detail |
 | <kbd>⌘</kbd><kbd>Return</kbd> | Open on GitHub (in a detail's comment field it posts, see [Commenting](#commenting)) |
 | <kbd>⌘</kbd><kbd>C</kbd> | Copy link |
@@ -296,7 +302,7 @@ Settings → Ask AI.
 | <kbd>⌘</kbd><kbd>1</kbd> · <kbd>⌘</kbd><kbd>2</kbd> | Pull Requests · Issues |
 | <kbd>⌃</kbd><kbd>1</kbd>…<kbd>⌃</kbd><kbd>9</kbd> | Saved search 1–9, in Settings order. Off while macOS uses ⌃1… to switch desktops (System Settings → Keyboard → Shortcuts → Mission Control) |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> | Repo menu ([one repo](#one-repo)) |
-| <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> | Board menu, on the Board tab |
+| <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> | Board menu, on the Board chip |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd> | Account menu |
 | <kbd>⌘</kbd><kbd>R</kbd> | Refresh |
 | <kbd>⌘</kbd><kbd>,</kbd> | Settings |
@@ -344,7 +350,7 @@ Reopen within a minute and the detail is still there.
 - A strip above the list names the step: *Today*, *Last 3 days*, *Last week*, *Last month*; hover for the full line and start date
 - On All and Mine, the Recently closed header names the step too; under the month it stays *Last 7 days*
 - Back to all: ✕ in the strip, **Show All**, or <kbd>Esc</kbd>. <kbd>Esc</kbd> clears this and Show Only *repo* together
-- Kept across chip changes. Cleared when the popover closes, the mode changes or the Issues tab changes
+- Kept across chip changes. Cleared when the popover closes, the mode changes or the Issues chip changes
 - Judged by last activity: when an open item last changed, or when a closed one ended
 - Counts and notifications still cover everything
 - Combines with Show Only *repo*
@@ -354,11 +360,11 @@ Reopen within a minute and the detail is still there.
 
 - Click ⇅ at the right of the strip above the list, or right-click a row, a header or the list → **Sort By**
 - Pull request chips: **Recently updated** (default) · **Waiting longest** (the 🕒 review wait, longest first; PRs not waiting follow) · **Oldest first** (by when opened)
-- Issue tabs: **Recently updated** (default) · **Newest first** · **Oldest first** (by when opened)
-- Each chip and Issues tab keeps its own, across relaunches. In All the sort orders the rows within each section; the sections keep their order. Off the default, the strip names it in the accent colour
+- Issue chips: **Recently updated** (default) · **Newest first** · **Oldest first** (by when opened). All adds **Board status**: rows in board column order, then by recently updated, issues not on the board last; offered only while a board is readable, else All sorts by recently updated
+- Each chip keeps its own, across relaunches. In All the sort orders the rows within each section; the sections keep their order. Off the default, the strip names it in the accent colour
 - Repo groups follow their first row; author groups stay by name; Board lanes keep the board's order and sort inside
 - Done, Recently closed and search's Closed keep their own order (most recently ended first)
-- Search results follow the sort of the chip or tab they're laid out for; Everywhere uses All's
+- Search results follow the sort of the chip they're laid out for; Everywhere uses All's
 - The selected row stays selected and in view
 
 ## Settings
@@ -367,7 +373,7 @@ Reopen within a minute and the detail is still there.
 
 | Tab | |
 |---|---|
-| General | Grouping, Team by author, compact cards, where pull requests open, background, filters (Needs you and Team), menu bar count, refresh interval, pending CI checks, shortcut, Keyboard Shortcuts window, launch at login, updates |
+| General | Grouping, Team by author, compact cards, where pull requests and issues open (Issues open on: All · Last used · Assigned · Created · Board), background, filters (Needs you and Team), menu bar count, refresh interval, pending CI checks, shortcut, Keyboard Shortcuts window, launch at login, updates |
 | Account | Account, org, board, access notices |
 | Notifications | One toggle per event, grouped: my pull requests · pull requests I review · issues assigned to me · issues I created |
 | Search | Saved searches: rename, edit the query, drag to reorder, **+** and **−**. Apply one from the empty search field; the first nine have ⌃1–⌃9 |
@@ -392,7 +398,7 @@ Reopen within a minute and the detail is still there.
 | | Status changed on the board | off |
 | | Closed or reopened | on |
 
-With Settings → General → Check my pending CI more often, CI failed and Ready to merge arrive within about 30 s while your checks run: for up to 5 of your PRs, for 20 minutes each, and not at a 1-minute refresh interval. Your own comments, moves and closes never notify, nor does asking yourself or one of your teams to review. Several comments on one issue between refreshes make one notification ("3 new comments"). A dismissed review that also puts the PR back in Review notifies once, as the dismissal. Status changes count on the board the Board tab shows, as "In Progress → In Review"; moves the board's automation makes after a close or a merge don't notify, the close does.
+With Settings → General → Check my pending CI more often, CI failed and Ready to merge arrive within about 30 s while your checks run: for up to 5 of your PRs, for 20 minutes each, and not at a 1-minute refresh interval. Your own comments, moves and closes never notify, nor does asking yourself or one of your teams to review. Several comments on one issue between refreshes make one notification ("3 new comments"). A dismissed review that also puts the PR back in Review notifies once, as the dismissal. Status changes count on the board the Board chip shows, as "In Progress → In Review"; moves the board's automation makes after a close or a merge don't notify, the close does.
 
 Click a notification to open the detail.
 

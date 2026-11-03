@@ -144,7 +144,7 @@ public struct BuiltIssueTabs: Sendable {
     }
 }
 
-/// A tab's count as the tab bar shows it.
+/// A tab's count as the chips and the footer show it.
 public enum IssueTabCount: Equatable, Sendable {
     /// The list's latest fetch succeeded.
     case current(Int)
@@ -318,12 +318,12 @@ public enum IssueTabBuilder {
     }
 
     /// By `sort`'s date (last update, or when opened), issues without that date after the rest, then by
-    /// repo and number. Waiting longest doesn't apply to issues and reads as Recently updated.
-    private static func sorted(_ issues: [BoardIssue], by sort: ListSort) -> [BoardIssue] {
+    /// repo and number. Waiting longest and Board status don't apply here and read as Recently updated.
+    static func sorted(_ issues: [BoardIssue], by sort: ListSort) -> [BoardIssue] {
         let date: (BoardIssue) -> Date?
         let newestFirst: Bool
         switch sort {
-        case .recentlyUpdated, .waitingLongest: (date, newestFirst) = ({ $0.updatedAt }, true)
+        case .recentlyUpdated, .waitingLongest, .boardStatus: (date, newestFirst) = ({ $0.updatedAt }, true)
         case .newestFirst: (date, newestFirst) = ({ $0.createdAt }, true)
         case .oldestFirst: (date, newestFirst) = ({ $0.createdAt }, false)
         }
