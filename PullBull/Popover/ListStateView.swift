@@ -1,4 +1,5 @@
 import SwiftUI
+import PullBullKit
 
 /// The one empty, unavailable and error state of a list: a glyph in a circle, a title, an optional detail
 /// and an optional action. `footer` holds anything quieter below them (a link, a hint).
@@ -144,6 +145,23 @@ private struct ButtonLabelStyle: LabelStyle {
         HStack(spacing: 6) {
             configuration.icon.font(.system(size: 11, weight: .medium))
             configuration.title
+        }
+    }
+}
+
+extension View {
+    /// Sizes an empty or loading state by `EmptyListFrame`. A folded section's share reads the height of the
+    /// scroll view around the list; an open section's leaves the state its own height, with room above and below.
+    @ViewBuilder func emptyStateFrame(_ below: EmptyListFrame.Below) -> some View {
+        switch below {
+        case .nothing:
+            frame(height: EmptyListFrame.height(below: below, viewport: 0).map { CGFloat($0) })
+        case .folded:
+            containerRelativeFrame(.vertical) { length, _ in
+                EmptyListFrame.height(below: below, viewport: Double(length)).map { CGFloat($0) } ?? length
+            }
+        case .open:
+            padding(.vertical, 24)
         }
     }
 }
