@@ -322,8 +322,6 @@ body {
 
 /* Mine's folded "Recently closed" section */
 .closed-rule { margin: 6px 8px 0; }
-.closed-header { position: relative; height: 28px; padding: 0 8px; gap: 6px; color: var(--secondary); }
-.closed-header .lane-chevron { position: absolute; left: 0; top: 0; bottom: 0; }
 .closed-row { gap: 10px; padding: 5px 8px; border-radius: 7px; }
 .closed-row .glyph { width: 20px; display: flex; justify-content: center; flex: none; }
 .closed-row .body { flex: 1 1 auto; gap: 1px; color: var(--secondary); }

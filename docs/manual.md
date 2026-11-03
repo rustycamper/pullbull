@@ -85,8 +85,8 @@ One list in sections, scoped by chips above it. It opens on All, or on the choic
 | Needs your review | The Needs you rows, including "You approved" rows when Hide approved is off | 🔔 in the accent colour |
 | Your PRs | Your open PRs that need you: ready to merge, changes requested, failing checks, conflicts, or a draft | PR glyph |
 | Waiting on others | Your other open PRs: waiting on review, or on checks still running | 🕒 |
-| Recently closed | Yours closed or merged in the last 7 days | chevron |
-| Team | Team's rows | chevron |
+| Recently closed | Yours closed or merged in the last 7 days | archive box |
+| Team | Team's rows | two people |
 
 - **The split:** a PR of yours is in Your PRs when it is ready to merge, a latest review requests changes, its checks failed, it has conflicts or it's a draft. Any other is in Waiting on others. A run that was only cancelled reads as failed in GitHub's rollup, so that PR is in Your PRs
 - **Once only:** a PR in Needs your review isn't repeated in Team, a dimmed one included. With Hide approved on, an approved PR isn't in Needs your review, so it stays in Team

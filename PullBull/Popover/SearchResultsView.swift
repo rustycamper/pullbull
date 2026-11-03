@@ -360,7 +360,7 @@ struct SearchResultsView: View {
             }
         } header: {
             ListSectionHeader(
-                glyph: nil, title: title, count: count,
+                glyph: "archivebox", title: title, count: count,
                 fold: .init(isOpen: model.searchExpansion.closed) { model.toggleSearchClosed() },
                 compact: model.settings.compact)
                 .pinnedHeaderBackground()
