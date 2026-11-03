@@ -173,7 +173,7 @@ Mockups: https://claude.ai/artifact/EpgpsFBW6hyLMHocJFmdBC (2a is the chosen hea
   - **Mine** takes the sections: Your PRs and Waiting on others, then Closed and merged. Recently closed PRs that match are closed results, so they sit in Closed and merged.
   - Narrowing to **Team** searches the de-duplicated Team, so it leaves out what is in Needs you, as the chip's count does.
   - Each layout follows its own chip's sort, and Everywhere follows All's.
-- A search kept open when the popover closes stays narrowed; the list under it resets to All. Its Esc hint stops naming a chip it started on ("Started typing on …") unless that is the chip the list reopens on, because returning there is no longer what Esc does.
+- A search kept open when the popover closes stays narrowed; the list under it resets to the opening scope. Its Esc hint stops naming a chip it started on ("Started typing on …") unless that is the chip the list reopens on, because returning there is no longer what Esc does.
 - In Issues mode, search scoping stays on the Issues tabs, as today.
 
 ### Settings (Settings → General)
@@ -220,8 +220,8 @@ These were settled while building:
 - **Reasoning on the open calls above.**
   - Mine has no repo grouping by the owner's ruling: its sections are the grouping, as in All, and rows name their repo. This replaces the draft's "a single-scope chip keeps today's grouping".
   - A narrowed search never asks GitHub, which is why Everywhere's count has nothing to show.
-  - The reset to All happens when the popover closes, not when it opens, so the old chip is never on screen.
-  - A scope reset scrolls to the top because a reopen mid-list would hide Needs your review; a reopen already on All keeps its offset, matching the rule that reopening restores selection and scroll.
+  - The reset to the opening scope happens when the popover closes, not when it opens, so the old chip is never on screen.
+  - A scope reset scrolls to the top because a reopen mid-list would hide Needs your review; a reopen already on the opening scope keeps its offset, matching the rule that reopening restores selection and scroll.
   - `searchStartedOnTab` is cleared, not set to All, because "Started typing on All" would be false.
   - A cancelled-only run lands in Your PRs because the list sees only GitHub's rollup.
 

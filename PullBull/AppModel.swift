@@ -58,15 +58,19 @@ final class AppModel {
             reconciled.rememberBoard()
             if reconciled != settings { settings = reconciled }
             settingsStore.save(settings)
-            // A chip no longer shown (Team without an org) goes back to All.
-            if !prScopes.contains(prScope) { prScope = .all }
-            if case .pullRequests(let started) = searchStartedOnTab, !prScopes.contains(started) {
-                searchStartedOnTab = nil
-            }
+            // With the popover closed, a new opening scope applies now; it is always a shown chip, and a
+            // detail kept open keeps its walk. Run first, so the fallback below doesn't clear the walk.
             if !MenuBarPopover.isShown,
                settings.scopeOnOpen != oldValue.scopeOnOpen || settings.scopeChips != oldValue.scopeChips {
                 openOnScope()
             }
+            // A chip no longer shown (chips off, Team without an org) goes back to All, and neither Back nor
+            // the Esc hint names it.
+            if !prScopes.contains(prScope) { prScope = .all }
+            if case .pullRequests(let started) = searchStartedOnTab, !prScopes.contains(started) {
+                searchStartedOnTab = nil
+            }
+            if let back = detailBackScope, !prScopes.contains(back) { detailBackScope = .all }
             if mode != settings.mode { mode = settings.mode }
             if selectedIssueTab != settings.lastIssueTab { selectedIssueTab = settings.lastIssueTab }
             rebuildTabs()

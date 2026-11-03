@@ -68,7 +68,7 @@ Without `read:project`: Board shows the command to add it, Mine groups by repo.
 
 <kbd>⌘</kbd><kbd>1</kbd>
 
-One list in sections, scoped by chips above it. It opens on All, or on the choice in Settings → General → Pull requests open on: All · Last used · Needs you · Mine · Team. A chip you pick lasts until the popover closes. Last used reopens the chip showing at the last close, also after a relaunch. A choice whose chip isn't shown (Team without an org) opens on All.
+One list in sections, scoped by chips above it. It opens on All, or on the choice in Settings → General → Pull requests open on: All · Last used · Needs you · Mine · Team. A chip you pick lasts until the popover closes. Last used reopens the last chip you left, also after a relaunch. A choice whose chip isn't shown (Team without an org) opens on All.
 
 | Chip | Shows |
 |---|---|

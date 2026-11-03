@@ -51,6 +51,7 @@ struct GeneralSettingsTab: View {
                 }
                 .labelsHidden()
                 .disabled(!model.settings.scopeChips)
+                .accessibilityHint(openOnNote)
             } label: {
                 // The longer note reserves its height, so the row doesn't move when the chips turn off.
                 RowLabel("Pull requests open on", note: Self.chipsOffOpenOnNote)
