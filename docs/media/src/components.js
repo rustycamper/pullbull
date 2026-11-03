@@ -75,7 +75,7 @@
       const selected = mode === m;
       return `<span class="mode-button${selected ? " selected" : ""}">${sym(symbol, 13, selected ? "semibold" : "regular")}</span>`;
     };
-    return `<div class="hstack mode-toggle">${btn("pullRequests", "pullbull.pullrequest")}${btn("issues", "pullbull.issue")}<span class="hairline-v"></span></div>`;
+    return `<div class="hstack mode-toggle">${btn("pullRequests", "pullbull.pullrequest")}${btn("issues", "pullbull.issue")}</div>`;
   }
 
   function tabBar(tabs, selectedId) {
@@ -100,12 +100,13 @@
       ? `<span class="c-secondary" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center">${sym("bookmark", 11)}</span>` +
         `<span class="c-secondary" style="width:16px;height:16px;border-radius:50%;background:var(--strong-fill);display:flex;align-items:center;justify-content:center">${sym("xmark", 7, "bold")}</span>`
       : (search && search.focused ? "" : `<span class="shortcut f11">⌘F</span>`);
-    return `<div class="search-row"><div class="hstack search-field${search && search.focused ? " focused" : ""}">` +
-      `<span class="c-tertiary hstack">${sym("magnifyingglass", 11)}</span>${text}${trailing}</div></div>`;
+    return `<div class="hstack search-field${search && search.focused ? " focused" : ""}">` +
+      `<span class="c-tertiary hstack">${sym("magnifyingglass", 11)}</span>${text}${trailing}</div>`;
   }
 
   function header(d) {
-    return `<div class="hstack title-row">${modeToggle(d.mode)}${tabBar(d.tabs, d.selectedTab)}</div>${searchField(d.search, d.mode)}`;
+    return `<div class="search-row">${modeToggle(d.mode)}${searchField(d.search, d.mode)}</div>` +
+      `<div class="tab-row">${tabBar(d.tabs, d.selectedTab)}</div>`;
   }
 
   /** FilterBar: "▦ Roadmap ▾ · ▤ All repos ▾" on the Board tab, "▤ All repos ▾" elsewhere. */
