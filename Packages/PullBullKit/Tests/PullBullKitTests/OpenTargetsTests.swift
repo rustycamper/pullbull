@@ -107,5 +107,16 @@ private func target(_ pr: PullRequest) -> FilesLink {
     @Test func hasFailure() {
         #expect(FailingCheck.hasFailure([Check(name: "unit", state: .failure, url: nil)]))
         #expect(!FailingCheck.hasFailure([Check(name: "lint", state: .success, url: nil)]))
+        #expect(!FailingCheck.hasFailure([Check(name: "description", state: .cancelled, url: nil)]))
+    }
+
+    @Test func failingCheckSkipsCancelledRuns() {
+        let checks = [
+            Check(name: "description", state: .cancelled, url: URL(string: "https://ci.example/old")!),
+            Check(name: "unit", state: .failure, url: URL(string: "https://ci.example/unit")!),
+        ]
+        #expect(FailingCheck.url(in: checks, key: key) == URL(string: "https://ci.example/unit")!)
+        let onlyCancelled = [checks[0]]
+        #expect(FailingCheck.url(in: onlyCancelled, key: key) == URL(string: "https://github.com/acme/web/pull/412/checks")!)
     }
 }

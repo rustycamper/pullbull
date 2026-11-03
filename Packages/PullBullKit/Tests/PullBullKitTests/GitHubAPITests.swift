@@ -430,6 +430,22 @@ private func page(_ nodes: [String], cursor: String, next: Bool) -> String {
         #expect(stub.bodies[0].contains(Queries.rollupCounts))
     }
 
+    @Test func detailMapsCancelledRunsToCancelledAndTheRestToFailure() async throws {
+        let body = """
+        {"data":{"repository":{"pullRequest":{"body":"","updatedAt":"2026-10-25T14:03:11Z",\
+        "commits":{"nodes":[{"commit":{"statusCheckRollup":{"state":"FAILURE","contexts":{"totalCount":4,"nodes":[\
+        {"__typename":"CheckRun","name":"a","status":"COMPLETED","conclusion":"CANCELLED"},\
+        {"__typename":"CheckRun","name":"b","status":"COMPLETED","conclusion":"TIMED_OUT"},\
+        {"__typename":"CheckRun","name":"c","status":"COMPLETED","conclusion":"STARTUP_FAILURE"},\
+        {"__typename":"CheckRun","name":"d","status":"COMPLETED","conclusion":"ACTION_REQUIRED"}]}}}}]},\
+        "latestReviews":{"nodes":[]},"comments":{"nodes":[]},"files":{"totalCount":0,"nodes":[]}}}}}
+        """
+        let detail = try await api(StubTransport(json: [body])).detail(PRKey(repo: "o/r", number: 1))
+        #expect(detail.checks.map(\.state) == [.cancelled, .failure, .failure, .failure])
+        // The PR's own state is GitHub's rollup, which counts a cancelled run as a failure.
+        #expect(detail.ci == .failure)
+    }
+
     @Test func searchPageCapReportsMore() async throws {
         let stub = StubTransport(json: [
             page([prNode(1)], cursor: "C1", next: true),

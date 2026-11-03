@@ -808,7 +808,8 @@ public struct GitHubAPI: Sendable {
                 switch node["conclusion"] as? String {
                 case "SUCCESS": state = .success
                 case "NEUTRAL", "SKIPPED": state = .skipped
-                case "FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE": state = .failure
+                case "CANCELLED": state = .cancelled
+                case "FAILURE", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE": state = .failure
                 default: state = .none
                 }
             }
