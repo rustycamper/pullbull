@@ -20,6 +20,8 @@ enum Queries {
       reviewRequestEvents: timelineItems(itemTypes:[REVIEW_REQUESTED_EVENT], last:20){\
     nodes{... on ReviewRequestedEvent{createdAt requestedReviewer{__typename ... on User{login} ... on Team{slug}}}}}
       readyEvent: timelineItems(itemTypes:[READY_FOR_REVIEW_EVENT], last:1){nodes{... on ReadyForReviewEvent{createdAt}}}
+      reviewDismissals: timelineItems(itemTypes:[REVIEW_DISMISSED_EVENT], last:5){\
+    nodes{... on ReviewDismissedEvent{createdAt actor{login} review{author{login}}}}}
     }
     """
 

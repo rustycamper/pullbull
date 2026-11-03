@@ -71,8 +71,19 @@ public enum Decoding {
             nodeId: node["id"] as? String,
             assignees: assignees(in: node),
             reviewRequestTimes: requestTimes(node),
-            readyForReviewAt: timeline(node, "readyEvent").last.flatMap { lenientDate($0["createdAt"]) }
+            readyForReviewAt: timeline(node, "readyEvent").last.flatMap { lenientDate($0["createdAt"]) },
+            reviewDismissals: dismissals(node)
         )
+    }
+
+    /// The ReviewDismissedEvents that name the review's author and a time, in timeline order.
+    private static func dismissals(_ node: [String: Any]) -> [ReviewDismissal] {
+        timeline(node, "reviewDismissals").compactMap { event in
+            guard let author = ((event["review"] as? [String: Any])?["author"] as? [String: Any])?["login"] as? String,
+                  let at = lenientDate(event["createdAt"]) else { return nil }
+            return ReviewDismissal(
+                reviewAuthor: author, actor: (event["actor"] as? [String: Any])?["login"] as? String, at: at)
+        }
     }
 
     /// The newest ReviewRequestedEvent per reviewer, by `Reviewer.key`.

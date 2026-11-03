@@ -19,6 +19,8 @@ private func event(_ kind: PREventKind, actor: String?) -> PREvent {
         #expect(event(.changesRequested, actor: "bob").notificationTitle == "api #42 · Changes requested")
         #expect(event(.ciFailed, actor: nil).notificationTitle == "api #42 · CI failed")
         #expect(event(.newComment, actor: "bob").notificationTitle == "api #42 · New comment")
+        #expect(event(.reviewDismissed, actor: "bob").notificationTitle == "api #42 · Your review was dismissed")
+        #expect(event(.reviewDismissed, actor: "bob").notificationSubtitle == "by bob")
     }
 
     @Test func subtitleNamesTheActor() {
