@@ -55,6 +55,7 @@ Builds on `2026-11-03-sectioned-pr-list-design.md`. Where this document is silen
 ### Scope chips (Issues mode)
 
 - The chips are **All · Assigned · Created · Board**, drawn with `ScopeChip`, as the PR chips are. One is selected at a time.
+- **Assigned is renamed.** Today's tab reads "Mine"; the chip, Back buttons, tooltips and the footer say "Assigned". It matches the Assigned to you section and no longer clashes with the PR side's Mine (PRs I opened).
 - **Board is always shown**, also with no board chosen or no access. It is where a board is chosen and missing access is explained (today's Board tab states), so hiding it would hide setup.
 - **Counts** are today's tab counts (`IssueTabCount`): Assigned and Board leave out their uncounted Done groups; Created counts its open issues. All shows no count.
 - **Created can count more than You opened.** Created keeps issues also assigned to me; You opened doesn't. The Created chip's tooltip and VoiceOver text say "Includes issues also assigned to you", so the difference doesn't read as a bug.
@@ -86,7 +87,7 @@ Builds on `2026-11-03-sectioned-pr-list-design.md`. Where this document is silen
 - **Done stays out of All.** An open issue in the board's Done column is housekeeping, so no All section shows it, whichever list it came from. It stays reachable on its chips: Assigned's folded "still open" Done group, the Board's 14-day Done, and Created, which lists it as today. The "done on the board" test (`IssueTabBuilder.isDone` on the issue's board copy) runs before de-duplication, so an issue removed from Assigned to you for being done never falls through to You opened.
 - **Folding:** headers fold on click, kept in `sectionFolds` as the PR sections are, under their own keys. Defaults: Assigned to you and You opened open, Rest of the board folded. Nothing folds while searching.
 - **Empty is said only of a loaded list.** An empty loaded section hides itself. If Assigned has loaded and Assigned to you is empty, a one-line "Nothing assigned to you" sits at the top and the other sections follow. If every list All reads has loaded and all three sections are empty, the empty state reads "No open issues assigned to you or opened by you".
-- **Not loaded is never shown as empty.** A list still loading shows its section header with the skeleton rows lists use today. A list that failed with nothing kept shows its header with one line, "Couldn't load assigned issues" (or created, or the board), and the error in its tooltip; it never falls back to the empty copy.
+- **Not loaded is never shown as empty.** A list still loading shows its section header with the skeleton rows lists use today. A list that failed with nothing kept shows its header with one line, "Couldn't load assigned issues" (or created), and the error in its tooltip; it never falls back to the empty copy.
 - **Stale:** a section whose list failed shows its last good rows with the warning glyph on its header and the chip's tooltip. Because a stale section can be folded or scrolled away and All has no count, the All chip also shows the warning glyph while any list it reads is stale, with a tooltip naming which.
 - **An unreadable board changes All's shape, as it changes Assigned's today.** Done is known only from the board copy, so while the board can't be read nothing is left out as done and Rest of the board is absent; when the board comes back they return. An issue on a project other than the chosen board is never treated as done.
 - **Footer link:** All links to the Assigned issues page on GitHub, as today's Assigned tab does.
@@ -145,6 +146,7 @@ One PR: chips, All sections, search layout, the open-on setting, the migration a
 
 These were my decisions, not the owner's. They are worth checking:
 
+- **The Assigned tab's "Mine" title becomes "Assigned".**
 - **Board chip always shown**, because it hosts board setup and access messages.
 - **All is flat:** no Status lanes or repo groups; Status becomes a row chip.
 - **Rest of the board is in All, folded**, de-duplicated against the two sections above it, like Team on the PR side. Named "Rest of the board" so it doesn't read as my issues on the board.
