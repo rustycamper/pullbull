@@ -17,6 +17,8 @@ public struct RowChips: Equatable, Sendable {
         case reviewWait(ReviewWait)
         /// A Review row I approved that doesn't count toward the tab.
         case youApprovedNotCounted
+        /// Requested from me directly, first time.
+        case requested
         case reRequested
         case newCommits
         /// Requested from a team of mine: `org/slug`, or the bare slug when the repo has no owner.
@@ -29,6 +31,7 @@ public struct RowChips: Equatable, Sendable {
             switch self {
             case .approvals, .youApprovedNotCounted: "checkmark"
             case .reviewWait: "clock"
+            case .requested: "bell"
             case .reRequested: "arrow.uturn.left"
             case .newCommits: "arrow.triangle.2.circlepath"
             case .viaTeam: "person.2"
@@ -42,7 +45,8 @@ public struct RowChips: Equatable, Sendable {
             case .approvals(let n): "\(n)"
             case .reviewWait(let wait): wait.text
             case .youApprovedNotCounted: "You approved · not counted"
-            case .reRequested: "Re-requested"
+            case .requested: "Req"
+            case .reRequested: "Re-req"
             case .newCommits: "New commits"
             case .viaTeam(let team): "via @\(team)"
             case .conflicts: "Conflicts"
@@ -54,6 +58,8 @@ public struct RowChips: Equatable, Sendable {
             switch self {
             case .approvals(let n): n == 1 ? "1 approval" : "\(n) approvals"
             case .reviewWait(let wait): wait.label
+            case .requested: "Review requested from you"
+            case .reRequested: "Review re-requested from you"
             case .newCommits: "New commits since your review"
             case .viaTeam(let team): "Requested via @\(team)"
             case .conflicts: "Merge conflicts"
@@ -114,7 +120,8 @@ public struct RowChips: Equatable, Sendable {
                 case .newCommitsSinceReview: .newCommits
                 case .teamRequested(let slug):
                     .viaTeam(ReviewWait.teamPath(slug, repo: pr.key.repo))
-                case .requested, nil: nil
+                case .requested: .requested
+                case nil: nil
                 }
             }
             var info = reason.map { [$0] } ?? []

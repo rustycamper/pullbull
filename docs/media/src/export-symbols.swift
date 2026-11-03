@@ -30,6 +30,7 @@ let list: [(String, CGFloat, String)] = [
     ("clock", 13, "regular"),
     ("minus.circle", 13, "regular"),
     ("minus", 13, "regular"),
+    ("bell", 9.5, "regular"),
     ("arrow.uturn.left", 9.5, "regular"),
     ("arrow.triangle.2.circlepath", 9.5, "regular"),
     ("person.2", 9.5, "regular"),

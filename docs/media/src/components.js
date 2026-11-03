@@ -120,7 +120,8 @@
 
   // RowChips.Info: symbol, meta text, and whether it is a count (sits after the age, unpunctuated).
   const INFO = {
-    reRequested: { symbol: "arrow.uturn.left", text: "Re-requested" },
+    requested: { symbol: "bell", text: "Req" },
+    reRequested: { symbol: "arrow.uturn.left", text: "Re-req" },
     newCommits: { symbol: "arrow.triangle.2.circlepath", text: "New commits" },
     youApprovedNotCounted: { symbol: "checkmark", text: "You approved · not counted" },
     conflicts: { symbol: "exclamationmark.triangle", text: "Conflicts", warning: true },
