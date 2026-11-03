@@ -69,9 +69,9 @@ struct NotificationSettingsTab: View {
         }
     }
 
-    /// Status moves count only on the board the Board tab shows.
+    /// Status moves count only on the board the Board chip shows.
     private var statusNote: String {
-        guard let title = model.snapshot?.boardTitle else { return "On the board shown on the Board tab" }
+        guard let title = model.snapshot?.boardTitle else { return "On the board shown on the Board chip" }
         return "On \(title)"
     }
 

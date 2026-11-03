@@ -741,6 +741,11 @@ final class AppModel {
         prScope = prScope.picking(scope)
     }
 
+    /// An Issues chip clicked outside search: its scope, or All when it is the one on screen.
+    func pickIssueScope(_ scope: IssueScope) {
+        issueScope = issueScope.picking(scope)
+    }
+
     /// Nil before the first snapshot, and for Board while the board is unavailable.
     func contents(of tab: IssueTab) -> IssueTabContents? {
         issueTabs?.contents(tab)
@@ -1206,15 +1211,12 @@ final class AppModel {
         searchField.forgetCompletion()
     }
 
-    /// The tab whose layout the results take. In Pull Requests mode, the narrowed scope, else All, whatever
-    /// tab typing started on. In Issues mode (`SearchScope.reference`), the narrowed tab, else the tab typing
-    /// started on while it is in this mode, else the tab on screen; where that is All, Assigned.
+    /// The tab whose layout the results take: the narrowed scope, else All, whatever tab typing started on.
     var searchReferenceTab: ShownTab {
-        if mode == .pullRequests { return .pullRequests(shownSearchScope.prScope ?? .all) }
-        let reference = SearchScope.reference(
-            scope: shownSearchScope, startedOn: searchStartedOnTab.map(SearchScope.init), shown: SearchScope(shownTab))
-        let tab = ShownTab(reference) ?? shownTab
-        return tab == .issues(.all) ? .issues(.assigned) : tab
+        switch mode {
+        case .pullRequests: .pullRequests(shownSearchScope.prScope ?? .all)
+        case .issues: .issues(shownSearchScope.issueScope ?? .all)
+        }
     }
 
     /// The PR results in Needs you's or Team's layout; nil for Everywhere and Mine (`searchSectionLayout`),
@@ -1239,17 +1241,27 @@ final class AppModel {
 
     /// The Everywhere segment's count while the search covers everything: the results'. Nil otherwise.
     var everywhereCount: IssueTabCount? {
-        guard mode == .pullRequests, shownSearchScope == .everything, searchResults != nil else { return nil }
+        guard shownSearchScope == .everything, searchResults != nil else { return nil }
         return .current(searchMatchCount)
     }
 
-    /// The issue results in the reference tab's layout, with edits shown; nil in PR mode and without
-    /// results or a snapshot.
+    /// The issue results in a narrowed search's tab layout, with edits shown; nil for Everywhere
+    /// (`searchIssueSectionLayout`), in PR mode and without results or a snapshot.
     var searchIssueLayout: SearchIssueLayout? {
         guard mode == .issues, let results = searchResults, let snapshot = shownSnapshot,
               case .issues(let scope) = searchReferenceTab, let tab = scope.tab
         else { return nil }
         return SearchLayout.issues(results, on: tab, settings: settings, focus: repoFocus, snap: snapshot)
+    }
+
+    /// The issue results in All's sections, with edits shown, for Everywhere; nil for a narrowed search
+    /// (`searchIssueLayout`), in PR mode and without results, lists or a snapshot.
+    var searchIssueSectionLayout: SearchIssueSectionLayout? {
+        guard mode == .issues, let results = searchResults, let snapshot = shownSnapshot, let issueTabs,
+              searchReferenceTab == .issues(.all)
+        else { return nil }
+        return SearchLayout.issueSections(
+            results, tabs: issueTabs, snap: snapshot, settings: settings, viewer: snapshot.org.viewer)
     }
 
     /// Folds or unfolds the results' Closed section; a selection it hides moves to the next row shown.
@@ -1286,7 +1298,9 @@ final class AppModel {
             searchSectionLayout?.keys(closedExpanded: searchExpansion.closed)
                 ?? searchPRLayout?.keys(closedExpanded: searchExpansion.closed) ?? []
         case .issues:
-            searchIssueLayout?.keys(closedExpanded: searchExpansion.closed, doneExpanded: searchExpansion.done) ?? []
+            searchIssueSectionLayout?.keys(closedExpanded: searchExpansion.closed, doneExpanded: searchExpansion.done)
+                ?? searchIssueLayout?.keys(closedExpanded: searchExpansion.closed, doneExpanded: searchExpansion.done)
+                ?? []
         }
     }
 
@@ -1326,10 +1340,15 @@ final class AppModel {
                 return
             }
         case .issues:
-            guard let layout = searchIssueLayout else { return }
-            shown = (
-                layout.groups(closedExpanded: searchExpansion.closed, doneExpanded: searchExpansion.done),
-                layout.isGrouped)
+            if let layout = searchIssueSectionLayout {
+                shown = (layout.groups(closedExpanded: searchExpansion.closed, doneExpanded: searchExpansion.done), true)
+            } else if let layout = searchIssueLayout {
+                shown = (
+                    layout.groups(closedExpanded: searchExpansion.closed, doneExpanded: searchExpansion.done),
+                    layout.isGrouped)
+            } else {
+                return
+            }
         }
         guard shown.grouped, let key = ListNavigation.jump(searchSelection, by: offset, in: shown.groups)
         else { return }
@@ -1344,9 +1363,8 @@ final class AppModel {
         searchSelection = key
     }
 
-    /// ← / → in the search field. In Pull Requests mode it moves along Everywhere and the tabs shown; in
-    /// Issues mode it narrows to the reference tab's neighbour, never toggling back to everything. A tab moved
-    /// to becomes the selected tab, and the search runs again. Nil at either end.
+    /// ← / → in the search field: moves along Everywhere and the mode's tabs shown. The chip moved to
+    /// becomes the selected one (All for Everywhere), and the search runs again. Nil at either end.
     func moveSearchScope(by offset: Int) -> ShownTab? {
         switch mode {
         case .pullRequests:
@@ -1357,13 +1375,12 @@ final class AppModel {
             runSearch(searchQuery, debounced: false)
             return .pullRequests(scope)
         case .issues:
-            let tabs = IssueTab.allCases.map { SearchScope.issues($0) }
-            guard let next = SearchScope(searchReferenceTab).moved(by: offset, among: tabs),
-                  case .issues(let tab) = next else { return nil }
+            guard let next = shownSearchScope.moved(by: offset, among: SearchScope.issueChips()),
+                  let scope = next.issueScope else { return nil }
             searchScope = next
-            issueScope = IssueScope(tab)
+            issueScope = scope
             runSearch(searchQuery, debounced: false)
-            return .issues(IssueScope(tab))
+            return .issues(scope)
         }
     }
 
