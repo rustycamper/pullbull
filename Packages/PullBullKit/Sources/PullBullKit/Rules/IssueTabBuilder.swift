@@ -319,7 +319,7 @@ public enum IssueTabBuilder {
 
     /// By `sort`'s date (last update, or when opened), issues without that date after the rest, then by
     /// repo and number. Waiting longest and Board status don't apply here and read as Recently updated.
-    private static func sorted(_ issues: [BoardIssue], by sort: ListSort) -> [BoardIssue] {
+    static func sorted(_ issues: [BoardIssue], by sort: ListSort) -> [BoardIssue] {
         let date: (BoardIssue) -> Date?
         let newestFirst: Bool
         switch sort {

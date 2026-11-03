@@ -39,6 +39,29 @@ public struct ListFocus: Equatable, Sendable {
         RepoFocus.scopeIssues(contents, keeping: keeps, mergeRepoGroups: repo != nil)
     }
 
+    /// Each section narrowed to the focus; a section it empties is left out unless it is loading or failed.
+    public func scope(_ list: IssueList) -> ScopedIssueList {
+        var hidden = 0
+        var sections: [IssueListSection] = []
+        for section in list.sections {
+            let kept = section.issues.filter(keeps)
+            hidden += section.issues.count - kept.count
+            switch section.state {
+            case .loading, .failed:
+                sections.append(section)
+            case .rows, .stale:
+                if !kept.isEmpty {
+                    sections.append(IssueListSection(section: section.section, issues: kept, state: section.state))
+                }
+            }
+        }
+        let status = list.status.filter { key, _ in sections.contains { $0.issues.contains { $0.key == key } } }
+        return ScopedIssueList(
+            list: IssueList(
+                sections: sections, status: status, nothingAssigned: list.nothingAssigned, isEmpty: list.isEmpty),
+            hiddenCount: hidden)
+    }
+
     /// "Nothing in widgets updated today on Review".
     public func emptyTitle(repoName: String?, tabTitle: String) -> String {
         var parts = ["Nothing"]
