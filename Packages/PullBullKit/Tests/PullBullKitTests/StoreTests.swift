@@ -573,7 +573,6 @@ private func sample() -> Snapshot {
             + #""lastIssueTab":"board","projectOwner":{"kind":"enterprise","login":"e"},"projectNumber":7}"#
         let s = try JSONDecoder().decode(AppSettings.self, from: Data(stored.utf8))
         #expect(s.badge == .review)
-        #expect(s.lastTab == .review)
         #expect(s.grouping == Grouping.none)
         #expect(s.mode == .issues)
         #expect(s.lastIssueTab == .board)
@@ -704,7 +703,6 @@ private func sample() -> Snapshot {
         let s = try JSONDecoder().decode(AppSettings.self, from: Data(old.utf8))
         #expect(s.toggleHotkey == .togglePopoverDefault)
         #expect(s.refreshMinutes == 5)
-        #expect(s.lastTab == .team)
     }
 
     @Test func solidBackgroundDefaultsOffAndRoundTrips() throws {
@@ -782,7 +780,7 @@ private func sample() -> Snapshot {
         #expect(s.notify.merged == true)
         #expect(s.notify.reviewRequested == true)
         #expect(s.notify.reviewDismissed == true)
-        #expect(s.lastTab == .mine)
+        #expect(s.openOn == .all)
         #expect(s.grouping == .none)
         #expect(s.toggleHotkey == nil)
     }
@@ -1029,22 +1027,6 @@ private func sample() -> Snapshot {
         #expect(s.scope == .personal(login: "solo"))
         s.org = "acme"
         #expect(s.scope == .org("acme"))
-    }
-
-    /// Team is hidden without an org: a saved Team tab shows Review; with an org it stays.
-    @Test func teamTabWithoutAnOrgFallsBackToReview() {
-        var s = AppSettings()
-        s.account = "a"
-        s.org = "acme"
-        s.lastTab = .team
-        s.reconcileTab()
-        #expect(s.lastTab == .team)
-        s.org = nil
-        s.reconcileTab()
-        #expect(s.lastTab == .review)
-        s.lastTab = .mine
-        s.reconcileTab()
-        #expect(s.lastTab == .mine)
     }
 
     @Test func preferredOrgRestoresRememberedChoice() {
