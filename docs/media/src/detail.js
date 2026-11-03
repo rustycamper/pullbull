@@ -197,10 +197,10 @@
     const pr = d.pr;
     const branches = `<div class="hstack" style="gap:6px;margin-top:10px"><span class="c-tertiary hstack">${sym("arrow.triangle.branch", 11)}</span>` +
       `<span class="branch-chip">${esc(pr.headRef)}</span><span class="c-tertiary hstack">${sym("arrow.right", 10, "semibold")}</span><span class="branch-chip">${esc(pr.baseRef)}</span></div>`;
-    // Open PRs lead with status (checks, reviewers), then the description (PRDetailView.sections).
+    // Open PRs lead with status (reviewers, checks), then the description (PRDetailView.sections).
     const description = section("Description", null, `<div class="description">${markdown(pr.body)}</div>`);
     const body = summaryBlock(pr.title, prStatePill(pr), pr.author, pr.opened, branches) +
-      checksSection(pr) + reviewersSection(pr, d.viewer.login) + description +
+      reviewersSection(pr, d.viewer.login) + checksSection(pr) + description +
       conversationSection(pr.comments, pr.commentTotal ?? pr.comments.length) + filesSection(pr);
     return `<div class="detail">${detailHeader(`${pr.repo} #${pr.number}`)}<div class="detail-scroll"><div class="detail-content">${body}</div></div>` +
       bottomBar(["doc.on.doc", "arrow.up.right.square"]) + `</div>`;

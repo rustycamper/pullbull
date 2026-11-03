@@ -5,7 +5,7 @@ import SwiftUI
 /// already shows from the list data. VoiceOver reads "Loading details…".
 struct DetailSkeleton: View {
     enum Layout {
-        /// An open PR: the Checks section. Reviewers follows from the list data.
+        /// An open PR: the Checks section, under Reviewers from the list data.
         case checks
         /// A merged or closed PR: the Description section, prose straight on the material.
         case prose
