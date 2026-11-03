@@ -11,12 +11,12 @@ enum Route: Equatable {
 /// A tab in either mode, such as the one type-anywhere started a search on.
 enum ShownTab: Hashable {
     case pullRequests(PRScope)
-    case issues(IssueTab)
+    case issues(IssueScope)
 
     var title: String {
         switch self {
         case .pullRequests(let scope): scope.title
-        case .issues(let tab): tab.title
+        case .issues(let scope): scope.title
         }
     }
 
@@ -25,17 +25,17 @@ enum ShownTab: Hashable {
         switch scope {
         case .everything: return nil
         case .pullRequests(let tab): self = .pullRequests(PRScope(tab))
-        case .issues(let tab): self = .issues(tab)
+        case .issues(let tab): self = .issues(IssueScope(tab))
         }
     }
 }
 
 extension SearchScope {
-    /// The search narrowed to `tab`; everything for All.
+    /// The search narrowed to `tab`; everything for either mode's All.
     init(_ tab: ShownTab) {
         switch tab {
         case .pullRequests(let scope): self = scope.tab.map(SearchScope.pullRequests) ?? .everything
-        case .issues(let tab): self = .issues(tab)
+        case .issues(let scope): self = scope.tab.map(SearchScope.issues) ?? .everything
         }
     }
 }
@@ -64,6 +64,10 @@ final class AppModel {
                settings.scopeOnOpen != oldValue.scopeOnOpen {
                 openOnScope()
             }
+            if !MenuBarPopover.isShown,
+               settings.issueScopeOnOpen != oldValue.issueScopeOnOpen {
+                openOnIssueScope()
+            }
             // A chip no longer shown (Team without an org) goes back to All, and neither Back nor
             // the Esc hint names it.
             if !prScopes.contains(prScope) { prScope = .all }
@@ -72,7 +76,6 @@ final class AppModel {
             }
             if let back = detailBackScope, !prScopes.contains(back) { detailBackScope = .all }
             if mode != settings.mode { mode = settings.mode }
-            if selectedIssueTab != settings.lastIssueTab { selectedIssueTab = settings.lastIssueTab }
             rebuildTabs()
             rebuildOrgAccess()
             checkInstallationsIfUnknown()
@@ -135,8 +138,13 @@ final class AppModel {
     private(set) var prList: PRList?
     /// The Issues tabs, built from the same snapshot as `tabs`.
     private(set) var issueTabs: BuiltIssueTabs? {
-        didSet { refreshRepoChoices() }
+        didSet {
+            refreshRepoChoices()
+            rebuildIssueList()
+        }
     }
+    /// The sections Issues All shows, before the focus; nil before the first snapshot.
+    private(set) var issueList: IssueList?
     private(set) var status = RefreshStatus(lastSuccess: nil, error: nil, isRefreshing: false)
     /// Review PRs hidden because "hide PRs I've approved" is on.
     private(set) var hiddenApprovedCount = 0
@@ -175,20 +183,21 @@ final class AppModel {
             if wasNarrowed { runSearch(searchQuery, debounced: false) } else { setSearchResults(results) }
         }
     }
-    var selectedIssueTab: IssueTab {
+    /// The chip on screen in Issues mode. Not persisted itself: the popover opens on the scope Settings
+    /// chooses (`popoverDidClose`), and `lastIssueScope` keeps the one last shown. A change clears the time
+    /// focus.
+    var issueScope: IssueScope = .all {
         didSet {
-            if settings.lastIssueTab != selectedIssueTab { settings.lastIssueTab = selectedIssueTab }
-            if selectedIssueTab != oldValue {
-                timeFocus = nil
-                detailWalk = nil
-            }
+            guard issueScope != oldValue else { return }
+            timeFocus = nil
+            detailWalk = nil
         }
     }
     /// The tab showing in the current mode.
     var shownTab: ShownTab {
         switch mode {
         case .pullRequests: .pullRequests(prScope)
-        case .issues: .issues(selectedIssueTab)
+        case .issues: .issues(issueScope)
         }
     }
     var route: Route = .list {
@@ -204,7 +213,7 @@ final class AppModel {
     var sort: ListSort {
         switch sortTab {
         case .pullRequests(let scope): settings.sort(for: scope)
-        case .issues(let tab): settings.sort(for: tab)
+        case .issues(let scope): settings.sort(for: scope, boardAvailable: boardAvailable)
         }
     }
 
@@ -212,7 +221,7 @@ final class AppModel {
     var sortChoices: [ListSort] {
         switch sortTab {
         case .pullRequests(let scope): ListSort.choices(for: scope)
-        case .issues(let tab): ListSort.choices(for: tab)
+        case .issues(let scope): ListSort.choices(for: scope, boardAvailable: boardAvailable)
         }
     }
 
@@ -220,9 +229,12 @@ final class AppModel {
     func setSort(_ sort: ListSort) {
         switch sortTab {
         case .pullRequests(let scope): settings.setSort(sort, for: scope)
-        case .issues(let tab): settings.setSort(sort, for: tab)
+        case .issues(let scope): settings.setSort(sort, for: scope)
         }
     }
+
+    /// The board can be read, so All offers and follows the Board status sort.
+    private var boardAvailable: Bool { issueTabs?.board != nil }
     /// The repository every list and search is narrowed to; counts, the badge and notifications ignore
     /// it. Never persisted. A selection the new focus hides is dropped, and search results on screen are
     /// searched again.
@@ -236,9 +248,9 @@ final class AppModel {
             if route == .search { runSearch(searchQuery, debounced: false) }
         }
     }
-    /// How recently the items of the list on screen were updated; narrows every PR chip, or the Issues tab
+    /// How recently the items of the list on screen were updated; narrows every PR chip, or the Issues chip
     /// on screen (search has its own `updated:` token), and counts, the badge and notifications ignore it.
-    /// Never persisted; switching mode or Issues tab clears it. The selection is dropped if the new focus
+    /// Never persisted; switching mode or Issues chip clears it. The selection is dropped if the new focus
     /// hides it.
     private(set) var timeFocus: TimeFocus? {
         didSet {
@@ -291,7 +303,7 @@ final class AppModel {
     /// Whether the results' Closed section and Done group are expanded; both start so, and stay as set
     /// through query edits, scope and mode changes and a detail, until the field empties.
     private(set) var searchExpansion = ListExpansion(closed: true, done: true)
-    /// The highlighted row of the PR list, one for every chip, and of each Issues tab (↑/↓; Return opens
+    /// The highlighted row of the PR list, one for every chip, and of each Issues chip (↑/↓; Return opens
     /// it), kept while switching (`selectionKey`).
     private(set) var listSelections: [ShownTab: PRKey] = [:]
     /// The list or search row chosen to open, highlighted for a moment before its detail opens.
@@ -438,6 +450,8 @@ final class AppModel {
     /// The chip a PR detail left open across a popover close was opened on, which Back names and returns
     /// to; the list behind it opens on the open-on scope otherwise. Nil while the popover has stayed open.
     private(set) var detailBackScope: PRScope?
+    /// The same for an issue detail: the Issues chip it was opened on.
+    private(set) var issueDetailBackScope: IssueScope?
     /// Done as the popover shows it, so a walk's order is the one on screen.
     @ObservationIgnored var listExpansion = ListExpansion()
     /// A notification opened a detail while the popover was closed; the next open shows it as it is.
@@ -531,7 +545,7 @@ final class AppModel {
         _ = loaded.reconcileBoard()
         self.settings = loaded
         self.mode = loaded.mode
-        self.selectedIssueTab = loaded.lastIssueTab
+        self.issueScope = loaded.issueScopeOnOpen
         self.prScope = loaded.scopeOnOpen
 
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
@@ -587,7 +601,7 @@ final class AppModel {
         storageAvailable = false
         self.settings = settings
         self.mode = settings.mode
-        self.selectedIssueTab = settings.lastIssueTab
+        self.issueScope = settings.issueScopeOnOpen
         self.prScope = settings.scopeOnOpen
         self.snapshot = snapshot
         self.status = status ?? RefreshStatus(lastSuccess: snapshot.fetchedAt, error: nil, isRefreshing: false)
@@ -635,10 +649,10 @@ final class AppModel {
         Task { await coordinator.refreshIfOlderThan(.seconds(30)) }
     }
 
-    /// The next open starts on the open-on scope, reset now so it never shows the old chip for a frame. A
-    /// detail left open keeps its walk, as it shows again on a quick reopen, and the chip it was opened
-    /// on, which Back returns to. A search kept open no longer goes back to the chip typing started on
-    /// unless that is the scope it opens on, so its Esc hint stops naming it.
+    /// The next open starts on each mode's open-on scope, reset now so it never shows the old chip for a
+    /// frame. A detail left open keeps its walk, as it shows again on a quick reopen, and the chip it was
+    /// opened on, which Back returns to. A search kept open no longer goes back to the chip typing started
+    /// on unless that is the scope it opens on, so its Esc hint stops naming it.
     func popoverDidClose() {
         var showsPRDetail = false
         if mode == .pullRequests, case .detail = route { showsPRDetail = true }
@@ -647,13 +661,32 @@ final class AppModel {
         } else if detailBackScope == nil {
             detailBackScope = prScope
         }
+        if !showsIssueDetail {
+            issueDetailBackScope = nil
+        } else if issueDetailBackScope == nil {
+            issueDetailBackScope = issueScope
+        }
         recordLastScope()
         openOnScope()
+        openOnIssueScope()
     }
 
-    /// Remembers the chip on screen for Last used.
+    /// An issue detail is on screen in Issues mode, alone or under a linked PR's detail.
+    private var showsIssueDetail: Bool {
+        guard mode == .issues else { return false }
+        switch route {
+        case .issueDetail: return true
+        case .detail:
+            if case .issueDetail = detailReturnRoute { return true }
+            return false
+        case .list, .search, .ask: return false
+        }
+    }
+
+    /// Remembers each mode's chip on screen for Last used.
     func recordLastScope() {
         settings.recordLastScope(prScope)
+        settings.recordLastIssueScope(issueScope)
     }
 
     /// Puts the list on the scope Settings chooses, keeping a detail's walk, which a scope change clears.
@@ -662,6 +695,15 @@ final class AppModel {
         prScope = settings.scopeOnOpen
         detailWalk = walk
         if case .pullRequests(let scope) = searchStartedOnTab, scope != prScope { searchStartedOnTab = nil }
+    }
+
+    /// Puts the Issues list on the scope Settings chooses, keeping a detail's walk, which a scope change
+    /// clears.
+    private func openOnIssueScope() {
+        let walk = detailWalk
+        issueScope = settings.issueScopeOnOpen
+        detailWalk = walk
+        if case .issues(let scope) = searchStartedOnTab, scope != issueScope { searchStartedOnTab = nil }
     }
 
     func refresh() {
@@ -747,6 +789,35 @@ final class AppModel {
 
     private func rebuildPRList() {
         prList = buildPRList(prScope)
+    }
+
+    /// `issueList` narrowed to the focus; unchanged, with nothing hidden, without one.
+    var scopedIssueList: ScopedIssueList? {
+        guard let issueList else { return nil }
+        return listFocus.isActive ? listFocus.scope(issueList) : ScopedIssueList(unscoped: issueList)
+    }
+
+    private func rebuildIssueList() {
+        guard let issueTabs, let snapshot = shownSnapshot else {
+            issueList = nil
+            return
+        }
+        issueList = IssueList.build(issueTabs, snap: snapshot, settings: settings)
+    }
+
+    /// The sections of `list` (All's, or it narrowed) shown folded; none while searching.
+    func foldedIssueSections(in list: IssueList) -> Set<IssueSection> {
+        settings.sectionFolds.shownFolded(issues: list, searching: route == .search)
+    }
+
+    /// Folds or opens a section of Issues All, for every account, keeping the highlight as
+    /// `toggleSection` does.
+    func toggleIssueSection(_ section: IssueSection) {
+        let old = listKeys(doneExpanded: false)
+        settings.sectionFolds.toggle(section)
+        guard let current = listSelection, old.contains(current) else { return }
+        let selection = ListNavigation.selection(current, from: old, to: listKeys(doneExpanded: false))
+        if selection != listSelection { listSelection = selection }
     }
 
     func scopedContents(of tab: IssueTab) -> ScopedIssueTab? {
@@ -1105,7 +1176,7 @@ final class AppModel {
         searchScope = shownSearchScope.picking(SearchScope(tab))
         switch tab {
         case .pullRequests(let scope): prScope = scope
-        case .issues(let tab): selectedIssueTab = tab
+        case .issues(let scope): issueScope = scope
         }
         runSearch(searchQuery, debounced: false)
     }
@@ -1137,12 +1208,13 @@ final class AppModel {
 
     /// The tab whose layout the results take. In Pull Requests mode, the narrowed scope, else All, whatever
     /// tab typing started on. In Issues mode (`SearchScope.reference`), the narrowed tab, else the tab typing
-    /// started on while it is in this mode, else the tab on screen.
+    /// started on while it is in this mode, else the tab on screen; where that is All, Assigned.
     var searchReferenceTab: ShownTab {
         if mode == .pullRequests { return .pullRequests(shownSearchScope.prScope ?? .all) }
         let reference = SearchScope.reference(
             scope: shownSearchScope, startedOn: searchStartedOnTab.map(SearchScope.init), shown: SearchScope(shownTab))
-        return ShownTab(reference) ?? shownTab
+        let tab = ShownTab(reference) ?? shownTab
+        return tab == .issues(.all) ? .issues(.assigned) : tab
     }
 
     /// The PR results in Needs you's or Team's layout; nil for Everywhere and Mine (`searchSectionLayout`),
@@ -1175,7 +1247,7 @@ final class AppModel {
     /// results or a snapshot.
     var searchIssueLayout: SearchIssueLayout? {
         guard mode == .issues, let results = searchResults, let snapshot = shownSnapshot,
-              case .issues(let tab) = searchReferenceTab
+              case .issues(let scope) = searchReferenceTab, let tab = scope.tab
         else { return nil }
         return SearchLayout.issues(results, on: tab, settings: settings, focus: repoFocus, snap: snapshot)
     }
@@ -1289,9 +1361,9 @@ final class AppModel {
             guard let next = SearchScope(searchReferenceTab).moved(by: offset, among: tabs),
                   case .issues(let tab) = next else { return nil }
             searchScope = next
-            selectedIssueTab = tab
+            issueScope = IssueScope(tab)
             runSearch(searchQuery, debounced: false)
-            return .issues(tab)
+            return .issues(IssueScope(tab))
         }
     }
 
@@ -2435,11 +2507,11 @@ extension AppModel {
 // MARK: - List keyboard
 
 extension AppModel {
-    /// Where the highlighted row is kept: one for every PR chip, so it stays across them; one per Issues tab.
+    /// Where the highlighted row is kept: one for every PR chip, so it stays across them; one per Issues chip.
     private var selectionKey: ShownTab {
         switch mode {
         case .pullRequests: .pullRequests(.all)
-        case .issues: .issues(selectedIssueTab)
+        case .issues: .issues(issueScope)
         }
     }
 
@@ -2460,7 +2532,7 @@ extension AppModel {
     }
 
     /// The shown groups of `tab`'s rows, in display order, and whether it shows group headers. The time
-    /// focus narrows the mode on screen only, and there only the Issues tab on screen, so another tab's
+    /// focus narrows the mode on screen only, and there only the Issues chip on screen, so another tab's
     /// rows are scoped by the repository alone.
     private func navigationGroups(
         for tab: ShownTab, unfolded: Bool, doneExpanded: Bool
@@ -2478,8 +2550,15 @@ extension AppModel {
             let groups = ListNavigation.prGroups(
                 scoped.list, grouping: grouping, folded: unfolded ? [] : foldedSections(in: scope))
             return (groups, ListNavigation.isGrouped(scoped.list, grouping: grouping))
-        case .issues(let issueTab):
-            guard let issueTabs, issueTabs.isLoaded(issueTab), let contents = contents(of: issueTab) else {
+        case .issues(.all):
+            guard let issueList else { return ([], false) }
+            let scoped = focus.isActive ? focus.scope(issueList) : ScopedIssueList(unscoped: issueList)
+            let groups = ListNavigation.issueGroups(
+                scoped.list, folded: unfolded ? [] : foldedIssueSections(in: scoped.list))
+            return (groups, true)
+        case .issues(let scope):
+            guard let issueTab = scope.tab, let issueTabs, issueTabs.isLoaded(issueTab),
+                  let contents = contents(of: issueTab) else {
                 return ([], false)
             }
             let scoped = focus.isActive ? focus.scope(contents) : ScopedIssueTab(unscoped: contents)
@@ -2526,7 +2605,7 @@ extension AppModel {
     func moveTab(by offset: Int) {
         switch mode {
         case .pullRequests: prScope = ListNavigation.tab(prScope, movedBy: offset, among: prScopes)
-        case .issues: selectedIssueTab = ListNavigation.tab(selectedIssueTab, movedBy: offset)
+        case .issues: issueScope = ListNavigation.tab(issueScope, movedBy: offset)
         }
     }
 
@@ -2920,6 +2999,8 @@ extension AppModel {
         case .issueDetail:
             break
         }
+        // A detail opened afresh returns to the chip on screen, not one an earlier detail kept.
+        if case .issueDetail = route {} else { issueDetailBackScope = nil }
         openedIssue = fetchedIssue(for: key) ?? issueDetails[key]?.issue
         closeCompletion()
         route = .issueDetail(key)
@@ -2933,11 +3014,14 @@ extension AppModel {
         issueDetailTask = nil
         issueDetailFetch = nil
         detailWalk = nil
+        let backScope = issueDetailBackScope
+        issueDetailBackScope = nil
         if !askReturn.isEmpty, askReturn.close() == .ask {
             route = .ask
             return
         }
         route = issueDetailReturnRoute == .search && !searchText.isEmpty ? .search : .list
+        if route == .list, let backScope { issueScope = backScope }
         searchAgainIfStale()
     }
 

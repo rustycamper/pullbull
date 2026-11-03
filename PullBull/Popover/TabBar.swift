@@ -23,10 +23,9 @@ struct TabBar: View {
     var body: some View {
         SegmentRow(spacing: 2, padding: crowded ? 6 : 8) {
             ForEach(IssueTab.allCases, id: \.self) { tab in
-                segment(
-                    .issues(tab), title: tab.title, count: count(of: .issues(tab)), selected: isSelected(.issues(tab))
-                ) {
-                    pick(.issues(tab))
+                let shown = ShownTab.issues(IssueScope(tab))
+                segment(shown, title: IssueScope(tab).title, count: count(of: shown), selected: isSelected(shown)) {
+                    pick(shown)
                 }
             }
         }
@@ -50,7 +49,7 @@ struct TabBar: View {
         switch tab {
         case .pullRequests(let scope):
             return (model.tabs?.count(of: scope)).flatMap { $0 == 0 ? nil : .current($0) }
-        case .issues(let tab): return (model.issueTabs?.count(tab)).flatMap { $0 == .current(0) ? nil : $0 }
+        case .issues(let scope): return (model.issueTabs?.count(of: scope)).flatMap { $0 == .current(0) ? nil : $0 }
         }
     }
 
@@ -59,7 +58,7 @@ struct TabBar: View {
     }
 
     /// None while an issue search covers everything.
-    private var hasSelection: Bool { IssueTab.allCases.contains { isSelected(.issues($0)) } }
+    private var hasSelection: Bool { IssueTab.allCases.contains { isSelected(.issues(IssueScope($0))) } }
 
     private func pick(_ tab: ShownTab) {
         clicks += 1
@@ -75,13 +74,13 @@ struct TabBar: View {
         willSelect()
         switch tab {
         case .pullRequests(let scope): model.pickScope(scope)
-        case .issues(let tab): model.selectedIssueTab = tab
+        case .issues(let scope): model.issueScope = scope
         }
     }
 
     /// Whether any count on screen reads three or more characters ("99+"), which needs the room.
     private var crowded: Bool {
-        let counts = IssueTab.allCases.map { count(of: .issues($0)) }
+        let counts = IssueTab.allCases.map { count(of: .issues(IssueScope($0))) }
         return counts.contains { count in
             switch count {
             case .current(let n), .stale(let n, _, _): TabCountText.header(n).count >= 3
@@ -286,6 +285,7 @@ extension ShownTab {
         case .pullRequests(.review): "PRs waiting for your review"
         case .pullRequests(.mine): "Your open PRs · closed last 7 days below"
         case .pullRequests(.team): "Open PRs by your teammates"
+        case .issues(.all): "Your issues, in sections"
         case .issues(.assigned): "Issues assigned to you"
         case .issues(.created): "Issues you opened"
         case .issues(.board): "Everyone's issues on the board"
@@ -299,16 +299,16 @@ extension AppModel {
         switch shownSearchScope {
         case .everything: nil
         case .pullRequests(let tab): PRScope(tab).title
-        case .issues(let tab): tab.title
+        case .issues(let tab): IssueScope(tab).title
         }
     }
 
-    /// The name of the chip or tab on screen in the current mode, for Back buttons; for a PR detail kept
+    /// The name of the chip or tab on screen in the current mode, for Back buttons; for a detail kept
     /// open across a popover close, the chip it was opened on.
     var selectedTabTitle: String {
         switch mode {
         case .pullRequests: (detailBackScope ?? prScope).title
-        case .issues: selectedIssueTab.title
+        case .issues: (issueDetailBackScope ?? issueScope).title
         }
     }
 }

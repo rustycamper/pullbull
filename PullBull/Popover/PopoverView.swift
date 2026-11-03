@@ -82,7 +82,7 @@ struct PopoverView: View {
     private var slides: Bool { !reduceMotion }
     /// The Board tab is on screen and its filter row names the board.
     private var boardPartShown: Bool {
-        model.mode == .issues && model.selectedIssueTab == .board && model.issueTabs != nil && model.offersBoardMenu
+        model.mode == .issues && model.issueScope == .board && model.issueTabs != nil && model.offersBoardMenu
     }
     /// The row at the top of the list or search results; nil with nothing to filter.
     private var filterRow: FilterRow? {
@@ -98,7 +98,7 @@ struct PopoverView: View {
             boardTitle: boardPartShown ? model.boardMenuTitle : nil)
     }
     /// The Done group of the Issues tab on screen is unfolded.
-    private var doneExpanded: Bool { doneExpandedTabs.contains(model.selectedIssueTab) }
+    private var doneExpanded: Bool { model.issueScope.tab.map(doneExpandedTabs.contains) ?? false }
     private var listExpansion: ListExpansion { ListExpansion(done: doneExpanded) }
 
     private func doneExpanded(_ tab: IssueTab) -> Binding<Bool> {
@@ -1306,7 +1306,7 @@ struct PopoverView: View {
     private var pane: ListPane {
         switch model.mode {
         case .pullRequests: .pullRequests(model.prScope)
-        case .issues: .issues(model.selectedIssueTab)
+        case .issues: .issues(model.issueScope)
         }
     }
 
@@ -1316,8 +1316,11 @@ struct PopoverView: View {
         case .pullRequests:
             model.prList != nil
         case .issues:
-            model.issueTabs?.isLoaded(model.selectedIssueTab) == true
-                && model.scopedContents(of: model.selectedIssueTab) != nil
+            if let tab = model.issueScope.tab {
+                model.issueTabs?.isLoaded(tab) == true && model.scopedContents(of: tab) != nil
+            } else {
+                model.issueList != nil
+            }
         }
     }
 
@@ -1354,15 +1357,24 @@ struct PopoverView: View {
         .onChange(of: pane, initial: true) { _, new in fadePane = new }
     }
 
+    /// All's sections, which show their own loading and failed states, or one tab's list.
     @ViewBuilder private func issueList(_ issueTabs: BuiltIssueTabs, now: Date) -> some View {
-        if !issueTabs.isLoaded(model.selectedIssueTab) {
-            IssueListNotLoadedView(model: model, tab: model.selectedIssueTab)
+        if let tab = model.issueScope.tab {
+            issueList(issueTabs, tab: tab, now: now)
+        } else if let scoped = model.scopedIssueList {
+            IssueAllListView(model: model, scoped: scoped, total: model.issueList?.rowCount ?? 0, now: now)
                 .transition(.opacity)
-        } else if let scoped = model.scopedContents(of: model.selectedIssueTab) {
+        }
+    }
+
+    @ViewBuilder private func issueList(_ issueTabs: BuiltIssueTabs, tab: IssueTab, now: Date) -> some View {
+        if !issueTabs.isLoaded(tab) {
+            IssueListNotLoadedView(model: model, tab: tab)
+                .transition(.opacity)
+        } else if let scoped = model.scopedContents(of: tab) {
             IssueListView(
-                model: model, tab: model.selectedIssueTab, scoped: scoped,
-                total: model.contents(of: model.selectedIssueTab)?.issues.count ?? 0, now: now,
-                doneExpanded: doneExpanded(model.selectedIssueTab))
+                model: model, tab: tab, scoped: scoped, total: model.contents(of: tab)?.issues.count ?? 0, now: now,
+                doneExpanded: doneExpanded(tab))
             .transition(.opacity)
         } else {
             BoardUnavailableView(model: model)
@@ -1404,7 +1416,7 @@ struct PopoverView: View {
             }
             .padding(.horizontal, 40)
         } else if model.mode == .issues {
-            SkeletonList.issues(model, tab: model.selectedIssueTab)
+            SkeletonList.issues(model, scope: model.issueScope)
         } else {
             SkeletonList.pullRequests(model)
         }
@@ -1701,7 +1713,7 @@ private struct GhSplitButton: View {
 
 /// The list chip or tab on screen, for telling rows arriving apart from a switch.
 private enum ListPane: Equatable {
-    case pullRequests(PRScope), issues(IssueTab)
+    case pullRequests(PRScope), issues(IssueScope)
 }
 
 /// A detail view, or the Ask screen, stacked over the list.

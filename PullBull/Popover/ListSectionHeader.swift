@@ -17,6 +17,9 @@ struct ListSectionHeader: View {
     var note: String? = nil
     /// Quiet text at the trailing edge, as in "Recently closed"'s "Last 7 days"; not read out.
     var trailing: String? = nil
+    /// Why the rows are a kept list that didn't update: a warning glyph after the count, this text as the
+    /// header's tooltip.
+    var warning: String? = nil
     /// Nil for headers that don't fold.
     var fold: Fold? = nil
     /// A person's avatar in the glyph's place, as an author group's header shows.
@@ -41,6 +44,14 @@ struct ListSectionHeader: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        if let warning {
+            content.help(warning)
+        } else {
+            content
+        }
+    }
+
+    @ViewBuilder private var content: some View {
         if let fold {
             Button(action: fold.toggle) {
                 label
@@ -64,7 +75,8 @@ struct ListSectionHeader: View {
     }
 
     private var accessibilityTitle: String {
-        ([title] + [count.map(String.init), note].compactMap { $0 }).joined(separator: ", ")
+        ([title] + [count.map(String.init), note, warning.map { _ in "didn't update" }].compactMap { $0 })
+            .joined(separator: ", ")
     }
 
     /// A folding header with nothing in its icon column.
@@ -103,6 +115,12 @@ struct ListSectionHeader: View {
                     Text("· \(note)")
                         .fontWeight(.regular)
                 }
+                if warning != nil {
+                    // The shape says "didn't update", not just the color.
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(Palette.amberGlyph)
+                }
             }
             Spacer(minLength: 0)
             if let trailing {
@@ -131,4 +149,16 @@ extension PRSection {
     }
 
     var glyphColor: Color { self == .needsReview ? .accentColor : .secondary }
+}
+
+extension IssueSection {
+    /// The glyph in the section header's icon column; nil leaves the column to the fold chevron.
+    var glyph: String? {
+        switch self {
+        case .assignedToYou: "person.crop.circle"
+        case .youOpened: "square.and.pencil"
+        case .doneStillOpen: "checkmark.circle"
+        case .restOfBoard, .otherResults: nil
+        }
+    }
 }

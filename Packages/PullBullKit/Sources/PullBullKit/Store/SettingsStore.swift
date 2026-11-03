@@ -177,11 +177,6 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var issueOpenOn: IssueOpenOn = .all
     /// The issue chip showing when the popover last closed, which Last used opens on.
     public var lastIssueScope: IssueScope = .all
-    /// Stands in for the old stored tab until the views move to `lastIssueScope`.
-    public var lastIssueTab: IssueTab {
-        get { lastIssueScope.tab ?? .assigned }
-        set { lastIssueScope = IssueScope(newValue) }
-    }
     /// Adds the Assigned issues count to the menu bar badge.
     public var countAssignedIssues = false
     /// Draws the popover on an opaque window background instead of the translucent material.

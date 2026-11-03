@@ -13,9 +13,6 @@ struct SkeletonList: View {
     /// The meta line's fixed height on PR rows (`PRRow.meta`); issue rows size it to the 11pt text.
     var metaHeight: CGFloat? = nil
 
-    private static let titleWidths: [CGFloat] = [0.72, 0.6, 0.68, 0.54, 0.64]
-    private static let metaWidths: [CGFloat] = [0.38, 0.32, 0.42, 0.3, 0.36]
-
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
@@ -24,9 +21,7 @@ struct SkeletonList: View {
                 } else {
                     Color.clear.frame(height: 6)
                 }
-                ForEach(0..<ListSkeleton.rowCount, id: \.self) { index in
-                    if compact { compactRow(index) } else { fullRow(index) }
-                }
+                SkeletonRows(compact: compact, trailing: trailing, metaHeight: metaHeight)
             }
             .padding(.horizontal, 6)
             .padding(.bottom, 6)
@@ -40,9 +35,29 @@ struct SkeletonList: View {
 
     /// `ListSectionHeader`: an 11pt semibold line.
     private var headerRow: some View {
-        bar(.system(size: 11, weight: .semibold), width: .fixed(72), height: 9)
+        SkeletonBar(font: .system(size: 11, weight: .semibold), width: .fixed(72), height: 9)
             .padding(.horizontal, 8)
             .frame(height: ListSectionHeader.height)
+    }
+}
+
+/// `SkeletonList`'s placeholder rows alone, for a section still loading inside a list; the caller adds the
+/// shimmer.
+struct SkeletonRows: View {
+    let compact: Bool
+    /// As `SkeletonList`'s.
+    let trailing: CGFloat
+    var metaHeight: CGFloat? = nil
+
+    private static let titleWidths: [CGFloat] = [0.72, 0.6, 0.68, 0.54, 0.64]
+    private static let metaWidths: [CGFloat] = [0.38, 0.32, 0.42, 0.3, 0.36]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<ListSkeleton.rowCount, id: \.self) { index in
+                if compact { compactRow(index) } else { fullRow(index) }
+            }
+        }
     }
 
     /// `PRRow.fullBody` / `IssueRow.fullBody` with a one-line title.
@@ -98,6 +113,14 @@ extension SkeletonList {
             header: model.prScope.showsSectionHeaders
                 || ListSkeleton.prLeadsWithHeader(grouping: model.listGrouping, focused: model.repoFocus != nil),
             compact: model.settings.compact, trailing: 14, metaHeight: 16)
+    }
+
+    /// An Issues chip before the first snapshot; All leads with a section header.
+    static func issues(_ model: AppModel, scope: IssueScope) -> SkeletonList {
+        guard let tab = scope.tab else {
+            return SkeletonList(header: true, compact: model.settings.compact, trailing: 18)
+        }
+        return issues(model, tab: tab)
     }
 
     /// An Issues tab before its first successful load.

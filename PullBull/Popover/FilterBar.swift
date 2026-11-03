@@ -125,11 +125,15 @@ struct FilterBar: View {
             guard let prList = model.prList else { return nil }
             return FilterRow.tally(focus.scope(prList).list.count, of: prList.count, in: model.prScope.title)
         case .issues:
-            let tab = model.selectedIssueTab
+            guard let tab = model.issueScope.tab else {
+                guard let issueList = model.issueList else { return nil }
+                return FilterRow.tally(
+                    focus.scope(issueList).list.rowCount, of: issueList.rowCount, in: model.issueScope.title)
+            }
             guard let issueTabs = model.issueTabs, issueTabs.isLoaded(tab), let contents = issueTabs.contents(tab),
                   let total = issueTabs.count(tab).value
             else { return nil }
-            return FilterRow.tally(focus.scope(contents).contents.count, of: total, in: tab.title)
+            return FilterRow.tally(focus.scope(contents).contents.count, of: total, in: IssueScope(tab).title)
         }
     }
 

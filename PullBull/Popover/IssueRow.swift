@@ -2,9 +2,9 @@ import SwiftUI
 import PullBullKit
 
 /// One issue in an Issues list: the state glyph, the title and a meta line (repo #num · age · search role ·
-/// comments · label chips), with assignee avatars on the right and, when closed, its pill (full rows only).
-/// Compact rows fit on one line. A search result draws
-/// as a row of the tab it is laid out for, with its marks.
+/// comments · label chips · Status), with assignee avatars on the right and, when closed, its pill (full rows
+/// only). Compact rows fit on one line, the Status as its glyph. A search result draws as a row of the tab it
+/// is laid out for, with its marks.
 struct IssueRow: View {
     let model: AppModel
     let issue: BoardIssue
@@ -18,6 +18,8 @@ struct IssueRow: View {
     var wantedLabels: [String] = []
     /// A search result's words and role; nil on a tab.
     var search: SearchMarks?
+    /// The board Status, shown where no lane names it (All's sections); nil elsewhere.
+    var status: BoardStatusValue? = nil
     @State private var hovering = false
 
     private var compact: Bool { model.settings.compact }
@@ -87,7 +89,8 @@ struct IssueRow: View {
                     // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
                     .help(issue.title)
                 IssueMetaLine(
-                    issue: issue, now: now, showsRepo: !inRepoGroup, role: search?.role, wantedLabels: wantedLabels)
+                    issue: issue, now: now, showsRepo: !inRepoGroup, role: search?.role, wantedLabels: wantedLabels,
+                    status: status)
                     .padding(.top, 3)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -130,7 +133,9 @@ struct IssueRow: View {
                 // On the title alone: a row-wide tip would cover the chips' and glyphs' own.
                 .help(issue.title)
         } badges: {
-            EmptyView()
+            if let status {
+                StatusChip(status: status, glyphOnly: true)
+            }
         } trailing: {
             // No ended pill, as on a compact PR row: the glyph and the bare age ("3d") already say it.
             AssigneeStack(assignees: avatars, showUnassigned: tab == .board, size: 16)
@@ -138,8 +143,9 @@ struct IssueRow: View {
     }
 }
 
-/// repo #num · updated age · search role · comment count · label chips. Chips that don't fit drop off the end into
-/// "+N", so the repo, age and comments always show. Under a repo header the repo is left out.
+/// repo #num · updated age · search role · comment count · label chips · Status. Chips that don't fit drop off
+/// the end into "+N", so the repo, age, comments and Status always show. Under a repo header the repo is left
+/// out.
 struct IssueMetaLine: View {
     let issue: BoardIssue
     let now: Date
@@ -147,6 +153,7 @@ struct IssueMetaLine: View {
     var role: String?
     /// The labels a `~label` search asks for, whose chips lead.
     var wantedLabels: [String] = []
+    var status: BoardStatusValue?
 
     var body: some View {
         let chips = LabelChipSet(issue, first: wantedLabels)
@@ -189,7 +196,47 @@ struct IssueMetaLine: View {
                     .padding(.leading, 4)
             }
             LabelChips(set: chips, fit: fitting)
+            if let status {
+                StatusChip(status: status)
+            }
         }
+    }
+}
+
+/// An issue's board Status on its row: a gray glyph and the name in a label chip's outline, never colour
+/// alone. VoiceOver reads "Status: In Progress". `glyphOnly` (compact rows) shows the glyph and names the
+/// Status in its tooltip.
+struct StatusChip: View {
+    let status: BoardStatusValue
+    var glyphOnly = false
+
+    private var glyph: some View {
+        Image(systemName: BoardStatusGlyph.symbol(forStatusNamed: status.name))
+            .font(.system(size: 10))
+            .foregroundStyle(Palette.secondaryText)
+    }
+
+    var body: some View {
+        Group {
+            if glyphOnly {
+                glyph
+                    .help("Status: \(status.name)")
+            } else {
+                HStack(spacing: 4) {
+                    glyph
+                    Text(status.name)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Palette.secondaryText)
+                        .lineLimit(1)
+                }
+                .fixedSize()
+                .padding(.horizontal, 6)
+                .frame(height: 16)
+                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Palette.separator, lineWidth: 0.5))
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Status: \(status.name)")
     }
 }
 

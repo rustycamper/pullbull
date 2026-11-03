@@ -61,7 +61,7 @@ struct IssueListView: View {
             if listed.isEmpty {
                 Group {
                     if focus.isActive, total > contents.issues.count {
-                        FocusedEmptyView(model: model, tabTitle: tab.title, hiddenCount: scoped.hiddenCount)
+                        FocusedEmptyView(model: model, tabTitle: IssueScope(tab).title, hiddenCount: scoped.hiddenCount)
                     } else {
                         IssueEmptyView(model: model, tab: tab, now: now)
                     }
@@ -160,7 +160,7 @@ private struct IssueEmptyView: View {
             return .init(title: "Retry", help: "Retry (⌘R)", disabled: model.status.isRefreshing) { model.refresh() }
         }
         if tab == .assigned, model.settings.org != nil {
-            return .init(title: "Browse \(boardTitle)", symbol: "rectangle.split.3x1") { model.selectedIssueTab = .board }
+            return .init(title: "Browse \(boardTitle)", symbol: "rectangle.split.3x1") { model.issueScope = .board }
         }
         return nil
     }
