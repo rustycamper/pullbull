@@ -27,6 +27,28 @@ public struct SearchPRLayout: Sendable {
     }
 }
 
+/// Pull request results laid out in the list's sections (Everywhere and Mine): the open ones in the
+/// section the list holds them in, the rest in Other results, then the merged and closed ones.
+public struct SearchSectionLayout: Sendable {
+    public let scope: PRScope
+    /// The open results: non-empty sections in `PRSection` order. Nothing folds in search.
+    public let sections: [ListSection]
+    /// Merged and closed results, the most recently closed first.
+    public let ended: [PullRequest]
+
+    /// The shown groups of rows, in display order: one per section, then Closed when expanded and not empty.
+    public func groups(closedExpanded: Bool) -> [[PRKey]] {
+        var groups = sections.map { $0.contents.rows.map(\.pr.key) }
+        if closedExpanded && !ended.isEmpty { groups.append(ended.map(\.key)) }
+        return groups
+    }
+
+    /// The rows as shown, `groups` flattened.
+    public func keys(closedExpanded: Bool) -> [PRKey] {
+        groups(closedExpanded: closedExpanded).flatMap { $0 }
+    }
+}
+
 /// Issue results laid out as the reference tab lays out its list: the open ones in its groups, Done
 /// included, then the closed ones in a Closed section.
 public struct SearchIssueLayout: Sendable {
@@ -64,12 +86,36 @@ public enum SearchLayout {
         let rows = results.openPRs.map { TabBuilder.row(for: $0, on: tab, me: org.viewer, myTeams: org.myTeams) }
         let contents = TabBuilder.contents(
             rows, sort: settings.sort(for: tab), on: tab, me: org.viewer, myTeams: org.myTeams, now: now)
-        let ended = results.closedPRs.sorted { a, b in
-            let ca = a.closedAt ?? .distantPast, cb = b.closedAt ?? .distantPast
-            if ca != cb { return ca > cb }
-            return tieBreak(a.key, b.key)
-        }
+        let ended = closed(results.closedPRs)
         return SearchPRLayout(tab: tab, grouping: grouping, contents: contents, ended: ended)
+    }
+
+    /// The pull request results in the list's sections. An open result sits in the section the list holds
+    /// it in; else, when it is mine, where `PRSection.mine` puts it; else in Other results. Its row follows
+    /// the section's fetched list, and each section follows the scope's sort (`settings.sort(for: scope)`).
+    public static func sections(
+        _ results: SearchResults, scope: PRScope, tabs: BuiltTabs, settings: AppSettings, org: OrgContext,
+        now: Date
+    ) -> SearchSectionLayout {
+        let held: [(PRSection, Set<PRKey>)] = [
+            (.needsReview, Set(tabs.review.rows.map(\.id))),
+            (.yourPRs, Set(tabs.yourPRs.rows.map(\.id))),
+            (.waiting, Set(tabs.waitingOnOthers.rows.map(\.id))),
+            (.team, Set(tabs.teamSection.rows.map(\.id))),
+        ]
+        func section(of pr: PullRequest) -> PRSection {
+            if let found = held.first(where: { $0.1.contains(pr.key) }) { return found.0 }
+            return pr.author.caseInsensitiveCompare(org.viewer) == .orderedSame ? PRSection.mine(pr) : .otherResults
+        }
+        let bySection = Dictionary(grouping: results.openPRs, by: section(of:))
+        let built: [ListSection] = PRSection.allCases.compactMap { section in
+            guard let prs = bySection[section], let tab = section.rowTab else { return nil }
+            let rows = prs.map { TabBuilder.row(for: $0, on: tab, me: org.viewer, myTeams: org.myTeams) }
+            let contents = TabBuilder.contents(
+                rows, sort: settings.sort(for: scope), on: tab, me: org.viewer, myTeams: org.myTeams, now: now)
+            return ListSection(section: section, contents: contents)
+        }
+        return SearchSectionLayout(scope: scope, sections: built, ended: closed(results.closedPRs))
     }
 
     /// The issue results as `tab` groups its open items (`IssueTabBuilder.groups(of:on:in:settings:)`).
@@ -101,6 +147,14 @@ public enum SearchLayout {
     /// link or `owner/repo#123` can bring a result from outside the focus.
     public static func showsRepo(_ key: PRKey, underRepoHeader: Bool, focus: RepoFocus?) -> Bool {
         !underRepoHeader && !(focus?.matches(key) ?? false)
+    }
+
+    private static func closed(_ prs: [PullRequest]) -> [PullRequest] {
+        prs.sorted { a, b in
+            let ca = a.closedAt ?? .distantPast, cb = b.closedAt ?? .distantPast
+            if ca != cb { return ca > cb }
+            return tieBreak(a.key, b.key)
+        }
     }
 
     private static func tieBreak(_ a: PRKey, _ b: PRKey) -> Bool {

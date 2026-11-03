@@ -18,6 +18,20 @@ public enum SearchScope: Hashable, Sendable {
         }
     }
 
+    /// How the list lays this scope out; nil for issues.
+    public var prScope: PRScope? {
+        switch self {
+        case .everything: .all
+        case .pullRequests(let tab): PRScope(tab)
+        case .issues: nil
+        }
+    }
+
+    /// The pull request chips: Everywhere, then the tabs shown.
+    public static func prChips(_ tabs: [PRTab]) -> [SearchScope] {
+        [.everything] + tabs.map(SearchScope.pullRequests)
+    }
+
     /// The tab whose layout the results take: the `scope` tab when narrowed, else the tab typing started
     /// on when it is in `shown`'s mode, else `shown`, the current mode's selected tab.
     public static func reference(scope: SearchScope, startedOn: SearchScope?, shown: SearchScope) -> SearchScope {
@@ -55,12 +69,12 @@ public enum SearchScope: Hashable, Sendable {
 /// A search narrowed to one tab: the items the tab lists, matched as `SearchEngine.local` matches the
 /// snapshot, within the repo focus. Nothing is asked of GitHub.
 public enum SearchNarrowing {
-    /// Every row of the tab, dimmed ones included, and on Mine the recently closed PRs.
+    /// Every row of the tab, dimmed ones included (Team leaves out what needs my review, as the list does), and on Mine the recently closed PRs.
     public static func items(of tab: PRTab, in tabs: BuiltTabs) -> [PullRequest] {
         switch tab {
         case .review: tabs.review.rows.map(\.pr)
         case .mine: tabs.mine.rows.map(\.pr) + tabs.recentlyClosed
-        case .team: tabs.team.rows.map(\.pr)
+        case .team: tabs.teamSection.rows.map(\.pr)
         }
     }
 

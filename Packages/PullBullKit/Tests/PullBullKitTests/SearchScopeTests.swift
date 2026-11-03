@@ -228,6 +228,33 @@ private let issueTabs = BuiltIssueTabs(
 @Suite struct SearchScopeMovedTests {
     private let all: [SearchScope] = [.pullRequests(.review), .pullRequests(.mine), .pullRequests(.team)]
 
+    @Test func everywhereIsTheFirstChipAndArrowsReachIt() {
+        let chips = SearchScope.prChips(PRTab.shown(in: .personal(login: "me")))
+        #expect(chips == [.everything, .pullRequests(.review), .pullRequests(.mine)])
+        #expect(SearchScope.everything.moved(by: 1, among: chips) == .pullRequests(.review))
+        #expect(SearchScope.pullRequests(.review).moved(by: -1, among: chips) == .everything)
+        #expect(SearchScope.everything.moved(by: -1, among: chips) == nil)
+        #expect(SearchScope.pullRequests(.mine).moved(by: 1, among: chips) == nil)
+    }
+
+    @Test func aSearchScopeLaysOutAsAPRScope() {
+        #expect(SearchScope.everything.prScope == .all)
+        #expect(SearchScope.pullRequests(.team).prScope == .team)
+        #expect(SearchScope.issues(.board).prScope == nil)
+    }
+
+    @Test func narrowingToTeamLeavesOutWhatNeedsMyReview() {
+        let both = pr(20, "Fix it", author: "bob")
+        let tabs = BuiltTabs(
+            review: TabContents(rows: [row(both)]), mine: TabContents(rows: []),
+            team: TabContents(rows: [row(both), row(pr(21, "Fix more", author: "carol"))]),
+            recentlyClosed: [], hiddenApprovedCount: 0)
+        #expect(SearchNarrowing.items(of: .team, in: tabs).map(\.key.number) == [21])
+        let counts = SearchNarrowing.counts(
+            .parse("fix"), prTabs: [.review, .mine, .team], tabs: tabs, issueTabs: nil, focus: nil, viewer: "me")
+        #expect(counts[.pullRequests(.team)] == .current(1))
+    }
+
     @Test func movedAlongTabs() {
         #expect(SearchScope.pullRequests(.review).moved(by: 1, among: all) == .pullRequests(.mine))
         #expect(SearchScope.pullRequests(.team).moved(by: 1, among: all) == nil)
