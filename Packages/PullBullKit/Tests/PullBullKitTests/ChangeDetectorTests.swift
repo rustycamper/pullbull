@@ -7,19 +7,20 @@ private let now = Date(timeIntervalSince1970: 1_800_000_000)
 private func pr(
     _ n: Int, author: String = "alice", ci: CIState = .none, comments: Int = 0,
     lastCommenter: String? = nil, reviews: [Review] = [], requests: [Reviewer] = [],
-    draft: Bool = false, updated: Date = now, mergeable: Mergeable? = nil
+    draft: Bool = false, updated: Date = now, mergeable: Mergeable? = nil,
+    headCommitDate: Date? = nil, requestedAt: [String: Date] = [:]
 ) -> PullRequest {
     PullRequest(
         key: PRKey(repo: "r", number: n), title: "t\(n)", url: URL(string: "https://x/\(n)")!,
         author: author, authorAvatarURL: nil, state: .open, isDraft: draft,
         createdAt: now, updatedAt: updated, closedAt: nil, headRef: "h", baseRef: "main", ci: ci,
-        headCommitDate: nil, commentCount: comments, lastCommentAuthor: lastCommenter,
-        latestReviews: reviews, reviewRequests: requests, mergeable: mergeable)
+        headCommitDate: headCommitDate, commentCount: comments, lastCommentAuthor: lastCommenter,
+        latestReviews: reviews, reviewRequests: requests, mergeable: mergeable, reviewRequestTimes: requestedAt)
 }
 
-private func snap(review: [PullRequest] = [], mine: [PullRequest] = []) -> Snapshot {
+private func snap(review: [PullRequest] = [], mine: [PullRequest] = [], at: Date = now) -> Snapshot {
     Snapshot(
-        fetchedAt: now,
+        fetchedAt: at,
         org: OrgContext(org: "o", viewer: "me", members: [], myTeams: [], repos: []),
         reviewCandidates: review, mine: mine, team: [], recentlyClosed: [], boardIssues: [])
 }
@@ -50,6 +51,99 @@ private func events(_ old: Snapshot?, _ new: Snapshot, toggles: NotificationTogg
         let e = ChangeDetector.events(
             old: teamRequested, new: reRequested, me: "me", myTeams: ["core"], toggles: .init())
         #expect(e.isEmpty)
+    }
+
+    // MARK: A PR that comes back
+
+    @Test func aReopenedPRWithAnOldRequestDoesNotNotifyAgain() {
+        // Closed, then reopened: absent from the previous poll, requested from me three hours ago.
+        let back = pr(1, requests: [.user("me")], requestedAt: ["me": now.addingTimeInterval(-3 * 3600)])
+        #expect(events(snap(at: now.addingTimeInterval(-60)), snap(review: [back])).isEmpty)
+    }
+
+    @Test func aRequestMadeSinceTheLastPollNotifies() {
+        let requested = pr(1, requests: [.user("ME")], requestedAt: ["me": now.addingTimeInterval(-30)])
+        #expect(events(snap(at: now.addingTimeInterval(-60)), snap(review: [requested])).map(\.kind) == [.reviewRequested])
+    }
+
+    @Test func aRequestTheSearchShowsLateStillNotifies() {
+        // Made five minutes before the last poll, which the search index hadn't caught up with.
+        let lagged = pr(1, requests: [.user("me")], requestedAt: ["me": now.addingTimeInterval(-360)])
+        #expect(events(snap(at: now.addingTimeInterval(-60)), snap(review: [lagged])).map(\.kind) == [.reviewRequested])
+    }
+
+    @Test func aRequestOfUnknownTimeStillNotifies() {
+        #expect(events(snap(at: now.addingTimeInterval(-60)), snap(review: [pr(1, requests: [.user("me")])])).count == 1)
+    }
+
+    @Test func anOldTeamRequestThatComesBackDoesNotNotify() {
+        let team = Reviewer.team(slug: "Core", name: "Core")
+        let old = pr(1, requests: [team], requestedAt: ["team:core": now.addingTimeInterval(-3600)])
+        let fresh = pr(2, requests: [team], requestedAt: ["team:core": now.addingTimeInterval(-10)])
+        let e = ChangeDetector.events(
+            old: snap(at: now.addingTimeInterval(-60)), new: snap(review: [old, fresh]), me: "me", myTeams: ["core"],
+            toggles: .init())
+        #expect(e.map(\.pr.key.number) == [2])
+    }
+
+    @Test func oldCommitsSinceMyReviewThatComeBackDoNotNotify() {
+        let reviewed = Review(author: "me", state: .approved, submittedAt: now.addingTimeInterval(-7200))
+        let old = pr(1, reviews: [reviewed], headCommitDate: now.addingTimeInterval(-3600))
+        let fresh = pr(2, reviews: [reviewed], headCommitDate: now.addingTimeInterval(-20))
+        #expect(events(snap(at: now.addingTimeInterval(-60)), snap(review: [old, fresh])).map(\.pr.key.number) == [2])
+    }
+
+    @Test func theWindowEndsTenMinutesBeforeTheLastPoll() {
+        let lastPoll = now.addingTimeInterval(-60)
+        let at = { (seconds: TimeInterval) in
+            pr(1, requests: [.user("me")], requestedAt: ["me": lastPoll.addingTimeInterval(-seconds)])
+        }
+        #expect(events(snap(at: lastPoll), snap(review: [at(599)])).count == 1)
+        #expect(events(snap(at: lastPoll), snap(review: [at(601)])).isEmpty)
+    }
+
+    @Test func aCapitalisedLoginFindsItsRequestTime() {
+        let back = pr(1, requests: [.user("pbojkov")], requestedAt: ["pbojkov": now.addingTimeInterval(-3600)])
+        let e = ChangeDetector.events(
+            old: snap(at: now.addingTimeInterval(-60)), new: snap(review: [back]), me: "PBojkov", myTeams: [],
+            toggles: .init())
+        #expect(e.isEmpty)
+    }
+
+    @Test func anOldReRequestThatComesBackDoesNotNotify() {
+        let commented = Review(author: "me", state: .commented, submittedAt: now.addingTimeInterval(-7200))
+        let back = pr(1, reviews: [commented], requests: [.user("me")], requestedAt: ["me": now.addingTimeInterval(-3600)])
+        #expect(events(snap(at: now.addingTimeInterval(-60)), snap(review: [back])).isEmpty)
+    }
+
+    @Test func aNewTeamRequestOnAPRThatComesBackNotifiesBesideAnOldDirectOne() {
+        let team = Reviewer.team(slug: "core", name: "Core")
+        let back = pr(1, requests: [.user("me"), team], requestedAt: [
+            "me": now.addingTimeInterval(-3600), "team:core": now.addingTimeInterval(-10),
+        ])
+        let e = ChangeDetector.events(
+            old: snap(at: now.addingTimeInterval(-60)), new: snap(review: [back]), me: "me", myTeams: ["Core"],
+            toggles: .init())
+        #expect(e.count == 1)
+    }
+
+    @Test func aRemovedTeamRequestDoesNotMakeAnOldOneNew() {
+        // The team was asked, then taken off: its newer time no longer stands for a pending request.
+        let back = pr(1, requests: [.user("me")], requestedAt: [
+            "me": now.addingTimeInterval(-3600), "team:core": now.addingTimeInterval(-10),
+        ])
+        let e = ChangeDetector.events(
+            old: snap(at: now.addingTimeInterval(-60)), new: snap(review: [back]), me: "me", myTeams: ["core"],
+            toggles: .init())
+        #expect(e.isEmpty)
+    }
+
+    @Test func aPRSeenLastPollWithoutAReasonNotifiesWhateverItsTimes() {
+        // On the list without needing me (approved), then new commits: a change seen live, so it counts.
+        let reviewed = Review(author: "me", state: .approved, submittedAt: now.addingTimeInterval(-7200))
+        let before = pr(1, reviews: [reviewed], headCommitDate: now.addingTimeInterval(-9000))
+        let after = pr(1, reviews: [reviewed], headCommitDate: now.addingTimeInterval(-3600))
+        #expect(events(snap(review: [before], at: now.addingTimeInterval(-60)), snap(review: [after])).count == 1)
     }
 
     @Test func approvalFires() {
