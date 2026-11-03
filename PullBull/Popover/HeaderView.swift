@@ -28,14 +28,12 @@ struct HeaderView<UnderField: View>: View {
         VStack(spacing: 0) {
             searchRow
             underField()
-            if model.mode == .issues || model.settings.scopeChips {
-                tabRow
-            }
+            tabRow
         }
     }
 
     /// The Pull Requests chips or the Issues tabs. While results are on screen they narrow them instead of
-    /// showing their lists. Pull Requests has no row with the chips off, searching or not.
+    /// showing their lists.
     private var tabRow: some View {
         Group {
             switch model.mode {

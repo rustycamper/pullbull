@@ -60,7 +60,7 @@ Keyboard-first · Native SwiftUI · Edits only what you pick
 | | | Created | Issues you opened |
 | | | Board | All open issues on the board, by Status. Folded *Done*: last 14 days |
 
-- **Chips:** Pull Requests opens on All, or on the chip set in Settings → General → Pull requests open on (Last used reopens the one you left). Click a chip or press <kbd>←</kbd> <kbd>→</kbd> to scope the list, and click the chip again for All. Scope chips can be turned off there too
+- **Chips:** Pull Requests opens on All, or on the chip set in Settings → General → Pull requests open on (Last used reopens the one you left). Click a chip or press <kbd>←</kbd> <kbd>→</kbd> to scope the list, and click the chip again for All
 - **Fold a section:** click its header on All or Mine. Folds are kept across relaunches
 - **Fold a lane:** click a Status header on Board or Mine. Folds are kept per tab and board
 - **Labels:** chips with the label's colour dot on each row (not in compact cards), all of them in the detail

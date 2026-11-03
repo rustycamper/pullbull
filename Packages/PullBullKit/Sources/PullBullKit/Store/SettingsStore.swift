@@ -169,8 +169,6 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var openOn: OpenOn = .all
     /// The chip showing when the popover last closed, which Last used opens on.
     public var lastScope: PRScope = .all
-    /// Off leaves the list on All, with no chip row, and every search covers Everywhere.
-    public var scopeChips = true
     /// The global shortcut that shows and hides the popover; nil when turned off.
     public var toggleHotkey: KeyCombo? = .togglePopoverDefault
     /// The popover mode last shown.
@@ -206,7 +204,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case account, org, projectNumber, projectOwner, projectOrg, orgByAccount, boardByOwner, grouping, groupTeamByAuthor, sorts, reviewOldestFirst, compact,
-            hideOlderThanTwoMonths, hideApprovedByMe, hideDrafts, badge, notify, refreshMinutes, followPendingCI, openOn, lastScope, scopeChips, toggleHotkey, mode, lastIssueTab,
+            hideOlderThanTwoMonths, hideApprovedByMe, hideDrafts, badge, notify, refreshMinutes, followPendingCI, openOn, lastScope, toggleHotkey, mode, lastIssueTab,
             countAssignedIssues, solidBackground, accountSource, appAccounts, signedOutByUser, laneFolds, sectionFolds,
             askEnabled, askModel, askModelChoices, askExcludedRepos
     }
@@ -255,7 +253,6 @@ public struct AppSettings: Codable, Equatable, Sendable {
         d.followPendingCI = c.readable(Bool.self, forKey: .followPendingCI) ?? d.followPendingCI
         d.openOn = c.readable(OpenOn.self, forKey: .openOn) ?? d.openOn
         d.lastScope = c.readable(PRScope.self, forKey: .lastScope) ?? d.lastScope
-        d.scopeChips = c.readable(Bool.self, forKey: .scopeChips) ?? d.scopeChips
         // A saved null is "turned off"; a missing key (settings saved before the shortcut) is the default.
         if let hotkey = c.readableOrNull(KeyCombo.self, forKey: .toggleHotkey) { d.toggleHotkey = hotkey }
         d.mode = c.readable(PopoverMode.self, forKey: .mode) ?? d.mode
@@ -302,7 +299,6 @@ public struct AppSettings: Codable, Equatable, Sendable {
         try c.encode(followPendingCI, forKey: .followPendingCI)
         try c.encode(openOn, forKey: .openOn)
         try c.encode(lastScope, forKey: .lastScope)
-        try c.encode(scopeChips, forKey: .scopeChips)
         try c.encode(toggleHotkey, forKey: .toggleHotkey)
         try c.encode(mode, forKey: .mode)
         try c.encode(lastIssueTab, forKey: .lastIssueTab)
