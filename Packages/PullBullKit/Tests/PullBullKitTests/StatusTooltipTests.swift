@@ -6,6 +6,10 @@ import Testing
     let now = Date(timeIntervalSince1970: 1_800_000_000)
     let interval = Duration.seconds(300)
 
+    @Test func badgeChoicesAreNamedAfterTheListAndChips() {
+        #expect(BadgeSource.allCases.map(\.title) == ["Needs your review", "Mine", "Needs your review + mine", "All"])
+    }
+
     func ok(ago seconds: TimeInterval = 180, refreshing: Bool = false) -> RefreshStatus {
         RefreshStatus(lastSuccess: now.addingTimeInterval(-seconds), error: nil, isRefreshing: refreshing)
     }

@@ -72,12 +72,9 @@ struct GeneralSettingsTab: View {
     private var menuBarSection: some View {
         Section("Menu bar") {
             Picker(selection: $model.settings.badge) {
-                Text("Needs my review").tag(BadgeSource.review)
-                Text("Mine").tag(BadgeSource.mine)
-                Text("Review + Mine").tag(BadgeSource.reviewAndMine)
-                Text("All").tag(BadgeSource.all)
+                ForEach(BadgeSource.allCases, id: \.self) { Text($0.title).tag($0) }
             } label: {
-                RowLabel("Count shows", note: "The badge uses the same filters as the tab it counts")
+                RowLabel("Count shows", note: "The badge uses the same filters as the lists it counts")
             }
             Toggle(isOn: $model.settings.countAssignedIssues) {
                 RowLabel("Also count assigned issues", note: "Adds open issues assigned to you")

@@ -4,6 +4,18 @@ public enum PRTab: String, Codable, CaseIterable, Sendable { case review, mine, 
 
 public enum BadgeSource: String, Codable, CaseIterable, Sendable { case review, mine, reviewAndMine, all }
 
+extension BadgeSource {
+    /// The picker label, named after the list and its chips: `.mine` counts all my open PRs, as the Mine chip does.
+    public var title: String {
+        switch self {
+        case .review: "Needs your review"
+        case .mine: "Mine"
+        case .reviewAndMine: "Needs your review + mine"
+        case .all: "All"
+        }
+    }
+}
+
 public enum Grouping: String, Codable, Sendable { case repository, none }
 
 /// How a PR tab's rows are grouped on screen: the setting, narrowed by the repo focus, and for Team the
