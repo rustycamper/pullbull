@@ -287,13 +287,17 @@ struct PopoverView: View {
             HeaderView(
                 model: model, searching: searchShown, searchOpen: searchOpen, fieldFocused: $fieldFocused,
                 ghostDrawn: $qualifierGhostDrawn, window: { [keyMonitor] in keyMonitor.window },
-                onCancelSearch: cancelSearch, onSwitchMode: switchMode(to:), onSaveSearch: openSaveRow)
-            if searchOpen, saveName != nil {
-                Hairline()
-                SaveSearchRow(
-                    name: Binding(get: { saveName ?? "" }, set: { saveName = $0 }), focused: $saveNameFocused,
-                    onSave: saveSearch, onCancel: closeSaveRow)
-                if filterRow != nil { Hairline() }
+                onCancelSearch: cancelSearch, onSwitchMode: switchMode(to:), onSaveSearch: openSaveRow
+            ) {
+                // The save row opens under the field, above the tabs, between two lines.
+                if searchOpen, saveName != nil {
+                    Hairline()
+                    SaveSearchRow(
+                        name: Binding(get: { saveName ?? "" }, set: { saveName = $0 }), focused: $saveNameFocused,
+                        onSave: saveSearch, onCancel: closeSaveRow)
+                    Hairline()
+                        .padding(.bottom, 4)
+                }
             }
             // One line between the header and the list: the filter row draws it when shown.
             if filterRow == nil { Hairline() }

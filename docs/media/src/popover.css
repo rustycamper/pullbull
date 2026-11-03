@@ -222,13 +222,13 @@ body {
 
 /* ---------- Header (HeaderView) ---------- */
 
-.title-row { height: 40px; padding: 0 8px; gap: 4px; flex: none; }
+/* The mode's tabs, under the search row: inset 8, 4 below. */
+.tab-row { padding: 0 8px 4px; display: flex; flex: none; }
 
-/* ModeToggle: two 22×28 buttons, 2 apart, then a hairline 18 tall with 2 before it. */
-.mode-toggle { gap: 2px; flex: none; }
-.mode-button { width: 22px; height: 28px; display: flex; align-items: center; justify-content: center; color: var(--secondary); border-radius: 6px; }
-.mode-button.selected { color: var(--accent); }
-.mode-toggle .hairline-v { height: 18px; margin-left: 2px; }
+/* ModeToggle: two 24×20 segments, 2 apart, on a 24-tall track padded 2. */
+.mode-toggle { gap: 2px; flex: none; padding: 2px; border-radius: 6px; background: var(--fill); }
+.mode-button { width: 24px; height: 20px; display: flex; align-items: center; justify-content: center; color: var(--secondary); border-radius: 5px; }
+.mode-button.selected { color: var(--accent); background: var(--strong-fill); }
 
 /* TabBar: equal segments 2 apart, 22 tall, inside 2 pt of vertical padding. */
 .tab-bar { flex: 1 1 auto; padding: 2px 0; display: flex; gap: 2px; }
@@ -255,9 +255,11 @@ body {
 .segment .count { color: var(--secondary-text); }
 .segment.selected .count { color: var(--label); }
 
-/* Search field: 24 tall, inset 6 (Metrics.rowInset), 6 below. */
-.search-row { padding: 0 6px 6px; flex: none; }
+/* Search row: the mode switch, 6 apart from the field; 24 tall, inset 6 (Metrics.rowInset), 8 above, 6 below. */
+.search-row { padding: 8px 6px 6px; flex: none; display: flex; gap: 6px; align-items: center; }
 .search-field {
+  flex: 1 1 auto;
+  min-width: 0;
   position: relative;
   height: 24px;
   padding: 0 6px 0 8px;

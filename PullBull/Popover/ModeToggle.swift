@@ -1,11 +1,11 @@
 import SwiftUI
 import PullBullKit
 
-/// The Pull Requests / Issues switch at the start of the header: two free-standing icon buttons, the
-/// active one in the accent colour on an accent-tinted chip, so it reads without hue too (a Graphite
-/// accent, Differentiate Without Colour). It has no shared track, so it doesn't read as part of the tab
-/// bar; a hairline divider closes it off. The other mode's glyph carries a dot while it has something new
-/// for me (`ModeNews`).
+/// The Pull Requests / Issues switch at the start of the search row: two icon segments on one track, as
+/// tall as the field beside it, the active one in the accent colour on a tinted chip, so it reads without
+/// hue too (a Graphite accent, Differentiate Without Colour). The track groups the two icons and sets them
+/// apart from the field. The other mode's glyph carries a dot while it has something new for me
+/// (`ModeNews`).
 struct ModeToggle: View {
     @Bindable var model: AppModel
     /// Switches to the mode, as ⌘1 / ⌘2 do: a query in the field stays, an empty open field closes.
@@ -19,11 +19,9 @@ struct ModeToggle: View {
                     news: model.mode == mode ? nil : model.modeNews.note(mode)
                 ) { select(mode) }
             }
-            Hairline(axis: .vertical)
-                .frame(height: 18)
-                .padding(.leading, 2)
-                .accessibilityHidden(true)
         }
+        .padding(2)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Palette.fill))
         .fixedSize()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Mode")
@@ -39,15 +37,15 @@ private struct ModeButton: View {
     @State private var hovering = false
     @Environment(\.colorSchemeContrast) private var contrast
 
-    /// The chip matches the tab bar's thumb: 22pt tall, the same corner radius.
-    private static let chip = RoundedRectangle(cornerRadius: 6)
+    /// 20pt tall inside the 24pt track; its radius nests inside the track's 6.
+    private static let chip = RoundedRectangle(cornerRadius: 5)
 
     var body: some View {
         Button(action: action) {
             Image(symbol: mode.symbol)
                 .font(.system(size: 13, weight: selected ? .semibold : .regular))
                 .foregroundStyle(selected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
-                .frame(width: 24, height: 22)
+                .frame(width: 24, height: 20)
                 .background(Self.chip.fill(fill))
                 .overlay {
                     // Increase Contrast edges the chosen chip too.
@@ -74,7 +72,8 @@ private struct ModeButton: View {
 
     private var fill: Color {
         if selected { return Palette.selection }
-        return hovering ? Palette.fill : .clear
+        // The track is `Palette.fill`, so a hover takes the stronger fill to show on it.
+        return hovering ? Palette.strongFill : .clear
     }
 }
 
