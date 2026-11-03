@@ -113,9 +113,10 @@ Mockups: https://claude.ai/artifact/EpgpsFBW6hyLMHocJFmdBC (2a is the chosen hea
 | Needs your review | Today's Review rows, including dimmed "You approved · not counted" rows when Hide approved is off | Review's (`RowChips` `.review`), Review's short wait | `bell`, accent colour |
 | Your PRs | My open PRs that need me: ready to merge, changes requested, a failed check, conflicts, or a draft | Mine's | the pull request glyph |
 | Waiting on others | My other open PRs: waiting on review or on checks still running | Mine's | `clock` |
-| Recently closed | Today's Mine "Recently closed" | as today | fold chevron |
-| Team | Today's Team rows minus any PR in Needs your review | Team's | fold chevron |
+| Recently closed | Today's Mine "Recently closed" | as today | `archivebox` |
+| Team | Today's Team rows minus any PR in Needs your review | Team's | `person.2` |
 
+- **Every section header has a glyph**, and a fold's chevron always hangs in the leading inset, left of the glyph. So every chevron sits on one line and every title on another; a header whose chevron moved into the icon column read as nested under the section above. Search's Other results uses `magnifyingglass` and its Closed and merged group `archivebox`.
 - **Your PRs and Waiting on others split Mine with no overlap.** A PR goes in Your PRs when any of these hold:
   - `ReviewRules.isReadyToMerge`;
   - a latest review requests changes;

@@ -198,28 +198,26 @@
       (count > 0 ? `<span class="w-medium mono">${count}</span>` : "") + `</span></div>`;
   }
 
-  // PRSection.glyph: Needs your review's bell in the accent colour, Your PRs' pull request, Waiting on others' clock; none for the rest.
+  // PRSection.glyph: Needs your review's bell in the accent colour; the rest secondary.
   const SECTION_GLYPH = {
     needsReview: ["bell", "var(--accent)"],
     yourPRs: ["pullbull.pullrequest", null],
     waiting: ["clock", null],
+    recentlyClosed: ["archivebox", null],
+    team: ["person.2", null],
+    otherResults: ["magnifyingglass", null],
   };
 
   /**
-   * ListSectionHeader with a fold: the glyph in the icon column; a section without one (Recently closed, Team, Other results)
-   * puts the chevron there, the others hang it in the leading inset. `trailing` is quiet text at the trailing edge.
+   * ListSectionHeader: the glyph in the icon column; a fold's chevron hangs in the leading inset, so every chevron and
+   * every title line up. `trailing` is quiet text at the trailing edge.
    */
   function sectionHeader({ title, glyph, accent, count, folded, trailing }) {
     const hasFold = folded !== undefined;
     const rotated = `transform:rotate(${folded ? 0 : 90}deg)`;
     const chevron = `<span class="lane-chevron" style="${rotated}">${sym("chevron.right", 9, "bold")}</span>`;
-    let lead = "", inset = "";
-    if (glyph) {
-      lead = `<span class="icon-col">${sym(glyph, 11, "regular", accent ? { color: accent } : {})}</span>`;
-      if (hasFold) inset = chevron;
-    } else if (hasFold) {
-      lead = `<span class="icon-col"><span style="${rotated};display:flex">${sym("chevron.right", 9, "bold")}</span></span>`;
-    }
+    const lead = glyph ? `<span class="icon-col">${sym(glyph, 11, "regular", accent ? { color: accent } : {})}</span>` : "";
+    const inset = hasFold ? chevron : "";
     return `<div class="hstack section-header f11 w-semibold">${inset}${lead}` +
       `<span class="hstack" style="gap:6px"><span>${esc(title)}</span>${count == null ? "" : `<span class="w-medium mono">${count}</span>`}</span>` +
       `<span class="spacer"></span>${trailing ? `<span style="font-weight:400">${esc(trailing)}</span>` : ""}</div>`;
@@ -251,9 +249,9 @@
 
   /** The folding closed section: Mine's "Recently closed" with its window, or search's "Closed and merged" (`rc.title`, no `rc.window`). */
   function closedSection(rc) {
-    const chevron = `<span class="lane-chevron" style="transform:rotate(${rc.expanded ? 90 : 0}deg)">${sym("chevron.right", 9, "bold")}</span>`;
-    let html = `<div class="hairline closed-rule"></div><div class="hstack closed-header f11 w-semibold">${chevron}<span>${esc(rc.title || "Recently closed")}</span>` +
-      `<span class="w-medium mono">${rc.count}</span><span class="spacer"></span>${rc.title ? "" : '<span style="font-weight:400">Last 7 days</span>'}</div>`;
+    let html = `<div class="hairline closed-rule"></div>` + sectionHeader({
+      title: rc.title || "Recently closed", glyph: "archivebox", count: rc.count, folded: !rc.expanded,
+      trailing: rc.title ? null : "Last 7 days" });
     if (rc.expanded) html += rc.rows.map((pr) => closedRow(pr, rc.words)).join("");
     return html;
   }

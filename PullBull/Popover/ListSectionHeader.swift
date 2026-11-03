@@ -3,10 +3,9 @@ import PullBullKit
 
 /// A list section's header, the same in every list: repo groups, lanes, Done, "Recently closed" and the
 /// search groups. The glyph sits in the rows' icon column, so header and row glyphs share one axis and the
-/// title starts on the row titles' edge; without a glyph the title starts where the row glyphs do. A
-/// header that folds toggles as a whole, its chevron hanging in the leading inset, left of the icon column;
-/// a folding header without a glyph puts the chevron in the icon column instead, where the inset would
-/// leave it touching the title.
+/// title starts on the row titles' edge; an author group shows an avatar there instead. A header that
+/// folds toggles as a whole, its chevron hanging in the leading inset, left of the icon column, so every
+/// fold's chevron sits on one line and every title on another.
 struct ListSectionHeader: View {
     let glyph: String?
     var glyphColor: Color = .secondary
@@ -56,9 +55,7 @@ struct ListSectionHeader: View {
             Button(action: fold.toggle) {
                 label
                     .overlay(alignment: .leading) {
-                        if !chevronInColumn {
-                            chevron(fold).frame(width: 8)
-                        }
+                        chevron(fold).frame(width: 8)
                     }
                     .contentShape(Rectangle())
             }
@@ -79,9 +76,6 @@ struct ListSectionHeader: View {
             .joined(separator: ", ")
     }
 
-    /// A folding header with nothing in its icon column.
-    private var chevronInColumn: Bool { fold != nil && glyph == nil && avatar == nil }
-
     private func chevron(_ fold: Fold) -> some View {
         Image(systemName: "chevron.right")
             .font(.system(size: 9, weight: .bold))
@@ -101,8 +95,6 @@ struct ListSectionHeader: View {
                     .font(.system(size: compact ? 10 : 11))
                     .foregroundStyle(glyphColor)
                     .frame(width: compact ? 16 : 20)
-            } else if chevronInColumn, let fold {
-                chevron(fold).frame(width: compact ? 16 : 20)
             }
             HStack(spacing: 6) {
                 Text(title)
@@ -138,13 +130,15 @@ struct ListSectionHeader: View {
 }
 
 extension PRSection {
-    /// The glyph in the section header's icon column; nil leaves the column to a fold chevron, or empty.
-    var glyph: String? {
+    /// The glyph in the section header's icon column.
+    var glyph: String {
         switch self {
         case .needsReview: "bell"
         case .yourPRs: "pullbull.pullrequest"
         case .waiting: "clock"
-        case .recentlyClosed, .team, .otherResults: nil
+        case .recentlyClosed: "archivebox"
+        case .team: "person.2"
+        case .otherResults: "magnifyingglass"
         }
     }
 
@@ -152,13 +146,14 @@ extension PRSection {
 }
 
 extension IssueSection {
-    /// The glyph in the section header's icon column; nil leaves the column to the fold chevron.
-    var glyph: String? {
+    /// The glyph in the section header's icon column.
+    var glyph: String {
         switch self {
         case .assignedToYou: "person.crop.circle"
         case .youOpened: "square.and.pencil"
         case .doneStillOpen: "checkmark.circle"
-        case .restOfBoard, .otherResults: nil
+        case .restOfBoard: "rectangle.split.3x1"
+        case .otherResults: "magnifyingglass"
         }
     }
 }
