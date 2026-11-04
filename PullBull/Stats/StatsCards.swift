@@ -46,11 +46,7 @@ struct StatsCards: View {
         if let bars = report?.bars {
             StatsBarChart(bars: bars, period: period)
         } else if loading {
-            RoundedRectangle(cornerRadius: 3)
-                .fill(.foreground)
-                .frame(height: StatsBarChart.totalHeight)
-                .skeletonShimmer()
-                .accessibilityHidden(true)
+            StatsBarChart.loadingPlaceholder
         } else {
             // The reviews didn't load: no bars rather than a row of empty days.
             Color.clear

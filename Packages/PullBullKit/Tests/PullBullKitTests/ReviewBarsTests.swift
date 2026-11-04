@@ -227,6 +227,15 @@ import Testing
         #expect(labels.map(\.text) == ["T", "F", "S", "S", "M", "T", "W"])
     }
 
+    @Test func weekLabelsAreEnglishWhateverTheCalendarsLocale() {
+        var german = posix
+        german.locale = Locale(identifier: "de_DE")
+        german.firstWeekday = 2
+        let bars = ReviewBars.make(reviewDates: [], window: StatsPeriod.week.window(now: nov4, calendar: german),
+                                   loadedFrom: nil, calendar: german)
+        #expect(bars.axisLabels(period: .week, calendar: german).map(\.text) == ["T", "F", "S", "S", "M", "T", "W"])
+    }
+
     @Test func monthLabelsAreTheFirstAndLastDates() {
         let bars = ReviewBars.make(reviewDates: [], window: StatsPeriod.month.window(now: nov4, calendar: posix),
                                    loadedFrom: nil, calendar: posix)

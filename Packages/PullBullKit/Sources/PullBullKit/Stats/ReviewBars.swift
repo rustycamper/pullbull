@@ -148,15 +148,14 @@ public struct ReviewBars: Equatable, Sendable {
         return best
     }
 
-    /// The labels under the chart. For 7 days, every day's weekday initial in `calendar`'s locale
-    /// ("T F S S M T W"); for 30 and 90, the first and last days' dates ("6 Oct", "4 Nov"). A day not
-    /// loaded is labelled all the same.
+    /// The labels under the chart, in English like the hover; `calendar` gives only the days. For 7
+    /// days, every day's weekday initial ("T F S S M T W"); for 30 and 90, the first and last days' dates
+    /// ("6 Oct", "4 Nov"). A day not loaded is labelled all the same.
     public func axisLabels(period: StatsPeriod, calendar: Calendar) -> [ReviewBarLabel] {
         guard let first = dayStarts.first, let last = dayStarts.last else { return [] }
         if period == .week {
-            let symbols = calendar.veryShortWeekdaySymbols
             return dayStarts.enumerated().map { index, day in
-                ReviewBarLabel(index: index, text: symbols[calendar.component(.weekday, from: day) - 1])
+                ReviewBarLabel(index: index, text: Self.format(day, "EEEEE", calendar))
             }
         }
         let lastIndex = dayStarts.count - 1

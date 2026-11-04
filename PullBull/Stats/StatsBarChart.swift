@@ -24,10 +24,7 @@ struct StatsBarChart: View {
         let hover = bars.hover(period: period, calendar: calendar)
         let labels = bars.axisLabels(period: period, calendar: calendar)
         VStack(alignment: .leading, spacing: Self.spacing) {
-            Text("Per day")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(height: Self.rowHeight)
+            Self.caption
             Canvas { context, size in
                 drawBars(in: &context, width: size.width)
                 drawCount(in: &context, width: size.width)
@@ -40,6 +37,28 @@ struct StatsBarChart: View {
         .accessibilityElement()
         .accessibilityLabel(hover)
         .accessibilityAddTraits(.isImage)
+    }
+
+    /// Stands in while the first report loads: the real caption, a shimmer where the bars go, and the
+    /// count and axis rows left empty, at the chart's full height.
+    static var loadingPlaceholder: some View {
+        VStack(alignment: .leading, spacing: spacing) {
+            caption
+            RoundedRectangle(cornerRadius: 3)
+                .fill(.foreground)
+                .frame(height: barHeight)
+                .skeletonShimmer()
+                .padding(.top, countSpace)
+        }
+        .frame(height: totalHeight, alignment: .top)
+        .accessibilityHidden(true)
+    }
+
+    private static var caption: some View {
+        Text("Per day")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .frame(height: rowHeight)
     }
 
     private static let baseline = countSpace + barHeight
@@ -107,6 +126,12 @@ struct StatsBarChart: View {
     }
     .padding()
     .frame(width: 332)
+}
+
+#Preview("Loading") {
+    StatsBarChart.loadingPlaceholder
+        .padding()
+        .frame(width: 332)
 }
 
 #Preview("One busy day, today busiest, capped") {
