@@ -73,7 +73,7 @@ struct StatsBarChart: View {
         }
     }
 
-    /// The busiest day's count, centred above its full-height bar and kept inside the chart's width.
+    /// The busiest day's count, centred 1 pt above its full-height bar and kept inside the chart's width.
     private func drawCount(in context: inout GraphicsContext, width: CGFloat) {
         guard let busiest = bars.busiest else { return }
         var text = context.resolve(Text("\(busiest.count)").font(.caption2.monospacedDigit()))
@@ -81,7 +81,7 @@ struct StatsBarChart: View {
         let half = text.measure(in: CGSize(width: width, height: Self.countSpace * 2)).width / 2
         let center = bars.centerX(of: busiest.index, width: width)
         let x = min(max(center, half), max(width - half, half))
-        context.draw(text, at: CGPoint(x: x, y: Self.countSpace), anchor: .bottom)
+        context.draw(text, at: CGPoint(x: x, y: Self.countSpace - 1), anchor: .bottom)
     }
 
     /// For 7 days each initial sits under its bar, today's in the accent colour; for 30 and 90 the first

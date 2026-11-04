@@ -185,6 +185,16 @@ import Testing
         #expect(abs(marks[89].x + marks[89].width - 300) < 0.001)
     }
 
+    @Test func monthBarsAreCappedAndCentredInAWideChart() {
+        let bars = ReviewBars.make(reviewDates: [day(29, .month)], window: window(.month), loadedFrom: nil, calendar: cal)
+        let marks = bars.marks(width: 520, height: 36)
+        #expect(marks.count == 30)
+        #expect(marks.allSatisfy { $0.width == 14 })
+        // 30 × 14 + 29 × 2 = 478 wide, so 21 pt either side.
+        #expect(abs(marks[0].x - 21) < 0.001)
+        #expect(abs(520 - (marks[29].x + marks[29].width) - 21) < 0.001)
+    }
+
     @Test func centerXIsTheMiddleOfEachMark() {
         for period in StatsPeriod.allCases {
             let bars = ReviewBars.make(reviewDates: [day(1, period)], window: window(period), loadedFrom: nil, calendar: cal)
@@ -205,7 +215,9 @@ import Testing
         let week = ReviewBars.make(reviewDates: [], window: window(.week), loadedFrom: nil, calendar: cal)
         #expect(week.extent(width: 300) == 89...211)
         let month = ReviewBars.make(reviewDates: [], window: window(.month), loadedFrom: nil, calendar: cal)
-        #expect(month.extent(width: 300) == 0...300)
+        let extent = month.extent(width: 300)
+        #expect(abs(extent.lowerBound) < 0.001)
+        #expect(abs(extent.upperBound - 300) < 0.001)
     }
 
     // MARK: Axis labels
@@ -234,6 +246,27 @@ import Testing
         let bars = ReviewBars.make(reviewDates: [], window: StatsPeriod.week.window(now: nov4, calendar: german),
                                    loadedFrom: nil, calendar: german)
         #expect(bars.axisLabels(period: .week, calendar: german).map(\.text) == ["T", "F", "S", "S", "M", "T", "W"])
+    }
+
+    /// New York, where daylight saving ends on Sunday 1 Nov 2026, inside the week.
+    var newYork: Calendar {
+        var c = posix
+        c.timeZone = TimeZone(identifier: "America/New_York")!
+        return c
+    }
+    var nov4NewYork: Date { newYork.date(from: DateComponents(year: 2026, month: 11, day: 4, hour: 12))! }
+
+    @Test func weekLabelsAcrossTheEndOfDaylightSaving() {
+        let bars = ReviewBars.make(reviewDates: [], window: StatsPeriod.week.window(now: nov4NewYork, calendar: newYork),
+                                   loadedFrom: nil, calendar: newYork)
+        #expect(bars.axisLabels(period: .week, calendar: newYork).map(\.text) == ["T", "F", "S", "S", "M", "T", "W"])
+    }
+
+    @Test func monthLabelsAcrossTheEndOfDaylightSaving() {
+        let bars = ReviewBars.make(reviewDates: [], window: StatsPeriod.month.window(now: nov4NewYork, calendar: newYork),
+                                   loadedFrom: nil, calendar: newYork)
+        #expect(bars.axisLabels(period: .month, calendar: newYork)
+                == [ReviewBarLabel(index: 0, text: "6 Oct"), ReviewBarLabel(index: 29, text: "4 Nov")])
     }
 
     @Test func monthLabelsAreTheFirstAndLastDates() {
