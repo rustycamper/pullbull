@@ -284,7 +284,20 @@ private struct FooterIconButton: View {
         .onHover { hovering = $0 }
         .help(help)
         .accessibilityLabel(label ?? help)
-        .accessibilityHint(hint ?? "")
+        .modifier(OptionalHint(hint: hint))
+    }
+}
+
+/// Adds a VoiceOver hint only when there is one, so a button without one keeps the system's default.
+private struct OptionalHint: ViewModifier {
+    let hint: String?
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if let hint {
+            content.accessibilityHint(hint)
+        } else {
+            content
+        }
     }
 }
 

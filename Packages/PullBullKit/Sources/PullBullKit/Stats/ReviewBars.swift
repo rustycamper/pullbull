@@ -196,7 +196,8 @@ public struct ReviewBars: Equatable, Sendable {
 
     private func layout(width: CGFloat) -> Layout {
         let n = CGFloat(max(counts.count, 1))
-        let gap = Self.gap(barCount: counts.count)
+        // Never wider than `width` allows, so a very narrow chart shrinks its gaps before its bars.
+        let gap = min(Self.gap(barCount: counts.count), max(width, 0) / max(n - 1, 1))
         let barWidth = max((width - gap * (n - 1)) / n, 0)
         return Layout(barWidth: barWidth, gap: gap)
     }

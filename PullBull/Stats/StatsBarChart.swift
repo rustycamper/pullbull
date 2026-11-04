@@ -10,11 +10,9 @@ import PullBullKit
 struct StatsBarChart: View {
     let bars: ReviewBars
     let period: StatsPeriod
-    /// The pointer's x over the plot. The day under it is worked out while drawing, so it follows the
-    /// bars when they change under a still pointer (a period switch, a refresh).
+    /// The pointer's x over the plot, kept as the pointer moves. The day under it is worked out while
+    /// drawing, so it follows the bars when they change under a still pointer (a period switch, a refresh).
     @State private var hoverX: CGFloat?
-    /// The plot's width, so the hover callback can tell when the pointer reaches another day.
-    @State private var plotWidth: CGFloat = 0
 
     static let barHeight: CGFloat = 36
     /// Room above the bars for the busiest day's count, so the tallest bar's label never clips.
@@ -39,15 +37,10 @@ struct StatsBarChart: View {
             }
             .frame(height: Self.plotHeight)
             .contentShape(Rectangle())
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { plotWidth = $0 }
             .onContinuousHover { phase in
                 switch phase {
                 case .active(let location):
-                    // Only a move onto another day redraws.
-                    let day = bars.day(at: location.x, width: plotWidth)
-                    if hoverX == nil || hoverX.flatMap({ bars.day(at: $0, width: plotWidth) }) != day {
-                        hoverX = location.x
-                    }
+                    hoverX = location.x
                 case .ended:
                     hoverX = nil
                 }

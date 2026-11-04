@@ -134,6 +134,24 @@ import Testing
         #expect(last.height == 20)
     }
 
+    @Test func ninetyBarsStayWithinAVeryNarrowWidth() {
+        let bars = ReviewBars.make(reviewDates: [], window: window(.quarter), loadedFrom: nil, calendar: cal)
+        let extent = bars.extent(width: 60)
+        #expect(extent.lowerBound >= 0)
+        #expect(extent.upperBound <= 60.001)
+        #expect(bars.marks(width: 60, height: 20).allSatisfy { $0.width >= 0 && $0.x + $0.width <= 60.001 })
+        #expect(bars.day(at: 60, width: 60) == 89)
+    }
+
+    @Test func ninetyMarksAgreeWithDayAtANonIntegralWidth() {
+        let bars = ReviewBars.make(reviewDates: [], window: window(.quarter), loadedFrom: nil, calendar: cal)
+        let marks = bars.marks(width: 301.5, height: 20)
+        #expect(marks.count == 90)
+        for mark in marks {
+            #expect(bars.day(at: mark.x + mark.width / 2, width: 301.5) == mark.index)
+        }
+    }
+
     @Test func daysNotLoadedDrawNothing() {
         let w = window(.week)
         let bars = ReviewBars.make(reviewDates: [day(4)], window: w, loadedFrom: w.dayStarts(calendar: cal)[3], calendar: cal)

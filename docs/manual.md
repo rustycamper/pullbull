@@ -138,7 +138,7 @@ One list scoped by chips, as on [Pull Requests](#pull-requests). It opens on All
 
 ## Stats
 
-<kbd>⌘</kbd><kbd>3</kbd>, the footer's chart button, or the gear → **Stats**, from the list or the search. How your reviewing and your pull requests have gone over the last 7, 30 or 90 days, each compared with the period before. It slides in like a detail: <kbd>Esc</kbd>, <kbd>⌘</kbd><kbd>[</kbd> or the back button return to where you were, search query kept. Nothing is counted inside PullBull and no time is estimated: every figure is a GitHub query.
+<kbd>⌘</kbd><kbd>3</kbd> or the gear → **Stats**, from the list or the search; the chart button is in the list's footer only. How your reviewing and your pull requests have gone over the last 7, 30 or 90 days, each compared with the period before. It slides in like a detail: <kbd>Esc</kbd>, <kbd>⌘</kbd><kbd>[</kbd> or the back button return to where you were, search query kept. Nothing is counted inside PullBull and no time is estimated: every figure is a GitHub query.
 
 - **Periods:** This week, This month and 90 days are whole local days ending today (today and the 6, 29 or 89 days before), not calendar weeks or months. The comparison is the same number of days just before. <kbd>←</kbd> <kbd>→</kbd> move between the chips; the choice is kept
 - **Account and scope:** the ones on screen: the account and org the lists show, or your repositories in the personal scope. Only repositories PullBull can see count. Other accounts aren't added in

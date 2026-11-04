@@ -23,6 +23,6 @@ struct AppMenuButton: View {
         .onHover { hovering = $0 }
         .help("Settings (⌘,), Keyboard Shortcuts (⌘/) and more")
         .accessibilityLabel("PullBull menu")
-        .accessibilityHint("Settings, Keyboard Shortcuts, About, Check for Updates and Quit")
+        .accessibilityHint("Settings, Keyboard Shortcuts, Stats, About, Check for Updates and Quit")
     }
 }
