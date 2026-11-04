@@ -2262,6 +2262,12 @@ extension AppModel {
         }
     }
 
+    /// A Right now row chosen on Stats: the row flashes, then its detail opens with Back to Stats. No walk:
+    /// the card's two rows aren't a list to step through.
+    func openStatsRowDetail(_ key: PRKey) {
+        flashRow(key) { $0.openDetail(key) }
+    }
+
     /// An issue row chosen in a list or search: the row flashes, then its detail opens, with ⌥↓ / ⌥↑
     /// walking the rows in the order on screen now.
     func openRowIssueDetail(_ key: PRKey) {

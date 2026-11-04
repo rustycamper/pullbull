@@ -1,5 +1,23 @@
 import Foundation
 
+/// One bar of the chart as drawn: points from the chart's leading edge, standing on its baseline.
+public struct ReviewBarMark: Equatable, Sendable {
+    public let x: CGFloat
+    public let width: CGFloat
+    public let height: CGFloat
+    /// A day with no reviews: the stub on the baseline.
+    public let isEmpty: Bool
+    public let isToday: Bool
+
+    public init(x: CGFloat, width: CGFloat, height: CGFloat, isEmpty: Bool, isToday: Bool) {
+        self.x = x
+        self.width = width
+        self.height = height
+        self.isEmpty = isEmpty
+        self.isToday = isToday
+    }
+}
+
 /// Reviews per local day for the bar chart. A day that may be missing reviews because a cap cut in is
 /// `nil`, not 0: missing beats wrong.
 public struct ReviewBars: Equatable, Sendable {
@@ -51,6 +69,29 @@ public struct ReviewBars: Equatable, Sendable {
             text += " Days before \(Self.format(loadedFrom, "d MMM", calendar)) not loaded"
         }
         return text
+    }
+
+    /// The space between bars: narrower as there are more, so 90 still fit a card.
+    public static func gap(barCount: Int) -> CGFloat {
+        barCount >= 90 ? 1 : barCount >= 30 ? 2 : 4
+    }
+
+    /// The bars across `width`, oldest first, each as tall as its count against the busiest loaded day's
+    /// `height`. A day with reviews is at least 2 pt, so it never passes for the 1-pt stub of a day with
+    /// none; a day not loaded draws nothing.
+    public func marks(width: CGFloat, height: CGFloat) -> [ReviewBarMark] {
+        guard !counts.isEmpty else { return [] }
+        let n = CGFloat(counts.count)
+        let gap = Self.gap(barCount: counts.count)
+        let barWidth = max((width - gap * (n - 1)) / n, 0)
+        let busiest = CGFloat(counts.compactMap { $0 }.max() ?? 0)
+        return counts.enumerated().compactMap { index, count in
+            guard let count else { return nil }
+            let barHeight = count == 0 || busiest == 0 ? 1 : max(height * CGFloat(count) / busiest, 2)
+            return ReviewBarMark(
+                x: CGFloat(index) * (barWidth + gap), width: barWidth, height: min(barHeight, height),
+                isEmpty: count == 0, isToday: index == todayIndex)
+        }
     }
 
     private func busiestDay() -> (index: Int, count: Int)? {

@@ -111,10 +111,11 @@ extension AppModel {
         statsSelection.flatMap(rightNow.item(for:))
     }
 
-    /// Return on Stats: the highlighted row's detail, with Back to Stats; false with none highlighted.
+    /// Return on Stats: the highlighted row flashes and its detail opens, with Back to Stats, as a click
+    /// does; false with none highlighted.
     func openStatsSelection() -> Bool {
         guard let key = statsSelectionItem?.row.id else { return false }
-        openDetail(key)
+        openStatsRowDetail(key)
         return true
     }
 

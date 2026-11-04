@@ -61,4 +61,53 @@ import Testing
         #expect(bars.hover(period: .week, calendar: cal)
                 == "1 review in the last 7 days, most on Sunday (1) Days before 10 Oct not loaded")
     }
+
+    @Test func gapNarrowsWithMoreBars() {
+        #expect(ReviewBars.gap(barCount: 7) == 4)
+        #expect(ReviewBars.gap(barCount: 30) == 2)
+        #expect(ReviewBars.gap(barCount: 90) == 1)
+    }
+
+    @Test func marksScaleToTheBusiestDayWithStubsForNone() {
+        let bars = ReviewBars.make(reviewDates: [day(0), day(0), day(0), day(0), day(2), day(6)],
+                                   window: window(.week), loadedFrom: nil, calendar: cal)
+        let marks = bars.marks(width: 80, height: 20)
+        #expect(marks.count == 7)
+        #expect(marks.map(\.width) == Array(repeating: 8, count: 7))
+        #expect(marks.map(\.x) == [0, 12, 24, 36, 48, 60, 72])
+        #expect(marks.map(\.height) == [20, 1, 5, 1, 1, 1, 5])
+        #expect(marks.map(\.isEmpty) == [false, true, false, true, true, true, false])
+        #expect(marks.map(\.isToday) == [false, false, false, false, false, false, true])
+    }
+
+    @Test func aDayWithReviewsIsTallerThanAStub() {
+        let dates = Array(repeating: day(0), count: 40) + [day(1)]
+        let marks = ReviewBars.make(reviewDates: dates, window: window(.week), loadedFrom: nil, calendar: cal)
+            .marks(width: 80, height: 20)
+        #expect(marks[1].height == 2)
+    }
+
+    @Test func noReviewsAreAllStubs() {
+        let marks = ReviewBars.make(reviewDates: [], window: window(.week), loadedFrom: nil, calendar: cal)
+            .marks(width: 80, height: 20)
+        #expect(marks.allSatisfy { $0.isEmpty && $0.height == 1 })
+    }
+
+    @Test func ninetyBarsFitTheWidth() {
+        let marks = ReviewBars.make(reviewDates: [day(89, .quarter)], window: window(.quarter), loadedFrom: nil, calendar: cal)
+            .marks(width: 312, height: 20)
+        #expect(marks.count == 90)
+        let last = marks[89]
+        #expect(abs(last.x + last.width - 312) < 0.001)
+        #expect(last.isToday)
+        #expect(last.height == 20)
+    }
+
+    @Test func daysNotLoadedDrawNothing() {
+        let w = window(.week)
+        let bars = ReviewBars.make(reviewDates: [day(4)], window: w, loadedFrom: w.dayStarts(calendar: cal)[3], calendar: cal)
+        let marks = bars.marks(width: 80, height: 20)
+        #expect(marks.map(\.x) == [36, 48, 60, 72])
+        #expect(marks.map(\.height) == [1, 20, 1, 1])
+    }
 }

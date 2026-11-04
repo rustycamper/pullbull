@@ -211,17 +211,17 @@ public struct StatsReport: Equatable, Sendable {
         let span = period == .quarter ? "the last 90 days" : period.title.lowercased()
         switch card {
         case .reviews:
-            return "Your reviews, \(span): \(counted(reviews, noun: "review", plural: "reviews")). "
+            return "\(card.title), \(span): \(counted(reviews, noun: "review", plural: "reviews")). "
                 + "\(median("Median turnaround", turnaround))."
         case .pullRequests:
-            var text = "Your pull requests, \(span): \(counted(merged, noun: "merged", plural: "merged")). "
+            var text = "\(card.title), \(span): \(counted(merged, noun: "merged", plural: "merged")). "
                 + "\(median("Median time to merge", timeToMerge)). \(median("Median first review", firstReview))."
             if let top = topReviewers, !top.isEmpty {
                 text += " Top reviewers: " + top.map { "\($0.login) \($0.prCount)" }.joined(separator: ", ") + "."
             }
             return text
         case .issues:
-            return "Issues, \(span): \(counted(issuesClosed, noun: "closed", plural: "closed")). "
+            return "\(card.title), \(span): \(counted(issuesClosed, noun: "closed", plural: "closed")). "
                 + "\(counted(issuesOpened, noun: "opened", plural: "opened")). "
                 + "\(counted(comments, noun: "comment", plural: "comments"))."
         }
