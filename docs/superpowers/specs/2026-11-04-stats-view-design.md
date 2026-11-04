@@ -91,7 +91,7 @@ Minutes and hours round down. The median of an even count is the mean of the two
 
 - A review is one you submitted (approved, changes requested, commented, dismissed), dated by its `submittedAt`. Pending (unsent) reviews and reviews on your own PRs (replies in a thread) don't count.
 - Bars: today's in the accent colour, the others in the secondary colour; a day with none draws a 1-pt stub on the baseline. No axis. Hover on the chart: "12 reviews in the last 7 days, most on Tuesday (4)"; for 90 days the busiest day reads with its date ("most on 14 Oct (6)").
-- When the cap cut in (below), days before the oldest loaded review are not drawn at all, not as stubs, and the hover adds "Days before 3 Oct not loaded".
+- When the cap cut in (below), days that may be missing reviews are not drawn at all, not as stubs, and the hover adds "Days before 3 Oct not loaded". Contributions come newest PR first, each dated by its latest review, so a PR not loaded has its latest review on or before the oldest loaded PR's latest review in the period: that day and every day before it are not drawn. A zero-review day: "No reviews in the last 7 days".
 - Turnaround, for each review R of yours in the period:
   - the request is the latest `ReviewRequestedEvent` on that PR made at or before R, naming you or one of your teams;
   - R is your response only if you submitted no other review on that PR between the request and R;
@@ -113,12 +113,12 @@ Minutes and hours round down. The median of an even count is the mean of the two
   - the first review is the earliest submitted review by a person other than you (a bot's review doesn't count, as in `ReviewWait`);
   - wait = first review − start.
   - Not samples: a PR still a draft, one not yet reviewed, one first reviewed before its start (reviewed while a draft).
-  - Hover: "Median of 6 PRs. 2 of your PRs opened in this period still wait for a first review." (the second sentence only when there are some).
+  - Hover: "Median of 6 PRs. 2 of your PRs opened in this period still wait for a first review." The second sentence counts open, non-draft PRs with no review yet, and shows only when there are some; a PR closed or merged without a review doesn't wait.
 - Top reviewers count PRs, not reviews: someone who reviewed one PR three times counts once. Ties sort by login. Bots and you are left out. None: "No reviews yet" in secondary text. Clicking a reviewer does nothing.
 
 ### Right now
 
-Two rows, drawn as full list rows (`PRRow`), from the PR rows already loaded for the All list, without Show Only repo or Show Only Updated. This card costs no queries and updates when the lists refresh.
+Two rows, drawn as full list rows (`PRRow`), from the PR rows already loaded for the lists (`BuiltTabs`: Review and Mine), so the list's Settings filters apply, but not Show Only repo or Show Only Updated. This card costs no queries and updates when the lists refresh.
 
 - **Waiting on you longest:** of the rows counted in Needs your review, the one whose wait started earliest, by `ReviewWait.make(for:on: .review, …)`. The row shows that wait as the list does. None: "Nothing waits on your review".
 - **Your PR waiting longest:** of your open, non-draft PRs with no submitted review by a person other than you, the one whose wait (`ReviewWait.make(for:on: .mine, …)`, "@georgi 2d" or "No reviewer 5d") started earliest. The no-review filter is this card's own; `ReviewWait` alone would also return re-requested PRs. None: "None of your PRs waits for a first review".
@@ -137,8 +137,8 @@ Two rows, drawn as full list rows (`PRRow`), from the PR rows already loaded for
 
 ### Caps
 
-- Each capped source reads at most the newest 100 items in scope for the period (per source below). When more exist, the item's hover ends with "From the latest 100", and the footer shows "· from latest 100".
-- A count that GitHub gives exactly (`issueCount`) is always exact; the cap only affects medians, bars, top reviewers and the counts that are tallied from loaded items (reviews, comments). A capped tally reads "100+".
+- Each capped source reads at most the newest 100 items in scope for the period (per source below; comments read up to 500). When more exist, the item's hover ends with "From the latest 100 PRs" (comments: "From your latest 500 comments"), and the footer shows "· from latest 100" (only comments capped: "· from latest 500 comments").
+- A count that GitHub gives exactly (`issueCount`) is always exact; the cap only affects medians, bars, top reviewers and the counts that are tallied from loaded items (reviews, comments). A capped tally reads "N+", N being what was counted ("137+"), comparisons included ("last week 137+").
 
 ### Loading, errors, cache
 
@@ -147,7 +147,7 @@ Two rows, drawn as full list rows (`PRRow`), from the PR rows already loaded for
 - A result with any failed item is stale at once: the next open or period switch fetches again.
 - Refresh (button or ⌘R) ignores the cache.
 - Memory only: a relaunch starts empty. An account's entries are dropped when it signs out.
-- An error (offline, rate limited, a query refused) keeps whatever is on screen and shows the app's error line under the chips, "Couldn't load stats: <reason>", with Retry. Values with nothing behind them show "–".
+- An error (offline, rate limited, a query refused) keeps whatever is on screen and shows a line under the chips in the style of the search's failure banner, "Couldn't load stats: <reason>" (the reason worded as the lists' error), with a Retry button that refreshes. Values with nothing behind them show "–".
 - A query that fails takes out only the items it feeds; the others show.
 - Rate limited: the line says when it resets, as the lists do; no automatic retry before then.
 - No polling: it loads on open (when stale), on period switch (when stale), on refresh, and on account or scope change.
@@ -188,7 +188,7 @@ query($from: DateTime!, $to: DateTime!, $org: ID, $login: String!, $after: Strin
 ```
 
 - GitHub returns one contribution per PR reviewed (its latest review), so the nodes are PRs, newest first. The reviews themselves come from each PR's `reviews(author:)`, `last: 50` so the newest are there; those with `submittedAt` in the window and state not `PENDING` are the period's reviews. Nodes whose PR you authored are dropped.
-- `$org` is the org's node ID, fetched once per org (`organization(login:) { id }`) and kept with the account's stats state; null in the personal scope.
+- `$org` is the org's node ID, fetched once per org (`organization(login:) { id }`) and kept in memory with the account's stats state; null in the personal scope. In an org scope the query is never sent without it (it would count every org): when the ID can't be fetched, the reviews items fail.
 - Cap: up to 100 in-scope PRs. In the personal scope, nodes outside the scope are dropped and the next page is read, up to 3 pages. The cap cut in when GitHub has more pages after the last one read.
 - The count of reviews, the bars and the turnaround are tallied from these. The total fields (`totalPullRequestReviewContributions`) aren't used: they count PRs, and include your own.
 - Repositories the token can't see come back as restricted contributions with no detail and aren't counted.
@@ -209,7 +209,7 @@ Merged = `issueCount`. Time to merge = median over the nodes. Over 100: the 100 
 Search, `first: 100`, `is:pr author:@me created:<from>..<to> archived:false sort:created-desc <scope>`, nodes:
 
 ```graphql
-createdAt isDraft
+createdAt isDraft state
 readyEvent: timelineItems(itemTypes: [READY_FOR_REVIEW_EVENT], last: 1) { nodes { ... on ReadyForReviewEvent { createdAt } } }
 reviews(first: 50) { nodes { submittedAt state author { __typename login avatarUrl } } }
 ```
@@ -271,6 +271,9 @@ The GitHub App's user token wasn't tried; every query here was run with a `gh` t
 - **← moves the period chips on Stats, not Back**, as it moves the list's chips; Esc, ⌘[ and the chevron go back.
 - **Current account and scope only.** Switching account switches the stats, as the lists do.
 - **Latest 100, cached 15 minutes, with a visible cap note.** The owner's choice of cost cap; the cap is said, not silently trimmed. A result with a failed item isn't cached as fresh.
+- **A capped tally reads "N+" with what was counted**, not a flat "100+": 100 PRs can hold 137 reviews, and "100+" would understate what is known.
+- **"Still waiting" counts only open PRs.** Found in plan review: the opened-PRs search includes closed and merged ones, and a PR closed without a review isn't waiting.
+- **Right now follows the list's Settings filters**, so a row hidden from the list (an old or draft PR) doesn't come back on Stats.
 - **Reviews are counted from each PR's own reviews, not GitHub's contribution totals.** Found in spec review, checked on public accounts: `pullRequestReviewContributions` gives one contribution per PR (78 against 104 real reviews for one user), and it includes reviews on your own PRs. The contributions query is still the source of which PRs you reviewed in the window, with `organizationID` and dates; each PR's `reviews(author:, last: 50)` gives the reviews.
 - **Turnaround only for reviews you were asked for, and only the first after each request.** A review nobody asked for, or a second review on the same request, isn't a response time; counting them would pull the median toward zero.
 - **First review starts when the PR was last marked ready, as `ReviewWait` does, and a review during the draft isn't a sample.** Counting it as 0 would pull the median toward zero.
