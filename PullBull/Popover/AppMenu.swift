@@ -27,8 +27,12 @@ final class AppMenu: NSObject {
             let item = NSMenuItem(title: title, action: #selector(pick(_:)), keyEquivalent: entry.keyEquivalent)
             item.target = self
             item.tag = entries.count
-            // Disabled while Sparkle is busy; Stats has no window yet.
-            item.isEnabled = (entry != .checkForUpdates || updater.canCheckForUpdates) && entry != .stats
+            // Disabled while Sparkle is busy, and Stats where it can't open.
+            switch entry {
+            case .checkForUpdates: item.isEnabled = updater.canCheckForUpdates
+            case .stats: item.isEnabled = model.canOpenStats
+            default: item.isEnabled = true
+            }
             entries.append(entry)
             menu.addItem(item)
         }
@@ -66,8 +70,13 @@ final class AppMenu: NSObject {
             SettingsOpener.forceActivate()
             NSApp.orderFrontStandardAboutPanel(nil)
         case .checkForUpdates: Updater.shared.checkForUpdates()
+        case .stats:
+            // The menu bar item's right-click closed the popover first: Stats opens in it.
+            guard model.canOpenStats else { return }
+            model.openStats()
+            MenuBarPopover.show()
         case .quit: NSApp.terminate(nil)
-        case .stats, .separator: break
+        case .separator: break
         }
     }
 }

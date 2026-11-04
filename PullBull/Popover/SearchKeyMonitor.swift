@@ -47,11 +47,12 @@ final class SearchKeyMonitor {
     static let downArrow: UInt16 = 125
     static let leftArrow: UInt16 = 123
     static let rightArrow: UInt16 = 124
-    /// kVK_ANSI_1 and kVK_ANSI_2: the keys in the 1 and 2 position, whatever they type.
+    /// kVK_ANSI_1 to kVK_ANSI_3: the keys in the 1, 2 and 3 position, whatever they type.
     static let digit1: UInt16 = 18
     static let digit2: UInt16 = 19
+    static let digit3: UInt16 = 20
     /// kVK_ANSI_1 to kVK_ANSI_9 in digit order: the number row by position, for ⌃1–⌃9.
-    static let digitKeys: [UInt16] = [digit1, digit2, 20, 21, 23, 22, 26, 28, 25]
+    static let digitKeys: [UInt16] = [digit1, digit2, digit3, 21, 23, 22, 26, 28, 25]
 
     /// 1 to 9 for a key in the number row's 1 to 9 position, else nil.
     static func digit(_ event: NSEvent) -> Int? {

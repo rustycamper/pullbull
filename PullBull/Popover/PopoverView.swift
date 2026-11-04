@@ -79,6 +79,8 @@ struct PopoverView: View {
     private var askLayerShown: Bool { layers.first == .ask }
     /// The Ask screen is the top layer, with no detail over it.
     private var askShownAlone: Bool { layers == [.ask] }
+    /// Stats is on screen, or under the detail it opened.
+    private var statsLayerShown: Bool { layers.first == .stats }
     private var slides: Bool { !reduceMotion }
     /// The Board scope is on screen and its filter row names the board.
     private var boardPartShown: Bool {
@@ -131,6 +133,13 @@ struct PopoverView: View {
                     removal: .opacity.animation(Self.fadeThroughOut).combined(with: .modifier(
                         active: LeavingLayer(leaving: true), identity: LeavingLayer(leaving: false)))))
                 .zIndex(0.5)
+            }
+            if statsLayerShown {
+                StatsView(model: model)
+                    .modifier(PushedLayer(slides: slides))
+                    .modifier(CoveredLayer(covered: detailKey != nil, slides: slides))
+                    .transition(layerTransition)
+                    .zIndex(0.75)
             }
             if let issueLayerKey {
                 // A replaced issue detail starts fresh too.
@@ -203,13 +212,13 @@ struct PopoverView: View {
         }
         .onChange(of: model.route) { old, new in
             // The hidden list keeps no focus, so typing in the detail never lands in the search field.
-            if Self.isDetail(new) || new == .ask {
+            if Self.isDetail(new) || new == .ask || new == .stats {
                 fieldFocused = false
                 saveName = nil
             }
-            // Back from a detail opened in search, or Esc on the Ask screen, puts the caret back in the
-            // kept query.
-            if Self.isDetail(old) || old == .ask, new == .search {
+            // Back from a detail or Stats opened in search, or Esc on the Ask screen, puts the caret back
+            // in the kept query.
+            if Self.isDetail(old) || old == .ask || old == .stats, new == .search {
                 fieldOpen = true
                 DispatchQueue.main.async { fieldFocused = true }
             }
@@ -364,8 +373,8 @@ struct PopoverView: View {
     // MARK: Search entry
 
     private func popoverDidShow(_ window: NSWindow) {
-        // Only the detail it was closed on goes stale: one a notification click opened while closed
-        // shows as it is, even if it is the same PR or issue.
+        // Only the detail (or Stats) it was closed on goes stale: one a notification click opened while
+        // closed shows as it is, even if it is the same PR or issue.
         if let closedAt = closedOnDetail, !model.detailOpenedWhileClosed {
             // The Ask screen, and details opened from it, follow `AskReturn.reopen`.
             if model.askOnScreen {
@@ -433,7 +442,7 @@ struct PopoverView: View {
         shown = false
         keyMonitor.remove()
         caretObserver.remove()
-        closedOnDetail = Self.isDetail(model.route) || model.route == .ask ? Date() : nil
+        closedOnDetail = Self.isDetail(model.route) || model.route == .ask || model.route == .stats ? Date() : nil
         syncLayers(animated: false)
         guard !searching else { return }
         fieldOpen = false
@@ -498,14 +507,15 @@ struct PopoverView: View {
     private func failureLineInset(_ insets: [PRKey: CGFloat]) -> CGFloat {
         switch model.route {
         case .detail(let key), .issueDetail(let key): insets[key] ?? 45
-        case .list, .search, .ask: 34
+        case .list, .search, .ask, .stats: 34
         }
     }
 
     private static func isDetail(_ route: Route) -> Bool {
         switch route {
         case .detail, .issueDetail: true
-        case .list, .search, .ask: false
+        // Stats is pushed like a detail but takes its own keys.
+        case .list, .search, .ask, .stats: false
         }
     }
 
@@ -668,15 +678,21 @@ struct PopoverView: View {
                 }
                 return true
             }
-            // ⌘1 / ⌘2 by key position too: on layouts like AZERTY those keys don't type digits.
+            // ⌘1 / ⌘2 / ⌘3 by key position too: on layouts like AZERTY those keys don't type digits.
             if event.keyCode == SearchKeyMonitor.digit1 || event.keyCode == SearchKeyMonitor.digit2 {
                 switchMode(to: event.keyCode == SearchKeyMonitor.digit1 ? .pullRequests : .issues)
+                return true
+            }
+            // ⌘3 is taken even when Stats can't open, so it never reaches the field.
+            if event.keyCode == SearchKeyMonitor.digit3 {
+                if model.canOpenStats { model.openStats() }
                 return true
             }
             switch key {
             case "f": openSearch()
             case "1": switchMode(to: .pullRequests)
             case "2": switchMode(to: .issues)
+            case "3": if model.canOpenStats { model.openStats() }
             case "r": if !model.status.isRefreshing { model.refresh() }
             case "c":
                 guard let link = listKeys.flatMap(model.listSelectionLink(in:)) else { return false }
@@ -1716,12 +1732,13 @@ private enum ListPane: Equatable {
     case pullRequests(PRScope), issues(IssueScope)
 }
 
-/// A detail view, or the Ask screen, stacked over the list.
+/// A detail view, the Ask screen or Stats, stacked over the list.
 private enum DetailLayer: Equatable {
-    case ask, issue(PRKey), pr(PRKey)
+    case ask, stats, issue(PRKey), pr(PRKey)
 
     /// The layers the model's route shows, bottom to top: a linked PR's detail sits on the issue it was
-    /// opened from, and details opened from Ask sit on the Ask screen.
+    /// opened from, details opened from Ask sit on the Ask screen, and a PR's detail opened from Stats
+    /// sits on Stats.
     @MainActor static func stack(for model: AppModel) -> [DetailLayer] {
         let ask: [DetailLayer] = model.askReturn.isEmpty ? [] : [.ask]
         switch model.route {
@@ -1729,10 +1746,13 @@ private enum DetailLayer: Equatable {
             return []
         case .ask:
             return [.ask]
+        case .stats:
+            return [.stats]
         case .issueDetail(let key):
             return ask + [.issue(key)]
         case .detail(let key):
             if case .issueDetail(let issue) = model.detailReturnRoute { return ask + [.issue(issue), .pr(key)] }
+            if model.detailReturnRoute == .stats { return [.stats, .pr(key)] }
             return ask + [.pr(key)]
         }
     }
