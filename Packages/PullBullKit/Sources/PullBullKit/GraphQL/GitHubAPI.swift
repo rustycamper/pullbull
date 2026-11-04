@@ -1205,7 +1205,7 @@ public struct GitHubAPI: Sendable {
 
     /// Sends one query and returns `data`. Partial results (errors alongside data) are returned as data.
     /// A 401 is reported to the token source; the query is sent again, once, when it has a new token.
-    private func execute(_ query: String, _ variables: [String: Any]) async throws -> [String: Any] {
+    func execute(_ query: String, _ variables: [String: Any]) async throws -> [String: Any] {
         try await executeReportingErrors(query, variables).data
     }
 

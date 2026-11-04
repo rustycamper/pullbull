@@ -2,7 +2,7 @@
 
 Every tab, key and setting. Overview: [README](../README.md).
 
-[Install](#install) · [Sign in](#sign-in) · [Pull Requests](#pull-requests) · [Issues](#issues) · [Search](#search) · [Ask AI](#ask-ai) · [Keyboard](#keyboard) · [One repo](#one-repo) · [Sorting](#sorting) · [Settings](#settings) · [Data](#data) · [Build](#build-from-source)
+[Install](#install) · [Sign in](#sign-in) · [Pull Requests](#pull-requests) · [Issues](#issues) · [Stats](#stats) · [Search](#search) · [Ask AI](#ask-ai) · [Keyboard](#keyboard) · [One repo](#one-repo) · [Sorting](#sorting) · [Settings](#settings) · [Data](#data) · [Build](#build-from-source)
 
 ## Install
 
@@ -62,7 +62,7 @@ Without `read:project`: Board shows the command to add it, Assigned groups by re
 | | |
 |---|---|
 | Click · <kbd>⌃</kbd><kbd>⌥</kbd><kbd>P</kbd> | Open or close (shortcut: Settings → General) |
-| Right-click | Settings · Keyboard Shortcuts · About PullBull · Check for Updates (release builds) · Quit. The same menu as the footer gear |
+| Right-click | Settings · Keyboard Shortcuts · Stats · About PullBull · Check for Updates (release builds) · Quit. The same menu as the footer gear |
 
 ## Pull Requests
 
@@ -106,7 +106,7 @@ A PR waiting on review shows who it waits on and for how long (🕒 @dana 3d, "+
 - **Labels:** up to two chips per row (none in compact cards), each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail's Details card lists them all
 - **Right-click a row:** [Reviewers…](#editing) · [Assignees…](#editing) · [Labels…](#editing) · copy branch, link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · show only updated · search author
 - **Right-click a group header** (repo, author): **Open All *N* on GitHub**, from two PRs up; above 8 it asks first. An author header's menu also offers **Search @*login*** and **Show Only Updated**. Headers in search results get their section's or tab's menus, without Show Only Updated
-- **Footer:** account · refresh · open on GitHub · the gear, a menu with Settings, Keyboard Shortcuts, About PullBull, Check for Updates (release builds) and Quit. Turns amber with **Retry** when a refresh fails
+- **Footer:** account · refresh · open on GitHub · the gear, a menu with Settings, Keyboard Shortcuts, Stats, About PullBull, Check for Updates (release builds) and Quit. Turns amber with **Retry** when a refresh fails
 - **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Lists your signed-in accounts, then GitHub CLI logins, each with the org it opens in; then Add Account… and Account Settings…. Each account comes back with its last org, and each org with its last board
 
 ## Issues
@@ -135,6 +135,33 @@ One list scoped by chips, as on [Pull Requests](#pull-requests). It opens on All
 - **Right-click a row:** [Status](#editing) (when a board is shown) · [Assignees…](#editing) · [Labels…](#editing) · copy link or Markdown link · open on GitHub · show only this repo · show only updated · search author
 - **Right-click a group header** (a Status lane, No status, Not on board or a repo): **Open All *N* on GitHub**, from two issues up; above 8 it asks first. Done has none. Headers in search results get the chip's menus, without Show Only Updated
 - **Detail:** who opened it and when it was last updated (the row's age), or when it was closed · board card (incl. labels) · linked PRs (<kbd>Esc</kbd> returns) · description (long ones fold) · the last two comments, with earlier ones counted above. Markdown incl. `<details>`. A [comment field](#commenting) is pinned at the bottom
+
+## Stats
+
+<kbd>⌘</kbd><kbd>3</kbd>, or the footer gear → **Stats**, from the list or the search. How your reviewing and your pull requests have gone over the last 7, 30 or 90 days, each compared with the period before. It slides in like a detail: <kbd>Esc</kbd>, <kbd>⌘</kbd><kbd>[</kbd> or the back button return to where you were, search query kept. Nothing is counted inside PullBull and no time is estimated: every figure is a GitHub query.
+
+- **Periods:** This week, This month and 90 days are whole local days ending today (today and the 6, 29 or 89 days before), not calendar weeks or months. The comparison is the same number of days just before. <kbd>←</kbd> <kbd>→</kbd> move between the chips; the choice is kept
+- **Account and scope:** the ones on screen: the account and org the lists show, or your repositories in the personal scope. Only repositories PullBull can see count. Other accounts aren't added in
+
+| Card | Figure | Means |
+|---|---|---|
+| Your reviews | Reviews | Reviews you submitted on other people's PRs in the period: approved, changes requested, commented or dismissed. Unsent reviews and replies on your own PRs don't count |
+| | Turnaround | Median time from a review request (to you or one of your teams) to your response. Reviews nobody asked for, and a second review on the same request, aren't samples |
+| | Bars | Reviews per day, today's in the accent colour, with the busiest day's count above its bar. A day with none is a small grey stub. Underneath, the weekday initials for a week, or the first and last dates for 30 and 90 days |
+| Your pull requests | Merged | Your PRs merged in the period |
+| | Time to merge | Median of merged minus opened, over those PRs |
+| | First review | Median wait for the first review by someone other than you, over your PRs opened in the period. It runs from when the PR was last marked ready. Drafts, unreviewed PRs and reviews made while a draft aren't samples; the hover says how many PRs still wait |
+| | Top reviewers | Up to three people who reviewed the most of your PRs opened in the period. A person counts once per PR, however many reviews. Bots and you are left out |
+| Right now | Waiting on you longest | The PR in Needs your review that has waited longest. Two rows like the list's; <kbd>↑</kbd> <kbd>↓</kbd> choose, <kbd>Return</kbd> opens the detail (<kbd>Esc</kbd> comes back), <kbd>⌘</kbd><kbd>Return</kbd> opens it on GitHub, <kbd>⌘</kbd><kbd>C</kbd> copies its link. Right-click offers only the copy and open items. The Settings filters apply |
+| | Your PR waiting longest | Your open PR with no review yet that has waited longest |
+| Issues | Closed | Issues assigned to you now that closed in the period, completed or not planned. An issue unassigned after it closed isn't counted |
+| | Opened | Issues you opened in the period |
+| | Comments | Comments you wrote in the conversation of issues and PRs. Review comments on code aren't counted |
+
+- **Medians:** shown as `42 m`, `3 h 10 m`, `2 d 4 h`. A dash means nothing to measure, or the query failed; the hover says why. A comparison is left out when either side has no value. Hover a figure for how many items it covers
+- **Caps:** each source reads at most the newest 100 PRs in scope for the period (comments: your latest 500). Reviews come from the 100 most recently updated PRs you reviewed since the period began; for the comparison that search reaches into the current period, so a busy current period uses up some of its 100. When more exist, the hover says so and the footer adds "· from latest 100". Counts GitHub gives exactly stay exact; counts tallied from loaded items read "137+". Days the chart can't vouch for are left out, not drawn empty
+- **Not shown:** Status moves on a board. GitHub records them only on each issue, so they can't be counted without missing some
+- **Refreshing:** the result is kept for 15 minutes per account, scope and period, in memory only. The refresh button and <kbd>⌘</kbd><kbd>R</kbd> fetch again. Nothing polls. A failure shows a line with **Retry** and keeps what was on screen. Hover the footer for when it was updated
 
 ## Editing
 
@@ -299,12 +326,12 @@ Settings → Ask AI.
 | <kbd>⇧</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Files changed; on a PR with new commits since your review, just those changes |
 | <kbd>⌃</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy Checkout Command: `gh pr checkout 412 -R owner/repo` |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | [Ask AI](#ask-ai), from the search field |
-| <kbd>⌘</kbd><kbd>1</kbd> · <kbd>⌘</kbd><kbd>2</kbd> | Pull Requests · Issues |
+| <kbd>⌘</kbd><kbd>1</kbd> · <kbd>⌘</kbd><kbd>2</kbd> · <kbd>⌘</kbd><kbd>3</kbd> | Pull Requests · Issues · [Stats](#stats) |
 | <kbd>⌃</kbd><kbd>1</kbd>…<kbd>⌃</kbd><kbd>9</kbd> | Saved search 1–9, in Settings order. Off while macOS uses ⌃1… to switch desktops (System Settings → Keyboard → Shortcuts → Mission Control) |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> | Repo menu ([one repo](#one-repo)) |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd> | Board menu, on the Board chip |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd> | Account menu |
-| <kbd>⌘</kbd><kbd>R</kbd> | Refresh |
+| <kbd>⌘</kbd><kbd>R</kbd> | Refresh. On [Stats](#stats), refreshes the stats |
 | <kbd>⌘</kbd><kbd>,</kbd> | Settings |
 | <kbd>⌘</kbd><kbd>/</kbd> | Keyboard Shortcuts window: every shortcut by section, with a filter. <kbd>Esc</kbd> clears the filter, then closes; <kbd>⌘</kbd><kbd>W</kbd> or <kbd>⌘</kbd><kbd>/</kbd> closes. Also the footer gear, and Settings → General → Keyboard shortcuts |
 | <kbd>Esc</kbd> | Clear search → clear repo → close |

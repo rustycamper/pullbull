@@ -73,10 +73,10 @@ struct HeaderView<UnderField: View>: View {
             TextField(placeholder, text: Binding(
                 get: { model.searchText },
                 set: { text in
-                    // Opening a detail unfocuses the field, which pushes its text back; a detail on
-                    // screen takes no edits from the hidden field.
+                    // Opening a detail unfocuses the field, which pushes its text back; a detail or
+                    // Stats on screen takes no edits from the hidden field.
                     switch model.route {
-                    case .detail, .issueDetail, .ask: return
+                    case .detail, .issueDetail, .ask, .stats: return
                     case .list, .search:
                         // The editor already holds `text`; its caret drives the "@user" completion.
                         model.updateSearch(text, caret: FieldCaret.read(in: window(), text: text))

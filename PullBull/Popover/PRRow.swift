@@ -9,11 +9,13 @@ struct SearchMarks {
     let role: String?
 }
 
-/// Where a PR row sits: on a tab, whose rules give its review state, or in the search results laid out
-/// as that tab lays out its list, under a repo header or not.
+/// Where a PR row sits: on a tab, whose rules give its review state, in the search results laid out
+/// as that tab lays out its list, under a repo header or not, or on Stats' Right now card, drawn by that
+/// tab's rules.
 enum RowContext {
     case tab(PRTab)
     case search(PRTab, SearchMarks, underRepoHeader: Bool)
+    case stats(PRTab)
 }
 
 /// One open PR in a list (merged and closed ones draw as `ClosedRow`). Review and Team rows lead with the
@@ -49,15 +51,16 @@ struct PRRow: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .accessibilityAddTraits(selected ? [.isSelected] : [])
-        .editPickerAnchor(for: pr.key, field: nil, model: model)
+        .modifier(ListRowAnchor(enabled: !onStats, key: pr.key, model: model))
         .prContextMenu(
-            pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
-            time: marks == nil ? TimeFocusMenu(model: model) : nil, person: .person(model: model, login: pr.author),
+            pr, focus: onStats ? nil : FocusMenuItem(model: model, repo: pr.key.repo),
+            time: onTab ? TimeFocusMenu(model: model) : nil,
+            person: onStats ? nil : .person(model: model, login: pr.author),
             files: model.filesLink(for: pr), failingCheck: { model.openFailingCheck(pr.key) },
-            sets: SetEditMenu.make(model: model, key: pr.key))
+            sets: onStats ? nil : SetEditMenu.make(model: model, key: pr.key))
     }
 
-    /// A search result moves `searchSelection`, a tab row `listSelection`.
+    /// A search result moves `searchSelection`, a tab row `listSelection`, a Right now row `statsSelection`.
     private func open() {
         switch context {
         case .tab:
@@ -65,14 +68,28 @@ struct PRRow: View {
             if PRActions.commandClicked { PRActions.openOnGitHub(pr) } else { model.openRowDetail(pr.key) }
         case .search:
             if PRActions.commandClicked { model.openSearchResultOnGitHub(pr) } else { model.openSearchResult(pr) }
+        case .stats:
+            model.statsSelection = pr.key
+            if PRActions.commandClicked { PRActions.openOnGitHub(pr) } else { model.openStatsRowDetail(pr.key) }
         }
     }
 
-    /// The tab whose rules draw the row: its own, or the one the search results are laid out for.
+    /// The tab whose rules draw the row: its own, the one the search results are laid out for, or the
+    /// list a Right now row comes from.
     var layoutTab: PRTab {
         switch context {
-        case .tab(let tab), .search(let tab, _, _): tab
+        case .tab(let tab), .search(let tab, _, _), .stats(let tab): tab
         }
+    }
+
+    /// A list row: the time focus, which only the list follows, is offered in its menu.
+    private var onTab: Bool {
+        if case .tab = context { true } else { false }
+    }
+
+    /// A Right now row: its menu only copies and opens, as the list it comes from is hidden under Stats.
+    private var onStats: Bool {
+        if case .stats = context { true } else { false }
     }
 
     /// A search result's words and role; nil on a tab.
@@ -152,10 +169,14 @@ struct PRRow: View {
     }
 
     /// `repo #num`, or `#num` under a repo header or the focus. A search result outside the focus (a link)
-    /// names its repo.
+    /// names its repo, and so does a Right now row, which ignores the focus.
     private var showsRepo: Bool {
-        guard case .search(_, _, let underRepoHeader) = context else { return model.rowsShowRepo }
-        return SearchLayout.showsRepo(pr.key, underRepoHeader: underRepoHeader, focus: model.repoFocus)
+        switch context {
+        case .tab: model.rowsShowRepo
+        case .search(_, _, let underRepoHeader):
+            SearchLayout.showsRepo(pr.key, underRepoHeader: underRepoHeader, focus: model.repoFocus)
+        case .stats: true
+        }
     }
 
     private var age: String { RelativeAge.short(from: pr.updatedAt, to: now) }
@@ -569,6 +590,21 @@ struct DraftPill: View {
             .padding(.horizontal, 6)
             .frame(height: 16)
             .overlay(Capsule().strokeBorder(Palette.separator, lineWidth: 0.5))
+    }
+}
+
+/// A row's edit picker anchor (`editPickerAnchor`), left off a Right now row, whose menu opens no picker.
+private struct ListRowAnchor: ViewModifier {
+    let enabled: Bool
+    let key: PRKey
+    let model: AppModel
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.editPickerAnchor(for: key, field: nil, model: model)
+        } else {
+            content
+        }
     }
 }
 

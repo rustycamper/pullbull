@@ -430,6 +430,17 @@ private func sample() -> Snapshot {
         #expect(!old.groupTeamByAuthor && old.sort(for: PRTab.review) == .recentlyUpdated)
     }
 
+    @Test func statsPeriodDefaultsToAWeekAndRoundTrips() throws {
+        let old = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"compact":true}"#.utf8))
+        #expect(old.statsPeriod == .week)
+        let unreadable = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"statsPeriod":"decade"}"#.utf8))
+        #expect(unreadable.statsPeriod == .week)
+        var s = AppSettings()
+        s.statsPeriod = .quarter
+        let loaded = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(s))
+        #expect(loaded.statsPeriod == .quarter)
+    }
+
     @Test func eachTabRemembersItsSort() throws {
         var s = AppSettings()
         #expect(s.sort(for: PRTab.review) == .recentlyUpdated && s.sort(for: IssueTab.board) == .recentlyUpdated)

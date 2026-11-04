@@ -101,6 +101,7 @@ struct PRDetailView: View {
         switch model.detailReturnRoute {
         case .issueDetail(let issue): return "#\(issue.number)"
         case .search: return "Search"
+        case .stats: return "Stats"
         case .list, .ask, .detail: return model.selectedTabTitle
         }
     }

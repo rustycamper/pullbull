@@ -42,7 +42,7 @@ public enum ShortcutCatalog {
                     ?? Shortcut("Show or hide PullBull", [], note: "Not set: Settings → General"),
                 Shortcut("Settings", [["⌘", ","]]),
                 Shortcut("Keyboard shortcuts", [["⌘", "/"]]),
-                Shortcut("Refresh", [["⌘", "R"]]),
+                Shortcut("Refresh", [["⌘", "R"]], note: "On Stats, refreshes the stats"),
                 Shortcut("Close", [["⌘", "W"]]),
             ]),
             ShortcutSection("Lists", [
@@ -53,6 +53,7 @@ public enum ShortcutCatalog {
                 Shortcut("Previous / next chip", [["←"], ["→"]]),
                 Shortcut("Pull Requests", [["⌘", "1"]]),
                 Shortcut("Issues", [["⌘", "2"]]),
+                Shortcut("Stats", [["⌘", "3"]]),
                 Shortcut("Open detail", [["↩"]]),
                 Shortcut("Open on GitHub", [["⌘", "↩"]]),
                 Shortcut("Repo menu", [["⇧", "⌘", "F"]], note: "Show only one repo"),

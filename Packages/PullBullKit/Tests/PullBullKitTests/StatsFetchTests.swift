@@ -1,0 +1,247 @@
+import Foundation
+import Testing
+@testable import PullBullKit
+
+private func response(_ status: Int, headers: [String: String] = [:]) -> HTTPURLResponse {
+    HTTPURLResponse(
+        url: URL(string: "https://api.github.com/graphql")!, statusCode: status,
+        httpVersion: nil, headerFields: headers)!
+}
+
+private final class StubTransport: GraphQLTransport, @unchecked Sendable {
+    private let lock = NSLock()
+    private var queue: [(Data, HTTPURLResponse)]
+    private var sent: [Data] = []
+
+    init(_ responses: [(Data, HTTPURLResponse)]) { queue = responses }
+
+    var bodies: [Data] { lock.withLock { sent } }
+
+    func send(_ body: Data, token: String) async throws -> (Data, HTTPURLResponse) {
+        lock.withLock {
+            sent.append(body)
+            return queue.removeFirst()
+        }
+    }
+}
+
+private func api(_ transport: StubTransport) -> GitHubAPI {
+    GitHubAPI(transport: transport, auth: StaticTokenSource("test-token"), now: { Date() })
+}
+
+private func fixture(_ name: String) throws -> (Data, HTTPURLResponse) {
+    let url = try #require(Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Fixtures"))
+    return (try Data(contentsOf: url), response(200))
+}
+
+private func json(_ text: String) -> (Data, HTTPURLResponse) { (Data(text.utf8), response(200)) }
+
+private func variables(_ body: Data) throws -> [String: Any] {
+    let object = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+    return try #require(object["variables"] as? [String: Any])
+}
+
+/// One page of the reviewed search, a PR per repo in `repos`.
+private func reviewedPage(repos: [String], hasNext: Bool) -> (Data, HTTPURLResponse) {
+    let nodes = repos.map {
+        #"{"updatedAt":"2026-11-03T10:00:00Z","author":{"login":"a"},"repository":{"nameWithOwner":"\#($0)"},"timelineItems":{"nodes":[]},"reviews":{"nodes":[]}}"#
+    }.joined(separator: ",")
+    return json(#"{"data":{"search":{"issueCount":\#(repos.count),"pageInfo":{"hasNextPage":\#(hasNext),"endCursor":"E"},"nodes":[\#(nodes)]}}}"#)
+}
+
+private func query(_ body: Data) throws -> String {
+    let object = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+    return try #require(object["query"] as? String)
+}
+
+private func iso(_ text: String) -> Date { try! Decoding.date(text) }
+
+private let utc: Calendar = {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "UTC")!
+    return calendar
+}()
+
+private let now = iso("2026-11-04T13:30:00Z")
+private let week = StatsPeriod.week.window(now: now, calendar: utc)
+
+@Suite struct StatsFetchTests {
+    @Test func reviewedQueryStrings() {
+        #expect(StatsQueries.reviewedPRs(window: week, scope: .org("acme"))
+            == "is:pr reviewed-by:@me -author:@me updated:>=2026-10-29T00:00:00Z archived:false sort:updated-desc org:acme")
+        #expect(StatsQueries.reviewedPRs(window: week, scope: .personal(login: "me"))
+            == "is:pr reviewed-by:@me -author:@me updated:>=2026-10-29T00:00:00Z archived:false sort:updated-desc user:me")
+    }
+
+    @Test func reviewedPRsDecodes() async throws {
+        let stub = StubTransport([try fixture("stats-reviewed")])
+        let result = try await api(stub).reviewedPRs(window: week, login: "me", scope: .org("acme"))
+        #expect(result.items.map(\.author) == ["me", "alice", "bob"])
+        #expect(result.items.map(\.updatedAt) == [
+            iso("2026-11-03T15:00:00Z"), iso("2026-11-02T09:30:00Z"), iso("2026-11-01T12:00:00Z")])
+        #expect(result.capped == false)
+        #expect(result.items[1].requests == [
+            ReviewRequestEvent(at: iso("2026-11-02T08:00:00Z"), reviewer: .team(slug: "ios", name: "ios"))])
+        #expect(result.items[2].requests.first?.reviewer == .user("me"))
+        #expect(result.items[2].myReviews.map(\.submittedAt) == [
+            iso("2026-11-01T09:00:00Z"), iso("2026-11-01T12:00:00Z")])
+        let body = try #require(stub.bodies.first)
+        #expect(try query(body) == StatsQueries.reviewed)
+        let sent = try variables(body)
+        #expect(Set(sent.keys) == ["q", "login", "after"])
+        #expect(sent["q"] as? String == StatsQueries.reviewedPRs(window: week, scope: .org("acme")))
+        #expect(sent["login"] as? String == "me")
+        #expect(sent["after"] is NSNull)
+    }
+
+    @Test func orgScopeReadsOnePageCappedByNextPage() async throws {
+        let stub = StubTransport([reviewedPage(repos: ["acme/web", "acme/api"], hasNext: true)])
+        let result = try await api(stub).reviewedPRs(window: week, login: "me", scope: .org("acme"))
+        #expect(stub.bodies.count == 1)
+        #expect(result.items.map(\.repo) == ["acme/web", "acme/api"])
+        #expect(result.capped)
+    }
+
+    @Test func orgScopeNotCappedWithoutNextPage() async throws {
+        let stub = StubTransport([reviewedPage(repos: ["acme/web"], hasNext: false)])
+        let result = try await api(stub).reviewedPRs(window: week, login: "me", scope: .org("acme"))
+        #expect(result.capped == false)
+    }
+
+    @Test func personalForeignPageNotCapped() async throws {
+        let stub = StubTransport([reviewedPage(repos: Array(repeating: "other/x", count: 100), hasNext: false)])
+        let result = try await api(stub).reviewedPRs(window: week, login: "me", scope: .personal(login: "me"))
+        #expect(result.items.isEmpty)
+        #expect(result.capped == false)
+    }
+
+    @Test func personalScopePagesWithTheRepoFilter() async throws {
+        let stub = StubTransport([
+            reviewedPage(repos: ["other/x", "me/lib"], hasNext: true), try fixture("stats-reviewed-page2"),
+        ])
+        let result = try await api(stub).reviewedPRs(
+            window: week, login: "me", scope: .personal(login: "me", repos: ["me/app"]))
+        #expect(result.items.map(\.repo) == ["me/app"])
+        #expect(result.items.first?.updatedAt == iso("2026-10-31T09:00:00Z"))
+        #expect(stub.bodies.count == 2)
+        #expect(result.capped == false)
+        #expect(try variables(stub.bodies[0])["q"] as? String
+            == StatsQueries.reviewedPRs(window: week, scope: .personal(login: "me", repos: ["me/app"])))
+        #expect(try variables(stub.bodies[0])["after"] is NSNull)
+        #expect(try variables(stub.bodies[1])["after"] as? String == "E")
+    }
+
+    @Test func personalScopeStopsAtThreePages() async throws {
+        let page = reviewedPage(repos: ["other/x"], hasNext: true)
+        let stub = StubTransport([page, page, page])
+        let result = try await api(stub).reviewedPRs(window: week, login: "me", scope: .personal(login: "me"))
+        #expect(stub.bodies.count == 3)
+        #expect(result.capped)
+    }
+
+    @Test func searchQueries() async throws {
+        let stub = StubTransport([try fixture("stats-opened"), try fixture("stats-merged")])
+        _ = try await api(stub).openedPRs(window: week, scope: .org("acme"))
+        _ = try await api(stub).mergedPRs(window: week, scope: .org("acme"))
+        #expect(try variables(stub.bodies[0])["q"] as? String
+            == "is:pr author:@me created:2026-10-29T00:00:00Z..2026-11-04T13:29:59Z archived:false sort:created-desc org:acme")
+        #expect(try variables(stub.bodies[1])["q"] as? String
+            == "is:pr author:@me is:merged merged:2026-10-29T00:00:00Z..2026-11-04T13:29:59Z archived:false sort:created-desc org:acme")
+    }
+
+    @Test func issueQueryStrings() {
+        let scope = FetchScope.personal(login: "me")
+        #expect(StatsQueries.closedIssues(window: week, scope: scope)
+            == "is:issue assignee:@me closed:2026-10-29T00:00:00Z..2026-11-04T13:29:59Z archived:false user:me")
+        #expect(StatsQueries.openedIssues(window: week, scope: scope)
+            == "is:issue author:@me created:2026-10-29T00:00:00Z..2026-11-04T13:29:59Z archived:false user:me")
+    }
+
+    @Test func openedDecodes() async throws {
+        let stub = StubTransport([try fixture("stats-opened")])
+        let result = try await api(stub).openedPRs(window: week, scope: .org("acme"))
+        #expect(result.total == 3)
+        #expect(result.items.count == 2)
+        #expect(result.capped)
+        #expect(result.items[0].isDraft)
+        #expect(result.items[0].readyAt == nil)
+        let ready = result.items[1]
+        #expect(ready.isOpen)
+        #expect(ready.readyAt == iso("2026-11-02T09:00:00Z"))
+        #expect(ready.reviews.map(\.byBot) == [true, false, false])
+        #expect(ready.reviews.map(\.pending) == [false, false, true])
+        #expect(ready.reviews[1].author == "alice")
+        #expect(ready.reviews[1].avatarURL == URL(string: "https://a/alice.png"))
+    }
+
+    @Test func mergedAndCounts() async throws {
+        let stub = StubTransport([try fixture("stats-merged"), try fixture("stats-count")])
+        let merged = try await api(stub).mergedPRs(window: week, scope: .org("acme"))
+        #expect(merged.total == 150)
+        #expect(merged.items.first == MergedPR(
+            createdAt: iso("2026-11-01T08:00:00Z"), mergedAt: iso("2026-11-02T08:00:00Z")))
+        #expect(merged.capped)
+        #expect(try await api(stub).issueCount("is:issue") == 7)
+        #expect(try variables(stub.bodies[1])["q"] as? String == "is:issue")
+    }
+
+    @Test func commentsPageBackwards() async throws {
+        let stub = StubTransport([try fixture("stats-comments"), try fixture("stats-comments-page2")])
+        let result = try await api(stub).myComments(window: week, scope: .personal(login: "acme"))
+        #expect(stub.bodies.count == 2)
+        #expect(result.items == [
+            iso("2026-10-31T10:00:00Z"), iso("2026-11-01T10:00:00Z"), iso("2026-11-03T10:00:00Z")])
+        #expect(result.capped == false)
+        #expect(try variables(stub.bodies[1])["before"] as? String == "K1")
+    }
+
+    @Test func commentsCapAtFivePages() async throws {
+        let page = json(#"{"data":{"viewer":{"issueComments":{"pageInfo":{"hasPreviousPage":true,"startCursor":"K"},"nodes":[{"createdAt":"2026-11-01T10:00:00Z","repository":{"nameWithOwner":"acme/web"}}]}}}}"#)
+        let stub = StubTransport(Array(repeating: page, count: 5))
+        let result = try await api(stub).myComments(window: week, scope: .org("acme"))
+        #expect(stub.bodies.count == 5)
+        #expect(result.items.count == 5)
+        #expect(result.capped)
+    }
+
+    @Test func orgCommentsOutsideTheOrgAreDropped() async throws {
+        let stub = StubTransport([try fixture("stats-comments"), try fixture("stats-comments-page2")])
+        let result = try await api(stub).myComments(window: week, scope: .org("Acme"))
+        #expect(result.items == [
+            iso("2026-10-31T10:00:00Z"), iso("2026-11-01T10:00:00Z"), iso("2026-11-03T10:00:00Z")])
+    }
+
+    @Test func nullNodesDoNotDropThePage() async throws {
+        let comments = json(#"{"data":{"viewer":{"issueComments":{"pageInfo":{"hasPreviousPage":false,"startCursor":"K"},"nodes":[null,{"createdAt":"2026-11-01T10:00:00Z","repository":{"nameWithOwner":"acme/web"}}]}}}}"#)
+        let reviewed = json(#"{"data":{"search":{"issueCount":2,"pageInfo":{"hasNextPage":false,"endCursor":"E"},"nodes":[null,{},{"updatedAt":"2026-11-03T10:00:00Z","author":{"login":"a"},"repository":{"nameWithOwner":"acme/web"},"timelineItems":{"nodes":[null]},"reviews":{"nodes":[null]}}]}}}"#)
+        let stub = StubTransport([comments, reviewed])
+        let dates = try await api(stub).myComments(window: week, scope: .org("acme"))
+        #expect(dates.items == [iso("2026-11-01T10:00:00Z")])
+        let prs = try await api(stub).reviewedPRs(window: week, login: "me", scope: .org("acme"))
+        #expect(prs.items.map(\.repo) == ["acme/web"])
+    }
+
+    @Test func personalTruncationToHundredIsCapped() async throws {
+        let sixty = reviewedPage(repos: Array(repeating: "me/app", count: 60), hasNext: true)
+        let more = reviewedPage(repos: Array(repeating: "me/app", count: 60), hasNext: false)
+        let stub = StubTransport([sixty, more])
+        let result = try await api(stub).reviewedPRs(window: week, login: "me", scope: .personal(login: "me"))
+        #expect(result.items.count == 100)
+        #expect(result.capped)
+    }
+
+    @Test func missingSearchThrows() async {
+        let stub = StubTransport([json(#"{"data":{}}"#)])
+        await #expect(throws: APIError.graphQL("missing search")) {
+            try await api(stub).reviewedPRs(window: week, login: "me", scope: .org("acme"))
+        }
+    }
+
+    @Test func rateLimitedPropagates() async {
+        let headers = ["x-ratelimit-remaining": "0", "x-ratelimit-reset": "1793050000"]
+        let stub = StubTransport([(Data("{}".utf8), response(403, headers: headers))])
+        await #expect(throws: APIError.rateLimited(resetAt: Date(timeIntervalSince1970: 1_793_050_000))) {
+            try await api(stub).myComments(window: week, scope: .org("acme"))
+        }
+    }
+}

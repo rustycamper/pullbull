@@ -5,7 +5,7 @@ import Observation
 import PullBullKit
 
 enum Route: Equatable {
-    case list, search, ask, detail(PRKey), issueDetail(PRKey)
+    case list, search, ask, stats, detail(PRKey), issueDetail(PRKey)
 }
 
 /// A tab in either mode, such as the one type-anywhere started a search on.
@@ -385,6 +385,18 @@ final class AppModel {
     /// Where Back lands from each detail opened from the Ask screen, innermost last.
     private(set) var askReturn = AskReturn()
     @ObservationIgnored var askTask: Task<Void, Never>?
+    // Stats (see Stats/AppModel+Stats.swift).
+    /// The report on the Stats screen: the last one for `statsKey`, cached or fetched; nil before the first.
+    private(set) var statsReport: StatsReport?
+    /// A fetch for `statsKey` is running.
+    private(set) var statsLoading = false
+    /// The reports fetched since launch, per account, scope and period.
+    @ObservationIgnored var statsCache = StatsCache()
+    @ObservationIgnored var statsTask: Task<Void, Never>?
+    /// Back from Stats ends in the search, with its query kept, rather than the list.
+    private(set) var statsReturnsToSearch = false
+    /// The highlighted Right now row on Stats (↑/↓; Return opens it).
+    var statsSelection: PRKey?
     /// Watches connectivity so a refresh runs as soon as the network is back (see `NetworkRecovery`);
     /// started by the main init only, cancelled in deinit.
     @ObservationIgnored private let pathMonitor = NWPathMonitor()
@@ -639,6 +651,7 @@ final class AppModel {
         if settings.askEnabled { loadAskKeyState() }
         if case .detail(let key) = route { loadDetail(key) }
         if case .issueDetail(let key) = route { loadIssueDetail(key) }
+        if route == .stats, !statsLoading { loadStats(force: false) }
         if route == .search, searchResults == nil || searchResults?.phase != .done || searchField.isStale {
             updateSearch(searchText)
         }
@@ -679,7 +692,7 @@ final class AppModel {
         case .detail:
             if case .issueDetail = detailReturnRoute { return true }
             return false
-        case .list, .search, .ask: return false
+        case .list, .search, .ask, .stats: return false
         }
     }
 
@@ -2038,6 +2051,9 @@ final class AppModel {
         searchCache.removeAll()
         if snapshot != nil || tabs != nil || searchResults != nil { clearAccountData() }
         commentDrafts.dropAccount(account.login)
+        statsCache.drop(account: account.login)
+        // Its lists may be gone already; Stats has nothing to load either way.
+        resetStats(signedOut: true)
         guard signedOutDropped != account else { return }
         signedOutDropped = account
         let store = snapshotStore
@@ -2083,6 +2099,7 @@ final class AppModel {
         timeFocus = nil
         boardList = BoardList()
         resetDetails()
+        resetStats()
         NotificationService.shared.resetBaseline()
     }
 
@@ -2106,6 +2123,8 @@ final class AppModel {
         // Also lays the reconciled posted comments over the search results.
         refreshShown()
         if route == .search, searchResults == nil, snapshot != nil { updateSearch(searchText) }
+        // Stats left on screen through an account or org change loads for the new one now its lists are here.
+        if route == .stats, statsReport == nil, !statsLoading { loadStats(force: false) }
         prefetchAfterSuccessfulRefresh(status)
         syncAskAfterRefresh(status)
         if !status.isRefreshing, status.error == nil { pickPersonalBoardIfNeeded() }
@@ -2241,6 +2260,12 @@ extension AppModel {
         }
     }
 
+    /// A Right now row chosen on Stats: the row flashes, then its detail opens with Back to Stats. No walk:
+    /// the card's two rows aren't a list to step through.
+    func openStatsRowDetail(_ key: PRKey) {
+        flashRow(key) { $0.openDetail(key) }
+    }
+
     /// An issue row chosen in a list or search: the row flashes, then its detail opens, with ⌥↓ / ⌥↑
     /// walking the rows in the order on screen now.
     func openRowIssueDetail(_ key: PRKey) {
@@ -2262,7 +2287,7 @@ extension AppModel {
         switch route {
         case .detail(let key): detailWalk?.position(showing: key, kind: .pullRequest)
         case .issueDetail(let key): detailWalk?.position(showing: key, kind: .issue)
-        case .list, .search, .ask: nil
+        case .list, .search, .ask, .stats: nil
         }
     }
 
@@ -2326,7 +2351,7 @@ extension AppModel {
         case .ask: askReturn.open(from: .ask)
         case .issueDetail: if !askReturn.isEmpty { askReturn.open(from: .issueDetail) }
         case .list, .search: leaveAsk()
-        case .detail: break
+        case .detail, .stats: break
         }
         if case .detail = route {} else {
             detailReturnRoute = route
@@ -2340,8 +2365,8 @@ extension AppModel {
     }
 
     /// Back: the Ask screen when Ask opened the detail, the issue detail a linked PR was opened from
-    /// (fetched again, since it may have changed while the PR was open), the search (query kept) when
-    /// the detail was opened from it, else the list.
+    /// (fetched again, since it may have changed while the PR was open), Stats when it opened the
+    /// detail, the search (query kept) when the detail was opened from it, else the list.
     func closeDetail() {
         detailTask?.cancel()
         detailTask = nil
@@ -2355,6 +2380,10 @@ extension AppModel {
             route = detailReturnRoute
             loadIssueDetail(issue)
             return
+        } else if detailReturnRoute == .stats {
+            route = .stats
+            // The report may have gone stale while the PR was open.
+            if !statsLoading { loadStats(force: false) }
         } else {
             route = detailReturnRoute == .search && !searchText.isEmpty ? .search : .list
             // A chip hidden since (Team without an org) falls back to All.
@@ -2364,16 +2393,20 @@ extension AppModel {
         detailWalk = nil
     }
 
-    /// Whether Back from the detail on screen (through an issue detail, for a linked PR) ends in the
-    /// search, so its query is kept while the popover is closed.
+    /// Whether Back from the detail or Stats on screen (through an issue detail, for a linked PR, or
+    /// Stats, for a detail opened there) ends in the search, so its query is kept while the popover is
+    /// closed.
     var detailReturnsToSearch: Bool {
         // Back through Ask ends in the search too: Esc on the Ask screen keeps the question.
         if !askReturn.isEmpty { return true }
         switch route {
         case .ask:
             return true
+        case .stats:
+            return statsReturnsToSearch
         case .detail:
             if case .issueDetail = detailReturnRoute { return issueDetailReturnRoute == .search }
+            if detailReturnRoute == .stats { return statsReturnsToSearch }
             return detailReturnRoute == .search
         case .issueDetail:
             return issueDetailReturnRoute == .search
@@ -2514,7 +2547,8 @@ extension AppModel {
         issueDetailReturnRoute = .list
         switch route {
         case .detail, .issueDetail, .ask: route = .list
-        case .list, .search: break
+        // Stats stays and loads for the new account (`resetStats`).
+        case .list, .search, .stats: break
         }
         // Nothing the previous account asked about may show either.
         clearAsk()
@@ -2694,7 +2728,7 @@ extension AppModel {
             return (key, pullRequest(for: key)?.url ?? GitHubLinks.pullRequest(key))
         case .issueDetail(let key):
             return (key, (issueDetails[key]?.issue ?? issue(for: key))?.url ?? GitHubLinks.issue(key))
-        case .list, .search, .ask:
+        case .list, .search, .ask, .stats:
             return nil
         }
     }
@@ -2704,17 +2738,18 @@ extension AppModel {
         switch route {
         case .detail: closeDetail()
         case .issueDetail: closeIssueDetail()
-        case .list, .search, .ask: break
+        case .list, .search, .ask, .stats: break
         }
     }
 
-    /// A reopen after a long while: drops the detail on screen, and any stacked under it, for the list
-    /// (the search, query kept, when Back would end there). The Ask screen, and details opened from it,
-    /// drop to the search with the question kept.
+    /// A reopen after a long while: drops the detail or Stats on screen, and any stacked under it, for the
+    /// list (the search, query kept, when Back would end there). The Ask screen, and details opened from
+    /// it, drop to the search with the question kept.
     func showListInsteadOfDetail() {
         let toSearch = detailReturnsToSearch && !searchText.isEmpty
         askReturn.reset()
         dropDetails()
+        stopStatsLoad()
         route = toSearch ? .search : .list
         searchAgainIfStale()
     }
@@ -2737,8 +2772,71 @@ extension AppModel {
         switch route {
         case .detail: if detailFetch?.isLoading != true { reloadDetail() }
         case .issueDetail: if issueDetailFetch?.isLoading != true { reloadIssueDetail() }
-        case .list, .search, .ask: break
+        case .list, .search, .ask, .stats: break
         }
+    }
+}
+
+// MARK: - Stats screen
+
+extension AppModel {
+    /// Stats opens from the list or the search only, with no picker open, once the running account's
+    /// lists, and so its scope, have loaded.
+    var canOpenStats: Bool {
+        guard route == .list || route == .search, statusPicker == nil, setPicker == nil else { return false }
+        return runningAccount != nil && shownSnapshot != nil
+    }
+
+    /// Stats is on screen, or under the detail on screen.
+    var statsOnScreen: Bool {
+        if route == .stats { return true }
+        if case .detail = route { return detailReturnRoute == .stats }
+        return false
+    }
+
+    /// The gear menu's Stats and ⌘3: pushes Stats over the list or the search, with the cached report at
+    /// once, fetched again when it isn't fresh.
+    func openStats() {
+        guard canOpenStats else { return }
+        // As for a detail: no Back leads to Ask, and a running Ask stops.
+        leaveAsk()
+        closeCompletion()
+        statsReturnsToSearch = route == .search
+        statsSelection = nil
+        route = .stats
+        loadStats(force: false)
+    }
+
+    /// Back from Stats: the search (query kept) when it was opened from there, else the list. A fetch
+    /// still running stops.
+    func closeStats() {
+        guard route == .stats else { return }
+        stopStatsLoad()
+        route = statsReturnsToSearch && !searchText.isEmpty ? .search : .list
+        searchAgainIfStale()
+    }
+
+    /// Puts `report` on the Stats screen, marked loading or not (see Stats/AppModel+Stats.swift).
+    func showStats(_ report: StatsReport?, loading: Bool) {
+        statsReport = report
+        statsLoading = loading
+    }
+
+    /// Stops the Stats fetch; the reports already fetched stay cached.
+    func stopStatsLoad() {
+        statsTask?.cancel()
+        statsTask = nil
+        statsLoading = false
+    }
+
+    /// Account or org changed: the previous one's report goes. Stats on screen stays, and loads for the
+    /// new one once its lists are here (`apply`); with no account left, or the account signed out, it
+    /// gives way to the list, as a detail does.
+    fileprivate func resetStats(signedOut: Bool = false) {
+        stopStatsLoad()
+        statsReport = nil
+        statsSelection = nil
+        if route == .stats, running == nil || signedOut { route = .list }
     }
 }
 
@@ -2785,7 +2883,7 @@ extension AppModel {
         let place: AskReturn.Place = switch route {
         case .detail: .pullRequestDetail
         case .issueDetail: .issueDetail
-        case .list, .search, .ask: .ask
+        case .list, .search, .ask, .stats: .ask
         }
         let landing = askReturn.reopen(at: place, question: askQuestion, closedAt: closedAt, now: now)
         if landing.place == .search { showSearch(landing) }
@@ -3008,11 +3106,17 @@ extension AppModel {
             askReturn.open(from: .ask)
             issueDetailReturnRoute = route
         case .detail:
-            // From a PR detail (e.g. a notification): Back goes to the list, not into the PR.
+            // From a PR detail (e.g. a notification): Back goes to the list, not into the PR or the
+            // Stats under it.
             askReturn.reset()
             detailTask?.cancel()
             detailTask = nil
             detailFetch = nil
+            stopStatsLoad()
+            issueDetailReturnRoute = .list
+        case .stats:
+            // From Stats (a notification): Back goes to the list, as from a PR detail.
+            stopStatsLoad()
             issueDetailReturnRoute = .list
         case .issueDetail:
             break
@@ -3354,6 +3458,7 @@ extension AppModel {
         personalRepoReads[account] = nil
         activityUnsupported.remove(account)
         commentDrafts.dropAccount(account.login)
+        statsCache.drop(account: account.login)
         searchCache.removeAll()
         let wasCurrent = settings.accountRef == account
         let stopped = wasCurrent ? coordinator : nil

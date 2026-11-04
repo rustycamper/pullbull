@@ -79,6 +79,8 @@ struct PopoverView: View {
     private var askLayerShown: Bool { layers.first == .ask }
     /// The Ask screen is the top layer, with no detail over it.
     private var askShownAlone: Bool { layers == [.ask] }
+    /// Stats is on screen, or under the detail it opened.
+    private var statsLayerShown: Bool { layers.first == .stats }
     private var slides: Bool { !reduceMotion }
     /// The Board scope is on screen and its filter row names the board.
     private var boardPartShown: Bool {
@@ -131,6 +133,13 @@ struct PopoverView: View {
                     removal: .opacity.animation(Self.fadeThroughOut).combined(with: .modifier(
                         active: LeavingLayer(leaving: true), identity: LeavingLayer(leaving: false)))))
                 .zIndex(0.5)
+            }
+            if statsLayerShown {
+                StatsView(model: model)
+                    .modifier(PushedLayer(slides: slides))
+                    .modifier(CoveredLayer(covered: detailKey != nil, slides: slides))
+                    .transition(layerTransition)
+                    .zIndex(0.75)
             }
             if let issueLayerKey {
                 // A replaced issue detail starts fresh too.
@@ -203,13 +212,13 @@ struct PopoverView: View {
         }
         .onChange(of: model.route) { old, new in
             // The hidden list keeps no focus, so typing in the detail never lands in the search field.
-            if Self.isDetail(new) || new == .ask {
+            if Self.isDetail(new) || new == .ask || new == .stats {
                 fieldFocused = false
                 saveName = nil
             }
-            // Back from a detail opened in search, or Esc on the Ask screen, puts the caret back in the
-            // kept query.
-            if Self.isDetail(old) || old == .ask, new == .search {
+            // Back from a detail or Stats opened in search, or Esc on the Ask screen, puts the caret back
+            // in the kept query.
+            if Self.isDetail(old) || old == .ask || old == .stats, new == .search {
                 fieldOpen = true
                 DispatchQueue.main.async { fieldFocused = true }
             }
@@ -364,8 +373,8 @@ struct PopoverView: View {
     // MARK: Search entry
 
     private func popoverDidShow(_ window: NSWindow) {
-        // Only the detail it was closed on goes stale: one a notification click opened while closed
-        // shows as it is, even if it is the same PR or issue.
+        // Only the detail (or Stats) it was closed on goes stale: one a notification click opened while
+        // closed shows as it is, even if it is the same PR or issue.
         if let closedAt = closedOnDetail, !model.detailOpenedWhileClosed {
             // The Ask screen, and details opened from it, follow `AskReturn.reopen`.
             if model.askOnScreen {
@@ -433,7 +442,7 @@ struct PopoverView: View {
         shown = false
         keyMonitor.remove()
         caretObserver.remove()
-        closedOnDetail = Self.isDetail(model.route) || model.route == .ask ? Date() : nil
+        closedOnDetail = Self.isDetail(model.route) || model.route == .ask || model.route == .stats ? Date() : nil
         syncLayers(animated: false)
         guard !searching else { return }
         fieldOpen = false
@@ -498,14 +507,15 @@ struct PopoverView: View {
     private func failureLineInset(_ insets: [PRKey: CGFloat]) -> CGFloat {
         switch model.route {
         case .detail(let key), .issueDetail(let key): insets[key] ?? 45
-        case .list, .search, .ask: 34
+        case .list, .search, .ask, .stats: 34
         }
     }
 
     private static func isDetail(_ route: Route) -> Bool {
         switch route {
         case .detail, .issueDetail: true
-        case .list, .search, .ask: false
+        // Stats is pushed like a detail but takes its own keys.
+        case .list, .search, .ask, .stats: false
         }
     }
 
@@ -565,6 +575,7 @@ struct PopoverView: View {
         if model.setPicker != nil { return handleSetPickerKey(event, flags: flags) }
         if Self.isDetail(model.route) { return handleDetailKey(event, flags: flags, in: window) }
         if model.route == .ask { return handleAskKey(event, flags: flags) }
+        if model.route == .stats { return handleStatsKey(event, flags: flags) }
         // The list's own keys work while no search is open and no text field has focus.
         let listKeys = !searchOpen && !(window.firstResponder is NSText)
             ? model.listKeys(doneExpanded: doneExpanded) : nil
@@ -668,15 +679,21 @@ struct PopoverView: View {
                 }
                 return true
             }
-            // ⌘1 / ⌘2 by key position too: on layouts like AZERTY those keys don't type digits.
+            // ⌘1 / ⌘2 / ⌘3 by key position too: on layouts like AZERTY those keys don't type digits.
             if event.keyCode == SearchKeyMonitor.digit1 || event.keyCode == SearchKeyMonitor.digit2 {
                 switchMode(to: event.keyCode == SearchKeyMonitor.digit1 ? .pullRequests : .issues)
+                return true
+            }
+            // ⌘3 is taken even when Stats can't open, so it never reaches the field.
+            if event.keyCode == SearchKeyMonitor.digit3 {
+                if model.canOpenStats { model.openStats() }
                 return true
             }
             switch key {
             case "f": openSearch()
             case "1": switchMode(to: .pullRequests)
             case "2": switchMode(to: .issues)
+            case "3": if model.canOpenStats { model.openStats() }
             case "r": if !model.status.isRefreshing { model.refresh() }
             case "c":
                 guard let link = listKeys.flatMap(model.listSelectionLink(in:)) else { return false }
@@ -1031,6 +1048,53 @@ struct PopoverView: View {
             guard plain.isEmpty else { return false }
             model.openAskSelection()
             return true
+        default:
+            return false
+        }
+    }
+
+    /// Stats has no search: Esc and ⌘[ go back, ← / → move the period chips, ↑ / ↓ the Right now rows, ↩
+    /// opens the highlighted row's detail, ⌘↩ its page on GitHub, ⌘C copies its link, ⌘R fetches the
+    /// stats again, and ⌘1 / ⌘2 / ⌘3 are taken and do nothing. Every other key passes through, as on a
+    /// detail, and never reaches the hidden list.
+    private func handleStatsKey(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
+        let plain = flags.subtracting([.capsLock, .numericPad, .function])
+        if flags.contains(.command) {
+            guard plain.subtracting([.command, .shift]).isEmpty else { return false }
+            // By key position too, as in the list: on layouts like AZERTY those keys don't type digits.
+            let digits = [SearchKeyMonitor.digit1, SearchKeyMonitor.digit2, SearchKeyMonitor.digit3]
+            if digits.contains(event.keyCode) { return true }
+            guard !plain.contains(.shift) else { return false }
+            // Nothing on Stats to take back: neither the list's last edit nor the hidden field's typing.
+            if Self.isCommandZ(event, flags: flags) { return true }
+            if event.keyCode == SearchKeyMonitor.return || event.keyCode == SearchKeyMonitor.enter {
+                return model.openStatsSelectionOnGitHub()
+            }
+            switch Self.commandKey(event) {
+            case "[": model.closeStats()
+            case "r": if !model.statsLoading { model.refreshStats() }
+            case "c": return model.copyStatsSelectionLink()
+            case "1", "2", "3": break
+            default: return false
+            }
+            return true
+        }
+        switch event.keyCode {
+        case SearchKeyMonitor.escape:
+            guard flags.isDisjoint(with: [.control, .option]) else { return false }
+            model.closeStats()
+            return true
+        case SearchKeyMonitor.leftArrow, SearchKeyMonitor.rightArrow:
+            guard plain.isEmpty else { return false }
+            model.moveStatsPeriod(by: event.keyCode == SearchKeyMonitor.rightArrow ? 1 : -1)
+            return true
+        case SearchKeyMonitor.upArrow, SearchKeyMonitor.downArrow:
+            guard plain.isEmpty else { return false }
+            model.moveStatsSelection(by: event.keyCode == SearchKeyMonitor.downArrow ? 1 : -1)
+            return true
+        case SearchKeyMonitor.return, SearchKeyMonitor.enter:
+            guard plain.isEmpty else { return false }
+            return model.openStatsSelection()
         default:
             return false
         }
@@ -1716,12 +1780,13 @@ private enum ListPane: Equatable {
     case pullRequests(PRScope), issues(IssueScope)
 }
 
-/// A detail view, or the Ask screen, stacked over the list.
+/// A detail view, the Ask screen or Stats, stacked over the list.
 private enum DetailLayer: Equatable {
-    case ask, issue(PRKey), pr(PRKey)
+    case ask, stats, issue(PRKey), pr(PRKey)
 
     /// The layers the model's route shows, bottom to top: a linked PR's detail sits on the issue it was
-    /// opened from, and details opened from Ask sit on the Ask screen.
+    /// opened from, details opened from Ask sit on the Ask screen, and a PR's detail opened from Stats
+    /// sits on Stats.
     @MainActor static func stack(for model: AppModel) -> [DetailLayer] {
         let ask: [DetailLayer] = model.askReturn.isEmpty ? [] : [.ask]
         switch model.route {
@@ -1729,10 +1794,13 @@ private enum DetailLayer: Equatable {
             return []
         case .ask:
             return [.ask]
+        case .stats:
+            return [.stats]
         case .issueDetail(let key):
             return ask + [.issue(key)]
         case .detail(let key):
             if case .issueDetail(let issue) = model.detailReturnRoute { return ask + [.issue(issue), .pr(key)] }
+            if model.detailReturnRoute == .stats { return [.stats, .pr(key)] }
             return ask + [.pr(key)]
         }
     }

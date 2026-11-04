@@ -659,29 +659,6 @@ struct Keycap<Content: View>: View {
 
 // MARK: - Rows
 
-private struct FailureBanner: View {
-    let message: String
-    var symbol = "wifi.slash"
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: symbol)
-                .font(.system(size: 11))
-                .foregroundStyle(Palette.amberGlyph)
-            Text(message)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Palette.amberFill))
-        .padding(.top, 8)
-        .accessibilityElement(children: .combine)
-    }
-}
-
 enum Highlight {
     /// The title with every query word on a soft highlight. Not bold: the title keeps the tab's width, so it
     /// wraps where the tab's does.

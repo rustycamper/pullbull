@@ -1,0 +1,11 @@
+{"data":{"search":{"issueCount":3,"nodes":[
+{"createdAt":"2026-11-01T08:00:00Z","isDraft":true,"state":"OPEN",
+ "readyEvent":{"nodes":[]},"reviews":{"nodes":[]}},
+{"createdAt":"2026-11-02T08:00:00Z","isDraft":false,"state":"OPEN",
+ "readyEvent":{"nodes":[{"createdAt":"2026-11-02T09:00:00Z"}]},
+ "reviews":{"nodes":[
+  {"submittedAt":"2026-11-02T09:10:00Z","state":"COMMENTED","author":{"__typename":"Bot","login":"copilot","avatarUrl":"https://a/b.png"}},
+  {"submittedAt":"2026-11-02T10:00:00Z","state":"APPROVED","author":{"__typename":"User","login":"alice","avatarUrl":"https://a/alice.png"}},
+  {"submittedAt":null,"state":"PENDING","author":{"__typename":"User","login":"me","avatarUrl":null}}]}},
+{}
+]}}}
