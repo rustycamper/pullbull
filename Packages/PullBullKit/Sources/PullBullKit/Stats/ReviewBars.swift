@@ -2,6 +2,8 @@ import Foundation
 
 /// One bar of the chart as drawn: points from the chart's leading edge, standing on its baseline.
 public struct ReviewBarMark: Equatable, Sendable {
+    /// The day's place in `counts`.
+    public let index: Int
     public let x: CGFloat
     public let width: CGFloat
     public let height: CGFloat
@@ -9,7 +11,8 @@ public struct ReviewBarMark: Equatable, Sendable {
     public let isEmpty: Bool
     public let isToday: Bool
 
-    public init(x: CGFloat, width: CGFloat, height: CGFloat, isEmpty: Bool, isToday: Bool) {
+    public init(index: Int, x: CGFloat, width: CGFloat, height: CGFloat, isEmpty: Bool, isToday: Bool) {
+        self.index = index
         self.x = x
         self.width = width
         self.height = height
@@ -99,18 +102,15 @@ public struct ReviewBars: Equatable, Sendable {
         return text
     }
 
-    /// The space between bars: narrower as there are more, so 90 still fit a card.
+    /// The space between bars: 6 pt for 7, 2 for 30, 1 for 90, so a week reads as wide columns and 90
+    /// still fit a card.
     public static func gap(barCount: Int) -> CGFloat {
-        barCount >= 90 ? 1 : barCount >= 30 ? 2 : 4
+        barCount >= 90 ? 1 : barCount >= 30 ? 2 : 6
     }
-
-    /// The widest a bar gets, so 7 bars stay bars rather than slabs.
-    public static let maxBarWidth: CGFloat = 14
 
     /// The bars across `width`, oldest first, each as tall as its count against the busiest loaded day's
     /// `height`. A day with reviews is at least 2 pt, so it never passes for the 1-pt stub of a day with
-    /// none; a day not loaded draws nothing. Bars are at most `maxBarWidth` wide, and when that cap
-    /// applies the bars and their gaps are centred in `width`.
+    /// none; a day not loaded draws nothing. The bars and their gaps fill `width`.
     public func marks(width: CGFloat, height: CGFloat) -> [ReviewBarMark] {
         guard !counts.isEmpty else { return [] }
         let layout = layout(width: width)
@@ -119,7 +119,7 @@ public struct ReviewBars: Equatable, Sendable {
             guard let count else { return nil }
             let barHeight = count == 0 || busiest == 0 ? 1 : max(height * CGFloat(count) / busiest, 2)
             return ReviewBarMark(
-                x: layout.x(of: index), width: layout.barWidth, height: min(barHeight, height),
+                index: index, x: layout.x(of: index), width: layout.barWidth, height: min(barHeight, height),
                 isEmpty: count == 0, isToday: index == todayIndex)
         }
     }
@@ -136,6 +136,24 @@ public struct ReviewBars: Equatable, Sendable {
         guard !counts.isEmpty else { return 0...0 }
         let layout = layout(width: width)
         return layout.x(of: 0)...(layout.x(of: counts.count - 1) + layout.barWidth)
+    }
+
+    /// The day whose strip holds `x` across `width`: each strip is the chart's full height, from the
+    /// middle of the gap before its bar to the middle of the gap after it, the first starting at 0 and
+    /// the last ending at `width`, so a 1-pt stub is as easy to hit as a tall bar. The middle of a gap
+    /// belongs to the later day. Nil outside 0...width.
+    public func day(at x: CGFloat, width: CGFloat) -> Int? {
+        guard !counts.isEmpty, x >= 0, x <= width else { return nil }
+        let layout = layout(width: width)
+        return (1..<counts.count).last { layout.stripStart(of: $0) <= x } ?? 0
+    }
+
+    /// The label for the hovered day, in English like the hover; `calendar` gives the day and its time
+    /// zone. "1 · Thu 29 Oct", "0 · Fri 30 Oct", or "Not loaded · Thu 29 Oct" for a day not loaded.
+    public func dayText(at index: Int, calendar: Calendar) -> String {
+        guard counts.indices.contains(index), dayStarts.indices.contains(index) else { return "" }
+        let day = Self.format(dayStarts[index], "EEE d MMM", calendar)
+        return "\(counts[index].map(String.init) ?? "Not loaded") · \(day)"
     }
 
     /// The day with the most reviews; the most recent of tied days wins. Nil when no loaded day has any.
@@ -165,19 +183,23 @@ public struct ReviewBars: Equatable, Sendable {
     }
 
     private struct Layout {
-        let origin: CGFloat
         let barWidth: CGFloat
         let gap: CGFloat
 
-        func x(of index: Int) -> CGFloat { origin + CGFloat(index) * (barWidth + gap) }
+        func x(of index: Int) -> CGFloat { CGFloat(index) * (barWidth + gap) }
+
+        /// The middle of the gap before the bar at `index`, where its hover strip starts.
+        func stripStart(of index: Int) -> CGFloat {
+            index == 0 ? 0 : (x(of: index - 1) + barWidth + x(of: index)) / 2
+        }
     }
 
     private func layout(width: CGFloat) -> Layout {
         let n = CGFloat(max(counts.count, 1))
-        let gap = Self.gap(barCount: counts.count)
-        let barWidth = min(max((width - gap * (n - 1)) / n, 0), Self.maxBarWidth)
-        let group = barWidth * n + gap * (n - 1)
-        return Layout(origin: max((width - group) / 2, 0), barWidth: barWidth, gap: gap)
+        // Never wider than `width` allows, so a very narrow chart shrinks its gaps before its bars.
+        let gap = min(Self.gap(barCount: counts.count), max(width, 0) / max(n - 1, 1))
+        let barWidth = max((width - gap * (n - 1)) / n, 0)
+        return Layout(barWidth: barWidth, gap: gap)
     }
 
     private static func format(_ date: Date, _ pattern: String, _ calendar: Calendar) -> String {
