@@ -138,6 +138,7 @@ import Testing
         let w = window(.week)
         let bars = ReviewBars.make(reviewDates: [day(4)], window: w, loadedFrom: w.dayStarts(calendar: cal)[3], calendar: cal)
         let marks = bars.marks(width: 78, height: 20)
+        #expect(marks.map(\.index) == [3, 4, 5, 6])
         #expect(marks.map(\.x) == [36, 48, 60, 72])
         #expect(marks.map(\.height) == [1, 20, 1, 1])
     }
@@ -295,5 +296,115 @@ import Testing
         let month = ReviewBars.make(reviewDates: [], window: StatsPeriod.month.window(now: nov4, calendar: posix),
                                     loadedFrom: nil, capped: true, calendar: posix)
         #expect(month.axisLabels(period: .month, calendar: posix).map(\.text) == ["6 Oct", "4 Nov"])
+    }
+
+    // MARK: Hovered day
+
+    @Test func dayAtTheEdgesOfAWeek() {
+        let bars = ReviewBars.make(reviewDates: [], window: window(.week), loadedFrom: nil, calendar: cal)
+        #expect(bars.day(at: 0, width: 300) == 0)
+        #expect(bars.day(at: 300, width: 300) == 6)
+    }
+
+    @Test func dayAtTheMidpointOfAGapIsTheLaterDay() {
+        let bars = ReviewBars.make(reviewDates: [], window: window(.week), loadedFrom: nil, calendar: cal)
+        let marks = bars.marks(width: 300, height: 36)
+        for index in 1..<7 {
+            let midpoint = (marks[index - 1].x + marks[index - 1].width + marks[index].x) / 2
+            #expect(bars.day(at: midpoint, width: 300) == index)
+            #expect(bars.day(at: midpoint - 0.01, width: 300) == index - 1)
+        }
+    }
+
+    @Test func dayInsideEachBarIsThatBar() {
+        let bars = ReviewBars.make(reviewDates: [day(2)], window: window(.week), loadedFrom: nil, calendar: cal)
+        for (index, mark) in bars.marks(width: 300, height: 36).enumerated() {
+            #expect(bars.day(at: mark.x + 0.01, width: 300) == index)
+            #expect(bars.day(at: mark.x + mark.width / 2, width: 300) == index)
+            #expect(bars.day(at: mark.x + mark.width - 0.01, width: 300) == index)
+        }
+    }
+
+    @Test func dayCoversDaysNotLoaded() {
+        let w = window(.week)
+        let bars = ReviewBars.make(reviewDates: [day(4)], window: w, loadedFrom: w.dayStarts(calendar: cal)[3], calendar: cal)
+        #expect(bars.day(at: bars.centerX(of: 1, width: 300), width: 300) == 1)
+    }
+
+    @Test func dayAcrossNinetyDays() {
+        let bars = ReviewBars.make(reviewDates: [], window: window(.quarter), loadedFrom: nil, calendar: cal)
+        let marks = bars.marks(width: 300, height: 36)
+        #expect(bars.day(at: 0, width: 300) == 0)
+        #expect(bars.day(at: 300, width: 300) == 89)
+        for (index, mark) in marks.enumerated() {
+            #expect(bars.day(at: mark.x + mark.width / 2, width: 300) == index)
+        }
+        let midpoint = (marks[44].x + marks[44].width + marks[45].x) / 2
+        #expect(bars.day(at: midpoint, width: 300) == 45)
+    }
+
+    @Test func dayOutsideTheWidthIsNil() {
+        let bars = ReviewBars.make(reviewDates: [], window: window(.week), loadedFrom: nil, calendar: cal)
+        #expect(bars.day(at: -0.5, width: 300) == nil)
+        #expect(bars.day(at: 300.5, width: 300) == nil)
+        #expect(bars.day(at: -100, width: 300) == nil)
+        #expect(bars.day(at: 1000, width: 300) == nil)
+    }
+
+    /// The week ending Wednesday 4 Nov 2026: Thu 29 Oct … Wed 4 Nov.
+    func weekBars(_ calendar: Calendar, now: Date, reviewDays: [Int], loadedFromDay: Int? = nil) -> ReviewBars {
+        let w = StatsPeriod.week.window(now: now, calendar: calendar)
+        let starts = w.dayStarts(calendar: calendar)
+        return ReviewBars.make(reviewDates: reviewDays.map { starts[$0].addingTimeInterval(3600) }, window: w,
+                               loadedFrom: loadedFromDay.map { starts[$0] }, calendar: calendar)
+    }
+
+    @Test func dayTextForALoadedDay() {
+        let bars = weekBars(posix, now: nov4, reviewDays: [0, 2, 2])
+        #expect(bars.dayText(at: 0, calendar: posix) == "1 · Thu 29 Oct")
+        #expect(bars.dayText(at: 2, calendar: posix) == "2 · Sat 31 Oct")
+    }
+
+    @Test func dayTextForAZeroDay() {
+        let bars = weekBars(posix, now: nov4, reviewDays: [0])
+        #expect(bars.dayText(at: 1, calendar: posix) == "0 · Fri 30 Oct")
+    }
+
+    @Test func dayTextForADayNotLoaded() {
+        let bars = weekBars(posix, now: nov4, reviewDays: [0, 4], loadedFromDay: 3)
+        #expect(bars.counts == [nil, nil, nil, 0, 1, 0, 0])
+        #expect(bars.dayText(at: 0, calendar: posix) == "Not loaded · Thu 29 Oct")
+        #expect(bars.dayText(at: 4, calendar: posix) == "1 · Mon 2 Nov")
+    }
+
+    @Test func dayTextForToday() {
+        let bars = weekBars(posix, now: nov4, reviewDays: [6, 6, 6])
+        #expect(bars.dayText(at: bars.todayIndex, calendar: posix) == "3 · Wed 4 Nov")
+    }
+
+    @Test func dayTextIsEnglishWhateverTheCalendarsLocale() {
+        var german = posix
+        german.locale = Locale(identifier: "de_DE")
+        german.firstWeekday = 2
+        let bars = weekBars(german, now: nov4, reviewDays: [0])
+        #expect(bars.dayText(at: 0, calendar: german) == "1 · Thu 29 Oct")
+        #expect(bars.dayText(at: 6, calendar: german) == "0 · Wed 4 Nov")
+    }
+
+    @Test func dayTextAcrossTheEndOfDaylightSaving() {
+        let bars = weekBars(newYork, now: nov4NewYork, reviewDays: [3, 4])
+        #expect((0..<7).map { bars.dayText(at: $0, calendar: newYork) } == [
+            "0 · Thu 29 Oct", "0 · Fri 30 Oct", "0 · Sat 31 Oct", "1 · Sun 1 Nov",
+            "1 · Mon 2 Nov", "0 · Tue 3 Nov", "0 · Wed 4 Nov",
+        ])
+    }
+
+    @Test func dayTextUsesTheCalendarsTimeZone() {
+        var tokyo = posix
+        tokyo.timeZone = TimeZone(identifier: "Asia/Tokyo")!
+        let now = tokyo.date(from: DateComponents(year: 2026, month: 11, day: 4, hour: 12))!
+        let bars = weekBars(tokyo, now: now, reviewDays: [0])
+        #expect(bars.dayText(at: 0, calendar: tokyo) == "1 · Thu 29 Oct")
+        #expect(bars.dayText(at: 6, calendar: tokyo) == "0 · Wed 4 Nov")
     }
 }
