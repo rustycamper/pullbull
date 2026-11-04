@@ -247,18 +247,22 @@ public struct StatsReport: Equatable, Sendable {
         }
     }
 
-    /// The card's value hovers for VoiceOver, which can't hover: joined by ". ", a sentence that ends
-    /// with its own full stop followed by a space only. Nil when the card has none.
+    /// The card's value hovers for VoiceOver, which can't hover: their sentences joined by ". ", a
+    /// sentence that ends with its own full stop followed by a space only, and a sentence two hovers
+    /// share (the cap note) said once. Nil when the card has none.
     public func cardHint(_ card: StatsCard) -> String? {
         let values: [StatValue] = switch card {
         case .reviews: [reviews, turnaround]
         case .pullRequests: [merged, timeToMerge, firstReview]
         case .issues: [issuesClosed, issuesOpened, comments]
         }
-        let hovers = values.compactMap(\.hover).filter { !$0.isEmpty }
-        guard var text = hovers.first else { return nil }
-        for hover in hovers.dropFirst() {
-            text += (text.hasSuffix(".") ? " " : ". ") + hover
+        var seen = Set<String>()
+        let sentences = values.compactMap(\.hover)
+            .flatMap { $0.components(separatedBy: ". ") }
+            .filter { !$0.isEmpty && seen.insert($0.hasSuffix(".") ? String($0.dropLast()) : $0).inserted }
+        guard var text = sentences.first else { return nil }
+        for sentence in sentences.dropFirst() {
+            text += (text.hasSuffix(".") ? " " : ". ") + sentence
         }
         return text
     }

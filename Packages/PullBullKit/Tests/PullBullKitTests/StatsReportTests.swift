@@ -206,11 +206,11 @@ import Testing
         #expect(report.timeToMerge.comparison == nil)
     }
 
-    @Test func cardHintJoinsTheHovers() {
+    @Test func cardHintJoinsTheHoversAndSaysTheCapOnce() {
         let items = reviewed(137, asked: 9, daysAgo: 1)
         let report = build(facts(reviewed: .success(Capped(items: items, capped: true))))
         #expect(report.cardHint(.reviews)
-            == "From the latest 100 PRs. Median of 9 reviews you were asked for. From the latest 100 PRs")
+            == "From the latest 100 PRs. Median of 9 reviews you were asked for")
     }
 
     @Test func cardHintKeepsASentencesOwnPeriod() {
