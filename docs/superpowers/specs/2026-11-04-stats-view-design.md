@@ -94,7 +94,7 @@ Minutes and hours round down. The median of an even count is the mean of the two
 
 - A review is one you submitted (approved, changes requested, commented, dismissed), dated by its `submittedAt`. Pending (unsent) reviews and reviews on your own PRs (replies in a thread) don't count.
 - Bars: today's in the accent colour, the others in the secondary colour; a day with none draws a 1-pt stub on the baseline in the tertiary colour, and a day with reviews is at least 2 pt tall, so an empty day never reads as a short bar. No axis. Hover on the chart: "12 reviews in the last 7 days, most on Tuesday (4)"; for 90 days the busiest day reads with its date ("most on 14 Oct (6)").
-- When the cap cut in (below), days that may be missing reviews are not drawn at all, not as stubs. Contributions come newest PR first, each dated by its latest review, so a PR not loaded has its latest review on or before the oldest loaded PR's latest review in the period: that day and every day before it are not drawn. When the cap cut in and no loaded PR has a review in the period, no day is drawn. A period with no reviews: "No reviews in the last 7 days".
+- When the cap cut in (below), days that may be missing reviews are not drawn at all, not as stubs. The reviewed search returns PRs most recently updated first, and a review updates its PR, so a PR not loaded has every review at or before the oldest loaded PR's `updatedAt`: every review from then on is loaded. The first day starting at or after that time is drawn (that same day when `updatedAt` is exactly local midnight, else the next day), and every day before it is not. When the cap cut in and no PR was loaded, no day is drawn. A period with no reviews: "No reviews in the last 7 days".
 - Capped, the hover's total reads "N+", as the Reviews figure does, and the days not loaded follow as a sentence of their own: "12+ reviews in the last 7 days, most on Tuesday (4). Days before 3 Oct not loaded". With nothing loaded: "0+ reviews in the last 7 days".
 - Turnaround, for each review R of yours in the period:
   - the request is the latest `ReviewRequestedEvent` on that PR made at or before R, naming you or one of your teams;
@@ -169,36 +169,42 @@ Two rows, drawn as full list rows (`PRRow`), from the PR rows already loaded for
 
 When a period loads, all its queries run in parallel, for the period and its comparison. The scope's search qualifier is `FetchScope.searchQualifier` (`org:acme` or `user:login`); searches add `archived:false`, as the lists do. In the personal scope limited to an installation's repositories, items outside them are dropped (`FetchScope.covers`). Dates go to GitHub as ISO 8601 UTC.
 
-### Reviews: contributions
+### Reviews: search
+
+Search for the PRs you reviewed, and read your reviews on each:
 
 ```graphql
-query($from: DateTime!, $to: DateTime!, $org: ID, $login: String!, $after: String) {
-  viewer {
-    contributionsCollection(organizationID: $org, from: $from, to: $to) {
-      pullRequestReviewContributions(first: 100, after: $after, orderBy: {direction: DESC}) {
-        pageInfo { hasNextPage endCursor }
-        nodes {
-          pullRequest {
-            author { login }
-            repository { nameWithOwner }
-            timelineItems(itemTypes: [REVIEW_REQUESTED_EVENT], last: 20) {
-              nodes { ... on ReviewRequestedEvent { createdAt
-                requestedReviewer { __typename ... on User { login } ... on Team { slug } } } }
-            }
-            reviews(author: $login, last: 50) { nodes { submittedAt state } }
-          }
-        }
+query($q: String!, $login: String!, $after: String) {
+  search(query: $q, type: ISSUE, first: 100, after: $after) {
+    issueCount
+    pageInfo { hasNextPage endCursor }
+    nodes { ... on PullRequest {
+      updatedAt
+      author { login }
+      repository { nameWithOwner }
+      timelineItems(itemTypes: [REVIEW_REQUESTED_EVENT], last: 20) {
+        nodes { ... on ReviewRequestedEvent { createdAt
+          requestedReviewer { __typename ... on User { login } ... on Team { slug } } } }
       }
-    }
+      reviews(author: $login, last: 50) { nodes { submittedAt state } }
+    } }
   }
 }
 ```
 
-- GitHub returns one contribution per PR reviewed (its latest review), so the nodes are PRs, newest first. The reviews themselves come from each PR's `reviews(author:)`, `last: 50` so the newest are there; those with `submittedAt` in the window and state not `PENDING` are the period's reviews. Nodes whose PR you authored are dropped.
-- `$org` is the org's node ID, fetched once per org (`organization(login:) { id }`) and kept in memory with the account's stats state; null in the personal scope. In an org scope the query is never sent without it (it would count every org): when the ID can't be fetched, the reviews items fail.
-- Cap: up to 100 in-scope PRs. In the personal scope, nodes outside the scope are dropped and the next page is read, up to 3 pages. The cap cut in when GitHub has more pages after the last one read.
-- The count of reviews, the bars and the turnaround are tallied from these. The total fields (`totalPullRequestReviewContributions`) aren't used: they count PRs, and include your own.
-- Repositories the token can't see come back as restricted contributions with no detail and aren't counted.
+`$q` is `StatsQueries.reviewedPRs(window:scope:)`:
+
+```
+is:pr reviewed-by:@me -author:@me updated:>=<from> archived:false sort:updated-desc <scope>
+```
+
+- Search can't filter by when a review was made, but a review updates its PR, so `updated:>=<from>` finds every PR with a review in the window, and some with reviews only before it. The reviews themselves come from each PR's `reviews(author:)`, `last: 50` so the newest are there; those with `submittedAt` in the window and state not `PENDING` are the period's reviews.
+- The window's end has no bound: a later update doesn't hide an earlier review, so a PR reviewed last week and updated today is still found for last week.
+- `updated:>=` takes the full timestamp (`2026-10-28T22:00:00Z`), checked live to the second.
+- `-author:@me` leaves out your own PRs; a node whose PR you authored is still dropped when tallying.
+- Nodes come most recently updated first; a null node (an item GitHub hides) is skipped. `updatedAt` is kept on each PR to date what was loaded when the cap cut in (Your reviews, above).
+- Cap: up to 100 in-scope PRs. An org reads 1 page. In the personal scope, PRs outside the scope are dropped and the next page is read, up to 3 pages. The cap cut in when the search has more pages after the last one read.
+- The count of reviews, the bars and the turnaround are tallied from these.
 - Cost: 2 points per page (measured with `gh`).
 
 ### Your merged PRs
@@ -244,13 +250,13 @@ Pages backwards (newest first) until a page reaches before the period's start, u
 
 ### Totals
 
-Per load of one period: contributions ×2 (2 points a page), merged ×2 (1), opened ×2 (2), issues closed ×2 (1), issues opened ×2 (1), comments ×1 (1 a page). In an org, about 15 points and 11 requests; at most about 30 in the personal scope with every extra page. A cold look at all three periods stays under 100; with the cache, an hour of ordinary use under 150 of the 5,000.
+Per load of one period: reviewed ×2 (2 points a page), merged ×2 (1), opened ×2 (2), issues closed ×2 (1), issues opened ×2 (1), comments ×1 (1 a page). In an org, about 15 points and 11 requests; at most about 30 in the personal scope with every extra page. A cold look at all three periods stays under 100; with the cache, an hour of ordinary use under 150 of the 5,000.
 
 The GitHub App's user token wasn't tried; every query here was run with a `gh` token. An App sign-in check belongs to the PR's verification. If GitHub refuses a query to the App, the items it feeds show "–" by the error rule.
 
 ### Not used
 
-- `search` with `reviewed-by:@me`: it can't filter by when the review was made.
+- `contributionsCollection.pullRequestReviewContributions`: see Decisions.
 - `PROJECT_V2_ITEM_STATUS_CHANGED_EVENT`: see Decisions.
 
 ## Rule location
@@ -281,10 +287,10 @@ The GitHub App's user token wasn't tried; every query here was run with a `gh` t
 - **A capped tally reads "N+" with what was counted**, not a flat "100+": 100 PRs can hold 137 reviews, and "100+" would understate what is known.
 - **"Still waiting" counts only open PRs.** Found in plan review: the opened-PRs search includes closed and merged ones, and a PR closed without a review isn't waiting.
 - **Right now follows the list's Settings filters**, so a row hidden from the list (an old or draft PR) doesn't come back on Stats.
-- **Reviews are counted from each PR's own reviews, not GitHub's contribution totals.** Found in spec review, checked on public accounts: `pullRequestReviewContributions` gives one contribution per PR (78 against 104 real reviews for one user), and it includes reviews on your own PRs. The contributions query is still the source of which PRs you reviewed in the window, with `organizationID` and dates; each PR's `reviews(author:, last: 50)` gives the reviews.
+- **The PRs you reviewed come from search, and the reviews from each PR's own reviews.** `viewer.contributionsCollection.pullRequestReviewContributions` returned zero, with no error and no restricted contributions, for an account that had 107 reviews that week on 79 PRs in its org, with or without `organizationID` and from both its tokens, so it can't be trusted. Its totals were wrong besides: one contribution per PR (78 against 104 real reviews for one public user), reviews on your own PRs included. Search with `reviewed-by:@me` can't filter by when a review was made, but `updated:>=` the window's start gives a superset that `submittedAt` then filters; each PR's `reviews(author:, last: 50)` gives the reviews. Search needs no org node ID, so there is no `organizationID` lookup.
 - **Turnaround only for reviews you were asked for, and only the first after each request.** A review nobody asked for, or a second review on the same request, isn't a response time; counting them would pull the median toward zero.
 - **First review starts when the PR was last marked ready, as `ReviewWait` does, and a review during the draft isn't a sample.** Counting it as 0 would pull the median toward zero.
-- **Searches sort by created date.** Without `sort:`, a capped page is in no useful order; GitHub can't sort by merge time, so a capped merged median is over the most recently opened.
+- **Your merged and opened PR searches sort by created date; the reviewed search sorts by updated date.** Without `sort:`, a capped page is in no useful order; GitHub can't sort by merge time, so a capped merged median is over the most recently opened. Updated order is what lets a capped reviewed result say which days are fully loaded.
 - **Opened issues come from search, not contributions**: exact, scoped, 1 point, and the same in both scopes.
 - **Top reviewers count PRs, not reviews**, so a long back-and-forth on one PR doesn't outrank someone who reviewed five.
 - **Board Status moves dropped from the Issues card.** The mockup had them. GitHub records them only on each issue's timeline (`ProjectV2ItemStatusChangedEvent`), so a count needs every issue you might have moved; any query that finds them (issues involving you) misses moves on other people's cards. Missing beats wrong. **Opened** takes its place.
