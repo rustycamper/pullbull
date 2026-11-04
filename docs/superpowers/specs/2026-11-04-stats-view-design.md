@@ -40,25 +40,28 @@ The feature fails if:
 
 ### Opening and closing
 
-- The gear menu (footer gear, and the menu bar item's right-click) gets a **Stats** item with ⌘3, after Keyboard Shortcuts. ⌘3 also opens Stats from the list and from search, by key position as well as character, as ⌘1 and ⌘2 do.
+- The gear menu (footer gear, and the menu bar item's right-click) gets a **Stats** item with ⌘3, after Keyboard Shortcuts. From the menu bar item's right-click it shows the popover, on Stats. ⌘3 also opens Stats from the list and from search, by key position as well as character, as ⌘1 and ⌘2 do.
 - Stats opens only from the list or the search. On any other screen (a detail, Ask, Stats itself) or with a picker open, the menu item is disabled and ⌘3 does nothing. It is disabled, and ⌘3 does nothing, while no account is signed in or the account's scope hasn't loaded.
 - It is a pushed screen like a detail: it slides in from the trailing edge over the list (a fade with Reduce Motion), with a back chevron in the header. Esc, ⌘[ or the chevron return to where it was opened from: the list, or the search with its query kept. ← does not go back on Stats; it moves the period chips (below).
-- ⌘1 and ⌘2 do nothing on Stats, as on a detail.
+- ⌘1, ⌘2 and ⌘3 do nothing on Stats, as on a detail. ⌘Z does nothing either: Stats has no edit to undo, and the list's last edit stays put.
+- Stats keys go only to Stats, never to the list hidden behind it: Esc, ⌘[, ← →, ↑ ↓, ↩, ⌘↩, ⌘C and ⌘R act on Stats, and no key edits the list's search, pickers or selection. ↑/↓ move the highlight between the two Right now rows; ↩ opens the highlighted row's detail, ⌘↩ opens it on GitHub, ⌘C copies its link. The highlight clears each time Stats opens.
+- An issue notification clicked while Stats is on screen opens the issue's detail, and Back from it returns to the list. A PR detail opened from Stats (a Right now row, or a PR notification) returns to Stats.
+- Back from a PR detail onto Stats fetches again if the period's result is stale.
 - The popover closed while Stats is on screen reopens on Stats under the rule a detail follows (`PopoverReopen`); otherwise on the list.
-- When the account or org changes (Settings, or the menu bar's account menu), Stats reloads for the new one if it is on screen.
+- When the account or org changes (Settings, or the menu bar's account menu), Stats reloads for the new one if it is on screen, once the new account's lists are loaded. Signing out while Stats is on screen returns to the list.
 
 ### Layout (top to bottom)
 
-1. **Header:** back chevron, the title "Stats" centred, a refresh button on the right. ⌘R on Stats refreshes the stats, not the lists.
-2. **Period chips:** This week · This month · 90 days, styled as the scope chips. ← and → move between them (no wrap). The choice is one app setting, kept across opens and relaunches. Default: This week.
+1. **Header:** back chevron, labelled with where Back goes (the list's name, or "Search"), the title "Stats" centred, a refresh button on the right. While a fetch runs the button is a spinner. ⌘R on Stats refreshes the stats, not the lists; with a fetch already running it does nothing, and neither does Retry.
+2. **Period chips:** This week · This month · 90 days, styled as the scope chips, each with a tooltip such as "Today and the 6 days before", and a faint "← →" hint at the trailing end. ← and → move between them (no wrap). The choice is one app setting, kept across opens and relaunches. Default: This week.
 3. **Error line**, only when there is an error (below).
-4. **Your reviews** card.
+4. **Your reviews** card, with "Last 7 days" (30, 90) at the trailing end of its header.
 5. **Your pull requests** card.
-6. **Right now** card.
+6. **Right now**: the section header and the two rows, with no card box around them. The rows draw their own hover and selection fill, and a box would put a fill inside a fill. Each row has a caption above it ("Waiting on you longest", "Your PR waiting longest").
 7. **Issues** card.
 8. **Footer:** "From GitHub, for `<login>` in `<org>`" (personal scope: "in your repositories"), plus "· from latest 100" when any cap cut in (below). Hover on the footer: "Updated 4 minutes ago. Only repositories PullBull can see."
 
-Header, chips and footer stay put; the cards scroll between them when they don't fit.
+Header, chips and footer stay put; the cards scroll between them when they don't fit. Your reviews, Your pull requests and Issues are drawn as the detail's cards under list-style section headers.
 
 ### Periods
 
@@ -90,21 +93,21 @@ Minutes and hours round down. The median of an even count is the mean of the two
 | Bar chart | Reviews per local day, one bar per day of the period (7, 30 or 90 bars) | no |
 
 - A review is one you submitted (approved, changes requested, commented, dismissed), dated by its `submittedAt`. Pending (unsent) reviews and reviews on your own PRs (replies in a thread) don't count.
-- Bars: today's in the accent colour, the others in the secondary colour; a day with none draws a 1-pt stub on the baseline. No axis. Hover on the chart: "12 reviews in the last 7 days, most on Tuesday (4)"; for 90 days the busiest day reads with its date ("most on 14 Oct (6)").
+- Bars: today's in the accent colour, the others in the secondary colour; a day with none draws a 1-pt stub on the baseline in the tertiary colour, and a day with reviews is at least 2 pt tall, so an empty day never reads as a short bar. No axis. Hover on the chart: "12 reviews in the last 7 days, most on Tuesday (4)"; for 90 days the busiest day reads with its date ("most on 14 Oct (6)").
 - When the cap cut in (below), days that may be missing reviews are not drawn at all, not as stubs, and the hover adds "Days before 3 Oct not loaded". Contributions come newest PR first, each dated by its latest review, so a PR not loaded has its latest review on or before the oldest loaded PR's latest review in the period: that day and every day before it are not drawn. A zero-review day: "No reviews in the last 7 days".
 - Turnaround, for each review R of yours in the period:
   - the request is the latest `ReviewRequestedEvent` on that PR made at or before R, naming you or one of your teams;
   - R is your response only if you submitted no other review on that PR between the request and R;
   - turnaround = R − the request.
   - A review with no such request (you reviewed unasked, or a follow-up) is not a sample. Neither is one whose request is older than the 20 request events loaded per PR.
-- Turnaround hover: "Median of 9 reviews you were asked for"; none: "No reviews you were asked for in this period".
+- Turnaround hover: "Median of 9 reviews you were asked for" ("1 review" for one); none: "No reviews you were asked for in this period".
 
 ### Your pull requests
 
 | Item | Value | Comparison |
 |---|---|---|
 | Merged | Your PRs merged in the period | yes |
-| Time to merge | Median of merged − opened over those PRs | yes |
+| Time to merge | Median of merged − opened over those PRs; hover "Median of 12 merged PRs" | yes |
 | First review | Median wait for a first review, over your PRs opened in the period (below) | yes |
 | Top reviewers | Up to 3 people, avatar + login + count, who reviewed the most of your PRs opened in the period | no |
 
@@ -137,24 +140,25 @@ Two rows, drawn as full list rows (`PRRow`), from the PR rows already loaded for
 
 ### Caps
 
-- Each capped source reads at most the newest 100 items in scope for the period (per source below; comments read up to 500). When more exist, the item's hover ends with "From the latest 100 PRs" (comments: "From your latest 500 comments"), and the footer shows "· from latest 100" (only comments capped: "· from latest 500 comments").
+- Each capped source reads at most the newest 100 items in scope for the period (per source below; comments read up to 500). When more exist, the item's hover ends with "From the latest 100 PRs" (comments: "From your latest 500 comments"), and the footer shows "· from latest 100" (only comments capped: "· from latest 500 comments"). When the PR sources and the comments are both capped, the footer shows only "· from latest 100", to keep it short; the comments item's own hover still says "From your latest 500 comments".
 - A count that GitHub gives exactly (`issueCount`) is always exact; the cap only affects medians, bars, top reviewers and the counts that are tallied from loaded items (reviews, comments). A capped tally reads "N+", N being what was counted ("137+"), comparisons included ("last week 137+").
 
 ### Loading, errors, cache
 
 - First load of a period (nothing cached for this account, scope and period): the cards' layout with the skeleton shimmer where values go, as the list's first load. The Right now card shows at once.
-- Each period's result is cached in memory, per account, scope and period, for 15 minutes. Opening Stats or switching to a period within that time shows the cached result with no request. After 15 minutes the cached result shows at once while a refresh runs, and values change in place.
+- Each period's result is cached in memory, per account, scope and period, for 15 minutes. Opening Stats or switching to a period within that time shows the cached result with no request. After 15 minutes the cached result shows at once while a refresh runs, and values change in place. Switching to a period with nothing cached shows the skeleton.
 - A result with any failed item is stale at once: the next open or period switch fetches again.
 - Refresh (button or ⌘R) ignores the cache.
-- Memory only: a relaunch starts empty. An account's entries are dropped when it signs out.
-- An error (offline, rate limited, a query refused) keeps whatever is on screen and shows a line under the chips in the style of the search's failure banner, "Couldn't load stats: <reason>" (the reason worded as the lists' error), with a Retry button that refreshes. Values with nothing behind them show "–".
+- A fetch that is stopped (Back, a period switch while it runs, a sign-out) caches nothing and leaves no spinner behind.
+- Memory only: a relaunch starts empty. An account's entries are dropped when it signs out or its session is revoked.
+- An error (offline, rate limited, a query refused) keeps whatever is on screen and shows a line under the chips in the style of the search's failure banner, "Couldn't load stats: <reason>" (the reason worded as the lists' error; with several failures, the first), with a Retry button that refreshes. Values with nothing behind them show "–".
 - A query that fails takes out only the items it feeds; the others show.
 - Rate limited: the line says when it resets, as the lists do; no automatic retry before then.
 - No polling: it loads on open (when stale), on period switch (when stale), on refresh, and on account or scope change.
 
 ### Accessibility
 
-- Each card is a VoiceOver group: "Your reviews, this week: 12 reviews, last week 9. Median turnaround 3 hours 10 minutes, last week 5 hours."
+- Each card is a VoiceOver group: "Your reviews, this week: 12 reviews, last week 9. Median turnaround 3 hours 10 minutes, last week 5 hours." The other cards read the same way: "Your pull requests, this week: 6 merged, last week 4. Median time to merge …. Median first review …. Top reviewers: dana 3, lee 2." and "Issues, this week: 3 closed …. 5 opened …. 12 comments." For 90 days the period reads "the last 90 days". A figure that is unknown reads "not available"; a card with no report reads "<title>, loading" or "<title>, not available".
 - The bar chart is one element labelled with its hover wording.
 - Values use monospaced digits so they don't jitter on refresh.
 
@@ -285,3 +289,9 @@ The GitHub App's user token wasn't tried; every query here was run with a `gh` t
 - **Issues closed means issues assigned to you now that closed**, whoever closed them: search can't find who closed an issue.
 - **Right now reuses the loaded lists and `ReviewWait`**, so the rows match the list and cost nothing; its rows open the detail like list rows.
 - **No polling.** Stats changes slowly; it loads when opened (if stale) and on demand.
+- **Stats keys go only to Stats.** The list stays mounted behind the screen; a key that reached it would edit a search, open a picker or undo an edit the user can't see. ⌘Z is swallowed for the same reason.
+- **An issue notification opened over Stats returns to the list.** An issue detail has no Stats return path, and adding one would be new routing for a rare case. A PR detail opened from Stats returns to Stats.
+- **A stopped fetch caches nothing.** Back, a period switch mid-fetch or a sign-out ends the fetch; storing its answer could show another account's or period's figures. ⌘R and Retry don't restart a fetch that is running.
+- **The footer says "· from latest 100" when both kinds of cap cut in.** One note keeps the footer on one line; the comments item's hover keeps its own wording.
+- **Zero-review days are tertiary-colour stubs, and a day with reviews is at least 2 pt.** An empty day must not read as a short bar.
+- **Right now has no card box.** Its rows draw their own hover and selection fill.
