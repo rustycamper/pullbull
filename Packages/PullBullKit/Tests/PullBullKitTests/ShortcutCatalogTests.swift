@@ -99,6 +99,16 @@ private let modifierOrder = ["⌃", "⌥", "⇧", "⌘"]
         #expect(app.shortcuts.contains { $0.action == "Keyboard shortcuts" && $0.keys == [["⌘", "/"]] })
     }
 
+    @Test func statsFollowsIssuesAndRefreshSaysWhatItDoesThere() throws {
+        let sections = ShortcutCatalog.sections(toggle: nil)
+        let lists = try #require(sections.first { $0.title == "Lists" })
+        let issues = try #require(lists.shortcuts.firstIndex { $0.action == "Issues" })
+        #expect(lists.shortcuts[issues + 1].action == "Stats")
+        #expect(lists.shortcuts[issues + 1].keys == [["⌘", "3"]])
+        let refresh = try #require(sections[0].shortcuts.first { $0.action == "Refresh" })
+        #expect(refresh.note == "On Stats, refreshes the stats")
+    }
+
     // MARK: Filter
 
     private let all = ShortcutCatalog.sections(toggle: ["⌃", "⌥", "P"])

@@ -204,11 +204,14 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// Repos (`owner/name`) Ask never indexes or sends.
     public var askExcludedRepos: [String] = []
 
+    /// The period the Stats screen reports on.
+    public var statsPeriod: StatsPeriod = .week
+
     private enum CodingKeys: String, CodingKey {
         case account, org, projectNumber, projectOwner, projectOrg, orgByAccount, boardByOwner, grouping, groupTeamByAuthor, sorts, reviewOldestFirst, compact,
             hideOlderThanTwoMonths, hideApprovedByMe, hideDrafts, badge, notify, refreshMinutes, followPendingCI, openOn, lastScope, toggleHotkey, mode, issueOpenOn, lastIssueScope, lastIssueTab,
             countAssignedIssues, solidBackground, accountSource, appAccounts, signedOutByUser, laneFolds, sectionFolds,
-            askEnabled, askModel, askModelChoices, askExcludedRepos
+            askEnabled, askModel, askModelChoices, askExcludedRepos, statsPeriod
     }
 
     public init() {}
@@ -284,6 +287,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         d.askModel = c.readable(String.self, forKey: .askModel) ?? d.askModel
         d.askModelChoices = c.readableElements(AskModel.self, forKey: .askModelChoices) ?? d.askModelChoices
         d.askExcludedRepos = c.readableElements(String.self, forKey: .askExcludedRepos) ?? d.askExcludedRepos
+        d.statsPeriod = c.readable(StatsPeriod.self, forKey: .statsPeriod) ?? d.statsPeriod
         self = d
     }
 
@@ -323,6 +327,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         try c.encode(askModel, forKey: .askModel)
         try c.encode(askModelChoices, forKey: .askModelChoices)
         try c.encode(askExcludedRepos, forKey: .askExcludedRepos)
+        try c.encode(statsPeriod, forKey: .statsPeriod)
     }
 
     /// The current account with its token source; nil when none is chosen.

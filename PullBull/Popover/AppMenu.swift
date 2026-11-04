@@ -27,8 +27,8 @@ final class AppMenu: NSObject {
             let item = NSMenuItem(title: title, action: #selector(pick(_:)), keyEquivalent: entry.keyEquivalent)
             item.target = self
             item.tag = entries.count
-            // Disabled while Sparkle is busy.
-            item.isEnabled = entry != .checkForUpdates || updater.canCheckForUpdates
+            // Disabled while Sparkle is busy; Stats has no window yet.
+            item.isEnabled = (entry != .checkForUpdates || updater.canCheckForUpdates) && entry != .stats
             entries.append(entry)
             menu.addItem(item)
         }
@@ -67,7 +67,7 @@ final class AppMenu: NSObject {
             NSApp.orderFrontStandardAboutPanel(nil)
         case .checkForUpdates: Updater.shared.checkForUpdates()
         case .quit: NSApp.terminate(nil)
-        case .separator: break
+        case .stats, .separator: break
         }
     }
 }
