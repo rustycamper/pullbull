@@ -85,6 +85,14 @@ import Testing
         #expect(StatsPeriod.allCases.map(\.comparisonName) == ["last week", "last month", "previous 90 days"])
     }
 
+    @Test func arrowsStepThroughTheChipsWithoutWrapping() {
+        #expect(ListNavigation.tab(StatsPeriod.week, movedBy: 1) == .month)
+        #expect(ListNavigation.tab(StatsPeriod.month, movedBy: 1) == .quarter)
+        #expect(ListNavigation.tab(StatsPeriod.quarter, movedBy: 1) == .quarter)
+        #expect(ListNavigation.tab(StatsPeriod.quarter, movedBy: -1) == .month)
+        #expect(ListNavigation.tab(StatsPeriod.week, movedBy: -1) == .week)
+    }
+
     @Test func comparisonText() {
         #expect(StatsComparison.text("5 h", period: .quarter) == "previous 90 days 5 h")
         #expect(StatsComparison.text("5 h", period: .week) == "last week 5 h")

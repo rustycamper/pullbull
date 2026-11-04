@@ -397,6 +397,8 @@ final class AppModel {
     @ObservationIgnored var statsOrgIDs: [String: String] = [:]
     /// Back from Stats ends in the search, with its query kept, rather than the list.
     private(set) var statsReturnsToSearch = false
+    /// The highlighted Right now row on Stats (↑/↓; Return opens it).
+    var statsSelection: PRKey?
     /// Watches connectivity so a refresh runs as soon as the network is back (see `NetworkRecovery`);
     /// started by the main init only, cancelled in deinit.
     @ObservationIgnored private let pathMonitor = NWPathMonitor()
@@ -2052,6 +2054,8 @@ final class AppModel {
         if snapshot != nil || tabs != nil || searchResults != nil { clearAccountData() }
         commentDrafts.dropAccount(account.login)
         statsCache.drop(account: account.login)
+        // Its lists may be gone already; Stats has nothing to load either way.
+        resetStats(signedOut: true)
         guard signedOutDropped != account else { return }
         signedOutDropped = account
         let store = snapshotStore
@@ -2374,6 +2378,8 @@ extension AppModel {
             return
         } else if detailReturnRoute == .stats {
             route = .stats
+            // The report may have gone stale while the PR was open.
+            if !statsLoading { loadStats(force: false) }
         } else {
             route = detailReturnRoute == .search && !searchText.isEmpty ? .search : .list
             // A chip hidden since (Team without an org) falls back to All.
@@ -2792,6 +2798,7 @@ extension AppModel {
         leaveAsk()
         closeCompletion()
         statsReturnsToSearch = route == .search
+        statsSelection = nil
         route = .stats
         loadStats(force: false)
     }
@@ -2819,11 +2826,13 @@ extension AppModel {
     }
 
     /// Account or org changed: the previous one's report goes. Stats on screen stays, and loads for the
-    /// new one once its lists are here (`apply`); with no account left it gives way to the list.
-    fileprivate func resetStats() {
+    /// new one once its lists are here (`apply`); with no account left, or the account signed out, it
+    /// gives way to the list, as a detail does.
+    fileprivate func resetStats(signedOut: Bool = false) {
         stopStatsLoad()
         statsReport = nil
-        if route == .stats, running == nil { route = .list }
+        statsSelection = nil
+        if route == .stats, running == nil || signedOut { route = .list }
     }
 }
 

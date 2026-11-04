@@ -575,6 +575,7 @@ struct PopoverView: View {
         if model.setPicker != nil { return handleSetPickerKey(event, flags: flags) }
         if Self.isDetail(model.route) { return handleDetailKey(event, flags: flags, in: window) }
         if model.route == .ask { return handleAskKey(event, flags: flags) }
+        if model.route == .stats { return handleStatsKey(event, flags: flags) }
         // The list's own keys work while no search is open and no text field has focus.
         let listKeys = !searchOpen && !(window.firstResponder is NSText)
             ? model.listKeys(doneExpanded: doneExpanded) : nil
@@ -1047,6 +1048,53 @@ struct PopoverView: View {
             guard plain.isEmpty else { return false }
             model.openAskSelection()
             return true
+        default:
+            return false
+        }
+    }
+
+    /// Stats has no search: Esc and ⌘[ go back, ← / → move the period chips, ↑ / ↓ the Right now rows, ↩
+    /// opens the highlighted row's detail, ⌘↩ its page on GitHub, ⌘C copies its link, ⌘R fetches the
+    /// stats again, and ⌘1 / ⌘2 / ⌘3 are taken and do nothing. Every other key passes through, as on a
+    /// detail, and never reaches the hidden list.
+    private func handleStatsKey(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
+        let plain = flags.subtracting([.capsLock, .numericPad, .function])
+        if flags.contains(.command) {
+            guard plain.subtracting([.command, .shift]).isEmpty else { return false }
+            // By key position too, as in the list: on layouts like AZERTY those keys don't type digits.
+            let digits = [SearchKeyMonitor.digit1, SearchKeyMonitor.digit2, SearchKeyMonitor.digit3]
+            if digits.contains(event.keyCode) { return true }
+            guard !plain.contains(.shift) else { return false }
+            // Nothing on Stats to take back: neither the list's last edit nor the hidden field's typing.
+            if Self.isCommandZ(event, flags: flags) { return true }
+            if event.keyCode == SearchKeyMonitor.return || event.keyCode == SearchKeyMonitor.enter {
+                return model.openStatsSelectionOnGitHub()
+            }
+            switch Self.commandKey(event) {
+            case "[": model.closeStats()
+            case "r": if !model.statsLoading { model.refreshStats() }
+            case "c": return model.copyStatsSelectionLink()
+            case "1", "2", "3": break
+            default: return false
+            }
+            return true
+        }
+        switch event.keyCode {
+        case SearchKeyMonitor.escape:
+            guard flags.isDisjoint(with: [.control, .option]) else { return false }
+            model.closeStats()
+            return true
+        case SearchKeyMonitor.leftArrow, SearchKeyMonitor.rightArrow:
+            guard plain.isEmpty else { return false }
+            model.moveStatsPeriod(by: event.keyCode == SearchKeyMonitor.rightArrow ? 1 : -1)
+            return true
+        case SearchKeyMonitor.upArrow, SearchKeyMonitor.downArrow:
+            guard plain.isEmpty else { return false }
+            model.moveStatsSelection(by: event.keyCode == SearchKeyMonitor.downArrow ? 1 : -1)
+            return true
+        case SearchKeyMonitor.return, SearchKeyMonitor.enter:
+            guard plain.isEmpty else { return false }
+            return model.openStatsSelection()
         default:
             return false
         }

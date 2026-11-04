@@ -57,4 +57,33 @@ import Testing
         #expect(picked.waitingOnMe == nil)
         #expect(picked.myLongest == nil)
     }
+
+    @Test func keysListTheRowsShownTopToBottom() {
+        let picked = Self.pick(review: [Self.row(1, requested: 3)], mine: [Self.row(2)])
+        #expect(picked.keys.map(\.number) == [1, 2])
+        #expect(picked.item(for: PRKey(repo: "org/repo", number: 2))?.row.id.number == 2)
+        #expect(picked.item(for: PRKey(repo: "org/repo", number: 3)) == nil)
+    }
+
+    @Test func keysSkipAMissingRow() {
+        #expect(Self.pick(mine: [Self.row(2)]).keys.map(\.number) == [2])
+        #expect(Self.pick(review: [Self.row(1, requested: 3)]).keys.map(\.number) == [1])
+        #expect(Self.pick().keys.isEmpty)
+    }
+
+    @Test func aPRInBothRowsIsOneStop() {
+        let both = Self.pick(review: [Self.row(1, requested: 3)]).waitingOnMe
+        let rightNow = RightNow(waitingOnMe: both, myLongest: both)
+        #expect(rightNow.keys.map(\.number) == [1])
+    }
+
+    @Test func selectionStepsBetweenTheRowsWithoutWrapping() {
+        let keys = Self.pick(review: [Self.row(1, requested: 3)], mine: [Self.row(2)]).keys
+        #expect(ListNavigation.move(nil, by: 1, in: keys)?.number == 1)
+        #expect(ListNavigation.move(nil, by: -1, in: keys)?.number == 2)
+        #expect(ListNavigation.move(keys[0], by: 1, in: keys)?.number == 2)
+        #expect(ListNavigation.move(keys[1], by: 1, in: keys)?.number == 2)
+        #expect(ListNavigation.move(keys[0], by: -1, in: keys)?.number == 1)
+        #expect(ListNavigation.move(nil, by: 1, in: []) == nil)
+    }
 }

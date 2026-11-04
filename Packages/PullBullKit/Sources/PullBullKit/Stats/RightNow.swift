@@ -22,6 +22,20 @@ public struct RightNow: Sendable {
         self.myLongest = myLongest
     }
 
+    /// The rows shown, top to bottom, for ↑ / ↓ on the card. A PR in both rows is one stop.
+    public var keys: [PRKey] {
+        var keys: [PRKey] = []
+        for item in [waitingOnMe, myLongest] {
+            if let key = item?.row.id, !keys.contains(key) { keys.append(key) }
+        }
+        return keys
+    }
+
+    /// The shown row for `key`, so its PR can be opened or copied.
+    public func item(for key: PRKey) -> RightNowItem? {
+        [waitingOnMe, myLongest].lazy.compactMap { $0 }.first { $0.row.id == key }
+    }
+
     /// `review` and `mine` are the tabs' rows as listed, so the list's filters apply. Rows without a known
     /// start are skipped; the earliest start wins and a tie keeps list order.
     public static func pick(review: [Row], mine: [Row], me: String, myTeams: Set<String>, now: Date) -> RightNow {
