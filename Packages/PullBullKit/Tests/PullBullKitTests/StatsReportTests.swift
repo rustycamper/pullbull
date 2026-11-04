@@ -115,6 +115,38 @@ import Testing
         #expect(report.bars?.counts.first == .some(nil))
     }
 
+    @Test func cappedWithNothingLoadedMarksEveryDayNotLoaded() {
+        let prs = reviewed(100, asked: 0, daysAgo: 10)
+        let report = build(facts(reviewed: .success(Capped(items: prs, capped: true))))
+        #expect(report.bars?.counts == Array(repeating: nil, count: 7))
+    }
+
+    @Test func cappedTurnaroundHoverJoinsTheCapSentence() {
+        let items = reviewed(12, asked: 9, daysAgo: 1)
+        let report = build(facts(reviewed: .success(Capped(items: items, capped: true))))
+        #expect(report.turnaround.hover == "Median of 9 reviews you were asked for. From the latest 100 PRs")
+    }
+
+    @Test func cappedTurnaroundHoverWithNoSamples() {
+        let items = reviewed(4, asked: 0, daysAgo: 1)
+        let report = build(facts(reviewed: .success(Capped(items: items, capped: true))))
+        #expect(report.turnaround.hover == "No reviews you were asked for in this period. From the latest 100 PRs")
+    }
+
+    @Test func timeToMergeHasNoHoverWithNothingMerged() {
+        let report = build(facts(merged: .success(CountedList(total: 0, items: []))))
+        #expect(report.timeToMerge.text == "–")
+        #expect(report.timeToMerge.hover == nil)
+    }
+
+    @Test func timeToMergeHoverUncapped() {
+        let prs = (0..<3).map { _ in
+            MergedPR(createdAt: now.addingTimeInterval(-3 * day), mergedAt: now.addingTimeInterval(-2 * day))
+        }
+        let report = build(facts(merged: .success(CountedList(total: 3, items: prs))))
+        #expect(report.timeToMerge.hover == "Median of 3 merged PRs")
+    }
+
     @Test func cappedComparison() {
         let before = Capped(items: reviewed(137, asked: 0, daysAgo: 8), capped: true)
         let report = build(facts(reviewedBefore: .success(before)))
@@ -158,8 +190,42 @@ import Testing
         #expect(report.merged.text == "140")
         #expect(report.merged.hover == nil)
         #expect(report.timeToMerge.text == "1 d")
-        #expect(report.timeToMerge.hover == "Median of 3 merged PRs From the latest 100 PRs")
+        #expect(report.timeToMerge.hover == "Median of 3 merged PRs. From the latest 100 PRs")
         #expect(report.anyCapped)
+    }
+
+    @Test func comparisonSplitsIntoLabelAndValue() {
+        let merged = (0..<5).map { _ in
+            MergedPR(createdAt: now.addingTimeInterval(-3 * day), mergedAt: now.addingTimeInterval(-2 * day))
+        }
+        let report = build(facts(merged: .success(CountedList(total: 5, items: merged))), period: .quarter)
+        #expect(report.merged.previous == StatComparison(label: "previous 90 days", value: "0"))
+        #expect(report.merged.comparison == "previous 90 days 0")
+        #expect(build(facts()).turnaround.previous == StatComparison(label: "last week", value: "5 h"))
+        #expect(report.timeToMerge.previous == nil)
+        #expect(report.timeToMerge.comparison == nil)
+    }
+
+    @Test func cardHintJoinsTheHovers() {
+        let items = reviewed(137, asked: 9, daysAgo: 1)
+        let report = build(facts(reviewed: .success(Capped(items: items, capped: true))))
+        #expect(report.cardHint(.reviews)
+            == "From the latest 100 PRs. Median of 9 reviews you were asked for. From the latest 100 PRs")
+    }
+
+    @Test func cardHintKeepsASentencesOwnPeriod() {
+        let prs = (0..<6).map { _ in opened(waitHours: 3) } + [opened(waitHours: nil), opened(waitHours: nil)]
+        let merged = (0..<3).map { _ in
+            MergedPR(createdAt: now.addingTimeInterval(-3 * day), mergedAt: now.addingTimeInterval(-2 * day))
+        }
+        let report = build(facts(
+            opened: .success(CountedList(total: 8, items: prs)), merged: .success(CountedList(total: 3, items: merged))))
+        #expect(report.cardHint(.pullRequests)
+            == "Median of 3 merged PRs. Median of 6 PRs. 2 of your PRs opened in this period still wait for a first review.")
+    }
+
+    @Test func cardHintNilWithoutHovers() {
+        #expect(build(facts()).cardHint(.issues) == nil)
     }
 
     @Test func topReviewersNilWhenOpenedFailed() {

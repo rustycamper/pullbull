@@ -27,19 +27,25 @@ public struct ReviewBars: Equatable, Sendable {
     public let todayIndex: Int
     private let dayStarts: [Date]
     private let loadedFrom: Date?
+    private let capped: Bool
     private let total: Int
 
-    private init(counts: [Int?], todayIndex: Int, dayStarts: [Date], loadedFrom: Date?, total: Int) {
+    private init(counts: [Int?], todayIndex: Int, dayStarts: [Date], loadedFrom: Date?, capped: Bool, total: Int) {
         self.counts = counts
         self.todayIndex = todayIndex
         self.dayStarts = dayStarts
         self.loadedFrom = loadedFrom
+        self.capped = capped
         self.total = total
     }
 
-    /// `loadedFrom` is nil when nothing was capped; otherwise the first fully loaded day's start, and
-    /// every day before it is nil.
-    public static func make(reviewDates: [Date], window: StatsWindow, loadedFrom: Date?, calendar: Calendar) -> ReviewBars {
+    /// `loadedFrom` is the first fully loaded day's start when a cap cut in, and every day before it is
+    /// nil; a `loadedFrom` implies `capped`. Capped with no `loadedFrom` means nothing in the window was
+    /// loaded, so every day is nil.
+    public static func make(
+        reviewDates: [Date], window: StatsWindow, loadedFrom: Date?, capped: Bool = false, calendar: Calendar
+    ) -> ReviewBars {
+        let capped = capped || loadedFrom != nil
         let starts = window.dayStarts(calendar: calendar)
         var tally = [Int](repeating: 0, count: starts.count)
         var total = 0
@@ -49,24 +55,31 @@ public struct ReviewBars: Equatable, Sendable {
             total += 1
         }
         let counts = zip(starts, tally).map { start, n -> Int? in
-            if let loadedFrom, start < loadedFrom { return nil }
+            if capped, loadedFrom.map({ start < $0 }) ?? true { return nil }
             return n
         }
         return ReviewBars(
-            counts: counts, todayIndex: max(starts.count - 1, 0), dayStarts: starts, loadedFrom: loadedFrom, total: total)
+            counts: counts, todayIndex: max(starts.count - 1, 0), dayStarts: starts, loadedFrom: loadedFrom,
+            capped: capped, total: total)
     }
 
     /// "12 reviews in the last 7 days, most on Tuesday (4)", with the date for 90 days; the most recent
-    /// of tied days wins. Days not loaded add " Days before 3 Oct not loaded".
+    /// of tied days wins. Capped, the total reads "12+ reviews", and days not loaded add
+    /// ". Days before 3 Oct not loaded".
     public func hover(period: StatsPeriod, calendar: Calendar) -> String {
         let span = "in the last \(period.days) days"
-        var text = total == 0 ? "No reviews \(span)" : "\(total) \(total == 1 ? "review" : "reviews") \(span)"
+        var text: String
+        if capped {
+            text = "\(total)+ reviews \(span)"
+        } else {
+            text = total == 0 ? "No reviews \(span)" : "\(total) \(total == 1 ? "review" : "reviews") \(span)"
+        }
         if total > 0, let busiest = busiestDay() {
             let format = period == .quarter ? "d MMM" : "EEEE"
             text += ", most on \(Self.format(dayStarts[busiest.index], format, calendar)) (\(busiest.count))"
         }
         if counts.contains(where: { $0 == nil }), let loadedFrom {
-            text += " Days before \(Self.format(loadedFrom, "d MMM", calendar)) not loaded"
+            text += ". Days before \(Self.format(loadedFrom, "d MMM", calendar)) not loaded"
         }
         return text
     }

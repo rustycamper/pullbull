@@ -30,9 +30,12 @@ public struct StatsCache: Sendable {
         reports[key]
     }
 
-    /// Whether `key` has a complete report under 15 minutes old; one from the future (the clock moved) is not fresh. A report with a failure is never fresh.
-    public func isFresh(_ key: StatsKey, now: Date) -> Bool {
+    /// Whether `key` has a complete report under 15 minutes old, fetched on the same local day; one from
+    /// the future (the clock moved) is not fresh. A report with a failure is never fresh. Past local
+    /// midnight the periods cover other days, so an earlier day's report is stale.
+    public func isFresh(_ key: StatsKey, now: Date, calendar: Calendar = .current) -> Bool {
         guard let report = reports[key], report.isComplete else { return false }
+        guard calendar.startOfDay(for: report.fetchedAt) == calendar.startOfDay(for: now) else { return false }
         let age = now.timeIntervalSince(report.fetchedAt)
         return age >= 0 && age < Self.freshFor
     }

@@ -45,26 +45,43 @@ public struct StatsFacts: Sendable {
     }
 }
 
+/// The previous period's figure beside a value: the period's name, "last week", and the figure, "5 h".
+public struct StatComparison: Equatable, Sendable {
+    public let label: String
+    public let value: String
+
+    public init(label: String, value: String) {
+        self.label = label
+        self.value = value
+    }
+}
+
 /// One figure on a card. `text` is "–" when the value is unknown: missing beats wrong.
 public struct StatValue: Equatable, Sendable {
     public let text: String
     /// The same figure for VoiceOver: "3 hours 10 minutes", or "not available".
     public let spoken: String
-    /// The previous period's figure, "last week 5 h"; nil when either side is unknown.
-    public let comparison: String?
+    /// The previous period's figure in its parts, for a column too narrow for one line; nil when either
+    /// side is unknown.
+    public let previous: StatComparison?
     /// The comparison for VoiceOver: "last week 5 hours".
     public let comparisonSpoken: String?
     public let hover: String?
     /// Whether a source cap cut into this figure.
     public let capped: Bool
 
+    /// The previous period's figure on one line, "last week 5 h"; nil when either side is unknown.
+    public var comparison: String? {
+        previous.map { "\($0.label) \($0.value)" }
+    }
+
     public init(
-        text: String, spoken: String, comparison: String? = nil, comparisonSpoken: String? = nil,
+        text: String, spoken: String, previous: StatComparison? = nil, comparisonSpoken: String? = nil,
         hover: String? = nil, capped: Bool = false
     ) {
         self.text = text
         self.spoken = spoken
-        self.comparison = comparison
+        self.previous = previous
         self.comparisonSpoken = comparisonSpoken
         self.hover = hover
         self.capped = capped
@@ -145,7 +162,7 @@ public struct StatsReport: Equatable, Sendable {
                 let text = sampled.stats.turnarounds.isEmpty
                     ? "No reviews you were asked for in this period"
                     : "Median of \(sampled.stats.turnarounds.count) \(sampled.stats.turnarounds.count == 1 ? "review" : "reviews") you were asked for"
-                return sampled.capped ? "\(text) \(prCap)" : text
+                return sampled.capped ? "\(text). \(prCap)" : text
             }, capped: current?.capped == true)
 
         let mergedNow = try? facts.merged.get()
@@ -156,9 +173,10 @@ public struct StatsReport: Equatable, Sendable {
         let timeToMerge = duration(
             mergeTimes.flatMap(Median.of), mergedBefore.map { MergeTimes.make($0.items) }.flatMap(Median.of),
             period: period,
-            hover: mergedNow.map { list in
+            hover: mergedNow.flatMap { list in
+                guard !list.items.isEmpty else { return nil }
                 let text = "Median of \(list.items.count) merged \(list.items.count == 1 ? "PR" : "PRs")"
-                return list.capped ? "\(text) \(prCap)" : text
+                return list.capped ? "\(text). \(prCap)" : text
             }, capped: mergedNow?.capped == true)
 
         let openedNow = try? facts.opened.get()
@@ -191,7 +209,9 @@ public struct StatsReport: Equatable, Sendable {
         if let current {
             let from = current.capped
                 ? ReviewStats.loadedFrom(current.prs, window: window, me: me, calendar: calendar) : nil
-            bars = ReviewBars.make(reviewDates: current.stats.reviewDates, window: window, loadedFrom: from, calendar: calendar)
+            bars = ReviewBars.make(
+                reviewDates: current.stats.reviewDates, window: window, loadedFrom: from, capped: current.capped,
+                calendar: calendar)
         }
 
         return StatsReport(
@@ -227,6 +247,22 @@ public struct StatsReport: Equatable, Sendable {
         }
     }
 
+    /// The card's value hovers for VoiceOver, which can't hover: joined by ". ", a sentence that ends
+    /// with its own full stop followed by a space only. Nil when the card has none.
+    public func cardHint(_ card: StatsCard) -> String? {
+        let values: [StatValue] = switch card {
+        case .reviews: [reviews, turnaround]
+        case .pullRequests: [merged, timeToMerge, firstReview]
+        case .issues: [issuesClosed, issuesOpened, comments]
+        }
+        let hovers = values.compactMap(\.hover).filter { !$0.isEmpty }
+        guard var text = hovers.first else { return nil }
+        for hover in hovers.dropFirst() {
+            text += (text.hasSuffix(".") ? " " : ". ") + hover
+        }
+        return text
+    }
+
     private func counted(_ value: StatValue, noun: String, plural: String) -> String {
         guard !value.isUnknown else { return "\(plural) not available" }
         let exact = value.spoken == "1"
@@ -255,7 +291,7 @@ public struct StatsReport: Equatable, Sendable {
         guard let now else { return .unknown }
         return StatValue(
             text: now.text, spoken: now.spoken,
-            comparison: before.map { StatsComparison.text($0.text, period: period) },
+            previous: before.map { StatComparison(label: period.comparisonName, value: $0.text) },
             comparisonSpoken: before.map { StatsComparison.text($0.spoken, period: period) },
             hover: hover, capped: now.capped)
     }
@@ -273,7 +309,7 @@ public struct StatsReport: Equatable, Sendable {
         guard let now else { return StatValue(text: "–", spoken: "not available", hover: hover, capped: capped) }
         return StatValue(
             text: StatDuration.short(now), spoken: StatDuration.spoken(now),
-            comparison: before.map { StatsComparison.text(StatDuration.short($0), period: period) },
+            previous: before.map { StatComparison(label: period.comparisonName, value: StatDuration.short($0)) },
             comparisonSpoken: before.map { StatsComparison.text(StatDuration.spoken($0), period: period) },
             hover: hover, capped: capped)
     }

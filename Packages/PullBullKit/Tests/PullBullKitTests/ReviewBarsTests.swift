@@ -59,7 +59,22 @@ import Testing
         let from = w.dayStarts(calendar: cal)[2]
         let bars = ReviewBars.make(reviewDates: [day(4)], window: w, loadedFrom: from, calendar: cal)
         #expect(bars.hover(period: .week, calendar: cal)
-                == "1 review in the last 7 days, most on Sunday (1) Days before 10 Oct not loaded")
+                == "1+ reviews in the last 7 days, most on Sunday (1). Days before 10 Oct not loaded")
+    }
+
+    @Test func hoverCappedReadsNPlusWithEveryDayLoaded() {
+        let w = window(.week)
+        let bars = ReviewBars.make(reviewDates: [day(0), day(4), day(4)], window: w,
+                                   loadedFrom: w.dayStarts(calendar: cal)[0], calendar: cal)
+        #expect(bars.counts == [1, 0, 0, 0, 2, 0, 0])
+        #expect(bars.hover(period: .week, calendar: cal) == "3+ reviews in the last 7 days, most on Sunday (2)")
+    }
+
+    @Test func cappedWithNothingLoadedDrawsNoBars() {
+        let bars = ReviewBars.make(reviewDates: [], window: window(.week), loadedFrom: nil, capped: true, calendar: cal)
+        #expect(bars.counts == Array(repeating: nil, count: 7))
+        #expect(bars.marks(width: 80, height: 20).isEmpty)
+        #expect(bars.hover(period: .week, calendar: cal) == "0+ reviews in the last 7 days")
     }
 
     @Test func gapNarrowsWithMoreBars() {
