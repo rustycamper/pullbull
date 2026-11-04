@@ -161,7 +161,7 @@ Two rows, drawn as full list rows (`PRRow`), from the PR rows already loaded for
 ### Accessibility
 
 - Each card is a VoiceOver group: "Your reviews, this week: 12 reviews, last week 9. Median turnaround 3 hours 10 minutes, last week 5 hours." The other cards read the same way: "Your pull requests, this week: 6 merged, last week 4. Median time to merge …. Median first review …. Top reviewers: dana 3, lee 2." and "Issues, this week: 3 closed …. 5 opened …. 12 comments." For 90 days the period reads "the last 90 days". A figure that is unknown reads "not available"; a card with no report reads "<title>, loading" or "<title>, not available".
-- A card's figures that have a hover give VoiceOver the same text as the card's hint, the hovers joined by ". " (a hover that ends with its own full stop is followed by a space only); a card with none has no hint.
+- A card's figures that have a hover give VoiceOver the same text as the card's hint, the hovers' sentences joined by ". " (a sentence that ends with its own full stop is followed by a space only), and a sentence two hovers share, such as the cap note, said once; a card with none has no hint.
 - The bar chart is one element labelled with its hover wording.
 - Values use monospaced digits so they don't jitter on refresh.
 
