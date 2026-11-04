@@ -110,8 +110,7 @@ public struct ReviewBars: Equatable, Sendable {
     /// The bars across `width`, oldest first, each as tall as its count against the busiest loaded day's
     /// `height`. A day with reviews is at least 2 pt, so it never passes for the 1-pt stub of a day with
     /// none; a day not loaded draws nothing. Bars are at most `maxBarWidth` wide, and when that cap
-    /// applies they spread across `width` with equal gaps, the first at 0 and the last ending at `width`
-    /// (a single bar is centred).
+    /// applies the bars and their gaps are centred in `width`.
     public func marks(width: CGFloat, height: CGFloat) -> [ReviewBarMark] {
         guard !counts.isEmpty else { return [] }
         let layout = layout(width: width)
@@ -176,10 +175,9 @@ public struct ReviewBars: Equatable, Sendable {
     private func layout(width: CGFloat) -> Layout {
         let n = CGFloat(max(counts.count, 1))
         let gap = Self.gap(barCount: counts.count)
-        let fitted = max((width - gap * (n - 1)) / n, 0)
-        guard fitted > Self.maxBarWidth else { return Layout(origin: 0, barWidth: fitted, gap: gap) }
-        guard n > 1 else { return Layout(origin: (width - Self.maxBarWidth) / 2, barWidth: Self.maxBarWidth, gap: gap) }
-        return Layout(origin: 0, barWidth: Self.maxBarWidth, gap: (width - n * Self.maxBarWidth) / (n - 1))
+        let barWidth = min(max((width - gap * (n - 1)) / n, 0), Self.maxBarWidth)
+        let group = barWidth * n + gap * (n - 1)
+        return Layout(origin: max((width - group) / 2, 0), barWidth: barWidth, gap: gap)
     }
 
     private static func format(_ date: Date, _ pattern: String, _ calendar: Calendar) -> String {
