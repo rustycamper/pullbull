@@ -99,18 +99,15 @@ public struct ReviewBars: Equatable, Sendable {
         return text
     }
 
-    /// The space between bars: narrower as there are more, so 90 still fit a card.
+    /// The space between bars: 6 pt for 7, 2 for 30, 1 for 90, so a week reads as wide columns and 90
+    /// still fit a card.
     public static func gap(barCount: Int) -> CGFloat {
-        barCount >= 90 ? 1 : barCount >= 30 ? 2 : 4
+        barCount >= 90 ? 1 : barCount >= 30 ? 2 : 6
     }
-
-    /// The widest a bar gets, so 7 bars stay bars rather than slabs.
-    public static let maxBarWidth: CGFloat = 14
 
     /// The bars across `width`, oldest first, each as tall as its count against the busiest loaded day's
     /// `height`. A day with reviews is at least 2 pt, so it never passes for the 1-pt stub of a day with
-    /// none; a day not loaded draws nothing. Bars are at most `maxBarWidth` wide, and when that cap
-    /// applies the bars and their gaps are centred in `width`.
+    /// none; a day not loaded draws nothing. The bars and their gaps fill `width`.
     public func marks(width: CGFloat, height: CGFloat) -> [ReviewBarMark] {
         guard !counts.isEmpty else { return [] }
         let layout = layout(width: width)
@@ -165,19 +162,17 @@ public struct ReviewBars: Equatable, Sendable {
     }
 
     private struct Layout {
-        let origin: CGFloat
         let barWidth: CGFloat
         let gap: CGFloat
 
-        func x(of index: Int) -> CGFloat { origin + CGFloat(index) * (barWidth + gap) }
+        func x(of index: Int) -> CGFloat { CGFloat(index) * (barWidth + gap) }
     }
 
     private func layout(width: CGFloat) -> Layout {
         let n = CGFloat(max(counts.count, 1))
         let gap = Self.gap(barCount: counts.count)
-        let barWidth = min(max((width - gap * (n - 1)) / n, 0), Self.maxBarWidth)
-        let group = barWidth * n + gap * (n - 1)
-        return Layout(origin: max((width - group) / 2, 0), barWidth: barWidth, gap: gap)
+        let barWidth = max((width - gap * (n - 1)) / n, 0)
+        return Layout(barWidth: barWidth, gap: gap)
     }
 
     private static func format(_ date: Date, _ pattern: String, _ calendar: Calendar) -> String {

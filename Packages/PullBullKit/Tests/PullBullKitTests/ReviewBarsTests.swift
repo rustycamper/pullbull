@@ -94,7 +94,7 @@ import Testing
     }
 
     @Test func gapNarrowsWithMoreBars() {
-        #expect(ReviewBars.gap(barCount: 7) == 4)
+        #expect(ReviewBars.gap(barCount: 7) == 6)
         #expect(ReviewBars.gap(barCount: 30) == 2)
         #expect(ReviewBars.gap(barCount: 90) == 1)
     }
@@ -102,9 +102,9 @@ import Testing
     @Test func marksScaleToTheBusiestDayWithStubsForNone() {
         let bars = ReviewBars.make(reviewDates: [day(0), day(0), day(0), day(0), day(2), day(6)],
                                    window: window(.week), loadedFrom: nil, calendar: cal)
-        let marks = bars.marks(width: 80, height: 20)
+        let marks = bars.marks(width: 78, height: 20)
         #expect(marks.count == 7)
-        #expect(marks.map(\.width) == Array(repeating: 8, count: 7))
+        #expect(marks.map(\.width) == Array(repeating: 6, count: 7))
         #expect(marks.map(\.x) == [0, 12, 24, 36, 48, 60, 72])
         #expect(marks.map(\.height) == [20, 1, 5, 1, 1, 1, 5])
         #expect(marks.map(\.isEmpty) == [false, true, false, true, true, true, false])
@@ -137,7 +137,7 @@ import Testing
     @Test func daysNotLoadedDrawNothing() {
         let w = window(.week)
         let bars = ReviewBars.make(reviewDates: [day(4)], window: w, loadedFrom: w.dayStarts(calendar: cal)[3], calendar: cal)
-        let marks = bars.marks(width: 80, height: 20)
+        let marks = bars.marks(width: 78, height: 20)
         #expect(marks.map(\.x) == [36, 48, 60, 72])
         #expect(marks.map(\.height) == [1, 20, 1, 1])
     }
@@ -164,18 +164,20 @@ import Testing
 
     // MARK: Bar widths
 
-    @Test func weekBarsAreCappedAndCentred() {
+    @Test func weekBarsFillTheCard() {
         let bars = ReviewBars.make(reviewDates: [day(5)], window: window(.week), loadedFrom: nil, calendar: cal)
         let marks = bars.marks(width: 300, height: 36)
+        let width = (300 - 36) / CGFloat(7)
         #expect(marks.count == 7)
-        #expect(marks.allSatisfy { $0.width == 14 })
-        // 7 × 14 + 6 × 4 = 122 wide, so 89 pt either side.
-        #expect(marks.map(\.x) == [89, 107, 125, 143, 161, 179, 197])
-        let last = marks[6]
-        #expect(marks[0].x == 300 - (last.x + last.width))
+        #expect(marks.allSatisfy { abs($0.width - width) < 0.001 })
+        #expect(abs(marks[0].x) < 0.001)
+        for (a, b) in zip(marks, marks.dropFirst()) {
+            #expect(abs(b.x - (a.x + a.width) - 6) < 0.001)
+        }
+        #expect(abs(marks[6].x + marks[6].width - 300) < 0.001)
     }
 
-    @Test func quarterBarsAreUncapped() {
+    @Test func quarterBarsFillTheCard() {
         let bars = ReviewBars.make(reviewDates: [day(89, .quarter)], window: window(.quarter), loadedFrom: nil, calendar: cal)
         let marks = bars.marks(width: 300, height: 36)
         let width = (300 - 89) / CGFloat(90)
@@ -185,14 +187,14 @@ import Testing
         #expect(abs(marks[89].x + marks[89].width - 300) < 0.001)
     }
 
-    @Test func monthBarsAreCappedAndCentredInAWideChart() {
+    @Test func monthBarsFillTheCard() {
         let bars = ReviewBars.make(reviewDates: [day(29, .month)], window: window(.month), loadedFrom: nil, calendar: cal)
-        let marks = bars.marks(width: 520, height: 36)
+        let marks = bars.marks(width: 300, height: 36)
+        let width = (300 - 58) / CGFloat(30)
         #expect(marks.count == 30)
-        #expect(marks.allSatisfy { $0.width == 14 })
-        // 30 × 14 + 29 × 2 = 478 wide, so 21 pt either side.
-        #expect(abs(marks[0].x - 21) < 0.001)
-        #expect(abs(520 - (marks[29].x + marks[29].width) - 21) < 0.001)
+        #expect(abs(marks[0].x) < 0.001)
+        #expect(marks.allSatisfy { abs($0.width - width) < 0.001 })
+        #expect(abs(marks[29].x + marks[29].width - 300) < 0.001)
     }
 
     @Test func centerXIsTheMiddleOfEachMark() {
@@ -207,13 +209,16 @@ import Testing
     @Test func centerXCoversDaysNotLoaded() {
         let w = window(.week)
         let bars = ReviewBars.make(reviewDates: [day(4)], window: w, loadedFrom: w.dayStarts(calendar: cal)[3], calendar: cal)
-        #expect(bars.centerX(of: 0, width: 300) == 96)
-        #expect(bars.centerX(of: 3, width: 300) == bars.marks(width: 300, height: 36)[0].x + 7)
+        let first = bars.marks(width: 300, height: 36)[0]
+        #expect(abs(bars.centerX(of: 0, width: 300) - (264.0 / 7) / 2) < 0.001)
+        #expect(abs(bars.centerX(of: 3, width: 300) - (first.x + first.width / 2)) < 0.001)
     }
 
     @Test func extentRunsFromTheFirstBarToTheLast() {
         let week = ReviewBars.make(reviewDates: [], window: window(.week), loadedFrom: nil, calendar: cal)
-        #expect(week.extent(width: 300) == 89...211)
+        let weekExtent = week.extent(width: 300)
+        #expect(abs(weekExtent.lowerBound) < 0.001)
+        #expect(abs(weekExtent.upperBound - 300) < 0.001)
         let month = ReviewBars.make(reviewDates: [], window: window(.month), loadedFrom: nil, calendar: cal)
         let extent = month.extent(width: 300)
         #expect(abs(extent.lowerBound) < 0.001)
