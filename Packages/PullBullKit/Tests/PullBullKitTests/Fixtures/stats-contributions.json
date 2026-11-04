@@ -1,0 +1,13 @@
+{"data":{"viewer":{"contributionsCollection":{"pullRequestReviewContributions":{
+"pageInfo":{"hasNextPage":false,"endCursor":"C3"},
+"nodes":[
+{"pullRequest":{"author":{"login":"me"},"repository":{"nameWithOwner":"acme/web"},
+ "timelineItems":{"nodes":[]},
+ "reviews":{"nodes":[{"submittedAt":"2026-11-02T10:00:00Z","state":"COMMENTED"}]}}},
+{"pullRequest":{"author":{"login":"alice"},"repository":{"nameWithOwner":"acme/api"},
+ "timelineItems":{"nodes":[{"createdAt":"2026-11-02T08:00:00Z","requestedReviewer":{"__typename":"Team","slug":"ios"}}]},
+ "reviews":{"nodes":[{"submittedAt":"2026-11-02T09:30:00Z","state":"APPROVED"}]}}},
+{"pullRequest":{"author":{"login":"bob"},"repository":{"nameWithOwner":"acme/web"},
+ "timelineItems":{"nodes":[{"createdAt":"2026-11-01T08:00:00Z","requestedReviewer":{"__typename":"User","login":"me"}}]},
+ "reviews":{"nodes":[{"submittedAt":"2026-11-01T09:00:00Z","state":"CHANGES_REQUESTED"},{"submittedAt":"2026-11-01T12:00:00Z","state":"APPROVED"}]}}}
+]}}}}}

@@ -1,0 +1,7 @@
+{"data":{"viewer":{"issueComments":{
+"pageInfo":{"hasPreviousPage":true,"startCursor":"K1"},
+"nodes":[
+{"createdAt":"2026-11-01T10:00:00Z","repository":{"nameWithOwner":"acme/web"}},
+{"createdAt":"2026-11-02T10:00:00Z","repository":{"nameWithOwner":"other/x"}},
+{"createdAt":"2026-11-03T10:00:00Z","repository":{"nameWithOwner":"acme/web"}}
+]}}}}
