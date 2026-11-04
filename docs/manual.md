@@ -151,8 +151,8 @@ One list scoped by chips, as on [Pull Requests](#pull-requests). It opens on All
 | Your pull requests | Merged | Your PRs merged in the period |
 | | Time to merge | Median of merged minus opened, over those PRs |
 | | First review | Median wait for the first review by someone other than you, over your PRs opened in the period. It runs from when the PR was last marked ready. Drafts, unreviewed PRs and reviews made while a draft aren't samples; the hover says how many PRs still wait |
-| | Top reviewers | Up to three people who reviewed the most of those PRs. A person counts once per PR, however many reviews. Bots and you are left out |
-| Right now | Waiting on you longest | The PR in Needs your review that has waited longest. Two rows like the list's; <kbd>↑</kbd> <kbd>↓</kbd> choose, <kbd>Return</kbd> opens the detail, <kbd>Esc</kbd> comes back. The Settings filters apply |
+| | Top reviewers | Up to three people who reviewed the most of your PRs opened in the period. A person counts once per PR, however many reviews. Bots and you are left out |
+| Right now | Waiting on you longest | The PR in Needs your review that has waited longest. Two rows like the list's; <kbd>↑</kbd> <kbd>↓</kbd> choose, <kbd>Return</kbd> opens the detail (<kbd>Esc</kbd> comes back), <kbd>⌘</kbd><kbd>Return</kbd> opens it on GitHub, <kbd>⌘</kbd><kbd>C</kbd> copies its link. Right-click offers only the copy and open items. The Settings filters apply |
 | | Your PR waiting longest | Your open PR with no review yet that has waited longest |
 | Issues | Closed | Issues assigned to you now that closed in the period, completed or not planned. An issue unassigned after it closed isn't counted |
 | | Opened | Issues you opened in the period |

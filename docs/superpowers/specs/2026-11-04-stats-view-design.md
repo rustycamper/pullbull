@@ -68,7 +68,7 @@ Header, chips and footer stay put; the cards scroll between them when they don't
 - A period is whole local calendar days ending with today: This week = today and the 6 days before, This month = today and the 29 before, 90 days = today and the 89 before. It starts at local midnight of its first day and ends now.
 - The comparison period is the same number of whole days just before it, ending at the period's start.
 - Both are half-open: a moment exactly at the period's start belongs to the period, not the comparison. Queries ask GitHub for `[start, end − 1 s]`, since GitHub's ranges include both ends.
-- Comparison wording, in secondary text after the value: "last week 5 h", "last month 31", "previous 90 days 2 d 4 h".
+- Comparison wording, in secondary text after the value: "last week 5 h", "last month 31", "previous 90 days 2 d 4 h". In a column too narrow for one line (the Your pull requests card's three columns), it takes two: the period's name ("previous 90 days") on the first, the value on the second.
 - A comparison is left out when either side has no value (a median with no samples, an item that failed).
 
 ### Durations
@@ -94,20 +94,21 @@ Minutes and hours round down. The median of an even count is the mean of the two
 
 - A review is one you submitted (approved, changes requested, commented, dismissed), dated by its `submittedAt`. Pending (unsent) reviews and reviews on your own PRs (replies in a thread) don't count.
 - Bars: today's in the accent colour, the others in the secondary colour; a day with none draws a 1-pt stub on the baseline in the tertiary colour, and a day with reviews is at least 2 pt tall, so an empty day never reads as a short bar. No axis. Hover on the chart: "12 reviews in the last 7 days, most on Tuesday (4)"; for 90 days the busiest day reads with its date ("most on 14 Oct (6)").
-- When the cap cut in (below), days that may be missing reviews are not drawn at all, not as stubs, and the hover adds "Days before 3 Oct not loaded". Contributions come newest PR first, each dated by its latest review, so a PR not loaded has its latest review on or before the oldest loaded PR's latest review in the period: that day and every day before it are not drawn. A zero-review day: "No reviews in the last 7 days".
+- When the cap cut in (below), days that may be missing reviews are not drawn at all, not as stubs. Contributions come newest PR first, each dated by its latest review, so a PR not loaded has its latest review on or before the oldest loaded PR's latest review in the period: that day and every day before it are not drawn. When the cap cut in and no loaded PR has a review in the period, no day is drawn. A period with no reviews: "No reviews in the last 7 days".
+- Capped, the hover's total reads "N+", as the Reviews figure does, and the days not loaded follow as a sentence of their own: "12+ reviews in the last 7 days, most on Tuesday (4). Days before 3 Oct not loaded". With nothing loaded: "0+ reviews in the last 7 days".
 - Turnaround, for each review R of yours in the period:
   - the request is the latest `ReviewRequestedEvent` on that PR made at or before R, naming you or one of your teams;
   - R is your response only if you submitted no other review on that PR between the request and R;
   - turnaround = R − the request.
   - A review with no such request (you reviewed unasked, or a follow-up) is not a sample. Neither is one whose request is older than the 20 request events loaded per PR.
-- Turnaround hover: "Median of 9 reviews you were asked for" ("1 review" for one); none: "No reviews you were asked for in this period".
+- Turnaround hover: "Median of 9 reviews you were asked for" ("1 review" for one); none: "No reviews you were asked for in this period". Capped, the cap sentence follows after ". ", as on every hover: "Median of 9 reviews you were asked for. From the latest 100 PRs".
 
 ### Your pull requests
 
 | Item | Value | Comparison |
 |---|---|---|
 | Merged | Your PRs merged in the period | yes |
-| Time to merge | Median of merged − opened over those PRs; hover "Median of 12 merged PRs" | yes |
+| Time to merge | Median of merged − opened over those PRs; hover "Median of 12 merged PRs" ("Median of 12 merged PRs. From the latest 100 PRs" when capped), and no hover when nothing merged | yes |
 | First review | Median wait for a first review, over your PRs opened in the period (below) | yes |
 | Top reviewers | Up to 3 people, avatar + login + count, who reviewed the most of your PRs opened in the period | no |
 
@@ -127,6 +128,7 @@ Two rows, drawn as full list rows (`PRRow`), from the PR rows already loaded for
 - **Your PR waiting longest:** of your open, non-draft PRs with no submitted review by a person other than you, the one whose wait (`ReviewWait.make(for:on: .mine, …)`, "@georgi 2d" or "No reviewer 5d") started earliest. The no-review filter is this card's own; `ReviewWait` alone would also return re-requested PRs. None: "None of your PRs waits for a first review".
 - A row whose wait has no known start (`ReviewWait.since` nil) is not chosen.
 - ↑/↓ select between the two rows; click or ↩ opens the PR's detail, and Back from it returns to Stats. ⌘↩ opens it on GitHub and ⌘C copies its link, as in the list.
+- A row's context menu has only the copy and open items: Copy Branch Name, Copy Checkout Command, Copy Link, Copy as Markdown Link, Open on GitHub, the files item and, on a PR whose checks failed, Open Failing Check. The list's repo focus, person search and Reviewers…/Assignees…/Labels… are left out, and the row anchors no edit picker: they act on the list hidden behind Stats.
 
 ### Issues
 
@@ -146,7 +148,7 @@ Two rows, drawn as full list rows (`PRRow`), from the PR rows already loaded for
 ### Loading, errors, cache
 
 - First load of a period (nothing cached for this account, scope and period): the cards' layout with the skeleton shimmer where values go, as the list's first load. The Right now card shows at once.
-- Each period's result is cached in memory, per account, scope and period, for 15 minutes. Opening Stats or switching to a period within that time shows the cached result with no request. After 15 minutes the cached result shows at once while a refresh runs, and values change in place. Switching to a period with nothing cached shows the skeleton.
+- Each period's result is cached in memory, per account, scope and period, for 15 minutes, and goes stale at local midnight however young it is. Opening Stats or switching to a period within that time shows the cached result with no request. After 15 minutes the cached result shows at once while a refresh runs, and values change in place. Switching to a period with nothing cached shows the skeleton.
 - A result with any failed item is stale at once: the next open or period switch fetches again.
 - Refresh (button or ⌘R) ignores the cache.
 - A fetch that is stopped (Back, a period switch while it runs, a sign-out) caches nothing and leaves no spinner behind.
@@ -159,6 +161,7 @@ Two rows, drawn as full list rows (`PRRow`), from the PR rows already loaded for
 ### Accessibility
 
 - Each card is a VoiceOver group: "Your reviews, this week: 12 reviews, last week 9. Median turnaround 3 hours 10 minutes, last week 5 hours." The other cards read the same way: "Your pull requests, this week: 6 merged, last week 4. Median time to merge …. Median first review …. Top reviewers: dana 3, lee 2." and "Issues, this week: 3 closed …. 5 opened …. 12 comments." For 90 days the period reads "the last 90 days". A figure that is unknown reads "not available"; a card with no report reads "<title>, loading" or "<title>, not available".
+- A card's figures that have a hover give VoiceOver the same text as the card's hint, the hovers joined by ". " (a hover that ends with its own full stop is followed by a space only); a card with none has no hint.
 - The bar chart is one element labelled with its hover wording.
 - Values use monospaced digits so they don't jitter on refresh.
 
@@ -295,3 +298,11 @@ The GitHub App's user token wasn't tried; every query here was run with a `gh` t
 - **The footer says "· from latest 100" when both kinds of cap cut in.** One note keeps the footer on one line; the comments item's hover keeps its own wording.
 - **Zero-review days are tertiary-colour stubs, and a day with reviews is at least 2 pt.** An empty day must not read as a short bar.
 - **Right now has no card box.** Its rows draw their own hover and selection fill.
+- **A capped chart hover reads "N+", and "Days before … not loaded" is its own sentence.** The total is what was counted, as on the Reviews figure; a bare "12 reviews" over a capped chart would read as exact.
+- **Every hover joins the cap sentence with ". "**, as the First review hover does, so "From the latest 100 PRs" never runs on from the sentence before it.
+- **No hover when there is nothing to take a median of.** "Median of 0 merged PRs" says nothing the "–" doesn't; the turnaround keeps its "No reviews you were asked for in this period", which says why.
+- **Capped with nothing loaded draws no bars.** No loaded PR has a review in the period, so no day can be vouched for; drawing seven zero stubs would be a wrong zero.
+- **The cache goes stale at local midnight.** The periods are whole local days, so a report from before midnight covers a different span; showing it for up to 15 more minutes would put yesterday's bars under today's.
+- **A Right now row's menu only copies and opens.** The list's repo focus, person search and edit pickers would change the list hidden behind Stats, which Stats keys already never reach.
+- **VoiceOver hears the hovers as the card's hint.** VoiceOver can't hover, and the hovers carry the sample sizes and cap notes; the hint keeps them out of the card's sentence, read after it.
+- **A narrow comparison breaks after the period's name, not wherever it wraps.** "previous 90 days 0" wrapped as "previous 90 days" over a lone "0" in one column and differently in the next; the two-line form keeps the copy and makes the break deliberate.
