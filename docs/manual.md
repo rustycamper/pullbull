@@ -159,7 +159,7 @@ One list scoped by chips, as on [Pull Requests](#pull-requests). It opens on All
 | | Comments | Comments you wrote in the conversation of issues and PRs. Review comments on code aren't counted |
 
 - **Medians:** shown as `42 m`, `3 h 10 m`, `2 d 4 h`. A dash means nothing to measure, or the query failed; the hover says why. A comparison is left out when either side has no value. Hover a figure for how many items it covers
-- **Caps:** each source reads at most the newest 100 PRs in scope for the period (comments: your latest 500). When more exist, the hover says so and the footer adds "· from latest 100". Counts GitHub gives exactly stay exact; counts tallied from loaded items read "137+". Days the chart can't vouch for are left out, not drawn empty
+- **Caps:** each source reads at most the newest 100 PRs in scope for the period (comments: your latest 500). Reviews come from the 100 most recently updated PRs you reviewed since the period began; for the comparison that search reaches into the current period, so a busy current period uses up some of its 100. When more exist, the hover says so and the footer adds "· from latest 100". Counts GitHub gives exactly stay exact; counts tallied from loaded items read "137+". Days the chart can't vouch for are left out, not drawn empty
 - **Not shown:** Status moves on a board. GitHub records them only on each issue, so they can't be counted without missing some
 - **Refreshing:** the result is kept for 15 minutes per account, scope and period, in memory only. The refresh button and <kbd>⌘</kbd><kbd>R</kbd> fetch again. Nothing polls. A failure shows a line with **Retry** and keeps what was on screen. Hover the footer for when it was updated
 
