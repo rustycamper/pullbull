@@ -3,47 +3,68 @@ import Testing
 @testable import PullBullKit
 
 private actor Calls {
-    var names: [String] = []
+    struct Call: Equatable {
+        let name: String
+        let window: StatsWindow?
+        let query: String?
+    }
+
+    var all: [Call] = []
     var orgIDReads = 0
-    func add(_ name: String) { names.append(name) }
+    var inFlight = 0
+    var maxInFlight = 0
     func read() { orgIDReads += 1 }
+    var names: [String] { all.map(\.name) }
+    func windows(_ name: String) -> [StatsWindow] { all.filter { $0.name == name }.compactMap(\.window) }
+
+    /// Records the call and stays in flight briefly, so overlapping calls show in `maxInFlight`.
+    func enter(_ name: String, window: StatsWindow? = nil, query: String? = nil) async {
+        all.append(Call(name: name, window: window, query: query))
+        inFlight += 1
+        maxInFlight = max(maxInFlight, inFlight)
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        inFlight -= 1
+    }
 }
 
 private struct StubSource: StatsSource {
     let calls = Calls()
     var failMerged = false
     var cancelOpened = false
+    var throwOnOpened: (any Error)?
     var reviewedItems: [ReviewedPR] = []
+    var counts: [String: Int] = [:]
 
     func organizationID(_ org: String) async throws -> String {
-        await calls.add("organizationID")
+        await calls.enter("organizationID")
         return "O_1"
     }
 
     func reviewedPRs(window: StatsWindow, orgID: String?, login: String, scope: FetchScope) async throws -> Capped<ReviewedPR> {
-        await calls.add("reviewed")
+        await calls.enter("reviewed", window: window)
         return Capped(items: reviewedItems, capped: false)
     }
 
     func openedPRs(window: StatsWindow, scope: FetchScope) async throws -> CountedList<OpenedPR> {
-        await calls.add("opened")
+        await calls.enter("opened", window: window)
         if cancelOpened { throw URLError(.cancelled) }
+        if let throwOnOpened { throw throwOnOpened }
         return CountedList(total: 0, items: [])
     }
 
     func mergedPRs(window: StatsWindow, scope: FetchScope) async throws -> CountedList<MergedPR> {
-        await calls.add("merged")
+        await calls.enter("merged", window: window)
         if failMerged { throw APIError.rateLimited(resetAt: nil) }
         return CountedList(total: 0, items: [])
     }
 
     func issueCount(_ query: String) async throws -> Int {
-        await calls.add("issueCount")
-        return 4
+        await calls.enter("issueCount", query: query)
+        return counts[query] ?? 0
     }
 
     func myComments(window: StatsWindow, scope: FetchScope) async throws -> Capped<Date> {
-        await calls.add("comments")
+        await calls.enter("comments", window: window)
         return Capped(items: [], capped: false)
     }
 }
@@ -69,16 +90,46 @@ private struct StubSource: StatsSource {
         let report = await load(source)
         #expect(report?.isComplete == true)
         let names = await source.calls.names
-        #expect(names.filter { $0 == "reviewed" }.count == 2)
-        #expect(names.filter { $0 == "opened" }.count == 2)
-        #expect(names.filter { $0 == "merged" }.count == 2)
-        #expect(names.filter { $0 == "issueCount" }.count == 4)
-        #expect(names.filter { $0 == "comments" }.count == 1)
+        #expect(names.count { $0 == "reviewed" } == 2)
+        #expect(names.count { $0 == "opened" } == 2)
+        #expect(names.count { $0 == "merged" } == 2)
+        #expect(names.count { $0 == "issueCount" } == 4)
+        #expect(names.count { $0 == "comments" } == 1)
+        #expect(await source.calls.maxInFlight >= 9)
+    }
+
+    @Test func eachSourceGetsItsWindowAndQuery() async {
+        let scope = FetchScope.org("acme")
+        let current = StatsPeriod.week.window(now: now, calendar: calendar)
+        let before = StatsPeriod.week.comparisonWindow(now: now, calendar: calendar)
+        let closed = StatsQueries.closedIssues(window: current, scope: scope)
+        let closedBefore = StatsQueries.closedIssues(window: before, scope: scope)
+        let opened = StatsQueries.openedIssues(window: current, scope: scope)
+        let openedBefore = StatsQueries.openedIssues(window: before, scope: scope)
+        let source = StubSource(counts: [closed: 4, closedBefore: 3, opened: 7, openedBefore: 2])
+        let report = await load(source, scope: scope)
+
+        for name in ["reviewed", "opened", "merged"] {
+            let windows = await source.calls.windows(name)
+            #expect(windows.count == 2)
+            #expect(windows.contains(current))
+            #expect(windows.contains(before))
+        }
+        #expect(await source.calls.windows("comments") == [current])
+        let queries = await source.calls.all.compactMap(\.query)
+        #expect(Set(queries) == [closed, closedBefore, opened, openedBefore])
+        #expect(queries.count == 4)
+
         #expect(report?.issuesClosed.text == "4")
+        #expect(report?.issuesClosed.comparison == "last week 3")
+        #expect(report?.issuesOpened.text == "7")
+        #expect(report?.issuesOpened.comparison == "last week 2")
     }
 
     @Test func oneFailureKeepsOthers() async {
-        let report = await load(StubSource(failMerged: true))
+        let window = StatsPeriod.week.window(now: now, calendar: calendar)
+        let closed = StatsQueries.closedIssues(window: window, scope: .org("acme"))
+        let report = await load(StubSource(failMerged: true, counts: [closed: 4]))
         #expect(report?.merged.text == "–")
         #expect(report?.issuesClosed.text == "4")
         #expect(report?.reviews.text == "0")
@@ -110,6 +161,10 @@ private struct StubSource: StatsSource {
 
     @Test func cancelledReturnsNil() async {
         #expect(await load(StubSource(cancelOpened: true)) == nil)
+    }
+
+    @Test func cancellationErrorReturnsNil() async {
+        #expect(await load(StubSource(throwOnOpened: CancellationError())) == nil)
     }
 
     @Test func cancelledTaskReturnsNil() async {

@@ -1,13 +1,13 @@
 import Foundation
 
-/// Which report: one account's scope and period.
+/// Which report: one account's scope and period. The account is compared without regard to case, as GitHub does.
 public struct StatsKey: Hashable, Sendable {
     public let account: String
     public let scope: FetchScope
     public let period: StatsPeriod
 
     public init(account: String, scope: FetchScope, period: StatsPeriod) {
-        self.account = account
+        self.account = account.lowercased()
         self.scope = scope
         self.period = period
     }
@@ -30,14 +30,16 @@ public struct StatsCache: Sendable {
         reports[key]
     }
 
-    /// Whether `key` has a complete report under 15 minutes old. A report with a failure is never fresh.
+    /// Whether `key` has a complete report under 15 minutes old; one from the future (the clock moved) is not fresh. A report with a failure is never fresh.
     public func isFresh(_ key: StatsKey, now: Date) -> Bool {
         guard let report = reports[key], report.isComplete else { return false }
-        return now.timeIntervalSince(report.fetchedAt) < Self.freshFor
+        let age = now.timeIntervalSince(report.fetchedAt)
+        return age >= 0 && age < Self.freshFor
     }
 
     /// Forgets everything for `account`, e.g. when it is removed.
     public mutating func drop(account: String) {
+        let account = account.lowercased()
         reports = reports.filter { $0.key.account != account }
     }
 }

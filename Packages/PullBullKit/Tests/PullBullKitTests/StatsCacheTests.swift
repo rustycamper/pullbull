@@ -59,4 +59,18 @@ import Testing
         cache.store(report(), for: key("a"))
         #expect(!cache.isFresh(key("b"), now: now))
     }
+
+    @Test func futureReportIsNotFresh() {
+        var cache = StatsCache()
+        cache.store(report(), for: key())
+        #expect(!cache.isFresh(key(), now: now.addingTimeInterval(-1)))
+    }
+
+    @Test func accountCaseIsIgnored() {
+        var cache = StatsCache()
+        cache.store(report(), for: key("Peter"))
+        #expect(cache.isFresh(key("peter"), now: now))
+        cache.drop(account: "PETER")
+        #expect(cache.report(for: key("peter")) == nil)
+    }
 }
