@@ -14,6 +14,17 @@ struct ScopeChips: View {
     let willSelect: () -> Void
 
     var body: some View {
+        // The chips tighten only when the row wouldn't fit, so their padding matches across modes.
+        ViewThatFits(in: .horizontal) {
+            chips(crowded: false)
+            chips(crowded: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Pull request scopes")
+    }
+
+    private func chips(crowded: Bool) -> some View {
         HStack(spacing: 4) {
             ForEach(model.prScopes, id: \.self) { scope in
                 ScopeChip(
@@ -25,9 +36,6 @@ struct ScopeChips: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Pull request scopes")
     }
 
     private func title(of scope: PRScope) -> String {
@@ -47,16 +55,6 @@ struct ScopeChips: View {
 
     private func isSelected(_ scope: PRScope) -> Bool {
         searching ? model.shownSearchScope == SearchScope(.pullRequests(scope)) : model.prScope == scope
-    }
-
-    /// Whether any count on screen reads three or more characters ("99+"), which needs the room.
-    private var crowded: Bool {
-        model.prScopes.contains { scope in
-            switch count(of: scope) {
-            case .current(let n), .stale(let n, _, _): TabCountText.header(n).count >= 3
-            case .unavailable, nil: false
-            }
-        }
     }
 
     private func pick(_ scope: PRScope) {
@@ -117,6 +115,7 @@ struct ScopeChip: View {
     let selected: Bool
     /// Needs you with something waiting: its count takes the accent colour.
     let hot: Bool
+    /// The row doesn't fit at the usual padding, so every chip in it takes the narrower one.
     let crowded: Bool
     let help: String
     let spoken: String
