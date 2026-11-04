@@ -34,7 +34,7 @@ extension AppModel {
             return
         }
         let cached = statsCache.report(for: key)
-        if !force, statsCache.isFresh(key, now: Date()) {
+        if !force, statsCache.isFresh(key, now: Date(), calendar: .current) {
             stopStatsLoad()
             showStats(cached, loading: false)
             return

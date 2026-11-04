@@ -51,12 +51,13 @@ struct PRRow: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .accessibilityAddTraits(selected ? [.isSelected] : [])
-        .editPickerAnchor(for: pr.key, field: nil, model: model)
+        .modifier(ListRowAnchor(enabled: !onStats, key: pr.key, model: model))
         .prContextMenu(
-            pr, focus: FocusMenuItem(model: model, repo: pr.key.repo),
-            time: onTab ? TimeFocusMenu(model: model) : nil, person: .person(model: model, login: pr.author),
+            pr, focus: onStats ? nil : FocusMenuItem(model: model, repo: pr.key.repo),
+            time: onTab ? TimeFocusMenu(model: model) : nil,
+            person: onStats ? nil : .person(model: model, login: pr.author),
             files: model.filesLink(for: pr), failingCheck: { model.openFailingCheck(pr.key) },
-            sets: SetEditMenu.make(model: model, key: pr.key))
+            sets: onStats ? nil : SetEditMenu.make(model: model, key: pr.key))
     }
 
     /// A search result moves `searchSelection`, a tab row `listSelection`, a Right now row `statsSelection`.
@@ -84,6 +85,11 @@ struct PRRow: View {
     /// A list row: the time focus, which only the list follows, is offered in its menu.
     private var onTab: Bool {
         if case .tab = context { true } else { false }
+    }
+
+    /// A Right now row: its menu only copies and opens, as the list it comes from is hidden under Stats.
+    private var onStats: Bool {
+        if case .stats = context { true } else { false }
     }
 
     /// A search result's words and role; nil on a tab.
@@ -584,6 +590,21 @@ struct DraftPill: View {
             .padding(.horizontal, 6)
             .frame(height: 16)
             .overlay(Capsule().strokeBorder(Palette.separator, lineWidth: 0.5))
+    }
+}
+
+/// A row's edit picker anchor (`editPickerAnchor`), left off a Right now row, whose menu opens no picker.
+private struct ListRowAnchor: ViewModifier {
+    let enabled: Bool
+    let key: PRKey
+    let model: AppModel
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.editPickerAnchor(for: key, field: nil, model: model)
+        } else {
+            content
+        }
     }
 }
 

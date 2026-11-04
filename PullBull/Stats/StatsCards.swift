@@ -33,7 +33,9 @@ struct StatsCards: View {
                         .init(label: "Reviews", value: report?.reviews, skeletonWidth: 34),
                         .init(label: "Turnaround", value: report?.turnaround, skeletonWidth: 66),
                     ])
-                    .cardSpeech(report?.cardSpeech(.reviews) ?? StatsCard.reviews.placeholderSpeech(loading: loading))
+                    .cardSpeech(
+                        report?.cardSpeech(.reviews) ?? StatsCard.reviews.placeholderSpeech(loading: loading),
+                        hint: report?.cardHint(.reviews))
                     chart
                 }
             }
@@ -72,7 +74,8 @@ struct StatsCards: View {
                     TopReviewersRow(reviewers: report?.topReviewers, loading: loading)
                 }
                 .cardSpeech(
-                    report?.cardSpeech(.pullRequests) ?? StatsCard.pullRequests.placeholderSpeech(loading: loading))
+                    report?.cardSpeech(.pullRequests) ?? StatsCard.pullRequests.placeholderSpeech(loading: loading),
+                    hint: report?.cardHint(.pullRequests))
             }
         }
     }
@@ -103,17 +106,22 @@ struct StatsCards: View {
                     .init(label: "Opened", value: report?.issuesOpened, skeletonWidth: 30),
                     .init(label: "Comments", value: report?.comments, skeletonWidth: 26),
                 ])
-                .cardSpeech(report?.cardSpeech(.issues) ?? StatsCard.issues.placeholderSpeech(loading: loading))
+                .cardSpeech(
+                    report?.cardSpeech(.issues) ?? StatsCard.issues.placeholderSpeech(loading: loading),
+                    hint: report?.cardHint(.issues))
             }
         }
     }
 }
 
 private extension View {
-    /// A card's figures read as one VoiceOver element: the card's sentence.
-    func cardSpeech(_ text: String) -> some View {
+    /// A card's figures read as one VoiceOver element: the card's sentence, with the figures' hovers as
+    /// its hint (`StatsReport.cardHint`) when there are any. An empty hint is no hint; set either way, so
+    /// the card keeps its identity (and its avatars) when the report lands.
+    func cardSpeech(_ text: String, hint: String?) -> some View {
         accessibilityElement(children: .combine)
             .accessibilityLabel(text)
+            .accessibilityHint(hint ?? "")
     }
 }
 
@@ -183,17 +191,35 @@ private struct StatColumn: View {
                 .skeletonShimmer()
             } else {
                 figure(column.value?.parts ?? [StatTextPart(text: "–", isUnit: false)])
-                // A line kept when there's no comparison, so the card doesn't change height as values land.
-                Text(column.value?.comparison ?? " ")
+                comparison
                     .font(Self.smallFont)
                     .monospacedDigit()
                     .foregroundStyle(Palette.secondaryText)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         // A "–" still says why when it can, such as "No reviews you were asked for in this period".
         .help(column.value?.hover ?? "")
+    }
+
+    /// "last week 5 h" on one line; in a column too narrow for it, the period's name over the figure,
+    /// rather than wherever the words happen to wrap. A line is kept when there's no comparison, so the
+    /// card doesn't change height as values land.
+    @ViewBuilder private var comparison: some View {
+        if let previous = column.value?.previous {
+            ViewThatFits(in: .horizontal) {
+                Text(column.value?.comparison ?? "")
+                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 0) {
+                    // Wraps only if even the name alone can't fit, rather than cutting it short.
+                    Text(previous.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(previous.value)
+                        .lineLimit(1)
+                }
+            }
+        } else {
+            Text(" ")
+        }
     }
 
     /// The figures large in the primary colour, the units small and secondary: "3 h 10 m".

@@ -14,13 +14,17 @@ struct FailureBanner: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: symbol)
-                .font(.system(size: 11))
-                .foregroundStyle(Palette.amberGlyph)
-            Text(message)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            // The icon and message read as one element; Retry stays its own, so VoiceOver can press it.
+            HStack(spacing: 6) {
+                Image(systemName: symbol)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Palette.amberGlyph)
+                Text(message)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
             Spacer(minLength: 0)
             if let action {
                 Button(action.title, action: action.perform)
@@ -32,6 +36,5 @@ struct FailureBanner: View {
         .padding(.vertical, 6)
         .background(RoundedRectangle(cornerRadius: 6).fill(Palette.amberFill))
         .padding(.top, 8)
-        .accessibilityElement(children: .combine)
     }
 }
