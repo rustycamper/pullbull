@@ -130,13 +130,17 @@ import Testing
         #expect(report.bars?.counts == [nil, nil, nil, nil, nil, nil, 0])
     }
 
-    @Test func reviewOnPRUpdatedLaterFillsItsDay() {
-        let pr = ReviewedPR(
+    /// Capped, a review on a PR updated later is on a loaded day: the bound is the oldest PR's update.
+    @Test func cappedReviewOnPRUpdatedLaterFillsItsDay() {
+        let older = ReviewedPR(
+            repo: "acme/app", author: "dana", updatedAt: now.addingTimeInterval(-4 * day), requests: [],
+            myReviews: [MyReview(submittedAt: now.addingTimeInterval(-4 * day), pending: false)])
+        let later = ReviewedPR(
             repo: "acme/app", author: "dana", updatedAt: now, requests: [],
             myReviews: [MyReview(submittedAt: now.addingTimeInterval(-3 * day), pending: false)])
-        let report = build(facts(reviewed: .success(Capped(items: [pr], capped: false))))
-        #expect(report.reviews.text == "1")
-        #expect(report.bars?.counts == [0, 0, 0, 1, 0, 0, 0])
+        let report = build(facts(reviewed: .success(Capped(items: [later, older], capped: true))))
+        #expect(report.reviews.text == "2+")
+        #expect(report.bars?.counts == [nil, nil, nil, 1, 0, 0, 0])
     }
 
     @Test func cappedTurnaroundHoverJoinsTheCapSentence() {

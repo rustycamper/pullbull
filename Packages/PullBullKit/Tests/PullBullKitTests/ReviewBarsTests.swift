@@ -70,6 +70,22 @@ import Testing
         #expect(bars.hover(period: .week, calendar: cal) == "3+ reviews in the last 7 days, most on Sunday (2)")
     }
 
+    @Test func hoverCappedLoadedFromTomorrowSaysNoDayLoaded() {
+        let w = window(.week)
+        let tomorrow = cal.date(byAdding: .day, value: 1, to: w.dayStarts(calendar: cal)[6])!
+        let bars = ReviewBars.make(reviewDates: [day(4), day(6)], window: w, loadedFrom: tomorrow, calendar: cal)
+        #expect(bars.counts == Array(repeating: nil, count: 7))
+        #expect(bars.hover(period: .week, calendar: cal) == "2+ reviews in the last 7 days. No day fully loaded")
+    }
+
+    @Test func hoverCappedLoadedFromTodayNamesToday() {
+        let w = window(.week)
+        let bars = ReviewBars.make(reviewDates: [day(6)], window: w, loadedFrom: w.dayStarts(calendar: cal)[6], calendar: cal)
+        #expect(bars.counts == [nil, nil, nil, nil, nil, nil, 1])
+        #expect(bars.hover(period: .week, calendar: cal)
+                == "1+ reviews in the last 7 days, most on Tuesday (1). Days before 14 Oct not loaded")
+    }
+
     @Test func cappedWithNothingLoadedDrawsNoBars() {
         let bars = ReviewBars.make(reviewDates: [], window: window(.week), loadedFrom: nil, capped: true, calendar: cal)
         #expect(bars.counts == Array(repeating: nil, count: 7))

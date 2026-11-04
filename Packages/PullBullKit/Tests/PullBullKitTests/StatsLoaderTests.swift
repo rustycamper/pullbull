@@ -7,6 +7,7 @@ private actor Calls {
         let name: String
         let window: StatsWindow?
         let query: String?
+        let scope: FetchScope?
     }
 
     var all: [Call] = []
@@ -14,10 +15,11 @@ private actor Calls {
     var maxInFlight = 0
     var names: [String] { all.map(\.name) }
     func windows(_ name: String) -> [StatsWindow] { all.filter { $0.name == name }.compactMap(\.window) }
+    func scopes(_ name: String) -> [FetchScope] { all.filter { $0.name == name }.compactMap(\.scope) }
 
     /// Records the call and stays in flight briefly, so overlapping calls show in `maxInFlight`.
-    func enter(_ name: String, window: StatsWindow? = nil, query: String? = nil) async {
-        all.append(Call(name: name, window: window, query: query))
+    func enter(_ name: String, window: StatsWindow? = nil, query: String? = nil, scope: FetchScope? = nil) async {
+        all.append(Call(name: name, window: window, query: query, scope: scope))
         inFlight += 1
         maxInFlight = max(maxInFlight, inFlight)
         try? await Task.sleep(nanoseconds: 100_000_000)
@@ -35,7 +37,7 @@ private struct StubSource: StatsSource {
     var counts: [String: Int] = [:]
 
     func reviewedPRs(window: StatsWindow, login: String, scope: FetchScope) async throws -> Capped<ReviewedPR> {
-        await calls.enter("reviewed", window: window)
+        await calls.enter("reviewed", window: window, scope: scope)
         if failReviewed { throw APIError.rateLimited(resetAt: nil) }
         return Capped(items: reviewedItems, capped: false)
     }
@@ -137,9 +139,12 @@ private struct StubSource: StatsSource {
         #expect(report?.failures == ["Rate limited"])
     }
 
-    @Test func personalScopeLoads() async {
-        let report = await load(StubSource(), scope: .personal(login: "me"))
+    @Test func personalScopeReachesTheReviewedFetches() async {
+        let scope = FetchScope.personal(login: "me", repos: ["me/app"])
+        let source = StubSource()
+        let report = await load(source, scope: scope)
         #expect(report?.isComplete == true)
+        #expect(await source.calls.scopes("reviewed") == [scope, scope])
     }
 
     @Test func cancelledReturnsNil() async {

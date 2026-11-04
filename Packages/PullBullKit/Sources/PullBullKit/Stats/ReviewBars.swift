@@ -65,7 +65,7 @@ public struct ReviewBars: Equatable, Sendable {
 
     /// "12 reviews in the last 7 days, most on Tuesday (4)", with the date for 90 days; the most recent
     /// of tied days wins. Capped, the total reads "12+ reviews", and days not loaded add
-    /// ". Days before 3 Oct not loaded".
+    /// ". Days before 3 Oct not loaded", or ". No day fully loaded" when not even today is.
     public func hover(period: StatsPeriod, calendar: Calendar) -> String {
         let span = "in the last \(period.days) days"
         var text: String
@@ -79,7 +79,11 @@ public struct ReviewBars: Equatable, Sendable {
             text += ", most on \(Self.format(dayStarts[busiest.index], format, calendar)) (\(busiest.count))"
         }
         if counts.contains(where: { $0 == nil }), let loadedFrom {
-            text += ". Days before \(Self.format(loadedFrom, "d MMM", calendar)) not loaded"
+            if let today = dayStarts.last, loadedFrom > today {
+                text += ". No day fully loaded"
+            } else {
+                text += ". Days before \(Self.format(loadedFrom, "d MMM", calendar)) not loaded"
+            }
         }
         return text
     }

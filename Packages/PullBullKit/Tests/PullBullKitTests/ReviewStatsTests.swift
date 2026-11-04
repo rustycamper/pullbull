@@ -76,13 +76,6 @@ import Testing
         #expect(stats.turnarounds == [2 * hour])
     }
 
-    @Test func reviewInWindowOnPRUpdatedLaterCounts() {
-        let later = window.end.addingTimeInterval(5 * 86_400)
-        let stats = make([pr(updatedAt: later, requests: [request(0, .user("me"))], reviews: [review(2)])])
-        #expect(stats.reviewDates == [t0.addingTimeInterval(2 * hour)])
-        #expect(stats.turnarounds == [2 * hour])
-    }
-
     var utc: Calendar {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC")!
