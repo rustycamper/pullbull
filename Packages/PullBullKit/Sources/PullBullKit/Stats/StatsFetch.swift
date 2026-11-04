@@ -52,13 +52,13 @@ extension GitHubAPI {
         repeat {
             let variables: [String: Any] = [
                 "from": StatsQueries.timestamp(window.start), "to": StatsQueries.timestamp(window.githubEnd),
-                "org": orgID ?? NSNull(), "login": login, "after": cursor ?? NSNull(),
+                "org": (scope.org == nil ? nil : orgID) ?? NSNull(), "login": login, "after": cursor ?? NSNull(),
             ]
             let data = try await execute(StatsQueries.contributions, variables)
             guard let connection = (((data["viewer"] as? [String: Any])?["contributionsCollection"]
                 as? [String: Any])?["pullRequestReviewContributions"] as? [String: Any])
             else { throw APIError.graphQL("missing review contributions") }
-            for node in connection["nodes"] as? [[String: Any]] ?? [] {
+            for node in Self.nodes(connection["nodes"]) {
                 guard let pr = Self.reviewedPR(node["pullRequest"] as? [String: Any]),
                       scope.covers(pr.repo) else { continue }
                 items.append(pr)
@@ -68,7 +68,7 @@ extension GitHubAPI {
             cursor = pageInfo?["endCursor"] as? String
             pages += 1
         } while hasNext && cursor != nil && pages < pageLimit && items.count < Self.reviewedCap
-        return Capped(items: Array(items.prefix(Self.reviewedCap)), capped: hasNext)
+        return Capped(items: Array(items.prefix(Self.reviewedCap)), capped: hasNext || items.count > Self.reviewedCap)
     }
 
     /// The viewer's PRs opened in `window`, the newest 100.
@@ -104,11 +104,11 @@ extension GitHubAPI {
                 throw APIError.graphQL("missing issue comments")
             }
             var oldest: Date?
-            for node in connection["nodes"] as? [[String: Any]] ?? [] {
-                guard let raw = node["createdAt"] as? String, let at = try? Decoding.date(raw) else { continue }
+            for node in Self.nodes(connection["nodes"]) {
+                guard let at = Decoding.lenientDate(node["createdAt"]) else { continue }
                 oldest = min(oldest ?? at, at)
                 let repo = (node["repository"] as? [String: Any])?["nameWithOwner"] as? String
-                if window.contains(at), repo.map(scope.covers) ?? false { dates.append(at) }
+                if window.contains(at), let repo, Self.inScope(repo, scope) { dates.append(at) }
             }
             let pageInfo = connection["pageInfo"] as? [String: Any]
             let hasPrevious = pageInfo?["hasPreviousPage"] as? Bool ?? false
@@ -119,26 +119,37 @@ extension GitHubAPI {
         return Capped(items: dates.sorted(), capped: capped)
     }
 
+    /// Nodes that are objects; a null (an item GitHub hides) is skipped, not the whole page.
+    private static func nodes(_ raw: Any?) -> [[String: Any]] {
+        (raw as? [Any] ?? []).compactMap { $0 as? [String: Any] }
+    }
+
+    /// `covers` leaves an org to its searches, which `viewer.issueComments` has none of: its owner is checked here.
+    private static func inScope(_ repo: String, _ scope: FetchScope) -> Bool {
+        guard let org = scope.org else { return scope.covers(repo) }
+        return repo.split(separator: "/", maxSplits: 1).first?.caseInsensitiveCompare(org) == .orderedSame
+    }
+
     private func searchResult(_ query: String, _ q: String) async throws -> (total: Int, nodes: [[String: Any]]) {
         let data = try await execute(query, ["q": q])
         guard let search = data["search"] as? [String: Any], let total = search["issueCount"] as? Int else {
             throw APIError.graphQL("missing search")
         }
-        return (total, (search["nodes"] as? [[String: Any]] ?? []).filter { !$0.isEmpty })
+        return (total, Self.nodes(search["nodes"]).filter { !$0.isEmpty })
     }
 
     private static func reviewedPR(_ node: [String: Any]?) -> ReviewedPR? {
         guard let node, let repo = (node["repository"] as? [String: Any])?["nameWithOwner"] as? String
         else { return nil }
-        let events = ((node["timelineItems"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? [])
+        let events = Self.nodes((node["timelineItems"] as? [String: Any])?["nodes"])
             .compactMap { event -> ReviewRequestEvent? in
-                guard let at = (event["createdAt"] as? String).flatMap({ try? Decoding.date($0) }) else { return nil }
+                guard let at = Decoding.lenientDate(event["createdAt"]) else { return nil }
                 return ReviewRequestEvent(at: at, reviewer: Decoding.reviewer(event))
             }
-        let mine = ((node["reviews"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? [])
+        let mine = Self.nodes((node["reviews"] as? [String: Any])?["nodes"])
             .map { review in
                 MyReview(
-                    submittedAt: (review["submittedAt"] as? String).flatMap { try? Decoding.date($0) },
+                    submittedAt: Decoding.lenientDate(review["submittedAt"]),
                     pending: review["state"] as? String == "PENDING")
             }
         return ReviewedPR(
@@ -147,28 +158,28 @@ extension GitHubAPI {
     }
 
     private static func openedPR(_ node: [String: Any]) -> OpenedPR? {
-        guard let created = (node["createdAt"] as? String).flatMap({ try? Decoding.date($0) }) else { return nil }
-        let ready = ((node["readyEvent"] as? [String: Any])?["nodes"] as? [[String: Any]])?.last
-        let reviews = ((node["reviews"] as? [String: Any])?["nodes"] as? [[String: Any]] ?? [])
+        guard let created = Decoding.lenientDate(node["createdAt"]) else { return nil }
+        let ready = Self.nodes((node["readyEvent"] as? [String: Any])?["nodes"]).last
+        let reviews = Self.nodes((node["reviews"] as? [String: Any])?["nodes"])
             .map { review -> OpenedPRReview in
                 let author = review["author"] as? [String: Any]
                 return OpenedPRReview(
                     author: author?["login"] as? String ?? "ghost",
                     avatarURL: (author?["avatarUrl"] as? String).flatMap(URL.init(string:)),
                     byBot: author?["__typename"] as? String == "Bot",
-                    submittedAt: (review["submittedAt"] as? String).flatMap { try? Decoding.date($0) },
+                    submittedAt: Decoding.lenientDate(review["submittedAt"]),
                     pending: review["state"] as? String == "PENDING")
             }
         return OpenedPR(
             createdAt: created, isDraft: node["isDraft"] as? Bool ?? false,
             isOpen: node["state"] as? String == "OPEN",
-            readyAt: (ready?["createdAt"] as? String).flatMap { try? Decoding.date($0) },
+            readyAt: Decoding.lenientDate(ready?["createdAt"]),
             reviews: reviews)
     }
 
     private static func mergedPR(_ node: [String: Any]) -> MergedPR? {
-        guard let created = (node["createdAt"] as? String).flatMap({ try? Decoding.date($0) }),
-              let merged = (node["mergedAt"] as? String).flatMap({ try? Decoding.date($0) })
+        guard let created = Decoding.lenientDate(node["createdAt"]),
+              let merged = Decoding.lenientDate(node["mergedAt"])
         else { return nil }
         return MergedPR(createdAt: created, mergedAt: merged)
     }

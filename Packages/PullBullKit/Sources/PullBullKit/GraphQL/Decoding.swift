@@ -239,7 +239,7 @@ public enum Decoding {
         }.max { $0.at < $1.at }
     }
 
-    private static func lenientDate(_ raw: Any?) -> Date? {
+    static func lenientDate(_ raw: Any?) -> Date? {
         (raw as? String).flatMap { try? date($0) }
     }
 

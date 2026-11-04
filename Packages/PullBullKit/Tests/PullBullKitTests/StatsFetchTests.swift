@@ -186,6 +186,40 @@ private let week = StatsPeriod.week.window(now: now, calendar: utc)
         #expect(result.capped)
     }
 
+    @Test func orgCommentsOutsideTheOrgAreDropped() async throws {
+        let stub = StubTransport([try fixture("stats-comments"), try fixture("stats-comments-page2")])
+        let result = try await api(stub).myComments(window: week, scope: .org("Acme"))
+        #expect(result.items == [
+            iso("2026-10-31T10:00:00Z"), iso("2026-11-01T10:00:00Z"), iso("2026-11-03T10:00:00Z")])
+    }
+
+    @Test func nullNodesDoNotDropThePage() async throws {
+        let comments = json(#"{"data":{"viewer":{"issueComments":{"pageInfo":{"hasPreviousPage":false,"startCursor":"K"},"nodes":[null,{"createdAt":"2026-11-01T10:00:00Z","repository":{"nameWithOwner":"acme/web"}}]}}}}"#)
+        let reviewed = json(#"{"data":{"viewer":{"contributionsCollection":{"pullRequestReviewContributions":{"pageInfo":{"hasNextPage":false,"endCursor":"E"},"nodes":[null,{"pullRequest":{"author":{"login":"a"},"repository":{"nameWithOwner":"acme/web"},"timelineItems":{"nodes":[null]},"reviews":{"nodes":[null]}}}]}}}}}"#)
+        let stub = StubTransport([comments, reviewed])
+        let dates = try await api(stub).myComments(window: week, scope: .org("acme"))
+        #expect(dates.items == [iso("2026-11-01T10:00:00Z")])
+        let prs = try await api(stub).reviewedPRs(window: week, orgID: "O", login: "me", scope: .org("acme"))
+        #expect(prs.items.map(\.repo) == ["acme/web"])
+    }
+
+    @Test func personalTruncationToHundredIsCapped() async throws {
+        let sixty = contributions(repos: Array(repeating: "me/app", count: 60), hasNext: true)
+        let more = contributions(repos: Array(repeating: "me/app", count: 60), hasNext: false)
+        let stub = StubTransport([sixty, more])
+        let result = try await api(stub).reviewedPRs(
+            window: week, orgID: nil, login: "me", scope: .personal(login: "me"))
+        #expect(result.items.count == 100)
+        #expect(result.capped)
+    }
+
+    @Test func personalScopeSendsNoOrgID() async throws {
+        let stub = StubTransport([contributions(repos: [], hasNext: false)])
+        _ = try await api(stub).reviewedPRs(
+            window: week, orgID: "O_stale", login: "me", scope: .personal(login: "me"))
+        #expect(try variables(stub.bodies[0])["org"] is NSNull)
+    }
+
     @Test func rateLimitedPropagates() async {
         let headers = ["x-ratelimit-remaining": "0", "x-ratelimit-reset": "1793050000"]
         let stub = StubTransport([(Data("{}".utf8), response(403, headers: headers))])
