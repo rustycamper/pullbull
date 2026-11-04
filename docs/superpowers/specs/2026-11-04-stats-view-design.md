@@ -1,6 +1,6 @@
 # Stats view
 
-A Stats view, opened from the gear menu with ⌘3, shows how your reviewing and your pull requests have gone over the last 7, 30 or 90 days. It covers how many reviews you did and how fast, how many of your PRs merged and how long they waited for a first review, who reviews you most, and what is waiting right now. Every number comes from GitHub for the account and scope on screen.
+A Stats view, opened from the footer's chart button, the gear menu or ⌘3, shows how your reviewing and your pull requests have gone over the last 7, 30 or 90 days. It covers how many reviews you did and how fast, how many of your PRs merged and how long they waited for a first review, who reviews you most, and what is waiting right now. Every number comes from GitHub for the account and scope on screen.
 
 Mockup: https://claude.ai/artifact/RjYzu4Ddd4dqmonwWUcjkz (artboard Main, light and dark).
 
@@ -40,8 +40,9 @@ The feature fails if:
 
 ### Opening and closing
 
+- The list's footer has a Stats icon button (`chart.bar`) between the open-on-GitHub button and the gear, so the bar reads account · (stale age) · refresh · open · Stats · gear. Its tooltip is "Stats (⌘3)"; VoiceOver reads "Stats" with the hint "⌘3", as the PRs and Issues mode buttons do. It is only in the normal footer: not in the gear-only footer (signed out, first run), not in the amber failure footer, and not on Stats, whose own footer covers the list's. When the bar is tight, the account label falls back as before (scope first, then the whole label) and the button keeps its 24 pt.
 - The gear menu (footer gear, and the menu bar item's right-click) gets a **Stats** item with ⌘3, after Keyboard Shortcuts. From the menu bar item's right-click it shows the popover, on Stats. ⌘3 also opens Stats from the list and from search, by key position as well as character, as ⌘1 and ⌘2 do.
-- Stats opens only from the list or the search. On any other screen (a detail, Ask, Stats itself) or with a picker open, the menu item is disabled and ⌘3 does nothing. It is disabled, and ⌘3 does nothing, while no account is signed in or the account's scope hasn't loaded.
+- Stats opens only from the list or the search. On any other screen (a detail, Ask, Stats itself) or with a picker open, the footer button and the menu item are disabled and ⌘3 does nothing. They are disabled, and ⌘3 does nothing, while no account is signed in or the account's scope hasn't loaded.
 - It is a pushed screen like a detail: it slides in from the trailing edge over the list (a fade with Reduce Motion), with a back chevron in the header. Esc, ⌘[ or the chevron return to where it was opened from: the list, or the search with its query kept. ← does not go back on Stats; it moves the period chips (below).
 - ⌘1, ⌘2 and ⌘3 do nothing on Stats, as on a detail. ⌘Z does nothing either: Stats has no edit to undo, and the list's last edit stays put.
 - Stats keys go only to Stats, never to the list hidden behind it: Esc, ⌘[, ← →, ↑ ↓, ↩, ⌘↩, ⌘C and ⌘R act on Stats, and no key edits the list's search, pickers or selection. ↑/↓ move the highlight between the two Right now rows; ↩ opens the highlighted row's detail, ⌘↩ opens it on GitHub, ⌘C copies its link. The highlight clears each time Stats opens.
@@ -269,7 +270,7 @@ The GitHub App's user token wasn't tried; every query here was run with a `gh` t
 
 - PullBullKit `Stats/`, the pure parts, unit-tested on their own: the period windows and wording, durations, medians, review samples and turnaround, first-review waits, top reviewers, daily bars, the Right now pick, the per-period result with its per-item values, failures and cap flags, and the cache's freshness.
 - `GitHubAPI` gains the stats fetch and its decoding, tested against fixtures shaped like the spike's answers.
-- App: a `.stats` route shown as a pushed layer, the Stats view (the cards draw what the kit returns), the gear menu entry and ⌘3.
+- App: a `.stats` route shown as a pushed layer, the Stats view (the cards draw what the kit returns), the footer button, the gear menu entry and ⌘3.
 
 ## Docs
 
@@ -286,7 +287,8 @@ The GitHub App's user token wasn't tried; every query here was run with a `gh` t
 - **Periods are trailing windows of whole local days**, not calendar weeks and months (the owner's choice, so early in a month the chart isn't nearly empty). Whole days, not 7×24 hours, so each bar is a full day and the bars add up to the count.
 - **Daily bars for every period**, 90 thin bars for 90 days. Weekly buckets can't divide 90 days evenly, and a partial bucket reads as a slow week.
 - **System accent colour.** The app follows the system accent; the mockup's first green was a wrong guess.
-- **Gear menu item with ⌘3, from the list and search only.** ⌘1 and ⌘2 are the modes and ⌘3 was free; Stats isn't an hourly check, so it gets no footer button. Opening it over a detail or Ask would stack screens the routing doesn't have.
+- **Opens from a footer button, the gear menu and ⌘3, from the list and search only.** ⌘1 and ⌘2 are the modes and ⌘3 was free. Opening it over a detail or Ask would stack screens the routing doesn't have.
+- **The button is a footer icon (`chart.bar`), left of the gear.** It sits with refresh and open on GitHub, the footer's actions that open something, and the gear stays last. The gear menu keeps its Stats item, because its shortcut column teaches ⌘3. It isn't a third segment of the PRs/Issues toggle: Stats is a pushed screen, not a mode. It is disabled by the same rule as the menu item (`canOpenStats`).
 - **← moves the period chips on Stats, not Back**, as it moves the list's chips; Esc, ⌘[ and the chevron go back.
 - **Current account and scope only.** Switching account switches the stats, as the lists do.
 - **Latest 100, cached 15 minutes, with a visible cap note.** The owner's choice of cost cap; the cap is said, not silently trimmed. A result with a failed item isn't cached as fresh.

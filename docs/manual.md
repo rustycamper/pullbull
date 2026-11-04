@@ -106,7 +106,7 @@ A PR waiting on review shows who it waits on and for how long (🕒 @dana 3d, "+
 - **Labels:** up to two chips per row (none in compact cards), each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail's Details card lists them all
 - **Right-click a row:** [Reviewers…](#editing) · [Assignees…](#editing) · [Labels…](#editing) · copy branch, link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · show only updated · search author
 - **Right-click a group header** (repo, author): **Open All *N* on GitHub**, from two PRs up; above 8 it asks first. An author header's menu also offers **Search @*login*** and **Show Only Updated**. Headers in search results get their section's or tab's menus, without Show Only Updated
-- **Footer:** account · refresh · open on GitHub · the gear, a menu with Settings, Keyboard Shortcuts, Stats, About PullBull, Check for Updates (release builds) and Quit. Turns amber with **Retry** when a refresh fails
+- **Footer:** account · refresh · open on GitHub · Stats · the gear, a menu with Settings, Keyboard Shortcuts, Stats, About PullBull, Check for Updates (release builds) and Quit. Turns amber with **Retry** when a refresh fails
 - **Switch account:** click the account in the footer, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>. Lists your signed-in accounts, then GitHub CLI logins, each with the org it opens in; then Add Account… and Account Settings…. Each account comes back with its last org, and each org with its last board
 
 ## Issues
@@ -138,7 +138,7 @@ One list scoped by chips, as on [Pull Requests](#pull-requests). It opens on All
 
 ## Stats
 
-<kbd>⌘</kbd><kbd>3</kbd>, or the footer gear → **Stats**, from the list or the search. How your reviewing and your pull requests have gone over the last 7, 30 or 90 days, each compared with the period before. It slides in like a detail: <kbd>Esc</kbd>, <kbd>⌘</kbd><kbd>[</kbd> or the back button return to where you were, search query kept. Nothing is counted inside PullBull and no time is estimated: every figure is a GitHub query.
+<kbd>⌘</kbd><kbd>3</kbd>, the footer's chart button, or the gear → **Stats**, from the list or the search. How your reviewing and your pull requests have gone over the last 7, 30 or 90 days, each compared with the period before. It slides in like a detail: <kbd>Esc</kbd>, <kbd>⌘</kbd><kbd>[</kbd> or the back button return to where you were, search query kept. Nothing is counted inside PullBull and no time is estimated: every figure is a GitHub query.
 
 - **Periods:** This week, This month and 90 days are whole local days ending today (today and the 6, 29 or 89 days before), not calendar weeks or months. The comparison is the same number of days just before. <kbd>←</kbd> <kbd>→</kbd> move between the chips; the choice is kept
 - **Account and scope:** the ones on screen: the account and org the lists show, or your repositories in the personal scope. Only repositories PullBull can see count. Other accounts aren't added in

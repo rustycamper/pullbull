@@ -2,7 +2,7 @@ import SwiftUI
 import PullBullKit
 
 /// The account, then the age (only once stale), refresh (a spinner while refreshing), the link for the tab on
-/// screen and the gear's app menu; or the amber error state with Retry.
+/// screen, Stats and the gear's app menu; or the amber error state with Retry.
 /// In the first-run and signed-out layout, only the gear. A muted line above it says when a renewed
 /// sign-in couldn't be saved to the Keychain.
 struct FooterView: View {
@@ -88,6 +88,11 @@ struct FooterView: View {
                 NSWorkspace.shared.open(link.url)
             }
             .accessibilityLabel("Open \(link.title)")
+            // Disabled where the gear's Stats item is; the list's footer is hidden under Stats.
+            FooterIconButton(symbol: "chart.bar", help: "Stats (⌘3)", label: "Stats", hint: "⌘3") {
+                model.openStats()
+            }
+            .disabled(!model.canOpenStats)
             AppMenuButton(model: model)
         }
         .font(.system(size: 11))
@@ -258,6 +263,10 @@ private struct AccountButton: View {
 private struct FooterIconButton: View {
     let symbol: String
     let help: String
+    /// What VoiceOver reads; the tooltip when nil.
+    var label: String?
+    /// The shortcut, read after the label, as the mode buttons do.
+    var hint: String?
     let action: () -> Void
     @State private var hovering = false
     @Environment(\.isEnabled) private var isEnabled
@@ -274,7 +283,8 @@ private struct FooterIconButton: View {
         .opacity(isEnabled ? 1 : 0.5)
         .onHover { hovering = $0 }
         .help(help)
-        .accessibilityLabel(help)
+        .accessibilityLabel(label ?? help)
+        .accessibilityHint(hint ?? "")
     }
 }
 
