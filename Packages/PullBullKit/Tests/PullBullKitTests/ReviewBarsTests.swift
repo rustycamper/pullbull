@@ -328,7 +328,51 @@ import Testing
     @Test func dayCoversDaysNotLoaded() {
         let w = window(.week)
         let bars = ReviewBars.make(reviewDates: [day(4)], window: w, loadedFrom: w.dayStarts(calendar: cal)[3], calendar: cal)
-        #expect(bars.day(at: bars.centerX(of: 1, width: 300), width: 300) == 1)
+        #expect(bars.counts[0...2] == [nil, nil, nil])
+        for index in 0..<3 {
+            #expect(bars.day(at: bars.centerX(of: index, width: 300), width: 300) == index)
+        }
+        #expect(bars.day(at: 0, width: 300) == 0)
+        let none = ReviewBars.make(reviewDates: [], window: w, loadedFrom: nil, capped: true, calendar: cal)
+        #expect(none.counts == Array(repeating: nil, count: 7))
+        #expect(none.day(at: none.centerX(of: 5, width: 300), width: 300) == 5)
+    }
+
+    @Test func dayAtOneDayIsThatDayAcrossTheWidth() {
+        let start = cal.startOfDay(for: now)
+        let w = StatsWindow(start: start, end: cal.date(byAdding: .day, value: 1, to: start)!)
+        let bars = ReviewBars.make(reviewDates: [now], window: w, loadedFrom: nil, calendar: cal)
+        #expect(bars.counts == [1])
+        for x in stride(from: CGFloat(0), through: 300, by: 12.5) {
+            #expect(bars.day(at: x, width: 300) == 0)
+        }
+        #expect(bars.day(at: 300, width: 300) == 0)
+    }
+
+    @Test func dayAcrossThirtyDays() {
+        let bars = ReviewBars.make(reviewDates: [], window: window(.month), loadedFrom: nil, calendar: cal)
+        let marks = bars.marks(width: 300, height: 36)
+        #expect(marks.count == 30)
+        #expect(bars.day(at: 0, width: 300) == 0)
+        #expect(bars.day(at: 300, width: 300) == 29)
+        for (index, mark) in marks.enumerated() {
+            #expect(bars.day(at: mark.x + mark.width / 2, width: 300) == index)
+        }
+        for index in 1..<30 {
+            let midpoint = (marks[index - 1].x + marks[index - 1].width + marks[index].x) / 2
+            #expect(bars.day(at: midpoint, width: 300) == index)
+        }
+    }
+
+    @Test func dayAtFixedPoints() {
+        // 7 bars in 78 pt with 6-pt gaps: each bar is 6 wide, the first gap runs 6...12, its middle is 9.
+        let bars = ReviewBars.make(reviewDates: [], window: window(.week), loadedFrom: nil, calendar: cal)
+        #expect(bars.marks(width: 78, height: 20).map(\.width) == Array(repeating: 6, count: 7))
+        #expect(bars.day(at: 9, width: 78) == 1)
+        #expect(bars.day(at: 8.99, width: 78) == 0)
+        #expect(bars.day(at: 21, width: 78) == 2)
+        #expect(bars.day(at: 20.99, width: 78) == 1)
+        #expect(bars.day(at: 78, width: 78) == 6)
     }
 
     @Test func dayAcrossNinetyDays() {

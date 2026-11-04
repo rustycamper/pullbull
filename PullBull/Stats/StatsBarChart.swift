@@ -10,8 +10,11 @@ import PullBullKit
 struct StatsBarChart: View {
     let bars: ReviewBars
     let period: StatsPeriod
-    /// The day under the pointer, from `ReviewBars.day(at:width:)`.
-    @State private var hovered: Int?
+    /// The pointer's x over the plot. The day under it is worked out while drawing, so it follows the
+    /// bars when they change under a still pointer (a period switch, a refresh).
+    @State private var hoverX: CGFloat?
+    /// The plot's width, so the hover callback can tell when the pointer reaches another day.
+    @State private var plotWidth: CGFloat = 0
 
     static let barHeight: CGFloat = 36
     /// Room above the bars for the busiest day's count, so the tallest bar's label never clips.
@@ -28,21 +31,27 @@ struct StatsBarChart: View {
         let labels = bars.axisLabels(period: period, calendar: calendar)
         VStack(alignment: .leading, spacing: Self.spacing) {
             Self.caption
-            GeometryReader { proxy in
-                Canvas { context, size in
-                    drawBars(in: &context, width: size.width)
-                    drawLabel(in: &context, width: size.width, calendar: calendar)
-                    drawAxis(labels, in: &context, width: size.width)
-                }
-                .contentShape(Rectangle())
-                .onContinuousHover { phase in
-                    switch phase {
-                    case .active(let location): hovered = bars.day(at: location.x, width: proxy.size.width)
-                    case .ended: hovered = nil
-                    }
-                }
+            Canvas { context, size in
+                let hovered = hoverX.flatMap { bars.day(at: $0, width: size.width) }
+                drawBars(in: &context, width: size.width, hovered: hovered)
+                drawLabel(in: &context, width: size.width, hovered: hovered, calendar: calendar)
+                drawAxis(labels, in: &context, width: size.width)
             }
             .frame(height: Self.plotHeight)
+            .contentShape(Rectangle())
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { plotWidth = $0 }
+            .onContinuousHover { phase in
+                switch phase {
+                case .active(let location):
+                    // Only a move onto another day redraws.
+                    let day = bars.day(at: location.x, width: plotWidth)
+                    if hoverX == nil || hoverX.flatMap({ bars.day(at: $0, width: plotWidth) }) != day {
+                        hoverX = location.x
+                    }
+                case .ended:
+                    hoverX = nil
+                }
+            }
         }
         .frame(height: Self.totalHeight, alignment: .top)
         .accessibilityElement()
@@ -74,24 +83,18 @@ struct StatsBarChart: View {
 
     private static let baseline = countSpace + barHeight
 
-    /// The hovered day, while it is still one of this period's days.
-    private var hoveredDay: Int? {
-        hovered.flatMap { bars.counts.indices.contains($0) ? $0 : nil }
-    }
-
     /// The hovered day's bar or stub draws in the primary colour, today's in a brighter accent.
-    private func drawBars(in context: inout GraphicsContext, width: CGFloat) {
-        let hoveredDay = hoveredDay
+    private func drawBars(in context: inout GraphicsContext, width: CGFloat, hovered: Int?) {
         for mark in bars.marks(width: width, height: Self.barHeight) {
             let rect = CGRect(x: mark.x, y: Self.baseline - mark.height, width: mark.width, height: mark.height)
             let radius = min(1.5, mark.width / 2, mark.height / 2)
             let path = Path(roundedRect: rect, cornerRadius: radius)
-            if mark.index == hoveredDay, mark.isToday {
+            if mark.index == hovered, mark.isToday {
                 var bright = context
                 bright.addFilter(.brightness(0.2))
                 bright.fill(path, with: .color(.accentColor))
             } else {
-                let shading: GraphicsContext.Shading = mark.index == hoveredDay ? .style(.primary)
+                let shading: GraphicsContext.Shading = mark.index == hovered ? .style(.primary)
                     : mark.isToday ? .color(.accentColor) : mark.isEmpty ? .color(Palette.tertiary) : .style(.secondary)
                 context.fill(path, with: shading)
             }
@@ -100,12 +103,12 @@ struct StatsBarChart: View {
 
     /// The hovered day's count and date ("1 · Thu 29 Oct"), or else the busiest day's count, centred 1 pt
     /// above the full-height bars over that day's bar and kept inside the chart's width.
-    private func drawLabel(in context: inout GraphicsContext, width: CGFloat, calendar: Calendar) {
+    private func drawLabel(in context: inout GraphicsContext, width: CGFloat, hovered: Int?, calendar: Calendar) {
         let label: String
         let index: Int
-        if let hoveredDay {
-            label = bars.dayText(at: hoveredDay, calendar: calendar)
-            index = hoveredDay
+        if let hovered {
+            label = bars.dayText(at: hovered, calendar: calendar)
+            index = hovered
         } else if let busiest = bars.busiest {
             label = String(busiest.count)
             index = busiest.index
@@ -146,11 +149,11 @@ struct StatsBarChart: View {
 
 #if DEBUG
 extension StatsBarChart {
-    /// For previews: the chart as it draws with the pointer over `hovered`.
-    init(bars: ReviewBars, period: StatsPeriod, hovered: Int?) {
+    /// For previews: the chart as it draws with the pointer at `hoverX`.
+    init(bars: ReviewBars, period: StatsPeriod, hoverX: CGFloat?) {
         self.bars = bars
         self.period = period
-        _hovered = State(initialValue: hovered)
+        _hoverX = State(initialValue: hoverX)
     }
 }
 
@@ -209,9 +212,10 @@ extension StatsBarChart {
     let dates = [starts[1], starts[4], starts[4], starts[6]].map { $0.addingTimeInterval(60) }
     let bars = ReviewBars.make(reviewDates: dates, window: window, loadedFrom: starts[1], calendar: .current)
     VStack(alignment: .leading, spacing: 16) {
-        // A day not loaded, a day with none, the busiest day, and today.
+        // A day not loaded, a day with none, the busiest day, and today, each pointed at the middle of
+        // its bar in the 300-pt plot (332 less the padding).
         ForEach([0, 2, 4, 6], id: \.self) { day in
-            StatsBarChart(bars: bars, period: .week, hovered: day)
+            StatsBarChart(bars: bars, period: .week, hoverX: bars.centerX(of: day, width: 300))
         }
     }
     .padding()

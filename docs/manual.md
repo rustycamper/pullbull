@@ -147,7 +147,7 @@ One list scoped by chips, as on [Pull Requests](#pull-requests). It opens on All
 |---|---|---|
 | Your reviews | Reviews | Reviews you submitted on other people's PRs in the period: approved, changes requested, commented or dismissed. Unsent reviews and replies on your own PRs don't count |
 | | Turnaround | Median time from a review request (to you or one of your teams) to your response. Reviews nobody asked for, and a second review on the same request, aren't samples |
-| | Bars | Reviews per day, today's in the accent colour, with the busiest day's count above its bar. A day with none is a small grey stub. Underneath, the weekday initials for a week, or the first and last dates for 30 and 90 days. Hover a day for its count |
+| | Bars | Reviews per day, today's in the accent colour, with the busiest day's count above its bar. A day with none is a small grey stub. Underneath, the weekday initials for a week, or the first and last dates for 30 and 90 days. Hover a day for its count and date |
 | Your pull requests | Merged | Your PRs merged in the period |
 | | Time to merge | Median of merged minus opened, over those PRs |
 | | First review | Median wait for the first review by someone other than you, over your PRs opened in the period. It runs from when the PR was last marked ready. Drafts, unreviewed PRs and reviews made while a draft aren't samples; the hover says how many PRs still wait |
