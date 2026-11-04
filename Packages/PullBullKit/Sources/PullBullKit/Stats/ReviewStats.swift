@@ -4,12 +4,17 @@ import Foundation
 public struct ReviewedPR: Equatable, Sendable {
     public let repo: String
     public let author: String?
+    /// When the PR last changed; the reviewed search is sorted by it. Nil when GitHub didn't say.
+    public let updatedAt: Date?
     public let requests: [ReviewRequestEvent]
     public let myReviews: [MyReview]
 
-    public init(repo: String, author: String?, requests: [ReviewRequestEvent], myReviews: [MyReview]) {
+    public init(
+        repo: String, author: String?, updatedAt: Date?, requests: [ReviewRequestEvent], myReviews: [MyReview]
+    ) {
         self.repo = repo
         self.author = author
+        self.updatedAt = updatedAt
         self.requests = requests
         self.myReviews = myReviews
     }
@@ -69,14 +74,15 @@ public struct ReviewStats: Equatable, Sendable {
         return ReviewStats(reviewDates: dates.sorted(), turnarounds: turnarounds)
     }
 
-    /// The first local day whose reviews are all loaded, or nil when no PR has a review in `window`.
-    /// Contributions come newest PR first, each dated by its latest review, so a PR not loaded has its
-    /// latest review on or before the earliest of the loaded ones: that day may be missing reviews.
-    public static func loadedFrom(_ prs: [ReviewedPR], window: StatsWindow, me: String, calendar: Calendar) -> Date? {
-        let newest = prs.filter { !isOwn($0, me: me) }
-            .compactMap { sentDates($0).filter(window.contains).max() }
-        guard let earliest = newest.min() else { return nil }
-        return calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: earliest))
+    /// The first local day whose reviews are all loaded when a cap cut in, or nil when nothing was loaded
+    /// (no PR with an `updatedAt`). The search returns PRs most recently updated first, and a review
+    /// updates its PR, so a PR not loaded has every review at or before the oldest loaded `updatedAt`:
+    /// every review from then on is loaded. That is the first day starting at or after it.
+    public static func loadedFrom(_ prs: [ReviewedPR], calendar: Calendar) -> Date? {
+        guard let oldest = prs.compactMap(\.updatedAt).min() else { return nil }
+        let day = calendar.startOfDay(for: oldest)
+        if day == oldest { return day }
+        return calendar.date(byAdding: .day, value: 1, to: day)
     }
 
     private static func isOwn(_ pr: ReviewedPR, me: String) -> Bool {

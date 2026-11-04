@@ -10,10 +10,8 @@ private actor Calls {
     }
 
     var all: [Call] = []
-    var orgIDReads = 0
     var inFlight = 0
     var maxInFlight = 0
-    func read() { orgIDReads += 1 }
     var names: [String] { all.map(\.name) }
     func windows(_ name: String) -> [StatsWindow] { all.filter { $0.name == name }.compactMap(\.window) }
 
@@ -30,18 +28,15 @@ private actor Calls {
 private struct StubSource: StatsSource {
     let calls = Calls()
     var failMerged = false
+    var failReviewed = false
     var cancelOpened = false
     var throwOnOpened: (any Error)?
     var reviewedItems: [ReviewedPR] = []
     var counts: [String: Int] = [:]
 
-    func organizationID(_ org: String) async throws -> String {
-        await calls.enter("organizationID")
-        return "O_1"
-    }
-
-    func reviewedPRs(window: StatsWindow, orgID: String?, login: String, scope: FetchScope) async throws -> Capped<ReviewedPR> {
+    func reviewedPRs(window: StatsWindow, login: String, scope: FetchScope) async throws -> Capped<ReviewedPR> {
         await calls.enter("reviewed", window: window)
+        if failReviewed { throw APIError.rateLimited(resetAt: nil) }
         return Capped(items: reviewedItems, capped: false)
     }
 
@@ -77,12 +72,9 @@ private struct StubSource: StatsSource {
         return calendar
     }
 
-    private func load(
-        _ source: StubSource, scope: FetchScope = .org("acme"),
-        orgID: @escaping @Sendable () async throws -> String? = { "O_1" }
-    ) async -> StatsReport? {
+    private func load(_ source: StubSource, scope: FetchScope = .org("acme")) async -> StatsReport? {
         await StatsLoader.load(
-            source, period: .week, scope: scope, me: "me", myTeams: [], orgID: orgID, now: now, calendar: calendar)
+            source, period: .week, scope: scope, me: "me", myTeams: [], now: now, calendar: calendar)
     }
 
     @Test func loadsAllInParallel() async {
@@ -95,7 +87,8 @@ private struct StubSource: StatsSource {
         #expect(names.count { $0 == "merged" } == 2)
         #expect(names.count { $0 == "issueCount" } == 4)
         #expect(names.count { $0 == "comments" } == 1)
-        #expect(await source.calls.maxInFlight >= 9)
+        // All 11 fetches, the reviewed ones too, are in flight at once.
+        #expect(await source.calls.maxInFlight == 11)
     }
 
     @Test func eachSourceGetsItsWindowAndQuery() async {
@@ -136,26 +129,16 @@ private struct StubSource: StatsSource {
         #expect(report?.failures == ["Rate limited"])
     }
 
-    @Test func orgIDFailureFailsReviewsOnly() async {
-        let source = StubSource()
-        let report = await load(source, orgID: { throw APIError.rateLimited(resetAt: nil) })
+    @Test func reviewedFailureFailsReviewsOnly() async {
+        let report = await load(StubSource(failReviewed: true))
         #expect(report?.reviews.text == "–")
+        #expect(report?.turnaround.text == "–")
         #expect(report?.merged.text == "0")
-        #expect(report?.failures.count == 1)
-        #expect(await !source.calls.names.contains("reviewed"))
+        #expect(report?.failures == ["Rate limited"])
     }
 
-    @Test func orgIDReadOnce() async {
-        let source = StubSource()
-        _ = await load(source, orgID: {
-            await source.calls.read()
-            return "O_1"
-        })
-        #expect(await source.calls.orgIDReads == 1)
-    }
-
-    @Test func personalScopeGetsNilOrgID() async {
-        let report = await load(StubSource(), scope: .personal(login: "me"), orgID: { nil })
+    @Test func personalScopeLoads() async {
+        let report = await load(StubSource(), scope: .personal(login: "me"))
         #expect(report?.isComplete == true)
     }
 

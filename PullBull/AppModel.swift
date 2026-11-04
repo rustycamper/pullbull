@@ -393,8 +393,6 @@ final class AppModel {
     /// The reports fetched since launch, per account, scope and period.
     @ObservationIgnored var statsCache = StatsCache()
     @ObservationIgnored var statsTask: Task<Void, Never>?
-    /// Org login (lowercased) to node ID, for the reviewed fetch; looked up once per org.
-    @ObservationIgnored var statsOrgIDs: [String: String] = [:]
     /// Back from Stats ends in the search, with its query kept, rather than the list.
     private(set) var statsReturnsToSearch = false
     /// The highlighted Right now row on Stats (↑/↓; Return opens it).

@@ -19,7 +19,7 @@ import Testing
             let requests = i < asked
                 ? [ReviewRequestEvent(at: at.addingTimeInterval(-wait * hour), reviewer: .user("me"))] : []
             return ReviewedPR(
-                repo: "acme/app", author: "dana", requests: requests,
+                repo: "acme/app", author: "dana", updatedAt: at, requests: requests,
                 myReviews: [MyReview(submittedAt: at, pending: false)])
         }
     }
@@ -116,9 +116,27 @@ import Testing
     }
 
     @Test func cappedWithNothingLoadedMarksEveryDayNotLoaded() {
-        let prs = reviewed(100, asked: 0, daysAgo: 10)
-        let report = build(facts(reviewed: .success(Capped(items: prs, capped: true))))
+        let report = build(facts(reviewed: .success(Capped(items: [], capped: true))))
         #expect(report.bars?.counts == Array(repeating: nil, count: 7))
+    }
+
+    @Test func cappedBarsLoadFromTheOldestUpdate() {
+        let at = now.addingTimeInterval(-3 * day)
+        let pr = ReviewedPR(
+            repo: "acme/app", author: "dana", updatedAt: now.addingTimeInterval(-1 * day), requests: [],
+            myReviews: [MyReview(submittedAt: at, pending: false)])
+        let report = build(facts(reviewed: .success(Capped(items: [pr], capped: true))))
+        #expect(report.reviews.text == "1+")
+        #expect(report.bars?.counts == [nil, nil, nil, nil, nil, nil, 0])
+    }
+
+    @Test func reviewOnPRUpdatedLaterFillsItsDay() {
+        let pr = ReviewedPR(
+            repo: "acme/app", author: "dana", updatedAt: now, requests: [],
+            myReviews: [MyReview(submittedAt: now.addingTimeInterval(-3 * day), pending: false)])
+        let report = build(facts(reviewed: .success(Capped(items: [pr], capped: false))))
+        #expect(report.reviews.text == "1")
+        #expect(report.bars?.counts == [0, 0, 0, 1, 0, 0, 0])
     }
 
     @Test func cappedTurnaroundHoverJoinsTheCapSentence() {

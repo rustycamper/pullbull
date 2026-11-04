@@ -208,7 +208,7 @@ public struct StatsReport: Equatable, Sendable {
         var bars: ReviewBars?
         if let current {
             let from = current.capped
-                ? ReviewStats.loadedFrom(current.prs, window: window, me: me, calendar: calendar) : nil
+                ? ReviewStats.loadedFrom(current.prs, calendar: calendar) : nil
             bars = ReviewBars.make(
                 reviewDates: current.stats.reviewDates, window: window, loadedFrom: from, capped: current.capped,
                 calendar: calendar)

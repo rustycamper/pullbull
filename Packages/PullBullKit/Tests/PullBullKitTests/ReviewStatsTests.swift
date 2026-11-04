@@ -7,8 +7,10 @@ import Testing
     let hour: TimeInterval = 3600
     var window: StatsWindow { StatsWindow(start: t0.addingTimeInterval(-86_400), end: t0.addingTimeInterval(10 * 86_400)) }
 
-    func pr(author: String? = "dana", requests: [ReviewRequestEvent] = [], reviews: [MyReview]) -> ReviewedPR {
-        ReviewedPR(repo: "acme/app", author: author, requests: requests, myReviews: reviews)
+    func pr(
+        author: String? = "dana", updatedAt: Date? = nil, requests: [ReviewRequestEvent] = [], reviews: [MyReview]
+    ) -> ReviewedPR {
+        ReviewedPR(repo: "acme/app", author: author, updatedAt: updatedAt, requests: requests, myReviews: reviews)
     }
     func review(_ offset: TimeInterval, pending: Bool = false) -> MyReview {
         MyReview(submittedAt: t0.addingTimeInterval(offset * hour), pending: pending)
@@ -21,7 +23,8 @@ import Testing
     }
 
     @Test func ownPRDropped() {
-        let stats = make([pr(author: "Me", requests: [request(0, .user("me"))], reviews: [review(3)])])
+        let stats = make([pr(author: "Me", updatedAt: t0.addingTimeInterval(3 * hour),
+                             requests: [request(0, .user("me"))], reviews: [review(3)])])
         #expect(stats.reviewDates.isEmpty)
         #expect(stats.turnarounds.isEmpty)
     }
@@ -73,17 +76,44 @@ import Testing
         #expect(stats.turnarounds == [2 * hour])
     }
 
-    @Test func loadedFromCapped() {
+    @Test func reviewInWindowOnPRUpdatedLaterCounts() {
+        let later = window.end.addingTimeInterval(5 * 86_400)
+        let stats = make([pr(updatedAt: later, requests: [request(0, .user("me"))], reviews: [review(2)])])
+        #expect(stats.reviewDates == [t0.addingTimeInterval(2 * hour)])
+        #expect(stats.turnarounds == [2 * hour])
+    }
+
+    var utc: Calendar {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC")!
-        let day0 = cal.startOfDay(for: t0)
-        let w = StatsWindow(start: day0, end: day0.addingTimeInterval(7 * 86_400 - 1))
-        func at(_ day: Int) -> MyReview { MyReview(submittedAt: day0.addingTimeInterval(Double(day) * 86_400 + 3600), pending: false) }
-        let a = pr(reviews: [at(1), at(5)])
-        let b = pr(reviews: [at(5)])
-        let from = ReviewStats.loadedFrom([a, b], window: w, me: "me", calendar: cal)
-        #expect(from == day0.addingTimeInterval(6 * 86_400))
-        #expect(ReviewStats.loadedFrom([], window: w, me: "me", calendar: cal) == nil)
-        #expect(ReviewStats.loadedFrom([pr(author: "me", reviews: [at(2)])], window: w, me: "me", calendar: cal) == nil)
+        return cal
+    }
+
+    /// The day after the oldest loaded PR's update, whatever its reviews' dates.
+    @Test func loadedFromOldestUpdate() {
+        let day0 = utc.startOfDay(for: t0)
+        func on(_ day: Double) -> Date { day0.addingTimeInterval(day * 86_400) }
+        let newer = pr(updatedAt: on(5) + 3600, reviews: [MyReview(submittedAt: on(1), pending: false)])
+        let older = pr(updatedAt: on(2) + 3600, reviews: [MyReview(submittedAt: on(2), pending: false)])
+        #expect(ReviewStats.loadedFrom([newer, older], calendar: utc) == on(3))
+    }
+
+    @Test func loadedFromMidnightUpdateIsThatDay() {
+        let day0 = utc.startOfDay(for: t0)
+        let midnight = day0.addingTimeInterval(2 * 86_400)
+        #expect(ReviewStats.loadedFrom([pr(updatedAt: midnight, reviews: [])], calendar: utc) == midnight)
+    }
+
+    @Test func loadedFromNothingLoadedIsNil() {
+        #expect(ReviewStats.loadedFrom([], calendar: utc) == nil)
+        #expect(ReviewStats.loadedFrom([pr(updatedAt: nil, reviews: [review(2)])], calendar: utc) == nil)
+    }
+
+    @Test func loadedFromLocalDay() {
+        var sofia = Calendar(identifier: .gregorian)
+        sofia.timeZone = TimeZone(identifier: "Europe/Sofia")!
+        let updated = try! Decoding.date("2026-11-03T23:30:00Z")
+        #expect(ReviewStats.loadedFrom([pr(updatedAt: updated, reviews: [])], calendar: sofia)
+            == (try! Decoding.date("2026-11-04T22:00:00Z")))
     }
 }

@@ -29,41 +29,25 @@ extension GitHubAPI {
     private static let reviewedPageLimit = 3
     private static let commentPageLimit = 5
 
-    /// The node ID of `org`, which the contributions query needs to keep to one organization.
-    public func organizationID(_ org: String) async throws -> String {
-        let data = try await execute(StatsQueries.organizationID, ["org": org])
-        guard let id = (data["organization"] as? [String: Any])?["id"] as? String else {
-            throw APIError.graphQL("missing organization ID")
-        }
-        return id
-    }
-
-    /// The PRs `login` reviewed in `window`, up to 100 in `scope`. An org is one page; the personal scope
-    /// drops other owners' PRs and reads up to 3 pages. `capped` when GitHub has pages after the last one read.
-    public func reviewedPRs(
-        window: StatsWindow, orgID: String?, login: String, scope: FetchScope
-    ) async throws -> Capped<ReviewedPR> {
-        if scope.org != nil && orgID == nil { throw APIError.graphQL("missing organization ID") }
+    /// The PRs `login` reviewed that were updated since `window` began, most recently updated first, up to
+    /// 100 in `scope`. An org is one page; the personal scope drops PRs `scope` doesn't cover and reads up
+    /// to 3 pages. `capped` when the search has pages after the last one read.
+    public func reviewedPRs(window: StatsWindow, login: String, scope: FetchScope) async throws -> Capped<ReviewedPR> {
         let pageLimit = scope.org == nil ? Self.reviewedPageLimit : 1
+        let q = StatsQueries.reviewedPRs(window: window, scope: scope)
         var items: [ReviewedPR] = []
         var cursor: String?
         var hasNext = false
         var pages = 0
         repeat {
-            let variables: [String: Any] = [
-                "from": StatsQueries.timestamp(window.start), "to": StatsQueries.timestamp(window.githubEnd),
-                "org": (scope.org == nil ? nil : orgID) ?? NSNull(), "login": login, "after": cursor ?? NSNull(),
-            ]
-            let data = try await execute(StatsQueries.contributions, variables)
-            guard let connection = (((data["viewer"] as? [String: Any])?["contributionsCollection"]
-                as? [String: Any])?["pullRequestReviewContributions"] as? [String: Any])
-            else { throw APIError.graphQL("missing review contributions") }
-            for node in Self.nodes(connection["nodes"]) {
-                guard let pr = Self.reviewedPR(node["pullRequest"] as? [String: Any]),
-                      scope.covers(pr.repo) else { continue }
+            let variables: [String: Any] = ["q": q, "login": login, "after": cursor ?? NSNull()]
+            let data = try await execute(StatsQueries.reviewed, variables)
+            guard let search = data["search"] as? [String: Any] else { throw APIError.graphQL("missing search") }
+            for node in Self.nodes(search["nodes"]) {
+                guard let pr = Self.reviewedPR(node), scope.covers(pr.repo) else { continue }
                 items.append(pr)
             }
-            let pageInfo = connection["pageInfo"] as? [String: Any]
+            let pageInfo = search["pageInfo"] as? [String: Any]
             hasNext = pageInfo?["hasNextPage"] as? Bool ?? false
             cursor = pageInfo?["endCursor"] as? String
             pages += 1
@@ -138,8 +122,8 @@ extension GitHubAPI {
         return (total, Self.nodes(search["nodes"]).filter { !$0.isEmpty })
     }
 
-    private static func reviewedPR(_ node: [String: Any]?) -> ReviewedPR? {
-        guard let node, let repo = (node["repository"] as? [String: Any])?["nameWithOwner"] as? String
+    private static func reviewedPR(_ node: [String: Any]) -> ReviewedPR? {
+        guard let repo = (node["repository"] as? [String: Any])?["nameWithOwner"] as? String
         else { return nil }
         let events = Self.nodes((node["timelineItems"] as? [String: Any])?["nodes"])
             .compactMap { event -> ReviewRequestEvent? in
@@ -154,7 +138,7 @@ extension GitHubAPI {
             }
         return ReviewedPR(
             repo: repo, author: (node["author"] as? [String: Any])?["login"] as? String,
-            requests: events, myReviews: mine)
+            updatedAt: Decoding.lenientDate(node["updatedAt"]), requests: events, myReviews: mine)
     }
 
     private static func openedPR(_ node: [String: Any]) -> OpenedPR? {

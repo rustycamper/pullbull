@@ -2,31 +2,23 @@ import Foundation
 
 /// The queries behind the Stats screen, and the search strings they and the issue counts use.
 enum StatsQueries {
-    static let organizationID = """
-    query($org:String!){organization(login:$org){id}}
-    """
-
-    /// One page of the PRs the viewer reviewed in `$from`..`$to`, newest first, with the review requests
-    /// and the viewer's own reviews on each.
-    static let contributions = """
-    query($from:DateTime!,$to:DateTime!,$org:ID,$login:String!,$after:String){
-      viewer{
-        contributionsCollection(organizationID:$org,from:$from,to:$to){
-          pullRequestReviewContributions(first:100,after:$after,orderBy:{direction:DESC}){
-            pageInfo{hasNextPage endCursor}
-            nodes{
-              pullRequest{
-                author{login}
-                repository{nameWithOwner}
-                timelineItems(itemTypes:[REVIEW_REQUESTED_EVENT],last:20){
-                  nodes{... on ReviewRequestedEvent{createdAt
-                    requestedReviewer{__typename ... on User{login} ... on Team{slug}}}}
-                }
-                reviews(author:$login,last:50){nodes{submittedAt state}}
-              }
-            }
+    /// One page of the `reviewedPRs` search: PRs most recently updated first, with the review requests
+    /// and `$login`'s own reviews on each.
+    static let reviewed = """
+    query($q:String!,$login:String!,$after:String){
+      search(query:$q,type:ISSUE,first:100,after:$after){
+        issueCount
+        pageInfo{hasNextPage endCursor}
+        nodes{... on PullRequest{
+          updatedAt
+          author{login}
+          repository{nameWithOwner}
+          timelineItems(itemTypes:[REVIEW_REQUESTED_EVENT],last:20){
+            nodes{... on ReviewRequestedEvent{createdAt
+              requestedReviewer{__typename ... on User{login} ... on Team{slug}}}}
           }
-        }
+          reviews(author:$login,last:50){nodes{submittedAt state}}
+        }}
       }
     }
     """
@@ -79,6 +71,13 @@ enum StatsQueries {
 
     private static func range(_ window: StatsWindow) -> String {
         "\(timestamp(window.start))..\(timestamp(window.githubEnd))"
+    }
+
+    /// Others' PRs the viewer reviewed that were updated since `window` began. A review updates its PR,
+    /// so this holds every PR with a review in the window; the end is open, because a later update doesn't
+    /// hide an earlier review. The reviews themselves are kept to the window by `submittedAt`.
+    static func reviewedPRs(window: StatsWindow, scope: FetchScope) -> String {
+        "is:pr reviewed-by:@me -author:@me updated:>=\(timestamp(window.start)) archived:false sort:updated-desc \(scope.searchQualifier)"
     }
 
     static func openedPRs(window: StatsWindow, scope: FetchScope) -> String {

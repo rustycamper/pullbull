@@ -42,18 +42,11 @@ extension AppModel {
         statsTask?.cancel()
         showStats(cached, loading: true)
         let api = api(for: account)
-        let org = key.scope.org
         let me = snapshot.org.viewer
         let myTeams = snapshot.org.myTeams
         statsTask = Task { [weak self] in
             let report = await StatsLoader.load(
-                api, period: key.period, scope: key.scope, me: me, myTeams: myTeams,
-                orgID: { [weak self] in
-                    guard let org else { return nil }
-                    guard let self else { throw CancellationError() }
-                    return try await self.statsOrgID(org, api: api)
-                },
-                now: Date(), calendar: .current)
+                api, period: key.period, scope: key.scope, me: me, myTeams: myTeams, now: Date(), calendar: .current)
             // A stopped fetch leaves the screen to whatever stopped it, and caches nothing: after a
             // sign-out the account's reports are dropped.
             guard let self, !Task.isCancelled else { return }
@@ -71,16 +64,6 @@ extension AppModel {
                 loadStats(force: false)
             }
         }
-    }
-
-    /// The org's node ID, which the reviewed fetch needs. GitHub's answer is kept, so each org is looked
-    /// up once.
-    private func statsOrgID(_ org: String, api: GitHubAPI) async throws -> String {
-        let login = org.lowercased()
-        if let id = statsOrgIDs[login] { return id }
-        let id = try await api.organizationID(org)
-        statsOrgIDs[login] = id
-        return id
     }
 }
 
