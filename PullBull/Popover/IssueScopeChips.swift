@@ -19,6 +19,17 @@ struct IssueScopeChips: View {
     private static let createdNote = "Includes issues also assigned to you"
 
     var body: some View {
+        // The chips tighten only when the row wouldn't fit, so their padding matches across modes.
+        ViewThatFits(in: .horizontal) {
+            chips(crowded: false)
+            chips(crowded: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Issue scopes")
+    }
+
+    private func chips(crowded: Bool) -> some View {
         HStack(spacing: 4) {
             ForEach(IssueScope.allCases, id: \.self) { scope in
                 ScopeChip(
@@ -30,9 +41,6 @@ struct IssueScopeChips: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Issue scopes")
     }
 
     private func title(of scope: IssueScope) -> String {
@@ -59,16 +67,6 @@ struct IssueScopeChips: View {
 
     private func isSelected(_ scope: IssueScope) -> Bool {
         searching ? model.shownSearchScope == SearchScope(.issues(scope)) : model.issueScope == scope
-    }
-
-    /// Whether any count on screen reads three or more characters ("99+"), which needs the room.
-    private var crowded: Bool {
-        IssueScope.allCases.contains { scope in
-            switch count(of: scope) {
-            case .current(let n), .stale(let n, _, _): TabCountText.header(n).count >= 3
-            case .unavailable, nil: false
-            }
-        }
     }
 
     private func pick(_ scope: IssueScope) {
