@@ -18,6 +18,17 @@ public struct ReviewBarMark: Equatable, Sendable {
     }
 }
 
+/// A label under the chart, for the bar at `index`.
+public struct ReviewBarLabel: Equatable, Sendable {
+    public let index: Int
+    public let text: String
+
+    public init(index: Int, text: String) {
+        self.index = index
+        self.text = text
+    }
+}
+
 /// Reviews per local day for the bar chart. A day that may be missing reviews because a cap cut in is
 /// `nil`, not 0: missing beats wrong.
 public struct ReviewBars: Equatable, Sendable {
@@ -74,7 +85,7 @@ public struct ReviewBars: Equatable, Sendable {
         } else {
             text = total == 0 ? "No reviews \(span)" : "\(total) \(total == 1 ? "review" : "reviews") \(span)"
         }
-        if total > 0, let busiest = busiestDay() {
+        if let busiest {
             let format = period == .quarter ? "d MMM" : "EEEE"
             text += ", most on \(Self.format(dayStarts[busiest.index], format, calendar)) (\(busiest.count))"
         }
@@ -93,31 +104,81 @@ public struct ReviewBars: Equatable, Sendable {
         barCount >= 90 ? 1 : barCount >= 30 ? 2 : 4
     }
 
+    /// The widest a bar gets, so 7 bars stay bars rather than slabs.
+    public static let maxBarWidth: CGFloat = 14
+
     /// The bars across `width`, oldest first, each as tall as its count against the busiest loaded day's
     /// `height`. A day with reviews is at least 2 pt, so it never passes for the 1-pt stub of a day with
-    /// none; a day not loaded draws nothing.
+    /// none; a day not loaded draws nothing. Bars are at most `maxBarWidth` wide, and when that cap
+    /// applies the bars and their gaps are centred in `width`.
     public func marks(width: CGFloat, height: CGFloat) -> [ReviewBarMark] {
         guard !counts.isEmpty else { return [] }
-        let n = CGFloat(counts.count)
-        let gap = Self.gap(barCount: counts.count)
-        let barWidth = max((width - gap * (n - 1)) / n, 0)
+        let layout = layout(width: width)
         let busiest = CGFloat(counts.compactMap { $0 }.max() ?? 0)
         return counts.enumerated().compactMap { index, count in
             guard let count else { return nil }
             let barHeight = count == 0 || busiest == 0 ? 1 : max(height * CGFloat(count) / busiest, 2)
             return ReviewBarMark(
-                x: CGFloat(index) * (barWidth + gap), width: barWidth, height: min(barHeight, height),
+                x: layout.x(of: index), width: layout.barWidth, height: min(barHeight, height),
                 isEmpty: count == 0, isToday: index == todayIndex)
         }
     }
 
-    private func busiestDay() -> (index: Int, count: Int)? {
+    /// The middle of the bar at `index` across `width`, laid out as `marks` lays it out, whether or not
+    /// that day is loaded.
+    public func centerX(of index: Int, width: CGFloat) -> CGFloat {
+        let layout = layout(width: width)
+        return layout.x(of: index) + layout.barWidth / 2
+    }
+
+    /// From the first bar's leading edge to the last bar's trailing edge, across `width`.
+    public func extent(width: CGFloat) -> ClosedRange<CGFloat> {
+        guard !counts.isEmpty else { return 0...0 }
+        let layout = layout(width: width)
+        return layout.x(of: 0)...(layout.x(of: counts.count - 1) + layout.barWidth)
+    }
+
+    /// The day with the most reviews; the most recent of tied days wins. Nil when no loaded day has any.
+    public var busiest: (index: Int, count: Int)? {
         var best: (index: Int, count: Int)?
         for (index, count) in counts.enumerated() {
             guard let count, count > 0, count >= (best?.count ?? 0), index < dayStarts.count else { continue }
             best = (index, count)
         }
         return best
+    }
+
+    /// The labels under the chart. For 7 days, every day's weekday initial in `calendar`'s locale
+    /// ("T F S S M T W"); for 30 and 90, the first and last days' dates ("6 Oct", "4 Nov"). A day not
+    /// loaded is labelled all the same.
+    public func axisLabels(period: StatsPeriod, calendar: Calendar) -> [ReviewBarLabel] {
+        guard let first = dayStarts.first, let last = dayStarts.last else { return [] }
+        if period == .week {
+            let symbols = calendar.veryShortWeekdaySymbols
+            return dayStarts.enumerated().map { index, day in
+                ReviewBarLabel(index: index, text: symbols[calendar.component(.weekday, from: day) - 1])
+            }
+        }
+        let lastIndex = dayStarts.count - 1
+        let start = ReviewBarLabel(index: 0, text: Self.format(first, "d MMM", calendar))
+        guard lastIndex > 0 else { return [start] }
+        return [start, ReviewBarLabel(index: lastIndex, text: Self.format(last, "d MMM", calendar))]
+    }
+
+    private struct Layout {
+        let origin: CGFloat
+        let barWidth: CGFloat
+        let gap: CGFloat
+
+        func x(of index: Int) -> CGFloat { origin + CGFloat(index) * (barWidth + gap) }
+    }
+
+    private func layout(width: CGFloat) -> Layout {
+        let n = CGFloat(max(counts.count, 1))
+        let gap = Self.gap(barCount: counts.count)
+        let barWidth = min(max((width - gap * (n - 1)) / n, 0), Self.maxBarWidth)
+        let group = barWidth * n + gap * (n - 1)
+        return Layout(origin: max((width - group) / 2, 0), barWidth: barWidth, gap: gap)
     }
 
     private static func format(_ date: Date, _ pattern: String, _ calendar: Calendar) -> String {

@@ -141,4 +141,112 @@ import Testing
         #expect(marks.map(\.x) == [36, 48, 60, 72])
         #expect(marks.map(\.height) == [1, 20, 1, 1])
     }
+
+    // MARK: Busiest day
+
+    @Test func busiestTieGoesToTheMostRecentDay() {
+        let bars = ReviewBars.make(reviewDates: [day(0), day(0), day(4), day(4), day(5)],
+                                   window: window(.week), loadedFrom: nil, calendar: cal)
+        #expect(bars.busiest?.index == 4)
+        #expect(bars.busiest?.count == 2)
+    }
+
+    @Test func busiestIsNilWhenEveryDayIsZero() {
+        let bars = ReviewBars.make(reviewDates: [], window: window(.week), loadedFrom: nil, calendar: cal)
+        #expect(bars.busiest == nil)
+    }
+
+    @Test func busiestIsNilWhenNoDayIsLoaded() {
+        let bars = ReviewBars.make(reviewDates: [day(3)], window: window(.week), loadedFrom: nil, capped: true, calendar: cal)
+        #expect(bars.counts == Array(repeating: nil, count: 7))
+        #expect(bars.busiest == nil)
+    }
+
+    // MARK: Bar widths
+
+    @Test func weekBarsAreCappedAndCentred() {
+        let bars = ReviewBars.make(reviewDates: [day(5)], window: window(.week), loadedFrom: nil, calendar: cal)
+        let marks = bars.marks(width: 300, height: 36)
+        #expect(marks.count == 7)
+        #expect(marks.allSatisfy { $0.width == 14 })
+        // 7 × 14 + 6 × 4 = 122 wide, so 89 pt either side.
+        #expect(marks.map(\.x) == [89, 107, 125, 143, 161, 179, 197])
+        let last = marks[6]
+        #expect(marks[0].x == 300 - (last.x + last.width))
+    }
+
+    @Test func quarterBarsAreUncapped() {
+        let bars = ReviewBars.make(reviewDates: [day(89, .quarter)], window: window(.quarter), loadedFrom: nil, calendar: cal)
+        let marks = bars.marks(width: 300, height: 36)
+        let width = (300 - 89) / CGFloat(90)
+        #expect(marks.count == 90)
+        #expect(marks[0].x == 0)
+        #expect(marks.allSatisfy { abs($0.width - width) < 0.001 })
+        #expect(abs(marks[89].x + marks[89].width - 300) < 0.001)
+    }
+
+    @Test func centerXIsTheMiddleOfEachMark() {
+        for period in StatsPeriod.allCases {
+            let bars = ReviewBars.make(reviewDates: [day(1, period)], window: window(period), loadedFrom: nil, calendar: cal)
+            for (index, mark) in bars.marks(width: 300, height: 36).enumerated() {
+                #expect(abs(bars.centerX(of: index, width: 300) - (mark.x + mark.width / 2)) < 0.001)
+            }
+        }
+    }
+
+    @Test func centerXCoversDaysNotLoaded() {
+        let w = window(.week)
+        let bars = ReviewBars.make(reviewDates: [day(4)], window: w, loadedFrom: w.dayStarts(calendar: cal)[3], calendar: cal)
+        #expect(bars.centerX(of: 0, width: 300) == 96)
+        #expect(bars.centerX(of: 3, width: 300) == bars.marks(width: 300, height: 36)[0].x + 7)
+    }
+
+    @Test func extentRunsFromTheFirstBarToTheLast() {
+        let week = ReviewBars.make(reviewDates: [], window: window(.week), loadedFrom: nil, calendar: cal)
+        #expect(week.extent(width: 300) == 89...211)
+        let month = ReviewBars.make(reviewDates: [], window: window(.month), loadedFrom: nil, calendar: cal)
+        #expect(month.extent(width: 300) == 0...300)
+    }
+
+    // MARK: Axis labels
+
+    /// en_US_POSIX in UTC; today is Wednesday 4 Nov 2026.
+    var posix: Calendar {
+        var c = Calendar(identifier: .gregorian)
+        c.locale = Locale(identifier: "en_US_POSIX")
+        c.timeZone = TimeZone(identifier: "UTC")!
+        return c
+    }
+    var nov4: Date { posix.date(from: DateComponents(year: 2026, month: 11, day: 4, hour: 12))! }
+
+    @Test func weekLabelsAreWeekdayInitials() {
+        let bars = ReviewBars.make(reviewDates: [], window: StatsPeriod.week.window(now: nov4, calendar: posix),
+                                   loadedFrom: nil, calendar: posix)
+        let labels = bars.axisLabels(period: .week, calendar: posix)
+        #expect(labels.map(\.index) == Array(0..<7))
+        #expect(labels.map(\.text) == ["T", "F", "S", "S", "M", "T", "W"])
+    }
+
+    @Test func monthLabelsAreTheFirstAndLastDates() {
+        let bars = ReviewBars.make(reviewDates: [], window: StatsPeriod.month.window(now: nov4, calendar: posix),
+                                   loadedFrom: nil, calendar: posix)
+        #expect(bars.axisLabels(period: .month, calendar: posix)
+                == [ReviewBarLabel(index: 0, text: "6 Oct"), ReviewBarLabel(index: 29, text: "4 Nov")])
+    }
+
+    @Test func quarterLabelsAreTheFirstAndLastDates() {
+        let bars = ReviewBars.make(reviewDates: [], window: StatsPeriod.quarter.window(now: nov4, calendar: posix),
+                                   loadedFrom: nil, calendar: posix)
+        #expect(bars.axisLabels(period: .quarter, calendar: posix)
+                == [ReviewBarLabel(index: 0, text: "7 Aug"), ReviewBarLabel(index: 89, text: "4 Nov")])
+    }
+
+    @Test func daysNotLoadedStillGetLabels() {
+        let w = StatsPeriod.week.window(now: nov4, calendar: posix)
+        let bars = ReviewBars.make(reviewDates: [], window: w, loadedFrom: nil, capped: true, calendar: posix)
+        #expect(bars.axisLabels(period: .week, calendar: posix).map(\.text) == ["T", "F", "S", "S", "M", "T", "W"])
+        let month = ReviewBars.make(reviewDates: [], window: StatsPeriod.month.window(now: nov4, calendar: posix),
+                                    loadedFrom: nil, capped: true, calendar: posix)
+        #expect(month.axisLabels(period: .month, calendar: posix).map(\.text) == ["6 Oct", "4 Nov"])
+    }
 }

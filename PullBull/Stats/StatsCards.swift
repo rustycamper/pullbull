@@ -48,13 +48,13 @@ struct StatsCards: View {
         } else if loading {
             RoundedRectangle(cornerRadius: 3)
                 .fill(.foreground)
-                .frame(height: StatsBarChart.height)
+                .frame(height: StatsBarChart.totalHeight)
                 .skeletonShimmer()
                 .accessibilityHidden(true)
         } else {
             // The reviews didn't load: no bars rather than a row of empty days.
             Color.clear
-                .frame(height: StatsBarChart.height)
+                .frame(height: StatsBarChart.totalHeight)
                 .accessibilityHidden(true)
         }
     }
