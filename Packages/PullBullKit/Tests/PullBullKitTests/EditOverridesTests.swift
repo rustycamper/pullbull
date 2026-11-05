@@ -301,6 +301,60 @@ private func card(_ snapshot: Snapshot, _ key: PRKey) -> BoardIssue? {
         #expect(!absent.isEmpty)
     }
 
+    // GitHub answers the write before its reads catch up, so the detail fetched straight after a review can
+    // miss it. The list agreeing must not uncover that read.
+    @Test func reviewHeldWhileTheDetailIsBehind() {
+        let mine = Review(author: "PB", state: .approved, submittedAt: t0, commitOid: "abc")
+        let there = editSnapshot(review: [editPR(77, reviews: [mine])])
+        var o = EditOverrides()
+        o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
+
+        let behind = PRDetail(key: editKey(77), body: "", checks: [], reviews: [], comments: [], files: [], requests: [.user("pb")])
+        let held = o.reviewsAhead(of: [editKey(77): behind])
+        #expect(held == [editKey(77)])
+        #expect(o.reconcile(with: there, now: t0 + 30, holdingReviews: held) == [editKey(77)])
+        #expect(!o.isEmpty)
+        #expect(o.apply(toRequests: [.user("pb")], on: editKey(77)) == [])
+
+        let caughtUp = PRDetail(key: editKey(77), body: "", checks: [], reviews: [mine], comments: [], files: [], requests: [])
+        let none = o.reviewsAhead(of: [editKey(77): caughtUp])
+        #expect(none.isEmpty)
+        #expect(o.reconcile(with: there, now: t0 + 60, holdingReviews: none).isEmpty)
+        #expect(o.isEmpty)
+    }
+
+    @Test func heldReviewWaitsForTheListBeforeAskingForARead() {
+        var o = EditOverrides()
+        o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
+        #expect(o.reconcile(with: editSnapshot(review: [editPR(77)]), now: t0 + 30, holdingReviews: [editKey(77)]).isEmpty)
+        #expect(!o.isEmpty)
+    }
+
+    @Test func heldReviewStillExpiresAtLifetime() {
+        let mine = Review(author: "pb", state: .approved, submittedAt: t0, commitOid: "abc")
+        var o = EditOverrides()
+        o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
+        let reread = o.reconcile(
+            with: editSnapshot(review: [editPR(77, reviews: [mine])]), now: t0 + EditOverrides.lifetime,
+            holdingReviews: [editKey(77)])
+        #expect(reread.isEmpty)
+        #expect(o.isEmpty)
+    }
+
+    @Test func reviewsAheadReadsOnlyTheNewestReviewOfALoadedDetail() {
+        let approved = Review(author: "pb", state: .approved, submittedAt: t0, commitOid: "abc")
+        let detail = PRDetail(key: editKey(77), body: "", checks: [], reviews: [approved], comments: [], files: [])
+        var o = EditOverrides()
+        o.record(.review(state: .changesRequested, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
+        o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0 + 10)
+        #expect(o.reviewsAhead(of: [editKey(77): detail]).isEmpty)
+        // Nothing is on screen to uncover without a detail, and other edits never hold.
+        #expect(o.reviewsAhead(of: [:]).isEmpty)
+        var labels = EditOverrides()
+        labels.record(.labels(added: [bug], removed: []), on: editKey(77), at: t0)
+        #expect(labels.reviewsAhead(of: [editKey(77): detail]).isEmpty)
+    }
+
     @Test func reviewExpiresAtLifetime() {
         var o = EditOverrides()
         o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)

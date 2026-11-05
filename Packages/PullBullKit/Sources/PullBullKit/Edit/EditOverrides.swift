@@ -50,16 +50,24 @@ public struct EditOverrides: Equatable, Sendable {
     }
 
     /// Drops each edit `fetched` agrees with, along with the older edits to the same item it replaced;
-    /// each older than `lifetime`; and each Status edit to an option the board no longer has.
-    public mutating func reconcile(with fetched: Snapshot, now: Date) {
+    /// each older than `lifetime`; and each Status edit to an option the board no longer has. A review on
+    /// a key in `held` stays although `fetched` agrees, as its going would uncover an older detail; those
+    /// keys come back, for the detail to be read again.
+    @discardableResult
+    public mutating func reconcile(with fetched: Snapshot, now: Date, holdingReviews held: Set<PRKey> = []) -> Set<PRKey> {
         let options = fetched.boardStatusOptions.flatMap { $0.isEmpty ? nil : Set($0.map(\.id)) }
         var retired = Set<UUID>()
+        var reread = Set<PRKey>()
         for (index, entry) in entries.enumerated() {
             if now.timeIntervalSince(entry.madeAt) >= Self.lifetime {
                 retired.insert(entry.id)
             } else if case .status(_, let to?, _) = entry.change, let options, !options.contains(to.optionId) {
                 retired.insert(entry.id)
             } else if Self.agrees(entry, with: fetched) {
+                if case .review = entry.change, held.contains(entry.key) {
+                    reread.insert(entry.key)
+                    continue
+                }
                 retired.insert(entry.id)
                 for older in entries[..<index] where older.key == entry.key && Self.overlaps(older.change, entry.change) {
                     retired.insert(older.id)
@@ -67,6 +75,23 @@ public struct EditOverrides: Equatable, Sendable {
             }
         }
         entries.removeAll { retired.contains($0.id) }
+        return reread
+    }
+
+    /// The pull requests whose detail in `details` lacks the newest review laid over it. GitHub answers a
+    /// review before its reads catch up, so the detail fetched straight after one can miss it.
+    public func reviewsAhead(of details: [PRKey: PRDetail]) -> Set<PRKey> {
+        var newest: [PRKey: Entry] = [:]
+        for entry in entries {
+            if case .review = entry.change { newest[entry.key] = entry }
+        }
+        return Set(newest.compactMap { key, entry -> PRKey? in
+            guard case .review(let state, let commit, let viewer) = entry.change, let detail = details[key] else { return nil }
+            let shows = detail.reviews.contains {
+                Self.same($0.author, viewer) && $0.state == state && $0.commitOid == commit
+            }
+            return shows ? nil : key
+        })
     }
 
     // MARK: Applying

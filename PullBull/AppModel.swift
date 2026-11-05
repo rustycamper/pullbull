@@ -2131,8 +2131,10 @@ final class AppModel {
         if status.activity == .unsupported, let account = running?.ref { activityUnsupported.insert(account) }
         notifyChanges(snapshot, status)
         if let snapshot {
-            edits.reconcile(with: snapshot, now: Date())
+            let behind = edits.overrides.reviewsAhead(of: details)
+            let reread = edits.reconcile(with: snapshot, now: Date(), holdingReviews: behind)
             postedComments.reconcile(with: snapshot, now: Date())
+            rereadReviewedDetails(reread)
         }
         self.snapshot = snapshot
         var status = status

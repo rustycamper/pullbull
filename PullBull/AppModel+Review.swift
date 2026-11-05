@@ -136,12 +136,12 @@ extension AppModel {
             // Out of the field, so a following ⌘↩ opens GitHub rather than posting the text as a comment.
             releaseCommentField(on: key)
             showReviewFailure(EditMessage.reviewHeadMoved(on: key), review)
-            reloadReviewedDetail(review)
+            reloadReviewedDetail(review.key, account: review.account)
         case .notOpen(let merged):
             guard settleReview(review) else { return }
             backToComposing(on: key)
             showReviewFailure(EditMessage.reviewNotOpen(on: key, merged: merged), review)
-            reloadReviewedDetail(review)
+            reloadReviewedDetail(review.key, account: review.account)
         case .checkFailed(let reason):
             guard settleReview(review) else { return }
             backToComposing(on: key)
@@ -190,7 +190,7 @@ extension AppModel {
         if let read {
             keepDetail(read)
         } else {
-            reloadReviewedDetail(review)
+            reloadReviewedDetail(review.key, account: review.account)
         }
         let done = switch review.verdict {
         case .approve: "Approved #\(review.key.number)"
@@ -222,13 +222,22 @@ extension AppModel {
         edits.showFailure(EditFailure(text: text, url: review.url))
     }
 
+    /// The list shows a review its detail is missing: GitHub's reads have caught up, so a new read has it.
+    /// A read under way is left to finish, as a refresh can report more than once. A later one tries again.
+    func rereadReviewedDetails(_ keys: Set<PRKey>) {
+        guard let account = runningAccount else { return }
+        for key in keys where !(route == .detail(key) && detailFetch?.isLoading == true) {
+            reloadReviewedDetail(key, account: account)
+        }
+    }
+
     /// Fetches the detail again, whether it's on screen or held under another layer.
-    private func reloadReviewedDetail(_ review: PendingReview) {
-        if route == .detail(review.key) {
+    private func reloadReviewedDetail(_ key: PRKey, account: AccountRef) {
+        if route == .detail(key) {
             reloadDetail()
-        } else if details[review.key] != nil {
+        } else if details[key] != nil {
             Task { [weak self] in
-                _ = try? await self?.fetchDetailComments(review.key, isPullRequest: true, account: review.account)
+                _ = try? await self?.fetchDetailComments(key, isPullRequest: true, account: account)
             }
         }
     }

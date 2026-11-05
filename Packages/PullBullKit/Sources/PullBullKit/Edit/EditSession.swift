@@ -95,14 +95,16 @@ public struct EditSession: Equatable, Sendable {
         failure = nil
     }
 
-    /// Ends the edits `fetched` agrees with. A fetch of another board drops them all, and the undo.
-    public mutating func reconcile(with fetched: Snapshot, now: Date) {
+    /// Ends the edits `fetched` agrees with, but for reviews on `held`, whose keys come back when their
+    /// detail needs reading again. A fetch of another board drops them all, and the undo.
+    @discardableResult
+    public mutating func reconcile(with fetched: Snapshot, now: Date, holdingReviews held: Set<PRKey> = []) -> Set<PRKey> {
         if let board, fetched.board != board {
             self = EditSession()
             self.board = fetched.board
-            return
+            return []
         }
         board = fetched.board
-        overrides.reconcile(with: fetched, now: now)
+        return overrides.reconcile(with: fetched, now: now, holdingReviews: held)
     }
 }
