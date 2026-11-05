@@ -319,9 +319,10 @@ struct PRDetailView: View {
         // posted from here show until the detail holds them.
         let shown = model.postedComments.conversation(
             for: key, held: detail.comments, total: detail.commentTotal, keep: nil, now: now)
+        let entries = ConversationEntry.merged(
+            comments: shown.comments, sendingIndex: shown.sendingIndex, reviews: detail.reviews)
         return ConversationSection(
-            comments: shown.comments, total: shown.total, earlier: shown.earlier,
-            sendingIndex: shown.sendingIndex, webURL: webURL, now: now)
+            entries: entries, total: shown.total, earlier: shown.earlier, webURL: webURL, now: now)
     }
 
     private func filesSection(_ detail: PRDetail) -> some View {

@@ -231,9 +231,10 @@ struct IssueDetailView: View {
         // The page shows the newest two, comments posted from here included until the detail holds them.
         let shown = model.postedComments.conversation(
             for: key, held: detail.lastComments, total: detail.commentTotal, keep: 2, now: now)
+        let entries = ConversationEntry.merged(
+            comments: shown.comments, sendingIndex: shown.sendingIndex, reviews: [])
         return ConversationSection(
-            comments: shown.comments, total: shown.total, earlier: shown.earlier,
-            sendingIndex: shown.sendingIndex, webURL: webURL, now: now)
+            entries: entries, total: shown.total, earlier: shown.earlier, webURL: webURL, now: now)
     }
 
     // MARK: Loading and errors
