@@ -14,3 +14,19 @@ import Testing
         #expect(EditMessage.reviewNotOpen(on: key, merged: false) == "#88 was closed.")
     }
 }
+
+@Suite struct MergeMessageTests {
+    private let key = PRKey(repo: "acme/app", number: 88)
+
+    @Test func mergeLinesReadAsWritten() {
+        #expect(EditMessage.mergeRefused(on: key, reason: "nope") == "Couldn't merge #88: nope")
+        #expect(EditMessage.mergeCheckFailed(on: key, reason: "offline") == "Couldn't check #88 before merging: offline")
+        #expect(EditMessage.mergeUnconfirmed(on: key)
+            == "Couldn't confirm the merge of #88. Check it before trying again.")
+        #expect(EditMessage.mergeHeadMoved(on: key) == "New commits on #88 since you opened this. Look again, then merge.")
+        #expect(EditMessage.autoMergeCancelRefused(on: key, reason: "nope") == "Couldn't cancel auto-merge on #88: nope")
+        #expect(EditMessage.autoMergeCancelUnconfirmed(on: key)
+            == "Couldn't confirm auto-merge was cancelled on #88. Check it on GitHub.")
+    }
+}
+

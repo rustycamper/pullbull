@@ -74,6 +74,30 @@ public enum EditMessage {
         "#\(key.number) was \(merged ? "merged" : "closed")."
     }
 
+    public static func mergeRefused(on key: PRKey, reason: String) -> String {
+        "Couldn't merge #\(key.number): \(reason)"
+    }
+
+    public static func mergeCheckFailed(on key: PRKey, reason: String) -> String {
+        "Couldn't check #\(key.number) before merging: \(reason)"
+    }
+
+    public static func mergeUnconfirmed(on key: PRKey) -> String {
+        "Couldn't confirm the merge of #\(key.number). Check it before trying again."
+    }
+
+    public static func mergeHeadMoved(on key: PRKey) -> String {
+        "New commits on #\(key.number) since you opened this. Look again, then merge."
+    }
+
+    public static func autoMergeCancelRefused(on key: PRKey, reason: String) -> String {
+        "Couldn't cancel auto-merge on #\(key.number): \(reason)"
+    }
+
+    public static func autoMergeCancelUnconfirmed(on key: PRKey) -> String {
+        "Couldn't confirm auto-merge was cancelled on #\(key.number). Check it on GitHub."
+    }
+
     /// GitHub's own words when it refused the write; the refresh wording for anything else.
     private static func reason(for error: any Error) -> String {
         if case APIError.writeRefused(let message) = error { return message }

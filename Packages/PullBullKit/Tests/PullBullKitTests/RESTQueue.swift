@@ -4,7 +4,7 @@ import Testing
 
 /// Answers each REST request in turn with a status and a JSON body, or a thrown error, and records what was sent.
 final class RESTQueue: GraphQLTransport, @unchecked Sendable {
-    struct Sent { let method: String; let path: String; let body: [String: Any] }
+    struct Sent { let method: String; let path: String; let body: [String: Any]; let rawBody: Data }
 
     private enum Answer {
         case response(Int, String)
@@ -31,7 +31,7 @@ final class RESTQueue: GraphQLTransport, @unchecked Sendable {
         let answer = lock.withLock {
             log.append(Sent(
                 method: method, path: path,
-                body: (try? JSONSerialization.jsonObject(with: body) as? [String: Any]) ?? [:]))
+                body: (try? JSONSerialization.jsonObject(with: body) as? [String: Any]) ?? [:], rawBody: body))
             return queue.removeFirst()
         }
         switch answer {

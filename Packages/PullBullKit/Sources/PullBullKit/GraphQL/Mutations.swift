@@ -22,6 +22,18 @@ enum Mutations {
     }
     """
 
+    static let enableAutoMerge = """
+    mutation($pr:ID!,$head:GitObjectID!,$method:PullRequestMergeMethod!){
+      enablePullRequestAutoMerge(input:{pullRequestId:$pr, expectedHeadOid:$head, mergeMethod:$method}){clientMutationId}
+    }
+    """
+
+    static let disableAutoMerge = """
+    mutation($pr:ID!){
+      disablePullRequestAutoMerge(input:{pullRequestId:$pr}){clientMutationId}
+    }
+    """
+
     static let deleteProjectItem = """
     mutation($project:ID!,$item:ID!){
       deleteProjectV2Item(input:{projectId:$project, itemId:$item}){deletedItemId}
