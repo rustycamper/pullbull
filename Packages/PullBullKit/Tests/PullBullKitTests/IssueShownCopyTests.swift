@@ -23,6 +23,15 @@ private func detail(_ issue: BoardIssue) -> IssueDetail {
         #expect(shown?.labels == ["bug"])
     }
 
+    // The list copy already has pending edits laid over it, so they aren't laid over it again.
+    @Test func newerListCopyIsReturnedAsItIs() {
+        var overrides = EditOverrides()
+        overrides.record(.labels(added: [bug], removed: []), on: editKey(7), at: early)
+        let list = issue(labels: ["docs"], updatedAt: late)
+        let shown = IssueDetail.shownIssue(detail: detail(issue(updatedAt: early)), list: list, overrides: overrides)
+        #expect(shown?.labels == ["docs"])
+    }
+
     @Test func newerDetailWinsWithPendingEditsOverIt() {
         var overrides = EditOverrides()
         overrides.record(.labels(added: [bug], removed: []), on: editKey(7), at: early)
