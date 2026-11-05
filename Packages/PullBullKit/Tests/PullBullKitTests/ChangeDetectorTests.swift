@@ -26,8 +26,10 @@ private func snap(review: [PullRequest] = [], mine: [PullRequest] = [], at: Date
         reviewCandidates: review, mine: mine, team: [], recentlyClosed: [], boardIssues: [])
 }
 
-private func events(_ old: Snapshot?, _ new: Snapshot, toggles: NotificationToggles = .init()) -> [PREvent] {
-    ChangeDetector.events(old: old, new: new, me: "me", myTeams: [], toggles: toggles)
+private func events(
+    _ old: Snapshot?, _ new: Snapshot, toggles: NotificationToggles = .init(), mergedHere: Set<PRKey> = []
+) -> [PREvent] {
+    ChangeDetector.events(old: old, new: new, me: "me", myTeams: [], toggles: toggles, mergedHere: mergedHere)
 }
 
 @Suite struct ChangeDetectorTests {
@@ -379,9 +381,32 @@ private func poll(
         #expect(events(poll(0, closed: [pr]), poll(120, closed: [pr])).isEmpty)
     }
 
-    @Test func mergeOfMyOwnHandIsSilent() {
+    // GitHub reports no difference between auto-merge and a merge by hand, so a merge of my own in the
+    // browser notifies too.
+    @Test func mergeOfMyOwnHandElsewhereNotifies() {
         let open = poll(0, mine: [pr(1, author: "me")])
-        #expect(events(open, poll(120, closed: [merged(1, by: "ME", closed: now.addingTimeInterval(60))])).isEmpty)
+        let e = events(open, poll(120, closed: [merged(1, by: "ME", closed: now.addingTimeInterval(60))]))
+        #expect(e.map(\.kind) == [.merged])
+        #expect(e.first?.actor == "ME")
+    }
+
+    // `mergedBy` is whoever set auto-merge, so it reads as me though I was away.
+    @Test func ownPRAutoMergedWhileAwayNotifies() {
+        let open = poll(0, mine: [pr(1, author: "me")])
+        let done = poll(120, closed: [merged(1, by: "me", closed: now.addingTimeInterval(60))])
+        #expect(events(open, done, mergedHere: [PRKey(repo: "r", number: 2)]).map(\.kind) == [.merged])
+    }
+
+    @Test func aMergeFromPullBullStaysSilent() {
+        let open = poll(0, mine: [pr(1, author: "me")])
+        let done = poll(120, closed: [merged(1, by: "me", closed: now.addingTimeInterval(60))])
+        #expect(events(open, done, mergedHere: [PRKey(repo: "r", number: 1)]).isEmpty)
+    }
+
+    @Test func aTeammatesPRStaysSilent() {
+        let open = poll(0, mine: [pr(1, author: "bob")])
+        let done = poll(120, closed: [merged(1, author: "bob", by: "me", closed: now.addingTimeInterval(60))])
+        #expect(events(open, done).isEmpty)
     }
 
     @Test func unknownMergerStillNotifies() {

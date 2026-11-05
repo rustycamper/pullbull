@@ -54,14 +54,17 @@ public struct NotificationGate: Sendable {
     /// The PR events of `changes(...)`.
     public mutating func events(
         snapshot: Snapshot?, status: RefreshStatus, toggles: NotificationToggles,
-        filters: ReviewFilters = .none, now: Date = Date()
+        filters: ReviewFilters = .none, mergedHere: Set<PRKey> = [], now: Date = Date()
     ) -> [PREvent] {
-        changes(snapshot: snapshot, status: status, toggles: toggles, filters: filters, now: now).prs
+        changes(
+            snapshot: snapshot, status: status, toggles: toggles, filters: filters, mergedHere: mergedHere, now: now
+        ).prs
     }
 
+    /// `mergedHere`: the pull requests merged from PullBull this session, which `ChangeDetector` keeps silent.
     public mutating func changes(
         snapshot: Snapshot?, status: RefreshStatus, toggles: NotificationToggles,
-        filters: ReviewFilters = .none, now: Date = Date()
+        filters: ReviewFilters = .none, mergedHere: Set<PRKey>, now: Date = Date()
     ) -> NotificationChanges {
         if status.isRefreshing {
             marker = .some(snapshot)
@@ -72,7 +75,7 @@ public struct NotificationGate: Sendable {
                   fresh.fetchedAt == old.fetchedAt
             else { return NotificationChanges() }
             baseline = fresh
-            return settle(diff(old, fresh, toggles: toggles, filters: filters, now: now), fresh, now: now)
+            return settle(diff(old, fresh, toggles: toggles, filters: filters, mergedHere: mergedHere, now: now), fresh, now: now)
         }
         guard let started = marker else { return NotificationChanges() }
         marker = nil
@@ -89,7 +92,7 @@ public struct NotificationGate: Sendable {
         guard let old = baseline, Self.sameContext(old, fresh), fresh.fetchedAt > old.fetchedAt else {
             return settle(NotificationChanges(), fresh, now: now)
         }
-        return settle(diff(old, fresh, toggles: toggles, filters: filters, now: now), fresh, now: now)
+        return settle(diff(old, fresh, toggles: toggles, filters: filters, mergedHere: mergedHere, now: now), fresh, now: now)
     }
 
     /// Holds back the viewer's own review requests in `changes` from the live fetch `fresh`, and ends
@@ -107,12 +110,13 @@ public struct NotificationGate: Sendable {
     }
 
     private func diff(
-        _ old: Snapshot, _ fresh: Snapshot, toggles: NotificationToggles, filters: ReviewFilters, now: Date
+        _ old: Snapshot, _ fresh: Snapshot, toggles: NotificationToggles, filters: ReviewFilters,
+        mergedHere: Set<PRKey>, now: Date
     ) -> NotificationChanges {
         NotificationChanges(
             prs: ChangeDetector.events(
                 old: old, new: fresh, me: fresh.org.viewer, myTeams: fresh.org.myTeams, toggles: toggles,
-                filters: filters, now: now),
+                filters: filters, mergedHere: mergedHere, now: now),
             issues: ChangeDetector.issueEvents(old: old, new: fresh, me: fresh.org.viewer, toggles: toggles))
     }
 

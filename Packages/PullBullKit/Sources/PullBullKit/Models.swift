@@ -140,7 +140,8 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
     public let url: URL
     public let author: String
     public let authorAvatarURL: URL?
-    public let state: PRState
+    /// Set by edit overrides too.
+    public internal(set) var state: PRState
     public let isDraft: Bool
     public let createdAt: Date
     public let updatedAt: Date
@@ -166,7 +167,8 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
     /// snapshots cached before it was stored. Read it through `labelColor(at:)`.
     public internal(set) var labelColors: [String?]
     /// Who merged it; nil while unmerged, for a deleted account, and in snapshots cached before it was stored.
-    public let mergedBy: String?
+    /// Set by edit overrides too.
+    public internal(set) var mergedBy: String?
     /// Nil when GitHub sent none or a value this build doesn't know, and in snapshots cached before it was stored.
     public let mergeable: Mergeable?
     /// Lines added and removed; nil when GitHub sent none, and in snapshots cached before they were stored.

@@ -4,6 +4,15 @@ import Testing
 @Suite struct ReviewMessageTests {
     private let key = PRKey(repo: "acme/app", number: 88)
 
+    @Test func mergeLines() {
+        let refused = APIError.writeRefused("nope")
+        #expect(EditMessage.failure(.merged(viewer: "me"), on: key, error: refused) == "Couldn't merge #88: nope")
+        #expect(EditMessage.failure(.autoMerge(enabled: true, viewer: "me"), on: key, error: refused)
+            == "Couldn't set auto-merge on #88: nope")
+        #expect(EditMessage.failure(.autoMerge(enabled: false, viewer: "me"), on: key, error: refused)
+            == "Couldn't cancel auto-merge on #88: nope")
+    }
+
     @Test func reviewLines() {
         #expect(EditMessage.reviewRefused(on: key, reason: "nope") == "Couldn't review #88: nope")
         #expect(EditMessage.reviewUnconfirmed(on: key)

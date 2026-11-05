@@ -200,12 +200,12 @@ extension NotificationGateTests {
             url: URL(string: "https://x/231")!, isOpen: true,
             myAssignment: Assignment(actor: "dev-b", at: launch.addingTimeInterval(60)))
         let cached = issueSnap(-3600, assigned: [])
-        #expect(gate.changes(snapshot: cached, status: idle, toggles: toggles).isEmpty)
-        #expect(gate.changes(snapshot: cached, status: busy, toggles: toggles).isEmpty)
+        #expect(gate.changes(snapshot: cached, status: idle, toggles: toggles, mergedHere: []).isEmpty)
+        #expect(gate.changes(snapshot: cached, status: busy, toggles: toggles, mergedHere: []).isEmpty)
         let a = issueSnap(10, assigned: [])
-        #expect(gate.changes(snapshot: a, status: idle, toggles: toggles).isEmpty)
-        #expect(gate.changes(snapshot: a, status: busy, toggles: toggles).isEmpty)
-        let changes = gate.changes(snapshot: issueSnap(130, assigned: [assigned]), status: idle, toggles: toggles)
+        #expect(gate.changes(snapshot: a, status: idle, toggles: toggles, mergedHere: []).isEmpty)
+        #expect(gate.changes(snapshot: a, status: busy, toggles: toggles, mergedHere: []).isEmpty)
+        let changes = gate.changes(snapshot: issueSnap(130, assigned: [assigned]), status: idle, toggles: toggles, mergedHere: [])
         #expect(changes.issues.count == 1)
         #expect(changes.prs.isEmpty)
         #expect(!changes.isEmpty)
@@ -376,5 +376,41 @@ private let pr2 = PRKey(repo: "initech/api", number: 2)
         #expect(poll(&gate, nil, none).isEmpty)
         gate.ownReviewRequest(on: pr2, at: launch.addingTimeInterval(20))
         #expect(poll(&gate, none, reviewSnap(80, [(2, [.user("me")]), (3, [.user("me")])])) == [.reviewRequested])
+    }
+}
+
+extension NotificationGateTests {
+    private func mergeSnap(_ offset: TimeInterval, merged: Bool) -> Snapshot {
+        let open = pr(1, comments: 0, author: "me")
+        let done = PullRequest(
+            key: open.key, title: open.title, url: open.url, author: "me", authorAvatarURL: nil, state: .merged,
+            isDraft: false, createdAt: launch, updatedAt: launch, closedAt: launch.addingTimeInterval(offset),
+            headRef: "h", baseRef: "main", ci: .none, headCommitDate: nil, commentCount: 0, lastCommentAuthor: nil,
+            latestReviews: [], reviewRequests: [], mergedBy: "me")
+        return Snapshot(
+            fetchedAt: launch.addingTimeInterval(offset),
+            org: OrgContext(org: "o", viewer: "me", members: [], myTeams: [], repos: []),
+            reviewCandidates: [], mine: merged ? [] : [open], team: [], recentlyClosed: merged ? [done] : [],
+            boardIssues: [])
+    }
+
+    private func mergedKinds(after status: RefreshStatus, at offset: TimeInterval, mergedHere: Set<PRKey>) -> [PREventKind] {
+        var gate = NotificationGate(launchedAt: launch)
+        let toggles = NotificationToggles()
+        let base = mergeSnap(10, merged: false)
+        _ = gate.changes(snapshot: nil, status: busy, toggles: toggles, mergedHere: [])
+        _ = gate.changes(snapshot: base, status: idle, toggles: toggles, mergedHere: [])
+        if !status.isCIFollow { _ = gate.changes(snapshot: base, status: busy, toggles: toggles, mergedHere: []) }
+        let next = mergeSnap(offset, merged: true)
+        return gate.changes(snapshot: next, status: status, toggles: toggles, mergedHere: mergedHere).prs.map(\.kind)
+    }
+
+    @Test func theGatePassesMergedHereOn() {
+        let key = PRKey(repo: "initech/api", number: 1)
+        #expect(mergedKinds(after: idle, at: 130, mergedHere: []) == [.merged])
+        #expect(mergedKinds(after: idle, at: 130, mergedHere: [key]).isEmpty)
+        // A fast CI follow is diffed too, on the baseline's own `fetchedAt`.
+        #expect(mergedKinds(after: followed, at: 10, mergedHere: []) == [.merged])
+        #expect(mergedKinds(after: followed, at: 10, mergedHere: [key]).isEmpty)
     }
 }

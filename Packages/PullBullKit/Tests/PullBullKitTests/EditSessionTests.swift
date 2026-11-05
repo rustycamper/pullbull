@@ -45,6 +45,31 @@ private func status(_ key: PRKey, _ session: EditSession, in snapshot: Snapshot 
         #expect(s.overrides.apply(to: editPR(412)).latestReviews.isEmpty)
     }
 
+    @Test func recordMergeLeavesUndoAlone() {
+        var s = EditSession()
+        let label = EditChange.labels(added: [bug], removed: [])
+        let id = s.begin(label, on: k412, at: t0)
+        let record = EditRecord(key: k412, change: label, madeAt: t0, addedItemId: nil)
+        s.applied(id, record)
+        let mergeId = s.recordMerge(.merged(viewer: "me"), on: k412, at: t0 + 1)
+        #expect(s.overrides.apply(to: editPR(412)).state == .merged)
+        #expect(s.canUndo(now: t0 + 2))
+        #expect(s.takeUndo(now: t0 + 2) == record)
+        s.showFailure(EditFailure(text: "boom", url: url412))
+        s.dropMerge(mergeId)
+        #expect(s.failure?.text == "boom")
+        #expect(s.overrides.apply(to: editPR(412)).state == .open)
+    }
+
+    @Test func reconcilePassesHeldMergesOn() {
+        var s = EditSession()
+        _ = s.recordMerge(.merged(viewer: "me"), on: k412, at: t0)
+        s.reconcile(with: editSnapshot(), now: t0 + 30, holdingMerges: [k412])
+        #expect(!s.overrides.isEmpty)
+        s.reconcile(with: editSnapshot(), now: t0 + 60)
+        #expect(s.overrides.isEmpty)
+    }
+
     @Test func appliedEditCanBeUndoneOnce() {
         var s = EditSession()
         let id = s.begin(move, on: k412, at: t0)

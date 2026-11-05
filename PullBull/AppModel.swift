@@ -111,6 +111,9 @@ final class AppModel {
     var reviewMode: ReviewMode?
     /// Items whose review is being written to GitHub, shown dimmed. `clearAccountData` drops them.
     var sendingReviews: Set<PRKey> = []
+    /// Pull requests merged directly from here this session, whose merge raises no notification. A Merge
+    /// when ready isn't one: it notifies when it lands. `clearAccountData` drops them.
+    var mergedHere: Set<PRKey> = []
     /// Held details being read again off screen, one read per key (see `rereadReviewedDetails`).
     @ObservationIgnored var reviewRereads: Set<PRKey> = []
     /// The newest submit's check and write. Only `leaveReviewMode` cancels it; everything else lets it run.
@@ -2104,6 +2107,7 @@ final class AppModel {
         // A submit under way carries on: its task and `postsInFlight` stay.
         endReviewMode(on: nil)
         sendingReviews.removeAll()
+        mergedHere.removeAll()
         snapshot = nil
         people = .empty
         labels = .empty
@@ -2134,7 +2138,8 @@ final class AppModel {
         notifyChanges(snapshot, status)
         if let snapshot {
             let behind = edits.overrides.reviewsAhead(of: details)
-            edits.reconcile(with: snapshot, now: Date(), holdingReviews: behind)
+            let mergesBehind = edits.overrides.mergesAhead(of: details)
+            edits.reconcile(with: snapshot, now: Date(), holdingReviews: behind, holdingMerges: mergesBehind)
             postedComments.reconcile(with: snapshot, now: Date())
             if !status.isRefreshing, status.error == nil { rereadReviewedDetails(behind) }
         }

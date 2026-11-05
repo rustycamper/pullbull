@@ -5,7 +5,7 @@ extension AppModel {
     func notifyChanges(_ snapshot: Snapshot?, _ status: RefreshStatus) {
         let service = NotificationService.shared
         service.attach(self)
-        service.process(snapshot, status, toggles: settings.notify, filters: ReviewFilters(settings))
+        service.process(snapshot, status, toggles: settings.notify, filters: ReviewFilters(settings), mergedHere: mergedHere)
     }
 
     /// A notification click: shows the popover on that PR's detail.

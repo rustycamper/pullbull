@@ -69,9 +69,11 @@ public struct MergeInfo: Codable, Equatable, Sendable {
     public let usesMergeQueue: Bool
     public let isStacked: Bool
     public let isDraft: Bool
-    public let autoMerge: AutoMerge?
+    /// Set by edit overrides too.
+    public internal(set) var autoMerge: AutoMerge?
     public let canEnableAutoMerge: Bool
-    public let canDisableAutoMerge: Bool
+    /// Set by edit overrides too.
+    public internal(set) var canDisableAutoMerge: Bool
     public let canWrite: Bool?
     public let allowedMethods: [MergeMethod]
     public let defaultMethod: MergeMethod?

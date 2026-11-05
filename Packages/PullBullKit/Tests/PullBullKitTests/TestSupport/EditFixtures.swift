@@ -30,12 +30,12 @@ func editSnapshot(
     board: [BoardIssue] = [], assigned: [BoardIssue]? = [], created: [BoardIssue]? = [], mine: [PullRequest] = [],
     viewer: String = "me", options: [StatusOption]? = nil, boardProject: Int? = 1,
     boardOwner: BoardOwner? = .org("o"), boardIds: BoardIds? = nil,
-    review: [PullRequest] = [], team: [PullRequest] = [], myTeams: Set<String> = []
+    review: [PullRequest] = [], team: [PullRequest] = [], myTeams: Set<String> = [], closed: [PullRequest] = []
 ) -> Snapshot {
     Snapshot(
         fetchedAt: Date(timeIntervalSince1970: 1_800_000_000),
         org: OrgContext(org: "o", viewer: viewer, members: [], myTeams: myTeams, repos: []),
-        reviewCandidates: review, mine: mine, team: team, recentlyClosed: [], boardIssues: board,
+        reviewCandidates: review, mine: mine, team: team, recentlyClosed: closed, boardIssues: board,
         boardProject: boardProject,
         assignedIssues: assigned, createdIssues: created, boardStatusOptions: options, boardOwner: boardOwner,
         boardIds: boardIds)

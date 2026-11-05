@@ -81,9 +81,11 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
 
     /// Feeds one coordinator update; posts what changed since the previous live fetch.
     func process(
-        _ snapshot: Snapshot?, _ status: RefreshStatus, toggles: NotificationToggles, filters: ReviewFilters
+        _ snapshot: Snapshot?, _ status: RefreshStatus, toggles: NotificationToggles, filters: ReviewFilters,
+        mergedHere: Set<PRKey>
     ) {
-        post(gate.changes(snapshot: snapshot, status: status, toggles: toggles, filters: filters, now: Date()))
+        post(gate.changes(
+            snapshot: snapshot, status: status, toggles: toggles, filters: filters, mergedHere: mergedHere, now: Date()))
     }
 
     func post(_ changes: NotificationChanges) {
