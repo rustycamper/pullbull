@@ -28,6 +28,9 @@ struct PopoverView: View {
     @FocusState private var saveNameFocused: Bool
     /// Set when ← leaves a detail: the held key's repeats do nothing, in the list too, until another key.
     @State private var swallowArrowRepeats = false
+    /// Held after submitting a review, ⌘↩ is one press: its repeats would otherwise submit again after a
+    /// failure, post the text as a comment or open GitHub once review mode ended.
+    @State private var swallowSubmitRepeats = false
     /// On screen: the panel is created once and only ordered out, so the views stay mounted while closed.
     @State private var shown = false
     /// When the popover last closed on a detail.
@@ -544,8 +547,13 @@ struct PopoverView: View {
                event.keyCode == SearchKeyMonitor.leftArrow || event.keyCode == SearchKeyMonitor.rightArrow {
                 return true
             }
+            if swallowSubmitRepeats,
+               event.keyCode == SearchKeyMonitor.return || event.keyCode == SearchKeyMonitor.enter {
+                return true
+            }
         } else {
             swallowArrowRepeats = false
+            swallowSubmitRepeats = false
         }
         // An input method or dead key is composing in the field: every key belongs to it.
         if (window.firstResponder as? NSTextView)?.hasMarkedText() == true { return false }
@@ -600,8 +608,9 @@ struct PopoverView: View {
                 }
                 return true
             }
-            // ⌥⌘M comments only in a detail, where the thread is in view; here it's taken and does nothing.
-            if Self.isOptionCommand(event, flags: flags, letter: "m") { return true }
+            // ⌥⌘M comments and ⌥⌘V reviews only in a detail, where the item is in view; here they're taken
+            // and do nothing.
+            if ["m", "v"].contains(where: { Self.isOptionCommand(event, flags: flags, letter: $0) }) { return true }
             // ⌘Z: takes back the last edit while it can be; typing since hands ⌘Z back to the field.
             if Self.isCommandZ(event, flags: flags) {
                 return model.undoLastEdit()
@@ -886,13 +895,20 @@ struct PopoverView: View {
 
     /// The detail views have no search: Esc, ← and ⌘[ go back, ⌥↓ / ⌥↑ step through the list it came
     /// from, ⌘↩ opens the page on GitHub, ⌘C copies its link (unless text is selected), ⌘⇧C its
-    /// reference, ⌥⌘C its Markdown link, ⌘R fetches it again, ⌥⌘M focuses the comment field. Every other
-    /// key passes through. While the comment field has focus it owns the keyboard (`CommentFieldKeys`).
+    /// reference, ⌥⌘C its Markdown link, ⌘R fetches it again, ⌥⌘M focuses the comment field, ⌥⌘V starts a
+    /// review. Every other key passes through. While the comment field has focus it owns the keyboard
+    /// (`CommentFieldKeys`), but for ⌥⌘V.
     private func handleDetailKey(_ event: NSEvent, flags: NSEvent.ModifierFlags, in window: NSWindow) -> Bool {
         if let field = window.firstResponder as? CommentEditor, let key = field.key {
+            // ⌥⌘V goes by the typed letter here too; text already in the field becomes the review's.
+            if !field.hasMarkedText(), Self.isOptionCommand(event, flags: flags, letter: "v") {
+                if field.isPullRequest { model.enterReviewMode(on: key) }
+                return true
+            }
             let action = CommentFieldKeys.route(
                 keyCode: event.keyCode, flags: KeyCombo.Modifiers(flags), mentionsOpen: model.mention != nil,
-                composing: field.hasMarkedText())
+                composing: field.hasMarkedText(),
+                review: model.reviewMode?.key == key ? model.reviewMode?.phase : nil)
             switch action {
             case .post:
                 model.postComment(on: key, isPullRequest: field.isPullRequest)
@@ -909,6 +925,18 @@ struct PopoverView: View {
             case .acceptMention:
                 // With nothing to take yet ("Loading people…"), Return and Tab type as usual.
                 return model.acceptMention()
+            case .submitReview:
+                // The model refuses it during the check and the write.
+                swallowSubmitRepeats = true
+                model.submitReview(on: key)
+                return true
+            case .leaveReview:
+                // Focus stays in the field. The model refuses it during the write.
+                model.leaveReviewMode()
+                return true
+            case .changeVerdict:
+                model.changeReviewVerdict()
+                return true
             case .text:
                 return false
             }
@@ -951,6 +979,11 @@ struct PopoverView: View {
             default:
                 break
             }
+            return true
+        }
+        // ⌥⌘V: review mode on a PR, where it's offered; on an issue it's taken and does nothing.
+        if Self.isOptionCommand(event, flags: flags, letter: "v") {
+            if case .detail(let key) = model.route { model.enterReviewMode(on: key) }
             return true
         }
         if Self.isOptionCommand(event, flags: flags, letter: "s") {
@@ -1227,6 +1260,7 @@ struct PopoverView: View {
         case SearchKeyMonitor.letterA: return "a"
         case SearchKeyMonitor.letterL: return "l"
         case SearchKeyMonitor.letterM: return "m"
+        case SearchKeyMonitor.letterV: return "v"
         default: return typed
         }
     }

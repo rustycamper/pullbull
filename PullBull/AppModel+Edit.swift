@@ -310,7 +310,7 @@ extension AppModel {
 
     /// Keeps the edited row selected in its new lane and scrolls to it; when it left the list, selects
     /// the row after it, and the row again when an undo or failure brings it back.
-    private func followEditedRow(_ key: PRKey, from before: [PRKey]) {
+    func followEditedRow(_ key: PRKey, from before: [PRKey]) {
         switch editSelection.follow(key, selection: listSelection, from: before, to: shownListKeys()) {
         case .none: break
         case .scroll: editScrollRequest += 1
@@ -318,7 +318,7 @@ extension AppModel {
         }
     }
 
-    private func shownListKeys() -> [PRKey] {
+    func shownListKeys() -> [PRKey] {
         listKeys(doneExpanded: listExpansion.done)
     }
 
