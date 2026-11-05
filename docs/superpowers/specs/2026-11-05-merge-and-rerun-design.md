@@ -125,7 +125,7 @@ The methods offered are what the repository allows (`mergeCommitAllowed`, `squas
 
 ### Cancelling auto-merge
 
-**Cancel auto-merge** takes one click and no panel, as on the web, and only for the viewer's own request (`viewerCanDisableAutoMerge`). Setting it again takes the full steps, and a slow cancel could lose to the checks passing. Someone else's request can't be cancelled from PullBull, since it may carry a commit message PullBull can't restore. A refusal reads "Couldn't cancel auto-merge on #88: …" and an unclear answer "Couldn't confirm auto-merge was cancelled on #88. Check it on GitHub." Both have their own lines, since a cancel that failed unnoticed is an unwanted merge.
+**Cancel auto-merge** takes one click and no panel, as on the web, and only for the viewer's own request (`viewerCanDisableAutoMerge`). Setting it again takes the full steps, and a slow cancel could lose to the checks passing. Someone else's request can't be cancelled from PullBull, since it may carry a commit message PullBull can't restore. A refusal reads "Couldn't cancel auto-merge on #88: …" and an unclear answer "Couldn't confirm auto-merge was cancelled on #88. Check it on GitHub." Both have their own lines, since a cancel that failed unnoticed is an unwanted merge. An unclear answer gets one read: a stale "still set" only sends the viewer to check.
 
 ### Keys
 
