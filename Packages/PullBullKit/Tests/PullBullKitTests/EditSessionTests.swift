@@ -96,7 +96,7 @@ private func status(_ key: PRKey, _ session: EditSession, in snapshot: Snapshot 
         let other = editSnapshot(
             board: [editIssue(412, status: todo), editIssue(413, status: todo)], options: options, boardProject: 2)
         s.reconcile(with: other, now: t0 + 1)
-        #expect(s.overrides.apply(to: editPR(412)).latestReviews.isEmpty)
+        #expect(s.overrides.isEmpty)
         #expect(!s.canUndo(now: t0 + 2))
     }
 
@@ -131,7 +131,7 @@ private func status(_ key: PRKey, _ session: EditSession, in snapshot: Snapshot 
         _ = s.begin(move, on: k412, at: t0)
         let fetched = editSnapshot(board: [editIssue(412, status: doing)], options: options)
         s.reconcile(with: fetched, now: t0 + 5)
-        #expect(s.overrides.apply(to: editPR(412)).latestReviews.isEmpty)
+        #expect(s.overrides.isEmpty)
     }
 
     @Test func dismissFailure() {
