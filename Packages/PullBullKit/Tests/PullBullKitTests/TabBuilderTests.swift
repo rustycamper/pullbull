@@ -368,6 +368,56 @@ private func snap(
         #expect(built.team.rows.isEmpty)
     }
 
+    @Test func staysInReviewDimmedAndUncounted() {
+        let (shown, overrides, _) = merging(snap(review: [pr(1), pr(2)]))
+        let built = build(shown, overrides)
+        #expect(built.review.rows.map(\.id.number) == [1, 2])
+        #expect(built.review.rows.map(\.dimmed) == [true, false])
+        #expect(built.review.count == 1)
+        #expect(built.review.rows.first?.pr.state == .open)
+        #expect(built.review.rows.first?.reviewReason == .requested)
+    }
+
+    @Test func isNotListedInTeamToo() {
+        let (shown, overrides, _) = merging(snap(review: [pr(1)], team: [pr(1), pr(2)]))
+        #expect(build(shown, overrides).teamSection.rows.map(\.id.number) == [2])
+    }
+
+    @Test func keepsItsPlaceInReviewsWaitSort() {
+        // With its reason #1 shows the viewer's own 1d wait; without one it would show the oldest request's 9d.
+        var settings = AppSettings()
+        settings.setSort(.waitingLongest, for: PRTab.review)
+        let requests: [Reviewer] = [.user("zed"), .user("me")]
+        let prs = [pr(1, requests: requests, waits: [9, 1]), pr(2, waits: [3])]
+        let (shown, overrides, _) = merging(snap(review: prs))
+        #expect(build(shown, overrides, settings: settings).review.rows.map(\.id.number) == [2, 1])
+    }
+
+    @Test func aHiddenApprovedRowStaysHidden() {
+        var settings = AppSettings()
+        settings.hideApprovedByMe = true
+        let (shown, overrides, _) = merging(snap(review: [approvedByMe(1)]))
+        let built = build(shown, overrides, settings: settings)
+        #expect(built.review.rows.isEmpty)
+        #expect(built.hiddenApprovedCount == 1)
+    }
+
+    @Test func isNotListedInRecentlyClosedToo() {
+        // Search lags: Mine still returns the PR while Recently closed already has it.
+        let closed = pr(1, author: "me", closed: 0, state: .merged)
+        let (shown, overrides, _) = merging(snap(mine: [pr(1, author: "me")], closed: [closed]))
+        let built = build(shown, overrides)
+        #expect(built.mine.rows.map(\.id.number) == [1])
+        #expect(built.recentlyClosed.isEmpty)
+    }
+
+    @Test func staysInRecentlyClosedOnceNoOtherListHasIt() {
+        // The lists caught up while the detail still holds the overlay: this is the only place it's listed.
+        let closed = pr(1, author: "me", closed: 0, state: .merged)
+        let (shown, overrides, _) = merging(snap(closed: [closed]))
+        #expect(build(shown, overrides).recentlyClosed.map(\.key.number) == [1])
+    }
+
     @Test func anAutoMergeKeepsTheRowUndimmed() {
         var overrides = EditOverrides()
         overrides.record(.autoMerge(enabled: true, viewer: "me"), on: key, at: now)
