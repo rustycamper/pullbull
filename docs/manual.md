@@ -250,8 +250,8 @@ Re-run the failed jobs of a pull request's GitHub Actions runs from its detail, 
 
 - **Who can:** on an open pull request with a failed check, with write access and Sign in with GitHub's Actions permission or a `gh` login. Without write access nothing is shown; without the Actions permission a note takes the button's place. Only runs that have finished count, so a run with another job still going is left until it ends. External checks can't be re-run here, nor can a run waiting for approval or one that failed to start
 - **Start:** **Re-run failed jobs** in the Checks section, beside **Open Failing Check**. There is no panel and no key. Its tooltip says it re-runs the failed jobs and the jobs that depend on them, since a dependent job can deploy
-- **Sending:** the button reads "Re-running…", then the detail is read again and the checks show as running. PullBull follows them as it does any running CI. A run restarted since the detail loaded isn't sent again
-- **Refused:** if some runs are refused the rest carry on, and a line says "Couldn't re-run 1 of 3 workflow runs." If all are, it gives GitHub's reason, with **Open on GitHub**
+- **Sending:** the button reads "Re-running…" and stays so while the detail is read up to three times, 2 s apart, until the runs show as restarted. If GitHub is slower, the button comes back, and pressing it again is safe. A run restarted since the detail loaded isn't sent again
+- **Refused:** if some runs are refused the rest carry on, and a line says "Couldn't re-run 1 of 3 workflow runs on #88." If all are, it gives GitHub's reason, with **Open on GitHub**
 - **Not here:** re-running every job of a run, one job, or a run waiting for approval
 - **Permissions:** Sign in with GitHub needs the Actions permission, which is new. Until an org owner accepts it, a note takes the button's place (click **Open on GitHub** to accept); everything else keeps working. With a `gh` login, `repo` covers it
 

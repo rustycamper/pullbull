@@ -145,7 +145,7 @@ private func node(_ name: String, run id: Int) -> String {
         #expect(stub.bodies[1].contains("\"after\":\"C1\""))
     }
 
-    @Test func rerunPostsToTheRunWithAnEmptyBody() async throws {
+    @Test func rerunPostsToTheRunWithTheBodyBraces() async throws {
         let t = RESTQueue([(201, "{}")])
         try await GitHubAPI(transport: t, auth: StaticTokenSource("t"))
             .rerunFailedJobs(PRKey(repo: "o/r", number: 3), runID: 42_093_340_598)
@@ -153,6 +153,7 @@ private func node(_ name: String, run id: Int) -> String {
         #expect(t.sent[0].method == "POST")
         #expect(t.sent[0].path == "/repos/o/r/actions/runs/42093340598/rerun-failed-jobs")
         #expect(t.sent[0].body.isEmpty)
+        #expect(String(decoding: t.sent[0].rawBody, as: UTF8.self) == "{}")
     }
 
     @Test func rerunRefusalIsAWriteRefusal() async {
