@@ -116,7 +116,7 @@ Confirming re-reads the PR, as reviews check before sending, and compares it wit
 
 ### Merge method
 
-The methods offered are what the repository allows (`mergeCommitAllowed`, `squashMergeAllowed`, `rebaseMergeAllowed`), narrowed by the base branch's rules: the `pull_request` rules' allowed methods, intersected when there are several; required linear history; and `canBeRebased` for rebase. The panel opens on `viewerDefaultMergeMethod` if that's allowed, else the first that is. With one method, the sentence just names it.
+The methods offered are what the repository allows (`mergeCommitAllowed`, `squashMergeAllowed`, `rebaseMergeAllowed`), narrowed by the base branch's rules: the `pull_request` rules' allowed methods, intersected when there are several; required linear history, when a ruleset sets it; and `canBeRebased` for rebase. An App can't read linear history set by classic protection: `baseRef{rules}` is empty there and `branchProtectionRule` is forbidden without Administration read, which isn't worth asking every install for. Merge commit stays offered on those branches, and GitHub refuses it with "Merge commits are not allowed on this repository." The panel opens on `viewerDefaultMergeMethod` if that's allowed, else the first that is. With one method, the sentence just names it.
 
 ### Cancelling auto-merge
 
@@ -134,14 +134,14 @@ The methods offered are what the repository allows (`mergeCommitAllowed`, `squas
 ## Merging
 
 - **Direct merge:** `PUT /repos/{owner}/{repo}/pulls/{n}/merge-async` with `sha` set to the pin, `merge_method`, `merge_action: direct_merge` and `bypass_rules: false`. GitHub recommends this API, and `mergePullRequest` has no bypass field, so it can't honour the anti-goal. `sha` makes GitHub refuse a moved head.
-- **Its answers:** `202` with a UUID: poll `GET .../merge-async/{uuid}` until it's no longer `pending`. `200`: already merged. `409`: a request is already pending, so poll that one. Rules fail at poll time, not at send, so a poll's failure is a refusal.
-- **Merge when ready:** `enablePullRequestAutoMerge` with `expectedHeadOid` and `mergeMethod`. A panel opened on `BLOCKED` can turn `CLEAN`, and GitHub then answers "Pull request is in clean status": that becomes a fresh read and a changed panel, not raw text.
+- **Its answers:** each has a `status` and a `details` object. `202` with `details.uuid`: poll `GET .../merge-async/{uuid}`, with no body, until it's no longer `pending`. `200`: already merged. `409`: a request is already pending, and `details.uuid` names it, so poll that one. `400`: refused, with the reason in `details.message`, as with a moved head ("Pull request head branch was modified.") or a closed PR. Rules fail at poll time, not at send, so a poll's `failed` is a refusal. GitHub's reasons can span lines, so whitespace runs collapse to one space.
+- **Merge when ready:** `enablePullRequestAutoMerge` with `expectedHeadOid` and `mergeMethod`. A panel opened on `BLOCKED` can turn `CLEAN`, and GitHub then answers "Pull request Pull request is in clean status", matched on "clean status": that becomes a fresh read and a changed panel, not raw text. Only a `data` object with a null payload and a typed error counts as a refusal. Any other answer leaves the outcome unknown, as the mutation may have landed.
 - **Sending:** the panel locks and reads "Merging…". It can't be called back. The PR shows as merged at once, dimmed, through the override layer.
-- **Refused:** the panel closes, the overlay goes, and the failure line gives GitHub's reason with **Open on GitHub**. A moved head reads as above.
+- **Refused:** one more read comes first. If it shows the PR merged or closed, that's the outcome, ahead of everything else, as someone else's merge can land while ours waits. Otherwise the panel closes, the overlay goes, and the failure line gives GitHub's reason with **Open on GitHub**. A moved head reads as above.
 - **Outcome unknown,** including a poll that doesn't finish in reasonable time: a fresh read decides, matched to the action sent. Otherwise the line says "Couldn't confirm the merge of #88. Check it before trying again." Nothing is ever sent twice.
 - **After merging:** the detail stays open showing the merged state. The row moves as after any refresh.
 - **No undo.** Cancelling auto-merge is the only take-back.
-- **Lag:** GitHub's reads trail its writes, by about 1.5 s measured on reviews. The overlay stays until the held detail shows the merge, up to the 5-minute lifetime. A merged PR leaving the lists counts as the lists agreeing. A read just after approving can also show a stale `BLOCKED`, so that's retried like `UNKNOWN`.
+- **Lag:** GitHub's reads trail its writes, by about 1.5 s measured on reviews. The overlay stays until the held detail shows the merge, up to the 5-minute lifetime. A merged PR leaving the lists counts as the lists agreeing. An auto-merge change, set or cancelled, settles once the detail shows the PR merged or closed, as nothing is left to compare. A read just after approving can also show a stale `BLOCKED`, so that's retried like `UNKNOWN`.
 - **Notifications:** `mergedBy` is whoever set auto-merge, so `ChangeDetector.mergedEvents` skips your own PR merging while you're away. It should notify. Tell the cases apart by the merge not having come from PullBull in this session, using the previous fetch's open state and not `autoMergeRequest`, which some PRs keep after merging. A teammate's PR you set to auto-merge raises nothing in this version, as merged notifications cover your own PRs.
 
 ## Re-running
@@ -150,7 +150,7 @@ The methods offered are what the repository allows (`mergeCommitAllowed`, `squas
 - One click, with no panel.
 - Offered only for runs that have finished (`checkSuite.status` `COMPLETED`), as a run with a failed job can still have others running.
 - A failed run has a check run concluding `FAILURE`, `TIMED_OUT` or `CANCELLED`. `ACTION_REQUIRED` needs a person to approve the run, and `STARTUP_FAILURE` can't be re-run, so neither counts.
-- The run ID comes from the check's `detailsUrl`, which holds it, falling back to `checkSuite{workflowRun{databaseId}}`. Each failed run gets `POST .../actions/runs/{run_id}/rerun-failed-jobs`.
+- The run ID comes from the check's `detailsUrl`, which holds it. A failed check with no run ID there is left out. Each failed run gets `POST .../actions/runs/{run_id}/rerun-failed-jobs`.
 - All of a PR's checks are paged in for this. The detail's `contexts(first:50)` can miss failures on a big PR: `grafana#134874` has 2 failures in 127 contexts, none in the first 50.
 - If only external checks failed, the button isn't there.
 - It reads "Re-running…", then the detail is read again and the existing CI follow takes over.
@@ -164,12 +164,14 @@ The methods offered are what the repository allows (`mergeCommitAllowed`, `squas
 
 ## Permissions
 
-The list below is a working assumption until the permission test passes (see Testing). GitHub documents REST permissions, not GraphQL mutations, and every install has to accept a change, so it has to be right the first time.
+Measured on real GitHub with `ghu_` tokens from a test App, as GitHub documents REST permissions, not GraphQL mutations, and every install has to accept a change.
 
-- **Contents write** to merge: GitHub lists `merge-async` under Contents, with nothing further.
-- **Actions write** to re-run: `rerun-failed-jobs` is listed under Actions, with nothing further.
-- **Auto-merge:** may also rely on Pull requests write, which the App has.
-- **Workflow files, likely a third permission.** Community reports say an App can't merge a PR changing `.github/workflows` without Workflows write. GitHub's docs don't say. If that's confirmed, the owner decides whether to ask for it too, or to let those PRs be refused with a clear line. A `gh` login has the same question: default scopes omit `workflow`, so `needsGhScope` applies.
+- **Contents write** to merge, and to enable and cancel auto-merge. With Pull requests set to read-only, both auto-merge calls still worked and `merge-async` was still accepted.
+- **Actions write** to re-run. On a run still going, GitHub answers `403` "This workflow is already running".
+- **Workflow files need nothing more.** The App merged a PR adding a file under `.github/workflows` without Workflows write, and so did a `gh` token without the `workflow` scope.
+- **`bypass_rules: false` stops a bypass.** An account able to bypass was refused at poll time on a failing required check, under a ruleset and under classic protection. The same call with `true` merged, so the bypass was real.
+- **The detail query needs no new permission.** It answers without errors on an install on the old permissions. `checkSuite{status}` is readable there, but `workflowRun` is refused without Actions permission, so it's never fetched.
+- `viewerPermission` reads correctly on a `ghu_` token, so no REST read backs it up.
 - `AccessChecker` gains `canWriteContents` and `canWriteActions`. `EditField` gains `merge` and `rerun`.
 - **An install on the old permissions:** Merge and Re-run show a line saying so, with the existing `permissionsReviewURL` link. Everything else carries on.
 - **No install on the owner, or a repository left out of a selected-repositories install:** a line, not silence. The second reports ready and is refused, and that refusal must read clearly.
@@ -183,22 +185,14 @@ The list below is a working assumption until the permission test passes (see Tes
 
 ## Testing
 
-**The test setup, which the owner creates:**
+**The test setup:**
 
-- A free GitHub organisation with a public repository. `rustycamper/pullbar` can't do this: on a free plan a private repo has no branch protection, rulesets or auto-merge (GitHub answers 403), so it can't produce `BLOCKED` or Merge when ready.
+- The public repository `rustycamper/merge-lab`, with auto-merge on, a second account on Write, a ruleset on `main` requiring `test`, and a `classic` branch under classic protection. `rustycamper/pullbar` can't do this: on a free plan a private repo has no branch protection, rulesets or auto-merge, so it can't produce `BLOCKED` or Merge when ready.
 - A separate test GitHub App, installed only there, with the production permissions plus Contents write and Actions write. The production App can't be used: it lacks them, and changing it asks every install to accept.
 - A build reaches it through `PULLBULL_GITHUB_CLIENT_ID` and `PULLBULL_GITHUB_APP_SLUG` in the git-ignored `Config/Local.xcconfig`. It needs a Developer ID build, as Sign in with GitHub does.
 - Sign in with the second account: a test build shares the Keychain item and would otherwise overwrite the production sign-in.
 
-**First, before the feature: a throwaway permission test** on that App's token (`ghu_`):
-
-- `merge-async`, `enablePullRequestAutoMerge`, `disablePullRequestAutoMerge`, and a re-run;
-- merging a PR that changes a workflow file;
-- a person who can bypass, on a `BLOCKED` PR, with `bypass_rules: false`, under rulesets and under classic protection: it must be refused;
-- reads of `viewerPermission`, `baseRef{rules}`, `viewerCanEnableAutoMerge` and `workflowRun`;
-- removing Pull requests write, to see if auto-merge needs it.
-
-The production permission list is final only after this.
+**The permission test** ran first, on that App's tokens and on a token from the production App. Its results are under Permissions and in the answers above.
 
 **Kit tests** against a fake GitHub: every row of the action table; the method narrowing; the second step and arming; the confirm comparison; each `merge-async` answer and poll result; the override and lag rules.
 
