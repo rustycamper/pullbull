@@ -688,6 +688,7 @@ private struct FileLine: View {
 }
 
 /// One line, truncated in the middle; the tooltip and VoiceOver always get the full name.
+/// No `.accessibilityLabel`: with `.textSelection` it can send SwiftUI's label lookup into a loop that overflows the stack.
 private struct BranchChip: View {
     let name: String
 
@@ -701,7 +702,6 @@ private struct BranchChip: View {
             .background(RoundedRectangle(cornerRadius: 5).fill(Palette.fill))
             .textSelection(.enabled)
             .help(name)
-            .accessibilityLabel(name)
     }
 }
 
