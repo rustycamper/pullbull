@@ -14,8 +14,11 @@ struct IssueDetailView: View {
     /// The list copy: on the board it carries the Status and the board item.
     private var listIssue: BoardIssue? { model.issue(for: key) }
     private var detail: IssueDetail? { model.issueDetails[key] }
-    /// The freshest row fields: the detail's, else the list's, with pending edits laid over them.
-    private var issue: BoardIssue? { (detail?.issue).map(model.edits.overrides.apply(to:)) ?? listIssue }
+    /// The freshest row fields: the newer of the list's and the detail's copy, with pending edits laid
+    /// over the detail's. The detail isn't re-read after an edit, so the list copy outlives its overlay.
+    private var issue: BoardIssue? {
+        IssueDetail.shownIssue(detail: detail, list: listIssue, overrides: model.edits.overrides)
+    }
     private var fetch: DetailFetch? { model.issueDetailFetch?.key == key ? model.issueDetailFetch : nil }
     private var webURL: URL { issue?.url ?? GitHubLinks.issue(key) }
     private var isOnBoard: Bool { model.shownSnapshot?.boardIssues.contains { $0.key == key } == true }

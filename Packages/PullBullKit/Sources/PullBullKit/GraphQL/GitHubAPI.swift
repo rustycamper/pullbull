@@ -352,6 +352,19 @@ public struct IssueDetail: Codable, Sendable, Equatable {
         guard let updatedAt = issue.updatedAt else { return false }
         return updatedAt == row.updatedAt
     }
+
+    /// The issue's row fields for the detail screen: whichever copy is newer by `updatedAt`. The list copy
+    /// (which already has edits laid over it) wins only when it is strictly newer than the detail's, as
+    /// after an edit that the detail never re-read; otherwise the detail's copy shows, with `overrides`
+    /// laid over it. A nil `updatedAt` on either side keeps the detail's copy. Not `isCurrent(for:)`: that
+    /// tests equality, so a detail fetched after the last list refresh would lose to the older row.
+    public static func shownIssue(detail: IssueDetail?, list: BoardIssue?, overrides: EditOverrides) -> BoardIssue? {
+        guard let detail else { return list }
+        if let list, let listAt = list.updatedAt, let detailAt = detail.issue.updatedAt, listAt > detailAt {
+            return list
+        }
+        return overrides.apply(to: detail.issue)
+    }
 }
 
 public struct URLSessionTransport: GraphQLTransport {
