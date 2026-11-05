@@ -207,8 +207,9 @@ extension AppModel {
     }
 
     /// The focused field's text or caret changed (`typed` when the text did): the @ list follows the
-    /// token at the caret.
+    /// token at the caret, and typing takes the warning off an empty Request changes.
     func commentTextChanged(key: PRKey, isPullRequest: Bool, text: String, caret: Int?, typed: Bool) {
+        if typed, reviewMode?.key == key, reviewMode?.missingText == true { reviewMode?.missingText = false }
         let dismissed = typed ? nil : mentionField.flatMap { $0.key == key ? $0.dismissedAt : nil }
         mentionField = MentionField(
             key: key, isPullRequest: isPullRequest, text: text, caret: caret, dismissedAt: dismissed)

@@ -259,6 +259,37 @@ struct OutlinedIconButton: View {
     }
 }
 
+/// An outlined button with a word for a label, as tall as `OutlinedIconButton`, for a detail's bottom bar.
+/// It takes no focus: a click that took it from the comment field would end review mode before the
+/// button acted.
+struct OutlinedTextButton: View {
+    let title: String
+    var help = ""
+    let action: () -> Void
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, 6)
+                .frame(height: 24)
+                .background(RoundedRectangle(cornerRadius: 6).fill(hovering && isEnabled ? Palette.fill : .clear))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.separator))
+                .contentShape(Rectangle())
+                .opacity(isEnabled ? 1 : 0.5)
+        }
+        .buttonStyle(PressableStyle())
+        .focusable(false)
+        .onHover { hovering = $0 }
+        .help(help)
+    }
+}
+
 struct PressableStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.opacity(configuration.isPressed ? 0.75 : 1)

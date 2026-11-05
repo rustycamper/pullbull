@@ -199,10 +199,11 @@ struct PRDetailView: View {
     }
 
     @ViewBuilder private func statusSections(_ detail: PRDetail) -> some View {
+        let reviews = model.edits.overrides.apply(toReviews: detail.reviews, on: key)
         if let pr {
-            reviewersSection(reviews: detail.reviews, pr: pr, detail: detail)
-        } else if !detail.reviews.isEmpty || detail.requests?.isEmpty == false {
-            reviewersSection(reviews: detail.reviews, pr: nil, detail: detail)
+            reviewersSection(reviews: reviews, pr: pr, detail: detail)
+        } else if !reviews.isEmpty || detail.requests?.isEmpty == false {
+            reviewersSection(reviews: reviews, pr: nil, detail: detail)
         }
         checksSection(detail)
     }
@@ -285,7 +286,8 @@ struct PRDetailView: View {
             } else {
                 ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                     if index > 0 { CardDivider() }
-                    ReviewerLine(entry: entry, isMe: !entry.isTeam && entry.name.caseInsensitiveCompare(me ?? "") == .orderedSame)
+                    let isMe = !entry.isTeam && entry.name.caseInsensitiveCompare(me ?? "") == .orderedSame
+                    ReviewerLine(entry: entry, isMe: isMe, isSending: isMe && model.sendingReviews.contains(key))
                 }
             }
         }
@@ -307,7 +309,7 @@ struct PRDetailView: View {
     /// The detail's own requests while it is current for the PR, else the list copy's; edits laid over
     /// either way.
     private func reviewRequests(pr: PullRequest?, detail: PRDetail?) -> [Reviewer] {
-        guard let pr else { return detail?.requests ?? [] }
+        guard let pr else { return model.edits.overrides.apply(toRequests: detail?.requests ?? [], on: key) }
         guard let requests = detail?.requests, let fetched = model.fetchedPullRequest(for: key),
               detail?.isCurrent(for: fetched) == true
         else { return pr.reviewRequests }
@@ -390,10 +392,22 @@ struct PRDetailView: View {
 
     // MARK: Bottom bar
 
-    /// The comment field, Copy branch and Open on GitHub, on one row.
+    /// The comment field, Review, Copy branch and Open on GitHub, on one row.
     private var bottomBar: some View {
         CommentField(model: model, key: key, isPullRequest: true, webURL: webURL) {
+            reviewButton
             if let pr { CopyBranchButton(pr: pr) }
+        }
+    }
+
+    /// Review where the PR can be reviewed and nothing is on its way; Cancel in review mode, until the
+    /// write starts.
+    @ViewBuilder private var reviewButton: some View {
+        if let mode = model.reviewMode, mode.key == key {
+            OutlinedTextButton(title: "Cancel", action: model.leaveReviewMode)
+                .disabled(!mode.canCancel)
+        } else if model.isReviewOffered(for: key), !model.isPostInFlight(for: key) {
+            OutlinedTextButton(title: "Review", help: "Review (⌥⌘V)") { model.enterReviewMode(on: key) }
         }
     }
 }
@@ -443,6 +457,8 @@ struct ReviewerEntry: Identifiable, Equatable {
 private struct ReviewerLine: View {
     let entry: ReviewerEntry
     let isMe: Bool
+    /// The viewer's review on its way to GitHub: dimmed, as a comment sending is.
+    let isSending: Bool
 
     var body: some View {
         HStack(spacing: 8) {
@@ -463,6 +479,7 @@ private struct ReviewerLine: View {
         .font(.system(size: 12))
         .padding(.horizontal, 10)
         .frame(minHeight: 34)
+        .opacity(isSending ? 0.5 : 1)
         .accessibilityElement(children: .combine)
     }
 }
