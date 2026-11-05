@@ -52,13 +52,11 @@ import Testing
         #expect(mode.phase == .reading)
     }
 
-    @Test func confirmDoesNothingWhileConfirmingOrSending() {
-        for phase in [MergePhase.confirming, .sending] {
-            var mode = shown(info())
-            mode.phase = phase
-            #expect(!press(&mode, at(5)))
-            #expect(mode.phase == phase)
-        }
+    @Test func confirmDoesNothingWhileConfirming() {
+        var mode = shown(info())
+        mode.phase = .confirming
+        #expect(!press(&mode, at(5)))
+        #expect(mode.phase == .confirming)
     }
 
     @Test func confirmMovesToConfirming() {
@@ -222,15 +220,6 @@ import Testing
         #expect(MergeWarning.checksRunning(2).text == "2 checks are still running.")
         #expect(MergeWarning.noChecks.text == "No checks have reported on this commit.")
         #expect(MergeWarning.changesRequested.text == "A review is requesting changes.")
-    }
-
-    @Test func cannotCancelWhileSending() {
-        var mode = shown(info())
-        #expect(mode.canCancel)
-        mode.phase = .confirming
-        #expect(mode.canCancel)
-        mode.phase = .sending
-        #expect(!mode.canCancel)
     }
 
     @Test func factsDifferOnEachField() {

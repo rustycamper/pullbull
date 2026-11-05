@@ -423,12 +423,10 @@ struct PRDetailView: View {
         }
     }
 
-    /// Merge where the detail offers it and nothing is on its way; Cancel with the panel open, until the
-    /// write starts.
+    /// Merge where the detail offers it and nothing is on its way; Cancel with the panel open.
     @ViewBuilder private var mergeButton: some View {
-        if let mode = model.mergeMode, mode.key == key {
+        if model.mergeMode?.key == key {
             OutlinedTextButton(title: "Cancel") { model.leaveMergeMode() }
-                .disabled(!mode.canCancel)
                 .background(MenuAnchorView(anchor: mergeCancelAnchor))
         } else if case .action = model.mergeOffer(for: key), !model.isPostInFlight(for: key) {
             OutlinedTextButton(title: "Merge", help: "Merge (⌥⌘G)") { model.enterMergeMode(on: key) }

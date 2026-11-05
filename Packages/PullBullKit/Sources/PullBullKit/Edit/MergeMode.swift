@@ -1,6 +1,6 @@
 import Foundation
 
-public enum MergePhase: Sendable { case reading, ready, confirming, sending }
+public enum MergePhase: Sendable { case reading, ready, confirming }
 
 /// What the panel shows, frozen, and what confirming compares against.
 public struct MergeFacts: Equatable, Sendable {
@@ -116,8 +116,6 @@ public struct MergeMode: Equatable, Sendable {
     public var methods: [MergeMethod] { read?.info?.allowedMethods ?? [] }
 
     public var confirmTitle: String { isSecondStep ? "Merge anyway" : "Merge" }
-
-    public var canCancel: Bool { phase != .sending }
 
     public func canConfirm(at now: Date) -> Bool {
         guard phase == .ready, read?.facts.action != nil else { return false }

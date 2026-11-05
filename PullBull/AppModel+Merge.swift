@@ -32,21 +32,21 @@ extension AppModel {
         }
     }
 
-    /// Esc, Cancel or a click outside. Stops anything not yet sent; a merge sending can't be called back.
+    /// Esc, Cancel or a click outside. Stops anything not yet sent: a sent merge has no panel.
     /// Esc and Cancel give the comment field its focus back if it had it; a click puts focus where it lands,
     /// so it passes false.
     func leaveMergeMode(returnsFocus: Bool = true) {
-        guard let mode = mergeMode, mode.canCancel else { return }
+        guard let mode = mergeMode else { return }
         stopUnsentMerge()
         mergeMode = nil
         if returnsFocus, mode.fieldHadFocus { requestCommentFieldFocus(on: mode.key) }
     }
 
     /// The screen, popover or account changed: the panel on `key`, or on anything when nil, closes. Stops
-    /// anything not yet sent; a merge sending carries on, as the viewer meant it.
+    /// anything not yet sent.
     func endMergeMode(on key: PRKey?) {
         guard let mode = mergeMode, key == nil || mode.key == key else { return }
-        if mode.canCancel { stopUnsentMerge() }
+        stopUnsentMerge()
         mergeMode = nil
     }
 
@@ -238,12 +238,13 @@ extension AppModel {
         }
     }
 
-    /// The read checked out and the write is about to start: it can't be called back from here. Shown at
-    /// once, for the sending account only.
+    /// The read checked out and the write is about to start: it can't be called back from here, so the panel
+    /// closes and the PR shows as merged at once, dimmed, for the sending account only. Any bad answer comes
+    /// back as the failure line.
     private func mergeWillSend(_ merge: inout PendingMerge) {
         confirmingMerge = nil
         guard runningAccount == merge.account else { return }
-        if mergeMode?.key == merge.key { mergeMode?.phase = .sending }
+        closeMergePanel(on: merge.key)
         recordMerge(&merge)
         AccessibilityNotification.Announcement("Merging").post()
     }
@@ -296,7 +297,7 @@ extension AppModel {
         }
     }
 
-    /// The write had no clear answer: the panel stays locked while one fresh detail decides, matched to what
+    /// The write had no clear answer: the overlay stays while one fresh detail decides, matched to what
     /// was sent. A failed read counts as unconfirmed, and nothing is ever sent again. Runs with the sending
     /// account even after a switch, so the slot goes. Its own task, which nothing cancels.
     private func confirmUnknownMerge(_ merge: PendingMerge, client: GitHubAPI) {

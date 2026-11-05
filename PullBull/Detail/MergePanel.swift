@@ -92,7 +92,6 @@ struct MergePanel: View {
     private var confirmTitle: String {
         switch mode.phase {
         case .reading, .confirming: "Checking…"
-        case .sending: "Merging…"
         case .ready: "\(mode.confirmTitle) ⌃⌘↩"
         }
     }
