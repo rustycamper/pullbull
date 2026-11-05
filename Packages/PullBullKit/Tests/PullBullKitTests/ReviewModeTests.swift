@@ -37,6 +37,17 @@ private func detail(
         #expect(mode.verdict == .approve)
     }
 
+    @Test func verdictLocksOnceSubmitted() {
+        for phase in [ReviewPhase.checking, .sending] {
+            var mode = ReviewMode(key: key, head: "abc", lastReview: nil)
+            mode.phase = phase
+            mode.missingText = true
+            mode.toggleVerdict()
+            #expect(mode.verdict == .approve)
+            #expect(mode.missingText)
+        }
+    }
+
     @Test func pinIgnoresNewerDetail() {
         let mode = ReviewMode(key: key, head: "abcdef123456", lastReview: nil)
         let newer = detail(head: "999999999999")

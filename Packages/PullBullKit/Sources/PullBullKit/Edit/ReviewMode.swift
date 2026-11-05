@@ -26,6 +26,7 @@ public struct ReviewMode: Equatable, Sendable {
     public var canChangeVerdict: Bool { phase == .composing }
 
     public mutating func toggleVerdict() {
+        guard canChangeVerdict else { return }
         verdict = verdict == .approve ? .requestChanges : .approve
         missingText = false
     }

@@ -47,7 +47,7 @@ public enum ReviewFlow {
 
 public enum ReviewCheck {
     /// The unknown-outcome check: a review by `viewer` (case-insensitive) in the verdict's state,
-    /// submitted no earlier than `since` less the clock skew. The newest match when several do.
+    /// submitted no earlier than `since` less the clock skew.
     public static func landed(_ verdict: ReviewVerdict, by viewer: String, since: Date, in reviews: [Review]) -> Review? {
         let earliest = since.addingTimeInterval(-CommentCheck.clockSkew)
         return reviews.last { review in

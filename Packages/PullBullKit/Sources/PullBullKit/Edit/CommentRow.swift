@@ -4,8 +4,8 @@ import Foundation
 /// There is no Comment button: typing needs the keyboard, so ⌘↩ is always to hand, and the hint says so.
 public enum CommentRow {
     /// The hint at the field's trailing end: "Checking…" while a review's head is read, then "Sending…"
-    /// while a post is in flight, focused or not; focused, the shortcut that posts; unfocused and empty, the one that focuses. A waiting draft's
-    /// preview takes the whole field unfocused, so it has none.
+    /// while a post is in flight, focused or not; focused, the shortcut that posts; unfocused and empty,
+    /// the one that focuses. A waiting draft's preview takes the whole field unfocused, so it has none.
     public static func hint(focused: Bool, sending: Bool, hasDraft: Bool, checking: Bool = false) -> String? {
         if checking { return "Checking…" }
         if sending { return "Sending…" }
