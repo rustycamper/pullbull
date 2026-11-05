@@ -9,13 +9,13 @@ public struct RerunPlan: Equatable, Sendable {
 
     private static let rerunnable: Set<String> = ["FAILURE", "TIMED_OUT", "CANCELLED"]
 
-    public init(checks: [Check]) {
+    public init(key: PRKey, checks: [Check]) {
         var seen = Set<Int64>()
         var ids: [Int64] = []
         for check in checks {
             guard check.suiteStatus == "COMPLETED", let conclusion = check.conclusion,
                   Self.rerunnable.contains(conclusion),
-                  let id = Self.runID(from: check.url),
+                  let id = Self.runID(from: check.url, in: key),
                   seen.insert(id).inserted
             else { continue }
             ids.append(id)
@@ -25,13 +25,18 @@ public struct RerunPlan: Equatable, Sendable {
 
     public var isEmpty: Bool { runIDs.isEmpty }
 
-    /// The run ID in an Actions details URL (`/actions/runs/{id}/job/{job}`); nil for any other URL.
-    public static func runID(from detailsURL: URL?) -> Int64? {
-        guard let parts = detailsURL?.pathComponents,
-              let index = zip(parts, parts.dropFirst()).enumerated()
-                  .first(where: { $0.element == ("actions", "runs") })?.offset,
-              parts.indices.contains(index + 2)
+    /// The run ID in a details URL of this repository's own Actions runs
+    /// (`https://github.com/{owner}/{repo}/actions/runs/{id}/job/{job}`); nil for any other URL, including
+    /// another repository's runs and other hosts. Host and repository compare without case.
+    public static func runID(from detailsURL: URL?, in key: PRKey) -> Int64? {
+        guard let url = detailsURL, url.scheme?.lowercased() == "https", url.host?.lowercased() == "github.com"
         else { return nil }
-        return Int64(parts[index + 2])
+        let parts = Array(url.pathComponents.dropFirst())
+        let own = key.repo.split(separator: "/").map(String.init)
+        guard own.count == 2, parts.count >= 5,
+              parts[0].lowercased() == own[0].lowercased(), parts[1].lowercased() == own[1].lowercased(),
+              parts[2] == "actions", parts[3] == "runs"
+        else { return nil }
+        return Int64(parts[4])
     }
 }

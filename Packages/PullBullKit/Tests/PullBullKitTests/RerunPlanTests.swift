@@ -11,6 +11,8 @@ private func run(
         conclusion: conclusion, suiteStatus: suite)
 }
 
+private let key = PRKey(repo: "o/r", number: 3)
+
 private func actions(_ id: Int64) -> String { "https://github.com/o/r/actions/runs/\(id)/job/1" }
 
 private final class PagesStub: GraphQLTransport, @unchecked Sendable {
@@ -41,7 +43,7 @@ private func node(_ name: String, run id: Int) -> String {
 
 @Suite struct RerunPlanTests {
     @Test func failureTimedOutAndCancelledCount() {
-        let plan = RerunPlan(checks: [
+        let plan = RerunPlan(key: key, checks: [
             run("a", "FAILURE", run: 1), run("b", "TIMED_OUT", run: 2), run("c", "CANCELLED", run: 3),
         ])
         #expect(plan.runIDs == [1, 2, 3])
@@ -49,14 +51,14 @@ private func node(_ name: String, run id: Int) -> String {
     }
 
     @Test func actionRequiredAndStartupFailureDont() {
-        let plan = RerunPlan(checks: [
+        let plan = RerunPlan(key: key, checks: [
             run("a", "ACTION_REQUIRED", run: 1), run("b", "STARTUP_FAILURE", run: 2), run("c", "SUCCESS", run: 3),
         ])
         #expect(plan.isEmpty)
     }
 
     @Test func aRunStillGoingIsLeftOut() {
-        let plan = RerunPlan(checks: [
+        let plan = RerunPlan(key: key, checks: [
             run("a", "FAILURE", suite: "IN_PROGRESS", run: 1), run("b", "FAILURE", suite: "QUEUED", run: 2),
             run("c", "FAILURE", run: 3),
         ])
@@ -64,7 +66,7 @@ private func node(_ name: String, run id: Int) -> String {
     }
 
     @Test func externalChecksAreLeftOut() {
-        let plan = RerunPlan(checks: [
+        let plan = RerunPlan(key: key, checks: [
             Check(name: "ci/circle", state: .failure, url: URL(string: "https://circleci.com/gh/o/r/12")),
             run("app", "FAILURE", url: "https://app.example/checks/9"),
             run("real", "FAILURE", run: 5),
@@ -73,7 +75,7 @@ private func node(_ name: String, run id: Int) -> String {
     }
 
     @Test func onlyExternalFailuresIsEmpty() {
-        let plan = RerunPlan(checks: [
+        let plan = RerunPlan(key: key, checks: [
             Check(name: "ci/circle", state: .failure, url: nil),
             run("app", "FAILURE", url: "https://app.example/checks/9"),
         ])
@@ -83,17 +85,35 @@ private func node(_ name: String, run id: Int) -> String {
 
     @Test func runIDComesFromTheDetailsURL() {
         let url = URL(string: "https://github.com/o/r/actions/runs/42093340598/job/1")
-        #expect(RerunPlan.runID(from: url) == 42_093_340_598)
-        #expect(RerunPlan.runID(from: URL(string: "https://github.com/o/r/actions/runs/7")) == 7)
-        #expect(RerunPlan.runID(from: URL(string: "https://github.com/o/r/pull/7")) == nil)
-        #expect(RerunPlan.runID(from: URL(string: "https://x.example/actions/runs/abc")) == nil)
-        #expect(RerunPlan.runID(from: nil) == nil)
-        let plan = RerunPlan(checks: [run("a", "FAILURE", url: actions(42_093_340_598))])
+        #expect(RerunPlan.runID(from: url, in: key) == 42_093_340_598)
+        #expect(RerunPlan.runID(from: URL(string: "https://github.com/o/r/actions/runs/7"), in: key) == 7)
+        #expect(RerunPlan.runID(from: URL(string: "https://github.com/o/r/pull/7"), in: key) == nil)
+        #expect(RerunPlan.runID(from: URL(string: "https://x.example/actions/runs/abc"), in: key) == nil)
+        #expect(RerunPlan.runID(from: nil, in: key) == nil)
+        let plan = RerunPlan(key: key, checks: [run("a", "FAILURE", url: actions(42_093_340_598))])
         #expect(plan.runIDs == [42_093_340_598])
     }
 
+    @Test func onlyThisRepositorysRunsCount() {
+        func id(_ url: String) -> Int64? { RerunPlan.runID(from: URL(string: url), in: key) }
+        #expect(id("https://github.com/microsoft/vscode-engineering/actions/runs/42130365063") == nil)
+        #expect(id("https://jenkins.acme.test/actions/runs/42/console") == nil)
+        #expect(id("https://jenkins.acme.test/o/r/actions/runs/42/console") == nil)
+        #expect(id("https://github.com/O/R/actions/runs/42/job/9") == 42)
+        #expect(id("https://GitHub.com/o/r/actions/runs/42") == 42)
+        #expect(id("https://github.com/o/other/actions/runs/42") == nil)
+        #expect(id("https://github.com/other/r/actions/runs/42") == nil)
+        #expect(id("github.com/o/r/actions/runs/42") == nil)
+        #expect(id("/o/r/actions/runs/42") == nil)
+        #expect(id("https://github.com/o/r/actions/runs/") == nil)
+        #expect(id("https://github.com/actions/runs/42") == nil)
+        #expect(id("https://github.com/o/r/x/actions/runs/42") == nil)
+        #expect(id("https://github.com/o/r/actions/runs/42/attempts/2") == 42)
+        #expect(id("https://github.com/o/r/actions/runs/42?pr=3") == 42)
+    }
+
     @Test func aFailedCheckWithNoRunIDInItsURLIsLeftOut() {
-        let plan = RerunPlan(checks: [run("a", "FAILURE", url: "https://example.com/details")])
+        let plan = RerunPlan(key: key, checks: [run("a", "FAILURE", url: "https://example.com/details")])
         #expect(plan.isEmpty)
     }
 
@@ -103,7 +123,7 @@ private func node(_ name: String, run id: Int) -> String {
     }
 
     @Test func oneEntryPerRun() {
-        let plan = RerunPlan(checks: [
+        let plan = RerunPlan(key: key, checks: [
             run("a", "FAILURE", run: 4), run("b", "TIMED_OUT", run: 4), run("c", "FAILURE", run: 2),
             run("d", "FAILURE", url: actions(4)),
         ])
@@ -117,7 +137,7 @@ private func node(_ name: String, run id: Int) -> String {
         let checks = try await api.allChecks(PRKey(repo: "o/r", number: 3))
         #expect(checks.count == 101)
         #expect(checks.last?.name == "late")
-        #expect(checks.last.flatMap { RerunPlan.runID(from: $0.url) } == 8)
+        #expect(checks.last.flatMap { RerunPlan.runID(from: $0.url, in: key) } == 8)
         #expect(checks.last?.conclusion == "FAILURE")
         #expect(checks.last?.suiteStatus == "COMPLETED")
         #expect(stub.bodies.count == 2)

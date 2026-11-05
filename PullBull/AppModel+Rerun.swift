@@ -14,7 +14,7 @@ extension AppModel {
             return
         }
         guard detail.checksTruncated else {
-            rerunPlans[key] = RerunPlan(checks: detail.checks)
+            rerunPlans[key] = RerunPlan(key: key, checks: detail.checks)
             return
         }
         let client = api(for: account)
@@ -22,7 +22,7 @@ extension AppModel {
         Task { [weak self] in
             guard let checks = try? await client.allChecks(key) else { return }
             guard let self, self.runningAccount == account, self.details[key]?.headOid == head else { return }
-            self.rerunPlans[key] = RerunPlan(checks: checks)
+            self.rerunPlans[key] = RerunPlan(key: key, checks: checks)
         }
     }
 
@@ -58,7 +58,7 @@ extension AppModel {
         Task { [weak self] in
             var line: String?
             do {
-                let plan = RerunPlan(checks: try await client.allChecks(key))
+                let plan = RerunPlan(key: key, checks: try await client.allChecks(key))
                 var refusals: [String] = []
                 for id in plan.runIDs {
                     do {
