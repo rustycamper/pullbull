@@ -65,7 +65,6 @@ struct DetailSection<Content: View, Accessory: View>: View {
         if let summary {
             Text(summary)
                 .monospacedDigit()
-                .lineLimit(stacksAccessory ? 1 : nil)
         }
     }
 }
