@@ -42,11 +42,11 @@ Keyboard-first · Native SwiftUI · Edits only what you pick
 
 ## Screens
 
-| Pull request detail | Issue detail |
+| Pull request detail | Stats |
 |:-:|:-:|
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/pr-detail-dark.png"><img src="docs/media/pr-detail-light.png" width="360" alt="Pull request detail, Ready to merge"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/issue-detail-dark.png"><img src="docs/media/issue-detail-light.png" width="360" alt="Issue detail with board card and linked PRs"></picture> |
-| **Board** | **Search** |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/board-dark.png"><img src="docs/media/board-light.png" width="360" alt="Board chip grouped by Status"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/search-dark.png"><img src="docs/media/search-light.png" width="360" alt="Search results in the list's sections, Everywhere"></picture> |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/pr-detail-dark.png"><img src="docs/media/pr-detail-light.png" width="360" alt="Pull request detail, Ready to merge"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/stats-dark.png"><img src="docs/media/stats-light.png" width="360" alt="Stats for this week: reviews per day with one day hovered, your pull requests and what is waiting right now"></picture> |
+| **Board** | **Keyboard shortcuts** |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/board-dark.png"><img src="docs/media/board-light.png" width="360" alt="Board chip grouped by Status"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/shortcuts-dark.png"><img src="docs/media/shortcuts-light.png" width="360" alt="Keyboard Shortcuts window with its filter field"></picture> |
 
 ## Lists
 
@@ -94,6 +94,12 @@ More in the [manual](docs/manual.md#issues).
 Results land in the list's sections, then **Other results** for the rest, then Closed and merged. Click a chip, or press <kbd>←</kbd> <kbd>→</kbd> at the field's start or end, to search only Needs you, Mine or Team (Issues: Assigned, Created or Board).
 
 Combine `@`, `~`, `is:`, `status:`, `updated:`, `review:`, `repo:`, `size:` and words. Type `st`, `la` or `up` and press <kbd>Tab</kbd> for `status:`, `label:` or `updated:`, with suggestions. Save the searches you repeat with the bookmark icon, apply one with ⌃1–⌃9; manage them in Settings → Search.
+
+<div align="center">
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/saved-searches-dark.png"><img src="docs/media/saved-searches-light.png" width="520" alt="Saved searches with their Control-number keys and the search tokens, under the empty search field"></picture>
+
+</div>
 
 > [!TIP]
 > **Can't remember the words?** [Ask AI](docs/manual.md#ask-ai) finds the item from a description (<kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd>). Off by default; turn it on in Settings → Ask AI.

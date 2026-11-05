@@ -51,6 +51,7 @@ let list: [(String, CGFloat, String)] = [
     ("arrow.clockwise", 24, "medium"),
     ("arrow.up.right.square", 24, "medium"),
     ("gearshape", 24, "medium"),
+    ("chart.bar", 24, "medium"),
     ("circle.dashed", 11, "regular"),
     ("circle.lefthalf.filled", 11, "regular"),
     ("circle.dotted", 11, "regular"),

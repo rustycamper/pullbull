@@ -9,17 +9,22 @@
 <script src="components.js"></script>
 <script src="detail.js"></script>
 <script src="search.js"></script>
+<script src="stats.js"></script>
+<script src="shortcuts.js"></script>
 <script src="data/review.js"></script>
 <script src="data/mine.js"></script>
 <script src="data/board.js"></script>
 <script src="data/pr-detail.js"></script>
 <script src="data/issue-detail.js"></script>
 <script src="data/search.js"></script>
+<script src="data/stats.js"></script>
+<script src="data/saved-searches.js"></script>
+<script src="data/shortcuts.js"></script>
 </head>
 <body>
 <div id="scene"></div>
 <script>
-  // ?scheme=dark|light  &data=review|mine|board|pr-detail|issue-detail|search  &width=520  &height=640
+  // ?scheme=dark|light  &data=review|mine|board|pr-detail|issue-detail|search|stats|saved-searches|shortcuts  &width=520  &height=640
   const q = new URLSearchParams(location.search);
   const scene = {
     scheme: q.get("scheme") || "dark",

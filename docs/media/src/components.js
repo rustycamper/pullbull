@@ -433,7 +433,7 @@
     // FooterGlyph: a 12×12 box (scaledToFit) inside 24×24
     const button = (name) => `<span class="footer-button">${sym(name, 24, "medium", { fit: 12 })}</span>`;
     return `<div class="hstack footer f11"><span class="hstack account">${avatar(viewer.login, 14)}<span class="nowrap">${esc(viewer.login)} · ${esc(viewer.org || "personal")}</span></span>` +
-      `<span class="spacer" style="min-width:8px"></span>${button("arrow.clockwise")}${button("arrow.up.right.square")}${button("gearshape")}</div>`;
+      `<span class="spacer" style="min-width:8px"></span>${button("arrow.clockwise")}${button("arrow.up.right.square")}${button("chart.bar")}${button("gearshape")}</div>`;
   }
 
   // ---------- Assembly ----------
@@ -442,12 +442,13 @@
     // A detail is a layer over the whole panel: its own header and bottom bar, no tabs or footer.
     if (d.view === "prDetail") return `<div class="panel">${window.PullBull.prDetail(d)}</div>`;
     if (d.view === "issueDetail") return `<div class="panel">${window.PullBull.issueDetail(d, scheme)}</div>`;
+    if (d.view === "stats") return `<div class="panel">${window.PullBull.stats(d)}</div>`;
     const P = window.PullBull;
     const searching = d.view === "search";
     const body = searching ? P.searchBody(d) : d.mode === "issues" ? issueList(d, scheme) : list(d);
     const foot = searching ? P.searchFooter(d.searchResults) : footer(d.viewer);
     return `<div class="panel">${header(d)}${d.filter ? "" : '<div class="hairline"></div>'}` +
-      `<div class="below-header">${d.filter ? filterBar(d.filter) : ""}${body}</div>${foot}</div>`;
+      `<div class="below-header">${d.filter ? filterBar(d.filter) : ""}${body}${d.hints ? P.searchHints(d.hints) : ""}</div>${foot}</div>`;
   }
 
   function menuBarItem(count, open) {
@@ -462,6 +463,10 @@
     root.className = `scene scheme-${scene.scheme}`;
     root.style.width = `${scene.width}px`;
     root.style.height = `${scene.height}px`;
+    if (d.view === "shortcuts") {
+      root.innerHTML = window.PullBull.shortcutsWindow(d);
+      return;
+    }
     root.innerHTML = `<div class="menubar">${menuBarItem(d.menuBar.count, d.menuBar.open)}</div>${popover(d, scene.scheme)}`;
     fitIssueMeta(root);
     const item = root.querySelector(".status-item");
@@ -471,7 +476,9 @@
     item.style.left = `${centre - itemWidth / 2}px`;
     panel.style.left = `${centre - 180}px`;
     panel.style.top = `${24 + 4}px`;
+    if (d.fadeAt) panel.style.maskImage = `linear-gradient(#000 ${d.fadeAt}px, transparent ${d.fadeAt + 30}px)`;
     if (d.hover) placeHover(root, d.hover);
+    if (d.stats) window.PullBull.placeBarCursor(root, d.stats.chart.hover);
   }
 
   window.PullBull = { esc, sym, avatar, identicon, modeToggle, scopeChips, sectionHeader, sectionList, searchField, header, filterBar, prRow, groupHeader, closedRow, closedSection, list, issueRow, laneHeader, doneSection, labelChip, assigneeStack, issueList, tunedLabelColor, footer, popover, menuBarItem, renderScene };

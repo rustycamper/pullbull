@@ -33,5 +33,15 @@
     return `<div class="list">${html}</div>`;
   }
 
-  Object.assign(P, { highlight, searchFooter, searchBody });
+  /** SearchHints: saved chips (filled, a code font when the name is the query, ⌃N after the first nine), two token lines, and the caption. */
+  function searchHints(h) {
+    const chip = (s, i) => `<span class="hint-chip${i === h.selected ? " selected" : ""}"><span class="${s.name === s.query ? "code" : ""}">${esc(s.name)}</span><span class="f11 c-secondary">⌃${i + 1}</span></span>`;
+    const token = ([sigil, word]) => `<span class="hint-token"><span class="sigil">${esc(sigil)}</span>${word ? `<span class="c-secondary">${esc(word)}</span>` : ""}</span>`;
+    const line = (tokens) => `<div class="hstack" style="gap:4px">${tokens.map(token).join("")}</div>`;
+    const picked = h.saved[h.selected];
+    return `<div class="hints"><div class="hint-cloud">${h.saved.map(chip).join("")}</div><div class="hint-tokens">${h.tokens.map(line).join("")}</div>` +
+      `<div class="hstack hint-caption"><span class="code f11 ellipsis">${esc(picked.query)}</span><span class="spacer"></span>${keycap("↩")}</div></div>`;
+  }
+
+  Object.assign(P, { highlight, searchFooter, searchBody, searchHints });
 })();
