@@ -339,7 +339,7 @@ struct PRDetailView: View {
                     let visible = filesExpanded ? files : Array(files.prefix(Self.foldedFileCount))
                     ForEach(Array(visible.enumerated()), id: \.offset) { index, file in
                         if index > 0 { CardDivider() }
-                        FileLine(file: file)
+                        FileLine(file: file, prURL: webURL)
                     }
                     if hidden > 0 {
                         CardDivider()
@@ -647,8 +647,14 @@ private struct DiffstatBar: View {
 
 private struct FileLine: View {
     let file: ChangedFile
+    let prURL: URL
 
     var body: some View {
+        Button { NSWorkspace.shared.open(file.diffURL(in: prURL)) } label: { line }
+            .buttonStyle(.plain)
+    }
+
+    private var line: some View {
         HStack(spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(file.fileName)
@@ -677,6 +683,7 @@ private struct FileLine: View {
         }
         .padding(.horizontal, 10)
         .frame(minHeight: 28)
+        .contentShape(Rectangle())
     }
 }
 
