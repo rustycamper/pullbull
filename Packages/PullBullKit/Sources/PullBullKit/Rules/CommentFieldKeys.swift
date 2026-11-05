@@ -12,6 +12,12 @@ public enum CommentKeyAction: Equatable, Sendable {
     case moveMention(Int)
     /// Return or Tab in the open mention list: insert the highlighted person or team.
     case acceptMention
+    /// ⌘↩ in review mode: submit the review.
+    case submitReview
+    /// Esc in review mode with the mention list closed: leave review mode, keeping the text.
+    case leaveReview
+    /// ⌥← or ⌥→ while composing a review: switch between Approve and Request changes.
+    case changeVerdict
     /// The key belongs to the text view: typing, editing, caret moves, or nothing.
     case text
 }
@@ -23,19 +29,27 @@ public enum CommentFieldKeys {
     private static let keypadEnter: UInt16 = 76
     private static let tab: UInt16 = 48
     private static let escape: UInt16 = 53
+    private static let left: UInt16 = 123
+    private static let right: UInt16 = 124
     private static let down: UInt16 = 125
     private static let up: UInt16 = 126
 
     /// keyCode is the virtual key; flags exclude caps lock, numeric pad and function.
     /// ⌘W, ⌘, and ⌘/ never reach this: PopoverView handles them before `handleDetailKey`.
+    /// `review` is the phase of review mode, nil outside it. ⌘↩ and Esc are taken in every phase and left to
+    /// the model to refuse; ⌥← ⌥→ change the verdict only while composing.
     public static func route(keyCode: UInt16, flags: KeyCombo.Modifiers,
-                             mentionsOpen: Bool, composing: Bool) -> CommentKeyAction {
+                             mentionsOpen: Bool, composing: Bool,
+                             review: ReviewPhase? = nil) -> CommentKeyAction {
         // An input method composing keeps every key, as the search field does.
         guard !composing else { return .text }
-        if flags == [.command], keyCode == returnKey || keyCode == keypadEnter { return .post }
+        if flags == [.command], keyCode == returnKey || keyCode == keypadEnter {
+            return review == nil ? .post : .submitReview
+        }
+        if flags == [.option], review == .composing, keyCode == left || keyCode == right { return .changeVerdict }
         guard flags.isEmpty else { return .text }
         switch keyCode {
-        case escape: return mentionsOpen ? .closeMentions : .leaveField
+        case escape: return mentionsOpen ? .closeMentions : review == nil ? .leaveField : .leaveReview
         case up where mentionsOpen: return .moveMention(-1)
         case down where mentionsOpen: return .moveMention(1)
         case returnKey where mentionsOpen, tab where mentionsOpen: return .acceptMention

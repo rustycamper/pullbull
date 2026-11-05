@@ -8,6 +8,7 @@ private enum Key {
     static let tab: UInt16 = 48
     static let escape: UInt16 = 53
     static let left: UInt16 = 123
+    static let right: UInt16 = 124
     static let down: UInt16 = 125
     static let up: UInt16 = 126
     static let a: UInt16 = 0
@@ -23,11 +24,44 @@ private enum Key {
 private typealias Mods = KeyCombo.Modifiers
 
 private func route(_ keyCode: UInt16, _ flags: Mods = [], mentionsOpen: Bool = false,
-                   composing: Bool = false) -> CommentKeyAction {
-    CommentFieldKeys.route(keyCode: keyCode, flags: flags, mentionsOpen: mentionsOpen, composing: composing)
+                   composing: Bool = false, review: ReviewPhase? = nil) -> CommentKeyAction {
+    CommentFieldKeys.route(keyCode: keyCode, flags: flags, mentionsOpen: mentionsOpen, composing: composing,
+                           review: review)
 }
 
 @Suite struct CommentFieldKeysTests {
+    @Test(arguments: [ReviewPhase.composing, .checking, .sending])
+    func commandReturnSubmitsInReviewMode(phase: ReviewPhase) {
+        #expect(route(Key.returnKey, .command, review: phase) == .submitReview)
+        #expect(route(Key.keypadEnter, .command, review: phase) == .submitReview)
+        #expect(route(Key.returnKey, .command, review: nil) == .post)
+    }
+
+    @Test(arguments: [Key.left, Key.right])
+    func optionArrowsChangeVerdictOnlyWhileComposing(keyCode: UInt16) {
+        #expect(route(keyCode, .option, review: .composing) == .changeVerdict)
+        #expect(route(keyCode, .option, review: .checking) == .text)
+        #expect(route(keyCode, .option, review: .sending) == .text)
+        #expect(route(keyCode, .option, review: nil) == .text)
+    }
+
+    @Test func escLeavesReviewBeforeField() {
+        #expect(route(Key.escape, review: .composing) == .leaveReview)
+        #expect(route(Key.escape, mentionsOpen: true, review: .composing) == .closeMentions)
+        #expect(route(Key.escape, review: nil) == .leaveField)
+    }
+
+    @Test func escDuringSendGoesToTheModel() {
+        #expect(route(Key.escape, review: .sending) == .leaveReview)
+    }
+
+    @Test(arguments: [
+        (Key.escape, Mods()), (Key.returnKey, Mods.command), (Key.left, Mods.option), (Key.right, Mods.option),
+    ])
+    func composingKeepsEveryKeyInReviewMode(keyCode: UInt16, flags: KeyCombo.Modifiers) {
+        #expect(route(keyCode, flags, composing: true, review: .composing) == .text)
+    }
+
     /// An input method composing keeps every key, Esc and ⌘↩ included, with the list open or not.
     @Test(arguments: [
         (Key.escape, Mods()), (Key.returnKey, Mods.command), (Key.keypadEnter, Mods.command),
