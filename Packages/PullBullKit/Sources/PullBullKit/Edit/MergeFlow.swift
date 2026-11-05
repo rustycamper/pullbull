@@ -36,10 +36,7 @@ public enum MergeFlow {
             fresh = try await read()
         } catch {
             if isCancelled() { return .cancelled }
-            switch CommentFailure.classify(error) {
-            case .refused(let reason): return .checkFailed(reason)
-            case .unknown: return .checkFailed(RefreshError(error).message)
-            }
+            return .checkFailed(reason(for: error))
         }
         if isCancelled() { return .cancelled }
         guard let state = fresh.facts.state else { return .changed(fresh) }
@@ -63,6 +60,29 @@ public enum MergeFlow {
         case .enqueued: return .unknown
         case .failed(let reason): return await refusal(reason, shown: shown, read: read)
         case .pending(let uuid): return await polling(uuid, shown: shown, poll: poll, sleep: sleep, read: read)
+        }
+    }
+
+    /// What a read before sending failed on: GitHub's words, or the refresh wording for anything else.
+    public static func reason(for error: any Error) -> String {
+        switch CommentFailure.classify(error) {
+        case .refused(let reason): reason
+        case .unknown: RefreshError(error).message
+        }
+    }
+
+    /// Whether `detail` shows what was sent, when GitHub's answer didn't say. An auto-merge can land at once,
+    /// so a merged PR counts for it too. Only the viewer's own request counts as theirs.
+    public static func landed(_ sent: EditChange, in detail: PRDetail) -> Bool {
+        switch sent {
+        case .merged:
+            return detail.state == .merged
+        case .autoMerge(enabled: true, let viewer):
+            if detail.state == .merged { return true }
+            guard detail.state == .open, let name = detail.merge?.autoMerge?.enabledBy else { return false }
+            return name.caseInsensitiveCompare(viewer) == .orderedSame
+        case .status, .labels, .assignees, .reviewers, .review, .autoMerge:
+            return false
         }
     }
 

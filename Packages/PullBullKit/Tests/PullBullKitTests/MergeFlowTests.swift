@@ -29,6 +29,48 @@ import Testing
             offer: offer)
     }
 
+    private func detail(state: PRState?, autoMerge: AutoMerge? = nil) -> PRDetail {
+        let merge = MergeInfo(
+            nodeID: "PR_1", status: .blocked, hasConflicts: false, usesMergeQueue: false, isStacked: false,
+            isDraft: false, autoMerge: autoMerge, canEnableAutoMerge: true, canDisableAutoMerge: false,
+            canWrite: true, allowedMethods: [.squash], defaultMethod: .squash, base: "main",
+            commitCount: 3, approvals: 1, tally: CheckTally(failing: 0, running: 0, total: 4), changesRequested: false)
+        return PRDetail(
+            key: key, body: "", checks: [], reviews: [], comments: [], files: [], headOid: "abc", state: state, merge: merge)
+    }
+
+    @Test func aDirectMergeLandedOnlyWhenTheDetailShowsItMerged() {
+        let sent = EditChange.merged(viewer: "pb")
+        #expect(MergeFlow.landed(sent, in: detail(state: .merged)))
+        #expect(!MergeFlow.landed(sent, in: detail(state: .open)))
+        #expect(!MergeFlow.landed(sent, in: detail(state: .closed)))
+        #expect(!MergeFlow.landed(sent, in: detail(state: nil)))
+        #expect(!MergeFlow.landed(sent, in: detail(state: .open, autoMerge: AutoMerge(enabledBy: "pb"))))
+    }
+
+    @Test func anAutoMergeLandedWhenSetByTheViewerOrAlreadyMerged() {
+        let sent = EditChange.autoMerge(enabled: true, viewer: "pb")
+        #expect(MergeFlow.landed(sent, in: detail(state: .open, autoMerge: AutoMerge(enabledBy: "PB"))))
+        #expect(MergeFlow.landed(sent, in: detail(state: .merged)))
+        #expect(!MergeFlow.landed(sent, in: detail(state: .open)))
+        #expect(!MergeFlow.landed(sent, in: detail(state: .open, autoMerge: AutoMerge(enabledBy: "someone"))))
+        #expect(!MergeFlow.landed(sent, in: detail(state: .open, autoMerge: AutoMerge(enabledBy: nil))))
+        #expect(!MergeFlow.landed(sent, in: detail(state: .closed, autoMerge: AutoMerge(enabledBy: "pb"))))
+    }
+
+    @Test func nothingElseCountsAsLanded() {
+        #expect(!MergeFlow.landed(.autoMerge(enabled: false, viewer: "pb"), in: detail(state: .merged)))
+        #expect(!MergeFlow.landed(.review(state: .approved, commit: "abc", viewer: "pb"), in: detail(state: .merged)))
+    }
+
+    @Test func aRefusedReadSaysGitHubsWords() {
+        #expect(MergeFlow.reason(for: APIError.writeRefused("Not allowed")) == "Not allowed")
+    }
+
+    @Test func anyOtherFailedReadSaysTheRefreshWording() {
+        #expect(MergeFlow.reason(for: Boom()) == RefreshError(Boom()).message)
+    }
+
     private struct Boom: Error {}
 
     private func run(

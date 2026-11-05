@@ -93,6 +93,11 @@ public enum EditMessage {
         "New commits on #\(key.number) since you opened this. Look again, then merge."
     }
 
+    /// GitHub turned the send down as the PR had changed, with no panel left open to show it.
+    public static func mergeChanged(on key: PRKey) -> String {
+        "#\(key.number) changed before it could merge. Look again, then merge."
+    }
+
     public static func autoMergeCancelRefused(on key: PRKey, reason: String) -> String {
         "Couldn't cancel auto-merge on #\(key.number): \(reason)"
     }

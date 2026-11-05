@@ -33,6 +33,7 @@ import Testing
         #expect(EditMessage.mergeUnconfirmed(on: key)
             == "Couldn't confirm the merge of #88. Check it before trying again.")
         #expect(EditMessage.mergeHeadMoved(on: key) == "New commits on #88 since you opened this. Look again, then merge.")
+        #expect(EditMessage.mergeChanged(on: key) == "#88 changed before it could merge. Look again, then merge.")
         #expect(EditMessage.autoMergeCancelRefused(on: key, reason: "nope") == "Couldn't cancel auto-merge on #88: nope")
         #expect(EditMessage.autoMergeCancelUnconfirmed(on: key)
             == "Couldn't confirm auto-merge was cancelled on #88. Check it on GitHub.")

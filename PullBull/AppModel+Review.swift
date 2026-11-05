@@ -7,7 +7,7 @@ import SwiftUI
 extension AppModel {
     /// Whether the detail offers a review of `key`: the Review button, and ⌥⌘V doing anything.
     func isReviewOffered(for key: PRKey) -> Bool {
-        ReviewGate.canReview(
+        mergeMode == nil && ReviewGate.canReview(
             detail: details[key], viewer: runningAccount?.login, permission: setEditPermission(.review, for: key))
     }
 
@@ -195,6 +195,7 @@ extension AppModel {
         } else {
             reloadReviewedDetail(review.key, account: review.account)
         }
+        rereadMergeState(on: review.key, afterReview: true)
         let done = switch review.verdict {
         case .approve: "Approved #\(review.key.number)"
         case .requestChanges: "Requested changes on #\(review.key.number)"
@@ -225,8 +226,8 @@ extension AppModel {
         edits.showFailure(EditFailure(text: text, url: review.url))
     }
 
-    /// A held detail is missing a review on screen: a refresh that finished cleanly reads it again, whether
-    /// or not a list holds the PR. A read under way is left to finish, on screen (`detailFetch`) or off
+    /// A held detail is missing a review or a merge on screen: a refresh that finished cleanly reads it
+    /// again, whether or not a list holds the PR. A read under way is left to finish, on screen (`detailFetch`) or off
     /// (`reviewRereads`), as a refresh can report more than once.
     func rereadReviewedDetails(_ keys: Set<PRKey>) {
         guard let account = runningAccount else { return }
@@ -236,7 +237,7 @@ extension AppModel {
     }
 
     /// Fetches the detail again, whether it's on screen or held under another layer.
-    private func reloadReviewedDetail(_ key: PRKey, account: AccountRef) {
+    func reloadReviewedDetail(_ key: PRKey, account: AccountRef) {
         if route == .detail(key) {
             reloadDetail()
         } else if details[key] != nil, reviewRereads.insert(key).inserted {
