@@ -88,13 +88,14 @@ public enum MergeFlow {
         return .unknown
     }
 
-    /// Reads once more to say why: a moved head whatever GitHub's words were, a PR that turned clean as
+    /// Reads once more to say why: a moved head whatever GitHub's words were, a PR that merged or closed meanwhile, a PR that turned clean as
     /// a fresh read, a repository left out of the install clearly; otherwise GitHub's reason.
     @MainActor private static func refusal(
         _ reason: String, shown: MergeFacts, read: @MainActor () async throws -> MergeRead
     ) async -> MergeOutcome {
         let fresh = try? await read()
-        if let fresh, fresh.facts.head != shown.head { return .headMoved }
+        if let state = fresh?.facts.state, state != .open { return .notOpen(merged: state == .merged) }
+        if let fresh, let head = fresh.facts.head, head != shown.head { return .headMoved }
         if let fresh, reason.contains("clean status") { return .changed(fresh) }
         if reason.contains("Resource not accessible by integration") { return .refused(notReachable) }
         return .refused(reason)

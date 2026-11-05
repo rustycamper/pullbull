@@ -145,6 +145,40 @@ private final class GraphQLQueue: GraphQLTransport, @unchecked Sendable {
         }
     }
 
+    @Test func aRateLimitedMergeKeepsItsHeaders() async {
+        let t = RESTQueue(
+            [(403, #"{"message":"API rate limit exceeded"}"#)],
+            headers: ["x-ratelimit-remaining": "0", "x-ratelimit-reset": "2000000000"])
+        do {
+            _ = try await api(t).requestMerge(key, head: "a", method: .squash)
+            Issue.record("sent")
+        } catch {
+            guard case APIError.rateLimited = error else {
+                Issue.record("not a rate limit: \(error)")
+                return
+            }
+        }
+    }
+
+    @Test func anEnqueuedAnswerMapsToEnqueued() async throws {
+        let t = RESTQueue([(200, #"{"status":"enqueued","details":{"message":"Queued."}}"#)])
+        #expect(try await api(t).requestMerge(key, head: "a", method: .squash) == .enqueued)
+    }
+
+    @Test func aNon400ErrorOnAPollIgnoresTheBody() async {
+        let t = RESTQueue([(422, #"{"status":"failed","details":{"message":"x"}}"#)])
+        await #expect(throws: (any Error).self) {
+            _ = try await api(t).mergeResult(key, uuid: "u1")
+        }
+    }
+
+    @Test func a400PollWithoutAFailedStatusThrows() async {
+        let t = RESTQueue([(400, #"{"status":"pending","details":{"uuid":"u1"}}"#)])
+        await #expect(throws: (any Error).self) {
+            _ = try await api(t).mergeResult(key, uuid: "u1")
+        }
+    }
+
     @Test func aFailed400PollCarriesItsMessage() async throws {
         let t = RESTQueue([(400, wrongSha)])
         #expect(try await api(t).mergeResult(key, uuid: "u1") == .failed("Pull request head branch was modified."))
@@ -186,6 +220,67 @@ private final class GraphQLQueue: GraphQLTransport, @unchecked Sendable {
         let t = GraphQLQueue([#"{"data":{"disablePullRequestAutoMerge":null},"errors":[{"type":"UNPROCESSABLE","message":"Auto merge is not enabled"}]}"#])
         await #expect(throws: APIError.writeRefused("Auto merge is not enabled")) {
             try await api(t).disableAutoMerge(key, nodeID: "PR_1")
+        }
+    }
+}
+
+@Suite struct AutoMergeUnknownTests {
+    private func isGraphQL(_ error: any Error) -> Bool {
+        if case APIError.graphQL = error { return true }
+        return false
+    }
+
+    @Test func anUnreadableEnableAnswerStaysUnknown() async {
+        let t = GraphQLQueue(["not json"])
+        do {
+            try await api(t).enableAutoMerge(key, nodeID: "PR_1", head: "a", method: .squash)
+            Issue.record("sent")
+        } catch {
+            #expect(isGraphQL(error))
+            #expect(CommentFailure.classify(error) == .unknown)
+        }
+    }
+
+    @Test func anEnableAnswerWithNoDataStaysUnknown() async {
+        let t = GraphQLQueue([#"{"errors":[{"message":"Something broke"}]}"#])
+        do {
+            try await api(t).enableAutoMerge(key, nodeID: "PR_1", head: "a", method: .squash)
+            Issue.record("sent")
+        } catch {
+            #expect(isGraphQL(error))
+            #expect(CommentFailure.classify(error) == .unknown)
+        }
+    }
+
+    @Test func anUnreadableDisableAnswerStaysUnknown() async {
+        let t = GraphQLQueue(["not json"])
+        do {
+            try await api(t).disableAutoMerge(key, nodeID: "PR_1")
+            Issue.record("sent")
+        } catch {
+            #expect(isGraphQL(error))
+            #expect(CommentFailure.classify(error) == .unknown)
+        }
+    }
+
+    @Test func aDisableAnswerWithNoDataStaysUnknown() async {
+        let t = GraphQLQueue([#"{"errors":[{"message":"Something broke"}]}"#])
+        do {
+            try await api(t).disableAutoMerge(key, nodeID: "PR_1")
+            Issue.record("sent")
+        } catch {
+            #expect(isGraphQL(error))
+            #expect(CommentFailure.classify(error) == .unknown)
+        }
+    }
+
+    @Test func aNullPayloadWithATypelessErrorStaysUnknown() async {
+        let t = GraphQLQueue([#"{"data":{"enablePullRequestAutoMerge":null},"errors":[{"message":"odd"}]}"#])
+        do {
+            try await api(t).enableAutoMerge(key, nodeID: "PR_1", head: "a", method: .squash)
+            Issue.record("sent")
+        } catch {
+            #expect(CommentFailure.classify(error) == .unknown)
         }
     }
 }

@@ -15,10 +15,18 @@ final class RESTQueue: GraphQLTransport, @unchecked Sendable {
     private var queue: [Answer]
     private var log: [Sent] = []
 
-    init(_ answers: [(Int, String)]) { queue = answers.map { .response($0.0, $0.1) } }
+    private let headers: [String: String]
+
+    init(_ answers: [(Int, String)], headers: [String: String] = [:]) {
+        queue = answers.map { .response($0.0, $0.1) }
+        self.headers = headers
+    }
 
     /// A transport whose one answer is `error`.
-    init(failing error: any Error) { queue = [.failure(error)] }
+    init(failing error: any Error) {
+        queue = [.failure(error)]
+        headers = [:]
+    }
 
     var sent: [Sent] { lock.withLock { log } }
 
@@ -39,7 +47,7 @@ final class RESTQueue: GraphQLTransport, @unchecked Sendable {
             throw error
         case .response(let status, let json):
             let response = HTTPURLResponse(
-                url: URL(string: "https://api.github.com\(path)")!, statusCode: status, httpVersion: nil, headerFields: nil)!
+                url: URL(string: "https://api.github.com\(path)")!, statusCode: status, httpVersion: nil, headerFields: headers)!
             return (Data(json.utf8), response)
         }
     }

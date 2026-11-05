@@ -3,7 +3,7 @@ import Foundation
 
 public protocol GraphQLTransport: Sendable {
     func send(_ body: Data, token: String) async throws -> (Data, HTTPURLResponse)
-    /// A REST request to `https://api.github.com` + `path` with a JSON body.
+    /// A REST request to `https://api.github.com` + `path` with a JSON body; an empty body means none.
     func send(_ method: String, path: String, body: Data, token: String) async throws -> (Data, HTTPURLResponse)
 }
 
@@ -805,14 +805,14 @@ public struct GitHubAPI: Sendable {
             "sha": head, "merge_method": method.rawValue.lowercased(),
             "merge_action": "direct_merge", "bypass_rules": false,
         ]
-        let (status, data) = try await restExchange("PUT", path, payload, keepingTransportFailures: true)
+        let (status, data, response) = try await restExchange("PUT", path, payload, keepingTransportFailures: true)
         switch status {
         case 200, 202, 409:
             return try Self.mergeState(data, uuid: nil)
         case 400:
             throw APIError.writeRefused(Self.mergeMessage(data) ?? "GitHub didn't apply the change")
         default:
-            throw failure(status, data, refusing: true)
+            throw httpError(data, response, refusing: true) ?? APIError.server(status)
         }
     }
 
@@ -820,30 +820,33 @@ public struct GitHubAPI: Sendable {
     /// leaves the merge's outcome unknown.
     public func mergeResult(_ key: PRKey, uuid: String) async throws -> MergeRequestState {
         let path = "/repos/\(key.repo)/pulls/\(key.number)/merge-async/\(uuid)"
-        let (status, data) = try await restExchange("GET", path, nil, keepingTransportFailures: false)
-        if (200..<300).contains(status) || status == 400 {
-            return try Self.mergeState(data, uuid: uuid)
-        }
-        throw failure(status, data, refusing: false)
+        let (status, data, response) = try await restExchange("GET", path, nil, keepingTransportFailures: false)
+        if (200..<300).contains(status) { return try Self.mergeState(data, uuid: uuid) }
+        if status == 400, case .failed(let reason) = try? Self.mergeState(data, uuid: uuid) { return .failed(reason) }
+        throw httpError(data, response) ?? APIError.server(status)
     }
 
     /// Turns on auto-merge for the pull request node. GitHub's validation answers throw `writeRefused`.
     public func enableAutoMerge(_ key: PRKey, nodeID: String, head: String, method: MergeMethod) async throws {
         let variables: [String: Any] = ["pr": nodeID, "head": head, "method": method.rawValue]
-        do {
-            _ = try await mutate(Mutations.enableAutoMerge, variables, payload: "enablePullRequestAutoMerge")
-        } catch APIError.graphQL(let message) {
-            throw APIError.writeRefused(message)
-        }
+        try await autoMergeMutation(Mutations.enableAutoMerge, variables, payload: "enablePullRequestAutoMerge")
     }
 
     /// Turns off auto-merge for the pull request node. GitHub's validation answers throw `writeRefused`.
     public func disableAutoMerge(_ key: PRKey, nodeID: String) async throws {
-        do {
-            _ = try await mutate(Mutations.disableAutoMerge, ["pr": nodeID], payload: "disablePullRequestAutoMerge")
-        } catch APIError.graphQL(let message) {
-            throw APIError.writeRefused(message)
-        }
+        try await autoMergeMutation(Mutations.disableAutoMerge, ["pr": nodeID], payload: "disablePullRequestAutoMerge")
+    }
+
+    /// Sends an auto-merge mutation. Only a real answer is a refusal: a `data` object whose payload is
+    /// null with an error that has a `type` (GitHub's validation, as "Pull request is in clean status"),
+    /// or FORBIDDEN. A body that can't be read, or has no `data` object, stays `graphQL`, which leaves
+    /// the outcome unknown.
+    private func autoMergeMutation(_ mutation: String, _ variables: [String: Any], payload: String) async throws {
+        let (data, errors) = try await executeReportingErrors(mutation, variables)
+        if data[payload] is [String: Any] { return }
+        let message = errors.first?["message"] as? String ?? "GitHub didn't apply the change"
+        if errors.contains(where: { $0["type"] is String }) { throw APIError.writeRefused(message) }
+        throw APIError.graphQL(message)
     }
 
     /// The state a `merge-async` body names. A pending request needs a uuid, from `details` or `uuid`.
@@ -855,6 +858,8 @@ public struct GitHubAPI: Sendable {
         switch status {
         case "merged":
             return .merged
+        case "enqueued":
+            return .enqueued
         case "failed":
             return .failed(mergeMessage(data) ?? "GitHub didn't merge the pull request")
         case "pending":
@@ -873,13 +878,6 @@ public struct GitHubAPI: Sendable {
         guard let raw else { return nil }
         let line = raw.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         return line.isEmpty ? nil : line
-    }
-
-    private func failure(_ status: Int, _ data: Data, refusing: Bool) -> any Error {
-        guard let url = URL(string: "https://api.github.com"),
-              let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)
-        else { return APIError.server(status) }
-        return httpError(data, response, refusing: refusing) ?? APIError.server(status)
     }
 
     /// Issue `key` with who last closed it; nil when it is gone (deleted, transferred, no access) or
@@ -1423,7 +1421,7 @@ public struct GitHubAPI: Sendable {
     /// `body` is nil.
     private func restExchange(
         _ method: String, _ path: String, _ body: [String: Any]?, keepingTransportFailures: Bool
-    ) async throws -> (status: Int, data: Data) {
+    ) async throws -> (status: Int, data: Data, response: HTTPURLResponse) {
         try Task.checkCancellation()
         let data = try body.map { try JSONSerialization.data(withJSONObject: $0, options: [.sortedKeys]) } ?? Data()
         let (answer, response) = try await sendAuthorized(with: auth) { token in
@@ -1433,7 +1431,7 @@ public struct GitHubAPI: Sendable {
                 throw CommentTransportError(code: error.code)
             }
         }
-        return (response.statusCode, answer)
+        return (response.statusCode, answer, response)
     }
 
     /// `execute`, also returning the errors that came alongside partial data, for callers that tell a

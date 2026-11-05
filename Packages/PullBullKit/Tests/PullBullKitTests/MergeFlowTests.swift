@@ -4,6 +4,7 @@ import Testing
 
 @MainActor private final class Probe {
     var reads = 0, sends = 0, polls = 0, sleeps = 0, willSends = 0
+    var uuids: [String] = [], intervals: [Duration] = []
 }
 
 @Suite @MainActor struct MergeFlowTests {
@@ -34,7 +35,7 @@ import Testing
         _ probe: Probe, shown: MergeRead? = nil, cancelled: @escaping () -> Bool = { false },
         reads: [Result<MergeRead, any Error>]? = nil,
         send: @escaping () async throws -> MergeRequestState = { .merged },
-        polls: [Result<MergeRequestState, any Error>] = [], limit: Int? = nil
+        polls: [Result<MergeRequestState, any Error>] = []
     ) async -> MergeOutcome {
         let shownFacts = (shown ?? read()).facts
         let answers = reads ?? [.success(read())]
@@ -51,12 +52,16 @@ import Testing
                 probe.sends += 1
                 return try await send()
             },
-            poll: { _ in
+            poll: { uuid in
                 probe.polls += 1
+                probe.uuids.append(uuid)
                 if pollQueue.isEmpty { return .pending(uuid: "u") }
                 return try pollQueue.removeFirst().get()
             },
-            sleep: { _ in probe.sleeps += 1 })
+            sleep: { interval in
+                probe.sleeps += 1
+                probe.intervals.append(interval)
+            })
     }
 
     @Test func changedFactsSendNothing() async {
@@ -141,6 +146,8 @@ import Testing
             probe, send: { .pending(uuid: "u") }, polls: [.success(.pending(uuid: "u")), .success(.merged)])
         #expect(outcome == .merged)
         #expect(probe.polls == 2 && probe.sleeps == 2 && probe.sends == 1)
+        #expect(probe.uuids == ["u", "u"])
+        #expect(probe.intervals == [MergeFlow.pollInterval, MergeFlow.pollInterval])
     }
 
     @Test func failedPollIsARefusal() async {
@@ -221,6 +228,38 @@ import Testing
         let probe = Probe()
         let outcome = await run(
             probe, reads: [.success(read()), .failure(Boom())],
+            send: { throw APIError.writeRefused("Pull request is not mergeable") })
+        #expect(outcome == .refused("Pull request is not mergeable"))
+    }
+
+    @Test func aFailedPollOnAMergedPRReadsAsMerged() async {
+        let probe = Probe()
+        let outcome = await run(
+            probe, reads: [.success(read()), .success(read(state: .merged))], send: { .pending(uuid: "u") },
+            polls: [.success(.failed("Pull request is already merged."))])
+        #expect(outcome == .notOpen(merged: true))
+    }
+
+    @Test func aClosedPRWithAMovedHeadReadsAsClosed() async {
+        let probe = Probe()
+        let outcome = await run(
+            probe, reads: [.success(read()), .success(read(head: "def", state: .closed))],
+            send: { throw APIError.writeRefused("Pull request is closed.") })
+        #expect(outcome == .notOpen(merged: false))
+    }
+
+    @Test func aMergedPRBeatsCleanStatus() async {
+        let probe = Probe()
+        let outcome = await run(
+            probe, reads: [.success(read()), .success(read(state: .merged))],
+            send: { throw APIError.writeRefused("Pull request Pull request is in clean status") })
+        #expect(outcome == .notOpen(merged: true))
+    }
+
+    @Test func aReadWithNoHeadIsNotAMovedHead() async {
+        let probe = Probe()
+        let outcome = await run(
+            probe, reads: [.success(read()), .success(read(head: nil))],
             send: { throw APIError.writeRefused("Pull request is not mergeable") })
         #expect(outcome == .refused("Pull request is not mergeable"))
     }

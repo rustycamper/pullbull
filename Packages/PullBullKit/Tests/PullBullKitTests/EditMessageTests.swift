@@ -29,4 +29,3 @@ import Testing
             == "Couldn't confirm auto-merge was cancelled on #88. Check it on GitHub.")
     }
 }
-
