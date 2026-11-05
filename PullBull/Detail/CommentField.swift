@@ -101,7 +101,7 @@ struct CommentField<Secondary: View>: View {
                 }
             // At the end of the last line, beside the text rather than under it.
             if let hint = CommentRow.hint(
-                focused: isFocused, sending: isSending,
+                focused: isFocused, sending: isSending && !model.sendingMerges.contains(key),
                 hasDraft: CommentRow.preview(of: draftText) != nil, checking: review?.phase == .checking)
             {
                 Text(hint)

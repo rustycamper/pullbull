@@ -22,7 +22,8 @@ extension View {
 }
 
 /// Why the last edit didn't stick, just above the footer or, on a detail, its bottom row with the
-/// comment field (or the note in its place), until it's dismissed, the next edit, or leaving the item it's about.
+/// comment field (or the note in its place). A line about a sent merge or cancel stays until it's dismissed
+/// or the next edit; any other goes too on leaving the item it's about.
 struct EditFailureLine: View {
     let model: AppModel
 

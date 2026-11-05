@@ -182,6 +182,8 @@ extension AppModel {
         let url: URL
         /// Nil until the send. `clearAccountData` can also leave it stale, and dropping a stale id does nothing.
         var overlay: UUID?
+        /// The write has gone out, or is about to: its failure line stays when the viewer leaves.
+        var sent = false
 
         var isDirect: Bool {
             if case .merged = change { return true }
@@ -203,7 +205,7 @@ extension AppModel {
             }
             return
         }
-        edits.dismissFailure()
+        edits.dismissFailure(startingOn: key)
         postsInFlight.insert(account: account.login, key: key)
         let viewer = account.login
         let head = mode.pinnedHead
@@ -242,7 +244,9 @@ extension AppModel {
     /// closes and the PR shows as merged at once, dimmed, for the sending account only. Any bad answer comes
     /// back as the failure line.
     private func mergeWillSend(_ merge: inout PendingMerge) {
+        merge.sent = true
         confirmingMerge = nil
+        mergeTask = nil
         guard runningAccount == merge.account else { return }
         closeMergePanel(on: merge.key)
         recordMerge(&merge)
@@ -273,14 +277,14 @@ extension AppModel {
                 mergeFailed(merge, EditMessage.mergeChanged(on: key), dropsOverlay: true, reloads: true)
                 return
             }
+            if read.facts.action == nil {
+                // Closing means it went, so a read with nothing left to do says why it didn't.
+                mergeFailed(merge, EditMessage.mergeChanged(on: key), dropsOverlay: true, reloads: true)
+                return
+            }
             _ = settleMerge(merge)
             dropMergeOverlay(merge)
-            if read.facts.action != nil {
-                showMergeRead(read, on: key)
-            } else {
-                closeMergePanel(on: key)
-                reloadReviewedDetail(key, account: merge.account)
-            }
+            showMergeRead(read, on: key)
         case .headMoved:
             mergeFailed(merge, EditMessage.mergeHeadMoved(on: key), dropsOverlay: true, reloads: true)
         case .notOpen(let merged):
@@ -297,18 +301,21 @@ extension AppModel {
         }
     }
 
-    /// The write had no clear answer: the overlay stays while one fresh detail decides, matched to what
-    /// was sent. A failed read counts as unconfirmed, and nothing is ever sent again. Runs with the sending
-    /// account even after a switch, so the slot goes. Its own task, which nothing cancels.
+    /// The write had no clear answer: the overlay stays while up to `MergeFlow.unknownReads` fresh details
+    /// decide, matched to what was sent. Nothing is ever sent again, and the slot holds until it settles.
+    /// Runs with the sending account even after a switch, so the slot goes. Its own task, which nothing
+    /// cancels.
     private func confirmUnknownMerge(_ merge: PendingMerge, client: GitHubAPI) {
         Task { [weak self] in
-            let fresh = try? await client.detail(merge.key)
+            let result = await MergeFlow.confirmLanded(
+                merge.change, read: { try await client.detail(merge.key) },
+                sleep: { duration in try await Task.sleep(for: duration) })
             guard let self else { return }
-            if let fresh, MergeFlow.landed(merge.change, in: fresh) {
+            if result.landed, let fresh = result.last {
                 self.mergeSent(merge, read: fresh)
                 return
             }
-            if let fresh, self.runningAccount == merge.account { self.storeDetail(fresh, account: merge.account) }
+            if let fresh = result.last, self.runningAccount == merge.account { self.storeDetail(fresh, account: merge.account) }
             self.mergeFailed(merge, EditMessage.mergeUnconfirmed(on: merge.key), dropsOverlay: true, reloads: false)
         }
     }
@@ -331,7 +338,7 @@ extension AppModel {
     /// The answer's final and bad: the panel closes and `text` shows, or waits for the sending account when
     /// another runs, in which case nothing else on screen changes.
     private func mergeFailed(_ merge: PendingMerge, _ text: String, dropsOverlay: Bool, reloads: Bool) {
-        let failure = EditFailure(text: text, url: merge.url, key: merge.key)
+        let failure = EditFailure(text: text, url: merge.url, key: merge.key, staysOnLeaving: merge.sent)
         guard settleMerge(merge) else {
             heldMergeLines[merge.account.login] = failure
             return
@@ -370,10 +377,11 @@ extension AppModel {
         guard mergeMode == nil, mergeOffer(for: key) == .cancelAutoMerge, !isPostInFlight(for: key),
               let account = runningAccount, let nodeID = details[key]?.merge?.nodeID
         else { return }
-        edits.dismissFailure()
+        edits.dismissFailure(startingOn: key)
         postsInFlight.insert(account: account.login, key: key)
         let change = EditChange.autoMerge(enabled: false, viewer: account.login)
         var merge = PendingMerge(key: key, change: change, account: account, url: mergeURL(for: key))
+        merge.sent = true
         recordMerge(&merge)
         let sent = merge
         let client = api(for: account)

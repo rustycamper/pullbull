@@ -118,7 +118,7 @@ final class AppModel {
     var mergeMode: MergeMode?
     /// Items whose merge or auto-merge change is being written to GitHub. `clearAccountData` drops them.
     var sendingMerges: Set<PRKey> = []
-    /// The panel's read, or its confirm's. Closing the panel cancels it, until the phase is `.sending`.
+    /// The panel's read, or its confirm's. Closing the panel cancels it until the merge is sent.
     @ObservationIgnored var mergeTask: Task<Void, Never>?
     /// The confirm `mergeTask` is checking, whose slot closing the panel releases. Nil once it sends.
     @ObservationIgnored var confirmingMerge: PendingMerge?
