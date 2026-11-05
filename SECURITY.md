@@ -9,7 +9,7 @@ Only the latest release is supported.
 ## What's in scope
 
 - **Tokens:** the Sign in with GitHub token and the Anthropic API key are kept in the macOS Keychain, on this Mac only. A `gh` token is held in memory only.
-- **Writes to GitHub:** PullBull writes only what you pick: an issue's board Status, assignees and labels, a pull request's review requests, assignees and labels, the comments you write, the reviews you submit, the pull requests you merge or set to merge, and the failed jobs you re-run, each only after a separate confirm and never bypassing the repository's rules, and cancelling an auto-merge you set, which takes one click with no separate confirm. Anything that writes more, or writes without you picking it, is a vulnerability.
+- **Writes to GitHub:** PullBull writes only what you pick: an issue's board Status, assignees and labels, a pull request's review requests, assignees and labels, the comments you write, the reviews you submit, and the pull requests you merge or set to merge, each only after a separate confirm and never bypassing the repository's rules. It also re-runs the failed jobs you pick and cancels an auto-merge you set, each with one click and no separate confirm. Anything that writes more, or writes without you picking it, is a vulnerability.
 - **Network:** PullBull talks to the GitHub API, GitHub avatars, the GitHub release feed, and the Anthropic API when Ask is on. A request anywhere else is a vulnerability.
 - **Untrusted content:** PR and issue text, Markdown and links come from GitHub users. Opening anything other than a web link from them is a vulnerability.
 - **Updates:** Sparkle updates are signed. A way to install an unsigned or tampered update is a vulnerability.

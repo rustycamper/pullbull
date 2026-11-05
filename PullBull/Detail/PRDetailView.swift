@@ -218,12 +218,13 @@ struct PRDetailView: View {
         let order: [CIState] = [.failure, .pending, .cancelled, .success, .skipped, .none]
         let sorted = order.flatMap { state in checks.filter { $0.state == state } }
         // On an open PR a green run folds to its summary; anything failed, running or cancelled stays open,
-        // so a cancelled run that GitHub's rollup counts as a failure shows why the row is red.
-        let folded = pr?.state == .open && !checksExpanded && !checks.isEmpty
+        // so a cancelled run that GitHub's rollup counts as a failure shows why the row is red. A failing
+        // rollup never folds: its failures may lie past the first 50 checks.
+        let folded = pr?.state == .open && !checksExpanded && !checks.isEmpty && detail.ci != .failure
             && checks.allSatisfy { [.success, .skipped, .none].contains($0.state) }
         // A folded list that never passed anything (all skipped) keeps the skipped glyph, not a check mark.
         let foldedState: CIState = checks.contains { $0.state == .success } ? .success : .skipped
-        return DetailSection(title: "Checks", summary: Self.checksSummary(checks)) {
+        return DetailSection(title: "Checks", summary: Self.checksSummary(checks), stacksAccessory: true) {
             DetailCard {
                 if sorted.isEmpty {
                     EmptyLine(text: "No checks")
@@ -268,11 +269,15 @@ struct PRDetailView: View {
                 let running = model.rerunning.contains(key)
                 Button(running ? "Re-running…" : "Re-run failed jobs") { model.rerunFailedJobs(on: key) }
                     .buttonStyle(.link)
+                    .lineLimit(1)
+                    .fixedSize()
                     .disabled(running)
                     .help("Re-runs the failed jobs and the jobs that depend on them")
             }
             if FailingCheck.hasFailure(checks) {
                 Link("Open Failing Check", destination: FailingCheck.url(in: checks, key: key))
+                    .lineLimit(1)
+                    .fixedSize()
             }
         }
     }

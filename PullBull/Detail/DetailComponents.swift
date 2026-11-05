@@ -7,29 +7,66 @@ import PullBullKit
 struct DetailSection<Content: View, Accessory: View>: View {
     let title: String
     var summary: String?
+    /// The accessory drops to its own row under the summary when the title, summary and it don't fit one row.
+    var stacksAccessory = false
     @ViewBuilder let content: () -> Content
     /// Drawn after the summary, such as the Files changed diffstat bar.
     @ViewBuilder var accessory: () -> Accessory
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(title)
-                    .fontWeight(.semibold)
-                    .accessibilityAddTraits(.isHeader)
-                Spacer()
-                if let summary {
-                    Text(summary)
-                        .monospacedDigit()
-                }
-                accessory()
-            }
-            .font(.system(size: 11))
-            .foregroundStyle(.secondary)
+            header
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
             content()
         }
         .padding(.horizontal, 16)
         .padding(.top, 14)
+    }
+
+    @ViewBuilder private var header: some View {
+        if stacksAccessory {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline) {
+                    titleText
+                    Spacer()
+                    summaryText
+                    accessory()
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline) {
+                        titleText
+                        Spacer()
+                        summaryText
+                    }
+                    HStack(alignment: .firstTextBaseline) {
+                        Spacer()
+                        accessory()
+                    }
+                }
+            }
+        } else {
+            HStack(alignment: .firstTextBaseline) {
+                titleText
+                Spacer()
+                summaryText
+                accessory()
+            }
+        }
+    }
+
+    private var titleText: some View {
+        Text(title)
+            .fontWeight(.semibold)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    @ViewBuilder private var summaryText: some View {
+        if let summary {
+            Text(summary)
+                .monospacedDigit()
+                .lineLimit(stacksAccessory ? 1 : nil)
+        }
     }
 }
 
