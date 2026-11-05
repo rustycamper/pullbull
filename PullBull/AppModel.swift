@@ -2132,9 +2132,9 @@ final class AppModel {
         notifyChanges(snapshot, status)
         if let snapshot {
             let behind = edits.overrides.reviewsAhead(of: details)
-            let reread = edits.reconcile(with: snapshot, now: Date(), holdingReviews: behind)
+            edits.reconcile(with: snapshot, now: Date(), holdingReviews: behind)
             postedComments.reconcile(with: snapshot, now: Date())
-            rereadReviewedDetails(reread)
+            rereadReviewedDetails(behind)
         }
         self.snapshot = snapshot
         var status = status

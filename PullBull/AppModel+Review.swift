@@ -222,8 +222,8 @@ extension AppModel {
         edits.showFailure(EditFailure(text: text, url: review.url))
     }
 
-    /// The list shows a review its detail is missing: GitHub's reads have caught up, so a new read has it.
-    /// A read under way is left to finish, as a refresh can report more than once. A later one tries again.
+    /// A held detail is missing a review on screen: each refresh reads it again until it shows it, whether
+    /// or not a list holds the PR. A read under way is left to finish, as a refresh can report more than once.
     func rereadReviewedDetails(_ keys: Set<PRKey>) {
         guard let account = runningAccount else { return }
         for key in keys where !(route == .detail(key) && detailFetch?.isLoading == true) {

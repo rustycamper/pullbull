@@ -312,32 +312,34 @@ private func card(_ snapshot: Snapshot, _ key: PRKey) -> BoardIssue? {
         let behind = PRDetail(key: editKey(77), body: "", checks: [], reviews: [], comments: [], files: [], requests: [.user("pb")])
         let held = o.reviewsAhead(of: [editKey(77): behind])
         #expect(held == [editKey(77)])
-        #expect(o.reconcile(with: there, now: t0 + 30, holdingReviews: held) == [editKey(77)])
+        o.reconcile(with: there, now: t0 + 30, holdingReviews: held)
         #expect(!o.isEmpty)
         #expect(o.apply(toRequests: [.user("pb")], on: editKey(77)) == [])
 
         let caughtUp = PRDetail(key: editKey(77), body: "", checks: [], reviews: [mine], comments: [], files: [], requests: [])
         let none = o.reviewsAhead(of: [editKey(77): caughtUp])
         #expect(none.isEmpty)
-        #expect(o.reconcile(with: there, now: t0 + 60, holdingReviews: none).isEmpty)
+        o.reconcile(with: there, now: t0 + 60, holdingReviews: none)
         #expect(o.isEmpty)
     }
 
-    @Test func heldReviewWaitsForTheListBeforeAskingForARead() {
+    // No list can agree on a pull request found by search or a link, so the detail is what must catch up.
+    @Test func reviewOnAPullRequestInNoListIsStillBehind() {
+        let detail = PRDetail(key: editKey(77), body: "", checks: [], reviews: [], comments: [], files: [])
         var o = EditOverrides()
         o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
-        #expect(o.reconcile(with: editSnapshot(review: [editPR(77)]), now: t0 + 30, holdingReviews: [editKey(77)]).isEmpty)
+        o.reconcile(with: editSnapshot(), now: t0 + 30, holdingReviews: [editKey(77)])
         #expect(!o.isEmpty)
+        #expect(o.reviewsAhead(of: [editKey(77): detail]) == [editKey(77)])
     }
 
     @Test func heldReviewStillExpiresAtLifetime() {
         let mine = Review(author: "pb", state: .approved, submittedAt: t0, commitOid: "abc")
         var o = EditOverrides()
         o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
-        let reread = o.reconcile(
+        o.reconcile(
             with: editSnapshot(review: [editPR(77, reviews: [mine])]), now: t0 + EditOverrides.lifetime,
             holdingReviews: [editKey(77)])
-        #expect(reread.isEmpty)
         #expect(o.isEmpty)
     }
 
