@@ -235,6 +235,10 @@ final class AppModel {
                 endMentions()
                 endReviewMode(on: nil)
                 endMergeMode(on: nil)
+                switch oldValue {
+                case .detail(let key), .issueDetail(let key): edits.dismissFailure(on: key)
+                default: break
+                }
             }
         }
     }

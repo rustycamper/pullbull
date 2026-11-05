@@ -5,10 +5,13 @@ public struct EditFailure: Equatable, Sendable {
     public let text: String
     /// The item on GitHub, for **Open on GitHub**.
     public let url: URL
+    /// The item it's about: leaving that item clears the line.
+    public let key: PRKey
 
-    public init(text: String, url: URL) {
+    public init(text: String, url: URL, key: PRKey) {
         self.text = text
         self.url = url
+        self.key = key
     }
 }
 
@@ -64,7 +67,7 @@ public struct EditSession: Equatable, Sendable {
     /// GitHub refused or couldn't be reached: take the edit back off the screen and say why.
     public mutating func failed(_ id: UUID, change: EditChange, on key: PRKey, url: URL, error: any Error) {
         overrides.drop(id)
-        failure = EditFailure(text: EditMessage.failure(change, on: key, error: error), url: url)
+        failure = EditFailure(text: EditMessage.failure(change, on: key, error: error), url: url, key: key)
     }
 
     /// GitHub applied part of edit `id`: the refused half leaves the screen, the failure line says
@@ -76,7 +79,7 @@ public struct EditSession: Equatable, Sendable {
     ) {
         let applied = change.keeping(result)
         overrides.replace(id, with: applied)
-        failure = EditMessage.partial(change, on: key, result: result).map { EditFailure(text: $0, url: url) }
+        failure = EditMessage.partial(change, on: key, result: result).map { EditFailure(text: $0, url: url, key: key) }
         if !isUndo, id == last, !applied.isEmpty {
             undo.remember(EditRecord(key: key, change: applied, madeAt: now, addedItemId: nil))
         }
@@ -103,6 +106,11 @@ public struct EditSession: Equatable, Sendable {
 
     public mutating func dismissFailure() {
         failure = nil
+    }
+
+    /// The viewer left `key`: its line goes. One about another item stays, as it may not have been seen.
+    public mutating func dismissFailure(on key: PRKey) {
+        if failure?.key == key { failure = nil }
     }
 
     /// Ends the edits `fetched` agrees with, but for reviews on `held` and merges on `heldMerges`. A fetch of

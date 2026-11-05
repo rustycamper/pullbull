@@ -223,7 +223,7 @@ extension AppModel {
     }
 
     private func showReviewFailure(_ text: String, _ review: PendingReview) {
-        edits.showFailure(EditFailure(text: text, url: review.url))
+        edits.showFailure(EditFailure(text: text, url: review.url, key: review.key))
     }
 
     /// A held detail is missing a review or a merge on screen: a refresh that finished cleanly reads it

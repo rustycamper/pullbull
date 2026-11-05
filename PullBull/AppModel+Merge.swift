@@ -117,7 +117,7 @@ extension AppModel {
     }
 
     private func showMergeFailure(_ text: String, on key: PRKey) {
-        edits.showFailure(EditFailure(text: text, url: mergeURL(for: key)))
+        edits.showFailure(EditFailure(text: text, url: mergeURL(for: key), key: key))
     }
 
     private func mergeURL(for key: PRKey) -> URL {
@@ -331,7 +331,7 @@ extension AppModel {
     /// The answer's final and bad: the panel closes and `text` shows, or waits for the sending account when
     /// another runs, in which case nothing else on screen changes.
     private func mergeFailed(_ merge: PendingMerge, _ text: String, dropsOverlay: Bool, reloads: Bool) {
-        let failure = EditFailure(text: text, url: merge.url)
+        let failure = EditFailure(text: text, url: merge.url, key: merge.key)
         guard settleMerge(merge) else {
             heldMergeLines[merge.account.login] = failure
             return
