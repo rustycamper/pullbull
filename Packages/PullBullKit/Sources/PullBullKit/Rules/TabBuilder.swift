@@ -236,7 +236,10 @@ public struct ReviewFilters: Equatable, Sendable {
 public enum TabBuilder {
     private static let day: TimeInterval = 86_400
 
-    public static func build(_ snap: Snapshot, settings: AppSettings, now: Date) -> BuiltTabs {
+    /// `merging`: the pull requests with a direct merge laid over them (`EditOverrides.directMerges`). Until
+    /// that settles each stays where it was in Mine and Team, as the open PR it was, dimmed and not counted;
+    /// GitHub may yet refuse it. A PR GitHub itself reports merged, with no such edit, leaves as usual.
+    public static func build(_ snap: Snapshot, settings: AppSettings, now: Date, merging: Set<PRKey> = []) -> BuiltTabs {
         let me = snap.org.viewer
         let myTeams = snap.org.myTeams
         let filters = ReviewFilters(settings)
@@ -254,12 +257,22 @@ public enum TabBuilder {
             }
             return row(for: pr, on: .review, me: me, myTeams: myTeams)
         }
-        let mine = snap.mine.filter { $0.state == .open }.map { Row(pr: $0, dimmed: false, counted: true) }
-        let team = snap.team
+        let asBefore = { (pr: PullRequest) -> PullRequest in
+            guard merging.contains(pr.key) else { return pr }
+            var open = pr
+            open.state = .open
+            return open
+        }
+        let listed = { (pr: PullRequest) -> Row in
+            let isMerging = merging.contains(pr.key)
+            return Row(pr: pr, dimmed: isMerging, counted: !isMerging)
+        }
+        let mine = snap.mine.map(asBefore).filter { $0.state == .open }.map(listed)
+        let team = snap.team.map(asBefore)
             .filter { pr in
                 pr.author.caseInsensitiveCompare(me) != .orderedSame && filters.keeps(pr, now: now)
             }
-            .map { Row(pr: $0, dimmed: false, counted: true) }
+            .map(listed)
 
         let closedCutoff = now.addingTimeInterval(-7 * day)
         let closed = snap.recentlyClosed

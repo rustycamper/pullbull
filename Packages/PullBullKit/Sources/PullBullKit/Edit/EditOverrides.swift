@@ -109,6 +109,15 @@ public struct EditOverrides: Equatable, Sendable {
         })
     }
 
+    /// The pull requests with a direct merge laid over them, whose rows `TabBuilder` keeps in place until
+    /// the edit settles. An auto-merge edit isn't one: its PR stays open.
+    public var directMerges: Set<PRKey> {
+        Set(entries.compactMap { entry -> PRKey? in
+            guard case .merged = entry.change else { return nil }
+            return entry.key
+        })
+    }
+
     // MARK: Applying
 
     public func apply(to snapshot: Snapshot) -> Snapshot {

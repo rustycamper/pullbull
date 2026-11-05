@@ -833,6 +833,17 @@ private func mergeDetail(state: PRState? = .open, merge: MergeInfo? = nil) -> PR
         #expect(o.isEmpty)
     }
 
+    @Test func directMergesAreTheLiveMergedEdits() {
+        var o = EditOverrides()
+        #expect(o.directMerges.isEmpty)
+        let merged = o.record(.merged(viewer: "pb"), on: editKey(77), at: t0)
+        o.record(.autoMerge(enabled: true, viewer: "pb"), on: editKey(78), at: t0)
+        o.record(.labels(added: [], removed: []), on: editKey(79), at: t0)
+        #expect(o.directMerges == [editKey(77)])
+        o.drop(merged)
+        #expect(o.directMerges.isEmpty)
+    }
+
     @Test func autoMergeShowsOnTheDetail() {
         var on = EditOverrides()
         on.record(.autoMerge(enabled: true, viewer: "pb"), on: editKey(77), at: t0)
