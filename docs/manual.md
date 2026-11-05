@@ -102,7 +102,7 @@ A PR waiting on review shows who it waits on and for how long (🕒 @dana 3d, "+
 > Ready to merge = approved, no changes requested, checks green or none, no conflicts, not a draft. It doesn't see branch protection (required review count).
 
 - **Pending CI:** while checks run on your PRs, PullBull checks up to 5 of them (newest commits first) every 30 s, for up to 20 minutes each, so *CI failed* and *Ready to merge* arrive sooner. Not while offline or rate-limited. Settings → General → Check my pending CI more often
-- **Detail:** who opened it and when it was last updated (the row's age), or when it was merged or closed · assignees, labels and reviewers (click to change) · checks (a cancelled run reads cancelled, not failed, though GitHub still marks the PR failed) · description (long ones fold) · the newest comments, with earlier ones counted above · files (click one to open its diff on GitHub). A [comment field](#commenting) is pinned at the bottom. Markdown incl. `<details>`. **Open Failing Check** beside failed checks
+- **Detail:** who opened it and when it was last updated (the row's age), or when it was merged or closed · assignees, labels and reviewers (click to change) · checks (a cancelled run reads cancelled, not failed, though GitHub still marks the PR failed) · description (long ones fold) · the newest comments, with earlier ones counted above, and the text of each person's latest review among them, tagged Approved, Changes requested or Reviewed · files (click one to open its diff on GitHub). A [comment field](#commenting), with a **Review** button when you can [review](#reviewing) the PR, is pinned at the bottom. Markdown incl. `<details>`. **Open Failing Check** beside failed checks
 - **Labels:** up to two chips per row (none in compact cards), each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail's Details card lists them all
 - **Right-click a row:** [Reviewers…](#editing) · [Assignees…](#editing) · [Labels…](#editing) · copy branch, link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · show only updated · search author
 - **Right-click a group header** (repo, author): **Open All *N* on GitHub**, from two PRs up; above 8 it asks first. An author header's menu also offers **Search @*login*** and **Show Only Updated**. Headers in search results get their section's or tab's menus, without Show Only Updated
@@ -165,7 +165,7 @@ One list scoped by chips, as on [Pull Requests](#pull-requests). It opens on All
 
 ## Editing
 
-Set an issue's board Status, a pull request's reviewers, and the assignees and labels of issues and pull requests, from PullBull, and [comment](#commenting) on both. It writes nothing else.
+Set an issue's board Status, a pull request's reviewers, and the assignees and labels of issues and pull requests, from PullBull, and [comment](#commenting) on both, and [review](#reviewing) pull requests. It writes nothing else.
 
 - **Open the picker:** select an issue row or search result and press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd>, click Status on the issue detail's board card, or right-click a row → **Status** to pick one straight away
 - **Assignees and labels:** select an issue or pull request row or search result, or open it, and press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>A</kbd> (assignees) or <kbd>⌥</kbd><kbd>⌘</kbd><kbd>L</kbd> (labels), click Assignees or Labels on the detail (on a pull request, in its Details card), or right-click a row → **Assignees…** or **Labels…**. Open, closed and merged pull requests alike
@@ -196,6 +196,26 @@ Write a comment on an open, closed or merged issue or pull request from its deta
 - **No undo:** a posted comment emails everyone tagged and subscribed. PullBull can't edit or delete it; GitHub can. <kbd>⌘</kbd><kbd>Z</kbd> in the field undoes typing only
 - **Your own comment** raises no "New comment" notification
 - **Permissions:** with Sign in with GitHub, an issue needs PullBull's Issues permission and a pull request its Pull requests permission; until an org owner accepts them, a note takes the field's place in the row (hover it for the whole note); click it to accept them on GitHub. With a `gh` login, `repo` covers it
+
+## Reviewing
+
+Approve a pull request or request changes on it from its detail. It goes out only when you submit it.
+
+- **Who can:** on an open pull request by someone else, once the detail has loaded, with Sign in with GitHub's Pull requests permission or a `gh` login. A draft is offered like any other; GitHub decides, and a refusal shows its reason. On your own PR, a closed or merged one, or an issue, <kbd>⌥</kbd><kbd>⌘</kbd><kbd>V</kbd> does nothing and there is no button
+- **Start:** <kbd>⌥</kbd><kbd>⌘</kbd><kbd>V</kbd>, or the **Review** button in the bottom row, puts the comment field in review mode and focuses it. Text you had started becomes the review's. The commit you see is pinned: a background refresh never moves it
+- **The panel:** above the bottom row, **Approve** and **Request changes**, with one line under them: the short commit, `5 files +120 −3`, and the checks (`checks passed`, `2 checks failing`, `checks running`, or nothing). Failing or running checks show in amber. They warn and don't block. A PR you last reviewed with Request changes opens on Request changes
+- **Verdict:** <kbd>⌥</kbd><kbd>←</kbd> <kbd>⌥</kbd><kbd>→</kbd>, or a click. VoiceOver reads it as an adjustable control, "Review verdict"
+- **Text:** optional on Approve ("Add a note (optional)…"). Request changes needs it ("Say what needs changing…"): submitted empty or blank, nothing is sent and the placeholder turns amber until you type or change the verdict. `@` tagging works as in [Commenting](#commenting)
+- **Submit:** <kbd>⌘</kbd><kbd>Return</kbd> with the field focused. Holding it submits once. Review mode ends when the field loses focus, you leave the detail, the popover closes or the account changes, and then <kbd>⌘</kbd><kbd>Return</kbd> opens the PR on GitHub as ever, so it never sends a review by accident. A click on the page text doesn't take focus from the field: the mode stays, and <kbd>⌘</kbd><kbd>Return</kbd> still submits
+- **Leave:** <kbd>Esc</kbd> or **Cancel** leaves review mode and keeps the text, with focus in the field. With the `@` list open, <kbd>Esc</kbd> closes it first
+- **Checked first:** the field reads "Checking…" while PullBull reads the PR's head. If new commits arrived since you started, nothing is sent and the line says "New commits on #88 since you started reviewing. Look again, then review."; <kbd>⌥</kbd><kbd>⌘</kbd><kbd>V</kbd> pins the new head. If the PR has been merged or closed, nothing is sent and the line says so. If the read fails, nothing is sent. The review is sent on the commit you saw
+- **While sending:** "Sending…". Cancel is disabled, <kbd>Esc</kbd> does nothing and the verdict is locked. Your review shows in Reviewers, dimmed. Cancel and <kbd>Esc</kbd> stop the check before that; leaving the detail or closing the popover doesn't
+- **Done:** the field empties and gives up focus, the review shows in Reviewers and the PR leaves Needs your review (an approved one leaves Review altogether, as it no longer needs you). PullBull keeps showing it until GitHub's own reads catch up, for at most 5 minutes. Your own review raises no notification
+- **Refused:** a line above the field says "Couldn't review #88: …" with GitHub's reason (an existing pending review on GitHub, a draft, a repo rule) and **Open on GitHub**. The text stays and review mode stays with it
+- **Not sure:** after a timeout or a dropped connection PullBull reads the PR. If your review is there it counts as sent. If not, the line says "Couldn't confirm your review of #88. Check the Reviewers section before sending again." and the text stays in the field. Check on GitHub first
+- **No undo:** GitHub can't delete a submitted review, and approving can count towards merging and sends an email. <kbd>⌘</kbd><kbd>Z</kbd> in the field undoes typing only. Changing your mind is another review
+- **Not here:** line comments, suggested changes, a Comment verdict, dismissing a review, merging
+- **Permissions:** the same Pull requests permission as reviewers and comments, so nothing new to accept. With a `gh` login, `repo` covers it
 
 ## Search
 
@@ -319,7 +339,7 @@ Settings → Ask AI.
 | <kbd>⌘</kbd><kbd>↑</kbd> <kbd>⌘</kbd><kbd>↓</kbd> | First / last row, in search results too |
 | <kbd>←</kbd> <kbd>→</kbd> | Previous / next chip. In search: narrow to the chip beside the one the results are laid out for (nothing from Everywhere with <kbd>←</kbd>, or from the last chip with <kbd>→</kbd>), with the caret at the start (<kbd>←</kbd>) or end (<kbd>→</kbd>) of the field |
 | <kbd>Return</kbd> | Detail |
-| <kbd>⌘</kbd><kbd>Return</kbd> | Open on GitHub (in a detail's comment field it posts, see [Commenting](#commenting)) |
+| <kbd>⌘</kbd><kbd>Return</kbd> | Open on GitHub (in a detail's comment field it posts, or submits in review mode, see [Commenting](#commenting) and [Reviewing](#reviewing)) |
 | <kbd>⌘</kbd><kbd>C</kbd> | Copy link |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd> | Copy `owner/repo#123` |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy Markdown link |
@@ -345,7 +365,7 @@ Settings → Ask AI.
 |---|---|
 | <kbd>Esc</kbd> · <kbd>←</kbd> · <kbd>⌘</kbd><kbd>[</kbd> | Back |
 | <kbd>⌥</kbd><kbd>↓</kbd> <kbd>⌥</kbd><kbd>↑</kbd> | Next / previous item of the list or search you came from. The back button shows where you are (2 of 6). Stops at the ends. Not for a detail opened from a notification or a linked PR |
-| <kbd>⌘</kbd><kbd>Return</kbd> | Open on GitHub; in the comment field, posts the comment |
+| <kbd>⌘</kbd><kbd>Return</kbd> | Open on GitHub; in the comment field, posts the comment, or submits the review in review mode |
 | <kbd>⌘</kbd><kbd>C</kbd> · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>C</kbd> | Same copies as the list |
 | <kbd>⇧</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Files changed; on a PR with new commits since your review, just those changes |
 | <kbd>⌃</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy Checkout Command: `gh pr checkout 412 -R owner/repo` |
@@ -355,6 +375,7 @@ Settings → Ask AI.
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>R</kbd> | [Reviewers picker](#editing), on a pull request |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>A</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>L</kbd> | [Assignees or labels picker](#editing), on an issue or pull request |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>M</kbd> | [Comment field](#commenting), on an issue or pull request. <kbd>⌘</kbd><kbd>Return</kbd> posts; <kbd>@</kbd> opens the list of people to tag (<kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Return</kbd> or <kbd>Tab</kbd> inserts, <kbd>Esc</kbd> closes it); <kbd>Esc</kbd> leaves the field, a second <kbd>Esc</kbd> goes back |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>V</kbd> | [Review mode](#reviewing), on a pull request, with the comment field focused or not. <kbd>⌥</kbd><kbd>←</kbd> <kbd>⌥</kbd><kbd>→</kbd> change the verdict; <kbd>⌘</kbd><kbd>Return</kbd> submits; <kbd>Esc</kbd> leaves review mode, keeping the text |
 | <kbd>⌘</kbd><kbd>Z</kbd> | Undo the last edit, for 10 seconds after it. In the comment field, undoes typing |
 
 The order is the one on screen when you opened the first item; a refresh doesn't reshuffle it. An item that has left the lists since is skipped, unless its detail was already loaded.
