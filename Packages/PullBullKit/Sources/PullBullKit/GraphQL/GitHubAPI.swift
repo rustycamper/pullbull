@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 public protocol GraphQLTransport: Sendable {
@@ -204,6 +205,16 @@ public struct ChangedFile: Codable, Sendable, Hashable {
     public var directory: String {
         guard let slash = path.lastIndex(of: "/") else { return "" }
         return String(path[..<slash])
+    }
+
+    /// This file's diff on the PR's Files changed page: `<pr url>/files#diff-<sha256 of the path>`.
+    /// GitHub hashes the raw UTF-8 path (the new path for a rename), and the host is the PR's own.
+    public func diffURL(in prURL: URL) -> URL {
+        let files = prURL.appendingPathComponent("files")
+        let digest = SHA256.hash(data: Data(path.utf8)).map { String(format: "%02x", $0) }.joined()
+        var components = URLComponents(url: files, resolvingAgainstBaseURL: false)
+        components?.fragment = "diff-\(digest)"
+        return components?.url ?? files
     }
 }
 
