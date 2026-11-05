@@ -102,7 +102,7 @@ A PR waiting on review shows who it waits on and for how long (🕒 @dana 3d, "+
 > Ready to merge = approved, no changes requested, checks green or none, no conflicts, not a draft. It doesn't see branch protection (required review count).
 
 - **Pending CI:** while checks run on your PRs, PullBull checks up to 5 of them (newest commits first) every 30 s, for up to 20 minutes each, so *CI failed* and *Ready to merge* arrive sooner. Not while offline or rate-limited. Settings → General → Check my pending CI more often
-- **Detail:** who opened it and when it was last updated (the row's age), or when it was merged or closed · assignees, labels and reviewers (click to change) · checks (a cancelled run reads cancelled, not failed, though GitHub still marks the PR failed) · description (long ones fold) · the newest comments, with earlier ones counted above, and the text of each person's latest review among them, tagged Approved, Changes requested or Reviewed · files (click one to open its diff on GitHub). A [comment field](#commenting), with a **Review** button when you can [review](#reviewing) the PR, is pinned at the bottom. Markdown incl. `<details>`. **Open Failing Check** beside failed checks
+- **Detail:** who opened it and when it was last updated (the row's age), or when it was merged or closed · assignees, labels and reviewers (click to change) · checks (a cancelled run reads cancelled, not failed, though GitHub still marks the PR failed) · description (long ones fold) · the newest comments, with earlier ones counted above, and the text of each person's latest review among them, tagged Approved, Changes requested or Reviewed · files (click one to open its diff on GitHub). A [comment field](#commenting), with a **Review** button when you can [review](#reviewing) the PR and a **Merge** button when you can [merge](#merging) it, is pinned at the bottom. Markdown incl. `<details>`. **Open Failing Check** beside failed checks
 - **Labels:** up to two chips per row (none in compact cards), each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail's Details card lists them all
 - **Right-click a row:** [Reviewers…](#editing) · [Assignees…](#editing) · [Labels…](#editing) · copy branch, link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · show only updated · search author
 - **Right-click a group header** (repo, author): **Open All *N* on GitHub**, from two PRs up; above 8 it asks first. An author header's menu also offers **Search @*login*** and **Show Only Updated**. Headers in search results get their section's or tab's menus, without Show Only Updated
@@ -214,8 +214,35 @@ Approve a pull request or request changes on it from its detail. It goes out onl
 - **Refused:** a line above the field says "Couldn't review #88: …" with GitHub's reason (an existing pending review on GitHub, a draft, a repo rule) and **Open on GitHub**. The text stays and review mode stays with it
 - **Not sure:** after a timeout or a dropped connection PullBull reads the PR. If your review is there it counts as sent. If not, the line says "Couldn't confirm your review of #88. Check the Reviewers section before sending again." and the text stays in the field. Check on GitHub first
 - **No undo:** GitHub can't delete a submitted review, and approving can count towards merging and sends an email. <kbd>⌘</kbd><kbd>Z</kbd> in the field undoes typing only. Changing your mind is another review
-- **Not here:** line comments, suggested changes, a Comment verdict, dismissing a review, merging
+- **Not here:** line comments, suggested changes, a Comment verdict, dismissing a review. Merging is [its own step](#merging)
 - **Permissions:** the same Pull requests permission as reviewers and comments, so nothing new to accept. With a `gh` login, `repo` covers it
+
+## Merging
+
+Merge a pull request, or set it to merge by itself once its requirements pass, from its detail. Nothing merges without a deliberate second action, and it can't be taken back.
+
+- **Who can:** on an open pull request that isn't a draft, once the detail has loaded, with write access and Sign in with GitHub's Contents permission or a `gh` login. Without those, nothing is shown. Otherwise the detail says why not, with **Open on GitHub**: part of a stack, a merge queue, merge conflicts, behind the base branch, the branch's rules not met yet, or auto-merge set by someone else. Stacks and merge queues are merged on GitHub
+- **Start:** <kbd>⌥</kbd><kbd>⌘</kbd><kbd>G</kbd>, or the **Merge** button in the bottom row, opens the merge panel above it. It works with the comment field focused, and does nothing on a PR with nothing to offer. The commit you see is pinned
+- **The panel:** what will happen as a sentence ("Squash and merge #88 into main"), the method when the repository allows more than one, and a summary: `3 commits · 2 approvals · 1 of 12 checks failing`. Warnings show in amber. What it shows is read when you open it and doesn't change while you look
+- **Method:** <kbd>⌥</kbd><kbd>←</kbd> <kbd>⌥</kbd><kbd>→</kbd>, or a click. Only the methods the repository and the branch's rules allow are offered, opening on your GitHub default. Where a branch's linear history comes from classic protection PullBull can't see it, so Merge commit stays offered and GitHub refuses it with its own reason
+- **Confirm:** <kbd>⌃</kbd><kbd>⌘</kbd><kbd>↩</kbd>, or a click on **Merge** in the panel. Both are disarmed for half a second after the sentence appears or changes, so a double click does nothing. Nothing else merges: <kbd>↩</kbd> and <kbd>⌘</kbd><kbd>↩</kbd> do nothing while the panel is open, and a held key never confirms
+- **A second step:** a failing or running check, no checks at all, or a review still requesting changes. The first confirm changes the button to **Merge anyway** and disarms for a second; a second, separate confirm merges. Changing the method resets it
+- **Checked first:** confirming reads the PR again and compares it with the panel. If the commit, the base, the checks or the reviews differ, or GitHub hasn't worked out the state yet, nothing is sent and the panel updates. A push, a changed base or a closed PR can't be merged by accident. PullBull never bypasses the repository's rules, even for an admin
+- **Merge when ready:** on a PR whose requirements aren't met yet, the panel's action is "Merge #88 into main when its requirements pass", and it sets GitHub's own auto-merge. It merges by itself, even with PullBull closed, and commits pushed later by people with write access are included. **Cancel auto-merge** takes one click and no panel, for a request you set; one set by someone else is cancelled on GitHub
+- **Leave:** <kbd>Esc</kbd> or **Cancel** closes the panel, and gives the focus back to the comment field if it had it. So does a click outside it, leaving the detail, closing the popover or changing account. A click on the panel itself doesn't. While it's open the panel takes every key, apart from <kbd>⌘</kbd><kbd>W</kbd>, <kbd>⌘</kbd><kbd>,</kbd> and <kbd>⌘</kbd><kbd>/</kbd>, and review mode ends, keeping its text
+- **Sending:** the panel closes at once and the PR shows as merged, dimmed, in Review, Mine and Team, not counted in the badge, until GitHub confirms, which takes a few seconds. It then turns solid. Your own merge raises no notification
+- **Refused:** a line above the field says "Couldn't merge #88: …" with GitHub's reason and **Open on GitHub**, and the PR comes back. A moved head or a state that changed reads "#88 changed before it could merge. Look again, then merge." The line goes away when you leave the PR
+- **Not sure:** after a timeout or a dropped connection PullBull reads the PR. If it merged, that counts. If not, the line says "Couldn't confirm the merge of #88. Check it before trying again." Nothing is ever sent twice. Check on GitHub first
+- **No undo:** a merge can start a deploy within seconds. Cancelling auto-merge is the only take-back
+- **Not here:** adding to a merge queue, merging a stack, editing the merge message, deleting the branch (the repository's setting applies), updating a branch, resolving conflicts, closing, merging from a row
+- **Permissions:** Sign in with GitHub needs the Contents permission, which is new. Until an org owner accepts it, a note takes the button's place (click it to accept on GitHub); everything else keeps working. With a `gh` login, `repo` covers it
+
+| Key | Does | Where |
+|---|---|---|
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>G</kbd> | Open the merge panel | Pull request detail |
+| <kbd>⌥</kbd><kbd>←</kbd> <kbd>⌥</kbd><kbd>→</kbd> | Change the method | Merge panel |
+| <kbd>⌃</kbd><kbd>⌘</kbd><kbd>↩</kbd> | Confirm | Merge panel |
+| <kbd>Esc</kbd> | Close the panel | Merge panel |
 
 ## Search
 
@@ -375,6 +402,7 @@ Settings → Ask AI.
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>R</kbd> | [Reviewers picker](#editing), on a pull request |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>A</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>L</kbd> | [Assignees or labels picker](#editing), on an issue or pull request |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>M</kbd> | [Comment field](#commenting), on an issue or pull request. <kbd>⌘</kbd><kbd>Return</kbd> posts; <kbd>@</kbd> opens the list of people to tag (<kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Return</kbd> or <kbd>Tab</kbd> inserts, <kbd>Esc</kbd> closes it); <kbd>Esc</kbd> leaves the field, a second <kbd>Esc</kbd> goes back |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>G</kbd> | [Merge panel](#merging), on a pull request, with the comment field focused or not. <kbd>⌥</kbd><kbd>←</kbd> <kbd>⌥</kbd><kbd>→</kbd> change the method; <kbd>⌃</kbd><kbd>⌘</kbd><kbd>↩</kbd> confirms; <kbd>Esc</kbd> closes it |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>V</kbd> | [Review mode](#reviewing), on a pull request, with the comment field focused or not. <kbd>⌥</kbd><kbd>←</kbd> <kbd>⌥</kbd><kbd>→</kbd> change the verdict; <kbd>⌘</kbd><kbd>Return</kbd> submits; <kbd>Esc</kbd> leaves review mode, keeping the text |
 | <kbd>⌘</kbd><kbd>Z</kbd> | Undo the last edit, for 10 seconds after it. In the comment field, undoes typing |
 
@@ -434,7 +462,7 @@ Reopen within a minute and the detail is still there.
 | | CI failed | on |
 | | New comment | on |
 | | Ready to merge: approved, checks green, no conflicts | off |
-| | Merged by someone else | on |
+| | Merged outside PullBull: by someone else, by you on GitHub, or by Merge when ready | on |
 | Pull requests I review | Review requested, re-requested, or new commits since your review | on |
 | | Your review dismissed: your approval or requested changes, by someone else | on |
 | | New comment on a PR you reviewed | off |
@@ -446,7 +474,7 @@ Reopen within a minute and the detail is still there.
 | | Status changed on the board | off |
 | | Closed or reopened | on |
 
-With Settings → General → Check my pending CI more often, CI failed and Ready to merge arrive within about 30 s while your checks run: for up to 5 of your PRs, for 20 minutes each, and not at a 1-minute refresh interval. Your own comments, moves and closes never notify, nor does asking yourself or one of your teams to review. Several comments on one issue between refreshes make one notification ("3 new comments"). A dismissed review that also puts the PR back in Review notifies once, as the dismissal. Status changes count on the board the Board chip shows, as "In Progress → In Review"; moves the board's automation makes after a close or a merge don't notify, the close does.
+With Settings → General → Check my pending CI more often, CI failed and Ready to merge arrive within about 30 s while your checks run: for up to 5 of your PRs, for 20 minutes each, and not at a 1-minute refresh interval. Your own comments, moves, closes and merges made in PullBull never notify, nor does asking yourself or one of your teams to review. Several comments on one issue between refreshes make one notification ("3 new comments"). A dismissed review that also puts the PR back in Review notifies once, as the dismissal. Status changes count on the board the Board chip shows, as "In Progress → In Review"; moves the board's automation makes after a close or a merge don't notify, the close does.
 
 Click a notification to open the detail.
 

@@ -1,6 +1,6 @@
 # Merge a pull request and re-run its failed checks
 
-Status: design, for the owner's review. Nothing here is built.
+Status: merging is built and tested on real GitHub (PR 1). Re-running is designed and ships in the second PR.
 
 PullBull lets you merge a pull request, or set it to merge by itself once its requirements pass, from the PR's detail, and re-run failed GitHub Actions jobs. With reviews (`2026-11-05-submit-review-design.md`, merged as #62) this finishes the loop for most PRs: from "needs you" to merged without opening the browser.
 
@@ -94,10 +94,13 @@ A panel above the bottom row, in the layout.
   - for Merge when ready: "Merges by itself, even with PullBull closed. Commits pushed later by people with write access are included."
 - **⌃⌘↩ confirms.** It means nothing else in the app, and the panel shows it on a **Merge** button that also takes a click.
 - Confirming is disarmed for 500 ms after the sentence appears or changes, for the key and the click alike, so a reflex or a double click does nothing.
-- Esc closes the panel. So does a click outside it, leaving the detail, closing the popover, or changing account. The panel takes keyboard focus, so review mode ends, keeping its text, and the comment draft is left alone. The bottom row's **Merge** button becomes **Cancel** while it's open.
+- Esc closes the panel, and so does the **Cancel** that the bottom row's **Merge** button becomes while it's open. So does a click outside it, leaving the detail, closing the popover, or changing account. A click on the panel itself, including **Merge** and the method, leaves it open.
+- The panel takes keyboard focus, and it's built with no first responder: opening it releases the comment field, review mode ends keeping its text, and the comment draft is left alone. The key monitor takes every key while the panel is open: ⌃⌘↩, ⌥← ⌥→ and Esc do their work and everything else is swallowed, so ↩ and ⌘↩ do nothing, with no field to type into and no GitHub page opened. ⌘W, ⌘, and ⌘/ run first, so the popover, Settings and the shortcuts window still work. No view takes focus because SwiftUI's programmatic focus depends on the system's keyboard navigation setting, and a key that must never type or merge by accident can't rest on that.
+- Esc or Cancel returns focus to the comment field if it had focus when the panel opened, as typing would otherwise go nowhere and ⌘↩ would open GitHub instead of posting. A click outside, or a send, doesn't: the click chose somewhere else, and a send has nothing to return to. Review's own Esc keeps focus as before.
+- The panel lives in the bottom bar, above the bottom row, so it shares the detail's width and fits at 360 pt.
 - ⌥← and ⌥→ change the method, which resets the second step.
 - A held key's repeat never confirms.
-- Merge mode and review mode exclude each other: with the panel open, ⌥⌘V does nothing. A merge on its way counts as a post in flight for that PR, in the tracking reviews and comments use.
+- Merge mode and review mode exclude each other: with the panel open, ⌥⌘V does nothing. A merge on its way counts as a post in flight for that PR, in the tracking reviews and comments use. Closing the panel cancels anything before the send; the send is the only exception.
 - VoiceOver: the panel announces its sentence and warnings on opening, the method is an adjustable control, and confirming is a named action on the panel.
 
 ### Warnings and the second step
@@ -112,7 +115,9 @@ The first confirm changes the label to "Merge anyway" and disarms for 1 s. A sec
 
 ### Confirming
 
-Confirming re-reads the PR, as reviews check before sending, and compares it with what the panel showed: head, base, action, check tally and review state. Any difference stops it: nothing is sent, the panel updates, and it disarms. So a check that failed while the panel sat open is seen before anything merges.
+Confirming re-reads the PR, as reviews check before sending, and compares it with what the panel showed: head, base, action, check tally and review state. Any difference stops it: nothing is sent, the panel updates, and it disarms. So a check that failed while the panel sat open is seen before anything merges. If GitHub hasn't worked out the merge state yet (`UNKNOWN`) on that read, nothing is sent, as PullBull never sends on a state GitHub hasn't settled. That costs, rarely, one more open.
+
+The check tally maps `STALE`, `ACTION_REQUIRED` and `STARTUP_FAILURE` to failing, and any state it doesn't know to running. An unknown state must warn and never pass, at the price of a second step that wasn't strictly needed. The summary shows one check part, failing first, and never failing and running together: the warnings list both counts, so nothing is hidden when it matters.
 
 ### Merge method
 
@@ -120,7 +125,7 @@ The methods offered are what the repository allows (`mergeCommitAllowed`, `squas
 
 ### Cancelling auto-merge
 
-**Cancel auto-merge** takes one click and no panel, as on the web, and only for the viewer's own request (`viewerCanDisableAutoMerge`). Setting it again takes the full steps, and a slow cancel could lose to the checks passing. Someone else's request can't be cancelled from PullBull, since it may carry a commit message PullBull can't restore.
+**Cancel auto-merge** takes one click and no panel, as on the web, and only for the viewer's own request (`viewerCanDisableAutoMerge`). Setting it again takes the full steps, and a slow cancel could lose to the checks passing. Someone else's request can't be cancelled from PullBull, since it may carry a commit message PullBull can't restore. A refusal reads "Couldn't cancel auto-merge on #88: …" and an unclear answer "Couldn't confirm auto-merge was cancelled on #88. Check it on GitHub." Both have their own lines, since a cancel that failed unnoticed is an unwanted merge.
 
 ### Keys
 
@@ -135,14 +140,17 @@ The methods offered are what the repository allows (`mergeCommitAllowed`, `squas
 
 - **Direct merge:** `PUT /repos/{owner}/{repo}/pulls/{n}/merge-async` with `sha` set to the pin, `merge_method`, `merge_action: direct_merge` and `bypass_rules: false`. GitHub recommends this API, and `mergePullRequest` has no bypass field, so it can't honour the anti-goal. `sha` makes GitHub refuse a moved head.
 - **Its answers:** each has a `status` and a `details` object. `202` with `details.uuid`: poll `GET .../merge-async/{uuid}`, with no body, until it's no longer `pending`. `200`: already merged. `409`: a request is already pending, and `details.uuid` names it, so poll that one. `400`: refused, with the reason in `details.message`, as with a moved head ("Pull request head branch was modified.") or a closed PR. Rules fail at poll time, not at send, so a poll's `failed` is a refusal. GitHub's reasons can span lines, so whitespace runs collapse to one space.
-- **Merge when ready:** `enablePullRequestAutoMerge` with `expectedHeadOid` and `mergeMethod`. A panel opened on `BLOCKED` can turn `CLEAN`, and GitHub then answers "Pull request Pull request is in clean status", matched on "clean status": that becomes a fresh read and a changed panel, not raw text. Only a `data` object with a null payload and a typed error counts as a refusal. Any other answer leaves the outcome unknown, as the mutation may have landed.
-- **Sending:** once the confirming read checks out, the panel closes and the PR shows as merged at once, dimmed, through the override layer, turning solid when GitHub confirms. The viewer doesn't wait: GitHub takes about 4.5 s to answer, and the dimming says it isn't final. It can't be called back, and Merge stays hidden until the answer, so it can't be sent twice.
-- **Refused:** one more read comes first. If it shows the PR merged or closed, that's the outcome, ahead of everything else, as someone else's merge can land while ours waits. Otherwise the overlay goes and the failure line gives GitHub's reason with **Open on GitHub**. A moved head reads as above. Every failure line in the app, not only merging's, clears when the viewer leaves the item it's about, as "New commits on #29" read wrongly on #32. A line that arrives after they left stays until dismissed or the next edit, since they haven't seen it, and a refusal can land after the panel closed and they moved on.
-- **Outcome unknown,** including a poll that doesn't finish in reasonable time: a fresh read decides, matched to the action sent. Otherwise the line says "Couldn't confirm the merge of #88. Check it before trying again." Nothing is ever sent twice.
+- **Merge when ready:** `enablePullRequestAutoMerge` with `expectedHeadOid` and `mergeMethod`. A panel opened on `BLOCKED` can turn `CLEAN`, and GitHub then answers "Pull request Pull request is in clean status", matched on "clean status": that becomes a fresh read and a changed panel, not raw text. A refusal is a `data` object with a null payload and an error typed `UNPROCESSABLE` or `FORBIDDEN`. A body of `errors` with no `data` object is also a refusal, as nothing executed. Any other answer, including a server-side type such as `INTERNAL`, leaves the outcome unknown and a fresh read decides, as the mutation may have landed: telling someone nothing happened when it may have is the worst failure here. That costs, at worst, one extra read.
+- **Sending:** once the confirming read checks out, the panel closes and the PR shows as merged at once, dimmed, through the override layer, turning solid when GitHub confirms. The panel has no "Sending" or "Merging" state of its own. The row and the pill were already optimistic, so a locked panel only made the viewer wait about 4.5 s, measured, for GitHub's answer; the dimming says it isn't final. A refusal comes back as the failure line, which can show a brief "Merged" before it, when a rule fails at poll time. A send can't be called back, and Merge stays hidden until the answer, so it can't be sent twice.
+- **Polling:** GitHub marks the poll's GET `max-age=60`, so through the URL cache the first `pending` stood in for every later poll and the merge never seemed to finish (12 of 12 pending, against merged on the third poll when the cache was skipped). Merge polls and the reads that decide an outcome skip the URL cache and go to GitHub each time.
+- **In the lists:** while a direct merge's overlay is live, its row stays where it was, dimmed and not counted, as Review's dimmed rows are, so the badge drops at the send and a refusal restores it. It stays in Review, Mine and Team. A Review row keeps its reason chip; "You approved · not counted" shows only on a dimmed row with no reason, as a PR the viewer merged without approving was never approved. Without this the row would vanish, or jump to Team, and then back on a refusal. Recently closed leaves out a key only while a Review, Mine or Team row actually keeps it, so one PR is never listed twice and never in none: a stale detail can hold the overlay after a refresh moved the PR into Recently closed.
+- **Refused:** one more read comes first. If it shows the PR merged or closed, that's the outcome, ahead of everything else, as someone else's merge can land while ours waits. If it shows a moved head, that's the cause, whatever GitHub's wording, so a change in GitHub's text can't hide it. The overlay goes, and the failure line gives GitHub's reason with **Open on GitHub**, and a 400's reason comes from `details.message`. A moved head, or a state that changed before the send, with the panel already gone, reads "#88 changed before it could merge. Look again, then merge.", as nothing merged and nobody would be told otherwise.
+- **Merged or closed meanwhile:** when the read after a refusal shows the PR closed, the overlay is dropped, as left in place it would claim a merge for up to 5 minutes. When it shows it merged, the overlay stays, as the PR is merged, and its key leaves the set of merges made here: our merge didn't land, and someone else's should notify. That can cost one extra banner. Every failure line in the app, not only merging's, clears when the viewer leaves the item it's about, as "New commits on #29" read wrongly on #32. A line that arrives after they left stays until dismissed or the next edit, since they haven't seen it, and a refusal can land after the panel closed and they moved on. Failure lines are held per account, so a line for one account isn't shown under another; successes are not held, since nobody is left not knowing.
+- **Outcome unknown,** including a poll that doesn't finish in reasonable time: a fresh read decides, matched to the action sent, up to three reads 2 s apart in the detail's refresh. Otherwise the line says "Couldn't confirm the merge of #88. Check it before trying again." Nothing is ever sent twice.
 - **After merging:** the detail stays open showing the merged state. The row moves as after any refresh.
 - **No undo.** Cancelling auto-merge is the only take-back.
-- **Lag:** GitHub's reads trail its writes, by about 1.5 s measured on reviews. The overlay stays until the held detail shows the merge, up to the 5-minute lifetime. A merged PR leaving the lists counts as the lists agreeing. An auto-merge change, set or cancelled, settles once the detail shows the PR merged or closed, as nothing is left to compare. A read just after approving can also show a stale `BLOCKED`, so that's retried like `UNKNOWN`.
-- **Notifications:** `mergedBy` is whoever set auto-merge, so `ChangeDetector.mergedEvents` skips your own PR merging while you're away. It should notify. Tell the cases apart by the merge not having come from PullBull in this session, using the previous fetch's open state and not `autoMergeRequest`, which some PRs keep after merging. A teammate's PR you set to auto-merge raises nothing in this version, as merged notifications cover your own PRs.
+- **Lag:** GitHub's reads trail its writes, by about 1.5 s measured on reviews. The overlay stays until the held detail shows the merge, up to the 5-minute lifetime. A merged PR leaving the lists counts as the lists agreeing. An auto-merge change, set or cancelled, settles once the detail shows the PR merged or closed, as nothing is left to compare. A read just after approving can also show a stale `BLOCKED`, so that's retried like `UNKNOWN`, but only after a review sent from PullBull, three reads 2 s apart; `UNKNOWN` alone is read the same way.
+- **Notifications:** `mergedBy` is whoever set auto-merge, so it can't tell a viewer's own merge from someone else's. `ChangeDetector.mergedEvents` therefore stays silent only for a merge made from PullBull in this session (`mergedHere`), and notifies for every other merge of the viewer's own PR: a teammate's, one the viewer made on GitHub, and a **Merge when ready** that merged by itself, which notifies like any merge that happened while the viewer was away. The Merged toggle's note therefore reads "When it's merged outside PullBull", not "When someone else merges it". An own PR merged by auto-merge while away reads "by <you>", which is accurate and stays. A teammate's PR the viewer set to auto-merge raises nothing in this version, as merged notifications come for the viewer's own PRs.
 
 ## Re-running
 
@@ -176,12 +184,14 @@ Measured on real GitHub with `ghu_` tokens from a test App, as GitHub documents 
 - **An install on the old permissions:** Merge and Re-run show a line saying so, with the existing `permissionsReviewURL` link. Everything else carries on.
 - **No install on the owner, or a repository left out of a selected-repositories install:** a line, not silence. The second reports ready and is refused, and that refusal must read clearly.
 - The owner changes the App's permissions and description by hand, at release and not before: saving asks every install to accept.
+- **Release:** the release that carries both PRs asks for Contents write and Actions write in one acceptance. Merging alone needs only Contents write; if the first PR were released alone, that is all it would ask, and Actions write would join with re-running.
 
 ## Docs and copy
 
-- The App's description, `docs/github-app-setup.md`, the README privacy row and `SECURITY.md` say PullBull never merges. All change at release, with the exact text given to the owner then.
-- `docs/manual.md`: a Merging section after Reviewing, and the key tables.
-- The Keyboard Shortcuts window: a Merging section after Reviewing.
+- `docs/manual.md` has a Merging section after Reviewing, with the key tables. Its Reviewing section lists merging as something reviews don't do, which stays true: a review doesn't merge.
+- The Keyboard Shortcuts window has a Merging section after Reviewing.
+- The Merged notification toggle's note, and the manual's notification table, say a merge outside PullBull notifies, including the viewer's own.
+- The App's description, `docs/github-app-setup.md`, the README privacy row and `SECURITY.md` no longer say PullBull never merges. They say it merges only what the viewer confirms, with Contents write for it. The owner changes the App's own description and permissions by hand at release, with the exact text given then. Actions write and the wording about re-running join the same files with the second PR.
 
 ## Testing
 
@@ -192,16 +202,35 @@ Measured on real GitHub with `ghu_` tokens from a test App, as GitHub documents 
 - A build reaches it through `PULLBULL_GITHUB_CLIENT_ID` and `PULLBULL_GITHUB_APP_SLUG` in the git-ignored `Config/Local.xcconfig`. It needs a Developer ID build, as Sign in with GitHub does.
 - Sign in with the second account: a test build shares the Keychain item and would otherwise overwrite the production sign-in.
 
-**The permission test** ran first, on that App's tokens and on a token from the production App. Its results are under Permissions and in the answers above.
+**The permission test** ran first, on that App's tokens and on a token from the production App. Its results are under Permissions.
 
-**Kit tests** against a fake GitHub: every row of the action table; the method narrowing; the second step and arming; the confirm comparison; each `merge-async` answer and poll result; the override and lag rules.
+**Kit tests** against a fake GitHub: every row of the action table; the method narrowing; the second step and arming; the confirm comparison; each `merge-async` answer and poll result; the override, list and lag rules; the key routing.
 
-**Before the PR, on real GitHub:** each merge method; a moved head; a state changing with the panel open; `BLOCKED` to auto-merge and cancelling it; a re-run; an install on the old permissions.
+**Run on real GitHub, by click, on the owner's Mac** (merge-lab, Developer ID builds):
 
-## Left to the builder
+- Each merge method: merge commit, squash and rebase.
+- The panel closing at the send, and Esc closing it at once.
+- A moved head stopping the merge with the line, and a check changing with the panel open stopping it.
+- The second step on a failing check and on no checks, and Esc resetting it.
+- **Merge when ready**: set, cancelled, set again, and merged by itself after a re-run, with the app showing Merged and notifying.
+- ⌘↩ and ↩ doing nothing in the panel; a click outside closing it, Cancel staying closed, a click on **Merge** or the method keeping it open, a click on the comment field closing it and taking focus; ⌥⌘G from the field then Esc keeping the text and the focus.
+- The layout at the default width.
 
-- The panel's exact layout, within the reviews panel's style.
-- How many reads to try on `UNKNOWN` and a stale `BLOCKED`, and the poll interval and limit.
-- Whether review mode and merge mode share code. Don't refactor reviews to get there.
-- Where the buttons sit in the bottom row, which must still fit at 360 pt. **Cancel auto-merge** may need an icon or a place in the detail instead.
-- Confirm ⌃⌘↩ is free in every key handler, and that macOS doesn't take it.
+Two merges happened that weren't test steps (#40 and #43): each was the owner's click on **Merge**, two deliberate actions as on GitHub, not a fault.
+
+**Not run on real GitHub or a Mac:**
+
+- ⌃⌘↩. Another app takes it on the owner's Mac, so it never reached PullBull, and the panel's **Merge** button did the confirming in every test. This is a known limit: the chord is a default that may be taken on other Macs. The button always works, so a taken chord can't lock anyone out, and no global hotkey can make a merge happen, as one only stops the key arriving. Also unrun by hand: keypad Enter as a confirm, the next panel opening after the popover closes, VoiceOver, the hairlines and the panel's height with every warning, a 360 pt popover, IME input, and ⌘, and ⌘/ with the panel open.
+- An install on the old permissions, and a repository left out of a selected-repositories install.
+- A merge queue and a stacked PR, which only show a line.
+
+**Re-running** is tested with PR 2.
+
+## As built
+
+Choices the design left open:
+
+- The panel is laid out in the reviews panel's style, in the bottom bar, and fits at 360 pt. **Cancel auto-merge** is a button on the line that says auto-merge is set.
+- `UNKNOWN` and a stale `BLOCKED` after a review sent here are read up to three times, 2 s apart, in the detail's refresh.
+- Review mode and merge mode share the comment field's release and focus code, not their state. Reviews were not refactored.
+- ⌃⌘↩ was audited in every key handler. A text view doesn't type it, the status picker applies only on plain Return, and no menu item or `NSStandardKeyBindingResponding` entry takes it. The one way it reaches another handler is outside the key handlers: a user can record it as PullBull's own show-or-hide shortcut, which makes the popover hide and the panel close, and fails safe.

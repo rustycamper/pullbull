@@ -23,7 +23,7 @@ struct NotificationSettingsTab: View {
                         RowLabel("Ready to merge", note: "Approved, checks green, no conflicts")
                     }
                     Toggle(isOn: $model.settings.notify.merged) {
-                        RowLabel("Merged", note: "When someone else merges it")
+                        RowLabel("Merged", note: "When it's merged outside PullBull")
                     }
                 }
                 Section("Pull requests I review") {
