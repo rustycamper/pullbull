@@ -427,7 +427,7 @@ struct PRDetailView: View {
     /// write starts.
     @ViewBuilder private var mergeButton: some View {
         if let mode = model.mergeMode, mode.key == key {
-            OutlinedTextButton(title: "Cancel", action: model.leaveMergeMode)
+            OutlinedTextButton(title: "Cancel") { model.leaveMergeMode() }
                 .disabled(!mode.canCancel)
                 .background(MenuAnchorView(anchor: mergeCancelAnchor))
         } else if case .action = model.mergeOffer(for: key), !model.isPostInFlight(for: key) {

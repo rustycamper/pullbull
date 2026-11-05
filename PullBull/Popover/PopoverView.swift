@@ -29,8 +29,8 @@ struct PopoverView: View {
     /// Set when ← leaves a detail: the held key's repeats do nothing, in the list too, until another key.
     @State private var swallowArrowRepeats = false
     /// Held after submitting a review, ⌘↩ is one press: its repeats would otherwise submit again after a
-    /// failure, post the text as a comment or open GitHub once review mode ended. ⌃⌘↩ in the merge panel
-    /// sets it too.
+    /// failure, post the text as a comment or open GitHub once review mode ended. Any Return in the merge
+    /// panel sets it too.
     @State private var swallowSubmitRepeats = false
     /// On screen: the panel is created once and only ordered out, so the views stay mounted while closed.
     @State private var shown = false
@@ -902,13 +902,15 @@ struct PopoverView: View {
     /// (`MergePanelKeys`).
     private func handleDetailKey(_ event: NSEvent, flags: NSEvent.ModifierFlags, in window: NSWindow) -> Bool {
         if let mode = model.mergeMode {
+            // Return is one press here: its repeats would otherwise reach the detail once the panel has
+            // closed, where ⌘↩, or ⌃⌘↩ with ⌃ let go first, opens GitHub.
+            if event.keyCode == SearchKeyMonitor.return || event.keyCode == SearchKeyMonitor.enter {
+                swallowSubmitRepeats = true
+            }
             switch MergePanelKeys.route(
                 keyCode: event.keyCode, flags: KeyCombo.Modifiers(flags), isRepeat: event.isARepeat)
             {
             case .confirm:
-                // ⌃⌘↩ is one press: its repeats would otherwise reach the detail once the panel has closed,
-                // where letting go of ⌃ first makes them a ⌘↩ that opens GitHub.
-                swallowSubmitRepeats = true
                 model.confirmMerge(on: mode.key)
             case .changeMethod(let offset):
                 model.changeMergeMethod(by: offset)
@@ -939,7 +941,8 @@ struct PopoverView: View {
                 model.postComment(on: key, isPullRequest: field.isPullRequest)
                 return true
             case .leaveField:
-                window.makeFirstResponder(nil)
+                // Esc held from the merge panel, which gave the field focus back, doesn't take it away again.
+                if !event.isARepeat { window.makeFirstResponder(nil) }
                 return true
             case .closeMentions:
                 model.closeMentions()
@@ -991,6 +994,8 @@ struct PopoverView: View {
             }
             guard event.keyCode == SearchKeyMonitor.escape, flags.isDisjoint(with: [.control, .option])
             else { return false }
+            // Holding Esc closes the merge panel once, not on out of the detail.
+            if event.isARepeat { return true }
             model.closeShownDetail()
             return true
         }
@@ -1213,7 +1218,7 @@ struct PopoverView: View {
             return true
         case SearchKeyMonitor.return, SearchKeyMonitor.enter:
             // ⌃⌘↩ confirms a merge and means nothing else anywhere.
-            guard !flags.isSuperset(of: [.control, .command]) else { return false }
+            guard flags.subtracting([.capsLock, .numericPad, .function]) != [.control, .command] else { return false }
             model.applyStatusPicker()
             return true
         case SearchKeyMonitor.escape:

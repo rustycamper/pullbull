@@ -53,6 +53,8 @@ public struct MergeMode: Equatable, Sendable {
 
     public let key: PRKey
     public let pinnedHead: String
+    /// The comment field had focus when the panel opened, so closing it with Esc or Cancel gives it back.
+    public let fieldHadFocus: Bool
     /// Frozen at each `show`, and all the panel reads, so nothing changes under the viewer.
     public private(set) var read: MergeRead?
     public var method: MergeMethod?
@@ -61,9 +63,10 @@ public struct MergeMode: Equatable, Sendable {
     private var armedAt = Date.distantFuture
     private var secondStepAt = Date.distantFuture
 
-    public init(key: PRKey, pinnedHead: String) {
+    public init(key: PRKey, pinnedHead: String, fieldHadFocus: Bool = false) {
         self.key = key
         self.pinnedHead = pinnedHead
+        self.fieldHadFocus = fieldHadFocus
     }
 
     public var warnings: [MergeWarning] {

@@ -50,7 +50,9 @@ struct MergePanel: View {
         .padding(.vertical, 8)
         .overlay(alignment: .top) { Hairline() }
         .background(MenuAnchorView(anchor: panelAnchor))
-        .onAppear { outsideClicks.install(inside: [panelAnchor, cancelAnchor], outside: model.leaveMergeMode) }
+        .onAppear {
+            outsideClicks.install(inside: [panelAnchor, cancelAnchor]) { model.leaveMergeMode(returnsFocus: false) }
+        }
         .onDisappear { outsideClicks.remove() }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Merge panel")

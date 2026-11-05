@@ -23,8 +23,9 @@ extension AppModel {
               !isPostInFlight(for: key), let head = details[key]?.headOid, let account = runningAccount
         else { return }
         endReviewMode(on: nil)
+        let fieldHadFocus = (NSApp.keyWindow?.firstResponder as? CommentEditor)?.key == key
         releaseCommentField(on: key)
-        mergeMode = MergeMode(key: key, pinnedHead: head)
+        mergeMode = MergeMode(key: key, pinnedHead: head, fieldHadFocus: fieldHadFocus)
         let client = api(for: account)
         mergeTask = Task { [weak self] in
             await self?.readForPanel(key, pinned: head, account: account, client: client)
@@ -32,10 +33,13 @@ extension AppModel {
     }
 
     /// Esc, Cancel or a click outside. Stops anything not yet sent; a merge sending can't be called back.
-    func leaveMergeMode() {
+    /// Esc and Cancel give the comment field its focus back if it had it; a click puts focus where it lands,
+    /// so it passes false.
+    func leaveMergeMode(returnsFocus: Bool = true) {
         guard let mode = mergeMode, mode.canCancel else { return }
         stopUnsentMerge()
         mergeMode = nil
+        if returnsFocus, mode.fieldHadFocus { requestCommentFieldFocus(on: mode.key) }
     }
 
     /// The screen, popover or account changed: the panel on `key`, or on anything when nil, closes. Stops
