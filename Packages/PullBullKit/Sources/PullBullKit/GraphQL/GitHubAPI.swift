@@ -158,11 +158,24 @@ public struct Check: Codable, Sendable, Hashable {
     public let name: String
     public let state: CIState
     public let url: URL?
+    /// A check run's raw conclusion (`FAILURE`, `TIMED_OUT`, ...); nil for a status context, a run not
+    /// finished, or a check read before conclusions were kept.
+    public let conclusion: String?
+    /// The raw status of the check's suite (`COMPLETED`, ...); nil when not read.
+    public let suiteStatus: String?
+    /// The GitHub Actions workflow run the check belongs to; nil for an external check.
+    public let runID: Int64?
 
-    public init(name: String, state: CIState, url: URL?) {
+    public init(
+        name: String, state: CIState, url: URL?,
+        conclusion: String? = nil, suiteStatus: String? = nil, runID: Int64? = nil
+    ) {
         self.name = name
         self.state = state
         self.url = url
+        self.conclusion = conclusion
+        self.suiteStatus = suiteStatus
+        self.runID = runID
     }
 }
 
@@ -970,7 +983,12 @@ public struct GitHubAPI: Sendable {
                 default: state = .none
                 }
             }
-            return Check(name: name, state: state, url: (node["detailsUrl"] as? String).flatMap(URL.init(string:)))
+            let suite = node["checkSuite"] as? [String: Any]
+            let run = (suite?["workflowRun"] as? [String: Any])?["databaseId"]
+            return Check(
+                name: name, state: state, url: (node["detailsUrl"] as? String).flatMap(URL.init(string:)),
+                conclusion: node["conclusion"] as? String, suiteStatus: suite?["status"] as? String,
+                runID: (run as? NSNumber)?.int64Value)
         case "StatusContext":
             guard let name = node["context"] as? String else { return nil }
             return Check(
@@ -979,6 +997,36 @@ public struct GitHubAPI: Sendable {
         default:
             return nil
         }
+    }
+
+    /// Every check on the PR's head commit, paged in, as the detail's first 50 can miss failures on a big PR.
+    public func allChecks(_ key: PRKey) async throws -> [Check] {
+        let (owner, name) = try Self.ownerAndName(key)
+        var checks: [Check] = []
+        var after: String?
+        for _ in 0..<Self.maxCheckPages {
+            var variables: [String: Any] = ["owner": owner, "name": name, "n": key.number]
+            if let after { variables["after"] = after }
+            let data = try await execute(Queries.allChecks, variables)
+            guard let pr = (data["repository"] as? [String: Any])?["pullRequest"] as? [String: Any] else {
+                throw APIError.notFound("pull request \(key.repo)#\(key.number) not found")
+            }
+            let commit = ((pr["commits"] as? [String: Any])?["nodes"] as? [[String: Any]])?.last?["commit"]
+                as? [String: Any]
+            let contexts = (commit?["statusCheckRollup"] as? [String: Any])?["contexts"] as? [String: Any]
+            checks += (contexts?["nodes"] as? [[String: Any]] ?? []).compactMap(Self.check)
+            let info = contexts?["pageInfo"] as? [String: Any]
+            guard info?["hasNextPage"] as? Bool == true, let cursor = info?["endCursor"] as? String else { break }
+            after = cursor
+        }
+        return checks
+    }
+
+    public static let maxCheckPages = 20
+
+    /// Re-runs the failed jobs of Actions run `runID`, and the jobs that depend on them.
+    public func rerunFailedJobs(_ key: PRKey, runID: Int64) async throws {
+        try await rest("POST", "/repos/\(key.repo)/actions/runs/\(runID)/rerun-failed-jobs", [:])
     }
 
     // MARK: Writes
