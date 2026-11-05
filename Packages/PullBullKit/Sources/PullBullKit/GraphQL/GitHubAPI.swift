@@ -163,19 +163,16 @@ public struct Check: Codable, Sendable, Hashable {
     public let conclusion: String?
     /// The raw status of the check's suite (`COMPLETED`, ...); nil when not read.
     public let suiteStatus: String?
-    /// The GitHub Actions workflow run the check belongs to; nil for an external check.
-    public let runID: Int64?
 
     public init(
         name: String, state: CIState, url: URL?,
-        conclusion: String? = nil, suiteStatus: String? = nil, runID: Int64? = nil
+        conclusion: String? = nil, suiteStatus: String? = nil
     ) {
         self.name = name
         self.state = state
         self.url = url
         self.conclusion = conclusion
         self.suiteStatus = suiteStatus
-        self.runID = runID
     }
 }
 
@@ -984,11 +981,9 @@ public struct GitHubAPI: Sendable {
                 }
             }
             let suite = node["checkSuite"] as? [String: Any]
-            let run = (suite?["workflowRun"] as? [String: Any])?["databaseId"]
             return Check(
                 name: name, state: state, url: (node["detailsUrl"] as? String).flatMap(URL.init(string:)),
-                conclusion: node["conclusion"] as? String, suiteStatus: suite?["status"] as? String,
-                runID: (run as? NSNumber)?.int64Value)
+                conclusion: node["conclusion"] as? String, suiteStatus: suite?["status"] as? String)
         case "StatusContext":
             guard let name = node["context"] as? String else { return nil }
             return Check(

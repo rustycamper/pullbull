@@ -250,7 +250,7 @@ enum Queries {
           pageInfo{hasNextPage endCursor}
           nodes{
             __typename
-            ... on CheckRun{name conclusion status detailsUrl checkSuite{status workflowRun{databaseId}}}
+            ... on CheckRun{name conclusion status detailsUrl checkSuite{status}}
             ... on StatusContext{context state targetUrl}
           }
         }}}}}
@@ -270,7 +270,7 @@ enum Queries {
           baseRef{rules(first:50){nodes{type parameters{... on PullRequestParameters{allowedMergeMethods}}}}}
           commits(last:1){nodes{commit{statusCheckRollup{state contexts(first:50){totalCount \(rollupCounts) statusContextCountsByState{state count} nodes{
             __typename
-            ... on CheckRun{name conclusion status detailsUrl checkSuite{status workflowRun{databaseId}}}
+            ... on CheckRun{name conclusion status detailsUrl checkSuite{status}}
             ... on StatusContext{context state targetUrl}
           }}}}}}
           reviewRequests(first:20){nodes{requestedReviewer{__typename ... on User{login} ... on Team{slug name}}}}

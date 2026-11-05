@@ -7,8 +7,8 @@ private func run(
     url: String? = nil
 ) -> Check {
     Check(
-        name: name, state: .failure, url: url.flatMap(URL.init(string:)),
-        conclusion: conclusion, suiteStatus: suite, runID: id)
+        name: name, state: .failure, url: (url ?? id.map(actions)).flatMap(URL.init(string:)),
+        conclusion: conclusion, suiteStatus: suite)
 }
 
 private func actions(_ id: Int64) -> String { "https://github.com/o/r/actions/runs/\(id)/job/1" }
@@ -36,7 +36,7 @@ private func page(_ nodes: String, next: String?) -> String {
 }
 
 private func node(_ name: String, run id: Int) -> String {
-    #"{"__typename":"CheckRun","name":"\#(name)","conclusion":"FAILURE","status":"COMPLETED","detailsUrl":"https://github.com/o/r/actions/runs/\#(id)/job/1","checkSuite":{"status":"COMPLETED","workflowRun":{"databaseId":\#(id)}}}"#
+    #"{"__typename":"CheckRun","name":"\#(name)","conclusion":"FAILURE","status":"COMPLETED","detailsUrl":"https://github.com/o/r/actions/runs/\#(id)/job/1","checkSuite":{"status":"COMPLETED"}}"#
 }
 
 @Suite struct RerunPlanTests {
@@ -92,9 +92,14 @@ private func node(_ name: String, run id: Int) -> String {
         #expect(plan.runIDs == [42_093_340_598])
     }
 
-    @Test func fallsBackToWorkflowRun() {
-        let plan = RerunPlan(checks: [run("a", "FAILURE", run: 99, url: "https://example.com/details")])
-        #expect(plan.runIDs == [99])
+    @Test func aFailedCheckWithNoRunIDInItsURLIsLeftOut() {
+        let plan = RerunPlan(checks: [run("a", "FAILURE", url: "https://example.com/details")])
+        #expect(plan.isEmpty)
+    }
+
+    @Test func theDetailQueryDoesNotAskForWorkflowRun() {
+        #expect(!Queries.detail.contains("workflowRun"))
+        #expect(!Queries.allChecks.contains("workflowRun"))
     }
 
     @Test func oneEntryPerRun() {
@@ -112,7 +117,7 @@ private func node(_ name: String, run id: Int) -> String {
         let checks = try await api.allChecks(PRKey(repo: "o/r", number: 3))
         #expect(checks.count == 101)
         #expect(checks.last?.name == "late")
-        #expect(checks.last?.runID == 8)
+        #expect(checks.last.flatMap { RerunPlan.runID(from: $0.url) } == 8)
         #expect(checks.last?.conclusion == "FAILURE")
         #expect(checks.last?.suiteStatus == "COMPLETED")
         #expect(stub.bodies.count == 2)

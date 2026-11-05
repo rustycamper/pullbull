@@ -15,7 +15,7 @@ public struct RerunPlan: Equatable, Sendable {
         for check in checks {
             guard check.suiteStatus == "COMPLETED", let conclusion = check.conclusion,
                   Self.rerunnable.contains(conclusion),
-                  let id = Self.runID(from: check.url) ?? check.runID,
+                  let id = Self.runID(from: check.url),
                   seen.insert(id).inserted
             else { continue }
             ids.append(id)
