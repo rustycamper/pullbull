@@ -220,6 +220,112 @@ private func card(_ snapshot: Snapshot, _ key: PRKey) -> BoardIssue? {
         #expect(o.isEmpty)
     }
 
+    // MARK: Reviews
+
+    @Test func reviewShowsAtOnce() {
+        var o = EditOverrides()
+        let pr = editPR(77, requests: [.user("pb")])
+        o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
+        let approved = o.apply(to: editSnapshot(viewer: "pb", review: [pr])).reviewCandidates[0]
+        #expect(ReviewRules.status(of: approved, me: "pb", myTeams: []) == .approvedByMe)
+        var c = EditOverrides()
+        c.record(.review(state: .changesRequested, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
+        let changes = c.apply(to: editSnapshot(viewer: "pb", review: [pr])).reviewCandidates[0]
+        #expect(ReviewRules.status(of: changes, me: "pb", myTeams: []) == .reviewedByMe)
+    }
+
+    @Test func reviewReplacesEarlierReview() {
+        var o = EditOverrides()
+        let earlier = Review(author: "pb", state: .changesRequested, submittedAt: t0 - 60, commitOid: "abc")
+        o.record(.review(state: .approved, commit: "abc", viewer: "PB"), on: editKey(77), at: t0)
+        let shown = o.apply(to: editPR(77, reviews: [earlier]))
+        #expect(shown.latestReviews.count == 1)
+        #expect(shown.latestReviews[0].author == "PB")
+        #expect(shown.latestReviews[0].state == .approved)
+        #expect(shown.latestReviews[0].submittedAt == t0)
+        #expect(shown.latestReviews[0].commitOid == "abc")
+    }
+
+    @Test func reviewLeavesTeamRequestAlone() {
+        var o = EditOverrides()
+        let team = Reviewer.team(slug: "core", name: "Core")
+        o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
+        let shown = o.apply(to: editPR(77, requests: [.user("PB"), team]))
+        #expect(shown.reviewRequests == [team])
+        #expect(ReviewRules.status(of: shown, me: "pb", myTeams: ["core"]) == .approvedByMe)
+    }
+
+    @Test func reviewKeepsOthersReviews() {
+        var o = EditOverrides()
+        let bob = Review(author: "bob", state: .changesRequested, submittedAt: t0 - 60, commitOid: "abc")
+        o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
+        let shown = o.apply(to: editPR(77, reviews: [bob]))
+        #expect(shown.latestReviews.map(\.author) == ["bob", "pb"])
+    }
+
+    @Test func reviewAppliesToDetailReviewsAndRequests() {
+        var o = EditOverrides()
+        o.record(.review(state: .changesRequested, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
+        let bob = Review(author: "bob", state: .approved, submittedAt: t0 - 60)
+        let reviews = o.apply(toReviews: [bob], on: editKey(77))
+        #expect(reviews.map(\.author) == ["bob", "pb"])
+        #expect(reviews[1].state == .changesRequested)
+        #expect(o.apply(toRequests: [.user("PB"), .user("bob")], on: editKey(77)) == [.user("bob")])
+        #expect(o.apply(toReviews: [bob], on: editKey(78)) == [bob])
+    }
+
+    @Test func reviewAgreesWhenEveryCopyHasIt() {
+        let mine = Review(author: "PB", state: .approved, submittedAt: t0, commitOid: "abc")
+        let lagging = editPR(77, requests: [.user("pb")])
+        let there = editPR(77, reviews: [mine])
+        func overrides() -> EditOverrides {
+            var o = EditOverrides()
+            o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
+            return o
+        }
+        var o = overrides()
+        o.reconcile(with: editSnapshot(mine: [there], review: [lagging]), now: t0 + 30)
+        #expect(!o.isEmpty)
+        o.reconcile(with: editSnapshot(mine: [there], review: [there]), now: t0 + 60)
+        #expect(o.isEmpty)
+        var other = overrides()
+        let elsewhere = editPR(77, reviews: [Review(author: "pb", state: .approved, submittedAt: t0, commitOid: "def")])
+        other.reconcile(with: editSnapshot(review: [elsewhere]), now: t0 + 30)
+        #expect(!other.isEmpty)
+        var wrongState = overrides()
+        let changes = editPR(77, reviews: [Review(author: "pb", state: .changesRequested, submittedAt: t0, commitOid: "abc")])
+        wrongState.reconcile(with: editSnapshot(review: [changes]), now: t0 + 30)
+        #expect(!wrongState.isEmpty)
+        var absent = overrides()
+        absent.reconcile(with: editSnapshot(), now: t0 + 30)
+        #expect(!absent.isEmpty)
+    }
+
+    @Test func reviewExpiresAtLifetime() {
+        var o = EditOverrides()
+        o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
+        o.reconcile(with: editSnapshot(review: [editPR(77)]), now: t0 + EditOverrides.lifetime - 1)
+        #expect(!o.isEmpty)
+        o.reconcile(with: editSnapshot(review: [editPR(77)]), now: t0 + EditOverrides.lifetime)
+        #expect(o.isEmpty)
+    }
+
+    @Test func newerReviewRetiresOlder() {
+        var o = EditOverrides()
+        o.record(.review(state: .changesRequested, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
+        o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0 + 10)
+        let approved = editPR(77, reviews: [Review(author: "pb", state: .approved, submittedAt: t0 + 10, commitOid: "abc")])
+        o.reconcile(with: editSnapshot(review: [approved]), now: t0 + 30)
+        #expect(o.isEmpty)
+    }
+
+    @Test func reviewPastPushNeedsReviewAgain() {
+        var o = EditOverrides()
+        o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
+        let shown = o.apply(to: editPR(77, headOid: "def"))
+        #expect(ReviewRules.status(of: shown, me: "pb", myTeams: []) == .needsReview(.newCommitsSinceReview))
+    }
+
     @Test func selfAddWaitsForReviewCandidates() {
         var o = EditOverrides()
         o.record(.reviewers(added: [.user("me")], removed: []), on: editKey(77), at: t0)

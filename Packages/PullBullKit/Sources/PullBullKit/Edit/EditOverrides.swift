@@ -112,8 +112,20 @@ public struct EditOverrides: Equatable, Sendable {
     /// `requests` on pull request `key` with its reviewer edits laid over: the detail's own requests.
     public func apply(toRequests requests: [Reviewer], on key: PRKey) -> [Reviewer] {
         entries.reduce(requests) { requests, entry in
-            guard entry.key == key, case .reviewers(let added, let removed) = entry.change else { return requests }
-            return Self.changeRequests(requests, added, removed)
+            guard entry.key == key else { return requests }
+            switch entry.change {
+            case .reviewers(let added, let removed): return Self.changeRequests(requests, added, removed)
+            case .review(_, _, let viewer): return Self.changeRequests(requests, [], [.user(viewer)])
+            default: return requests
+            }
+        }
+    }
+
+    /// `reviews` on pull request `key` with the viewer's submitted review laid over: the detail's own reviews.
+    public func apply(toReviews reviews: [Review], on key: PRKey) -> [Review] {
+        entries.reduce(reviews) { reviews, entry in
+            guard entry.key == key, case .review(let state, let commit, let viewer) = entry.change else { return reviews }
+            return Self.changeReviews(reviews, state, commit, viewer, at: entry.madeAt)
         }
     }
 
@@ -137,7 +149,7 @@ public struct EditOverrides: Equatable, Sendable {
             (issue.labels, issue.labelColors) = changeLabels(issue.labels, issue.labelColors, added, removed)
         case .assignees(let added, let removed):
             issue.assignees = changeAssignees(issue.assignees, added, removed)
-        case .reviewers:
+        case .reviewers, .review:
             break
         }
         return issue
@@ -161,6 +173,10 @@ public struct EditOverrides: Equatable, Sendable {
             for key in added.map(\.key) where !before.contains(key) {
                 pr.reviewRequestTimes[key] = entry.madeAt
             }
+        case .review(let state, let commit, let viewer):
+            pr.latestReviews = changeReviews(pr.latestReviews, state, commit, viewer, at: entry.madeAt)
+            // The review answers a direct request; a team's request stays until GitHub drops it.
+            pr.reviewRequests = changeRequests(pr.reviewRequests, [], [.user(viewer)])
         }
         return pr
     }
@@ -185,6 +201,17 @@ public struct EditOverrides: Equatable, Sendable {
             requests.append(reviewer)
         }
         return requests
+    }
+
+    /// `reviews` with the viewer's earlier reviews replaced by the one just submitted, logins compared
+    /// case-insensitively.
+    private static func changeReviews(
+        _ reviews: [Review], _ state: ReviewState, _ commit: String, _ viewer: String, at date: Date
+    ) -> [Review] {
+        var reviews = reviews
+        reviews.removeAll { same($0.author, viewer) }
+        reviews.append(Review(author: viewer, state: state, submittedAt: date, commitOid: commit))
+        return reviews
     }
 
     /// Labels and their colours by position; colours missing from an old cache are padded with nil so
@@ -277,6 +304,11 @@ public struct EditOverrides: Equatable, Sendable {
             let listed = Set(fetched.reviewCandidates.first { $0.key == entry.key }?.reviewRequests.map(\.key) ?? [])
             return added.allSatisfy { !mine.contains($0.key) || listed.contains($0.key) }
                 && !removed.contains { mine.contains($0.key) && listed.contains($0.key) }
+        case .review(let state, let commit, let viewer):
+            let copies = prs(in: fetched).filter { $0.key == entry.key }
+            return !copies.isEmpty && copies.allSatisfy { copy in
+                copy.latestReviews.contains { same($0.author, viewer) && $0.state == state && $0.commitOid == commit }
+            }
         }
     }
 
@@ -299,6 +331,8 @@ public struct EditOverrides: Equatable, Sendable {
             return shared((a1 + r1).map(\.login), (a2 + r2).map(\.login))
         case (.reviewers(let a1, let r1), .reviewers(let a2, let r2)):
             return !Set((a1 + r1).map(\.key)).isDisjoint(with: (a2 + r2).map(\.key))
+        case (.review, .review):
+            return true
         default:
             return false
         }

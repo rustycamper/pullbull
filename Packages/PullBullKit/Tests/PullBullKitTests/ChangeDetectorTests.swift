@@ -31,6 +31,14 @@ private func events(_ old: Snapshot?, _ new: Snapshot, toggles: NotificationTogg
 }
 
 @Suite struct ChangeDetectorTests {
+    @Test func ownReviewRaisesNothing() {
+        let old = snap(mine: [pr(1, author: "me")], at: now.addingTimeInterval(-60))
+        let approved = Review(author: "Me", state: .approved, submittedAt: now, commitOid: "abc")
+        let changes = Review(author: "me", state: .changesRequested, submittedAt: now, commitOid: "abc")
+        #expect(events(old, snap(mine: [pr(1, author: "me", reviews: [approved])])).isEmpty)
+        #expect(events(old, snap(mine: [pr(1, author: "me", reviews: [changes])])).isEmpty)
+    }
+
     @Test func firstLoadSilent() {
         let s = snap(review: [pr(1, requests: [.user("me")])], mine: [pr(2, author: "me", ci: .failure)])
         #expect(events(nil, s).isEmpty)

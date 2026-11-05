@@ -154,7 +154,8 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
     public internal(set) var lastCommentAuthor: String?
     /// Whether the newest comment's author is a bot; nil with no comment and in snapshots cached before it was stored.
     public internal(set) var lastCommentByBot: Bool?
-    public let latestReviews: [Review]
+    /// Set by edit overrides too.
+    public internal(set) var latestReviews: [Review]
     /// Set by edit overrides too.
     public internal(set) var reviewRequests: [Reviewer]
     /// The head commit's oid; nil in snapshots cached before it was stored.

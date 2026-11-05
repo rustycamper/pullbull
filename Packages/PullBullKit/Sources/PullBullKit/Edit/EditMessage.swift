@@ -22,7 +22,7 @@ public enum EditMessage {
             return result.addApplied
                 ? "Asked \(asked) to review #\(key.number), but couldn't remove \(removedNames): \(reason)"
                 : "Removed \(removedNames) from #\(key.number), but couldn't ask \(asked): \(reason)"
-        case .status:
+        case .status, .review:
             return failure(change, on: key, reason: reason)
         }
         let number = "#\(key.number)"
@@ -41,6 +41,7 @@ public enum EditMessage {
         case .labels: "change labels on \(number)"
         case .assignees: "change assignees on \(number)"
         case .reviewers: "change reviewers on \(number)"
+        case .review: "review \(number)"
         }
         return "Couldn't \(what): \(reason)"
     }

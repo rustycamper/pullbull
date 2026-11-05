@@ -13,7 +13,7 @@ public struct SetEditor: Sendable {
     /// result with one half refused is returned for the caller to show.
     public func apply(_ change: EditChange, on key: PRKey, contentId: String?) async throws -> SetChangeResult {
         switch change {
-        case .status:
+        case .status, .review:
             return SetChangeResult(addApplied: true, removeApplied: true, refusal: nil)
         case .labels(let added, let removed):
             let subject = try await content(contentId, key)
