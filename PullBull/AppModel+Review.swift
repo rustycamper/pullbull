@@ -79,6 +79,7 @@ extension AppModel {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard ReviewGate.canSubmit(mode.verdict, text: text) else {
             reviewMode?.missingText = true
+            AccessibilityNotification.Announcement(CommentRow.reviewPlaceholder(mode.verdict)).post()
             return
         }
         edits.dismissFailure()

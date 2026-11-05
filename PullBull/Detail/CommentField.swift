@@ -21,7 +21,8 @@ struct CommentField<Secondary: View>: View {
     @State private var isFocused = false
     /// The text's laid-out height, reported by the text view.
     @State private var contentHeight = CommentTextView.oneLineHeight
-    /// Whether the text view holds nothing, an input method's unfinished text included.
+    /// Whether the text view holds nothing but spaces and new lines, as `ReviewGate.canSubmit` reads it,
+    /// counting an input method's unfinished text as text. Only the review placeholder reads this.
     @State private var isEmpty = true
 
     private var account: String? { model.runningAccount?.login }
@@ -92,11 +93,11 @@ struct CommentField<Secondary: View>: View {
                 isEmpty: $isEmpty)
                 .frame(height: textHeight)
                 .overlay(alignment: .leading) {
-                    if !isFocused {
-                        unfocusedText
-                    } else if let review, isEmpty {
-                        reviewPlaceholder(review)
-                    }
+                    if !isFocused { unfocusedText }
+                }
+                // On the first line, however many blank lines the field has grown to.
+                .overlay(alignment: .topLeading) {
+                    if isFocused, let review, isEmpty { reviewPlaceholder(review) }
                 }
             // At the end of the last line, beside the text rather than under it.
             if let hint = CommentRow.hint(
@@ -149,13 +150,14 @@ struct CommentField<Secondary: View>: View {
         .accessibilityHidden(true)
     }
 
-    /// Focused and empty in review mode, what the verdict asks for; a Request changes sent empty warns.
+    /// Focused and blank in review mode, what the verdict asks for; a Request changes sent blank warns.
     private func reviewPlaceholder(_ review: ReviewMode) -> some View {
         Text(CommentRow.reviewPlaceholder(review.verdict))
             .font(.system(size: CommentTextView.fontSize))
             .foregroundStyle(review.missingText ? Palette.amberGlyph : Palette.tertiary)
             .lineLimit(1)
             .truncationMode(.tail)
+            .frame(height: CommentTextView.oneLineHeight)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }
@@ -476,10 +478,12 @@ struct CommentTextView: NSViewRepresentable {
             DispatchQueue.main.async { [weak self] in self?.parent.contentHeight = height }
         }
 
-        /// Whether the view holds any text, for the review placeholder; passed on after the current update.
+        /// Whether the view holds only spaces and new lines, for the review placeholder; passed on after
+        /// the current update.
         private func reportEmpty() {
-            guard let textView, textView.string.isEmpty != parent.isEmpty else { return }
-            let empty = textView.string.isEmpty
+            guard let textView else { return }
+            let empty = textView.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            guard empty != parent.isEmpty else { return }
             DispatchQueue.main.async { [weak self] in self?.parent.isEmpty = empty }
         }
     }
