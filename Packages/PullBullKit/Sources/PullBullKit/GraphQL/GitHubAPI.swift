@@ -767,7 +767,7 @@ public struct GitHubAPI: Sendable {
             headOid: pr["headRefOid"] as? String,
             author: (pr["author"] as? [String: Any])?["login"] as? String ?? "ghost",
             state: (pr["state"] as? String).flatMap { PRState(rawValue: $0.lowercased()) },
-            merge: MergeInfo.read(pullRequest: pr, repository: data["repository"] as? [String: Any] ?? [:]))
+            merge: MergeInfo.read(pullRequest: pr, repository: data["repository"] as? [String: Any]))
     }
 
     /// The pull request's head commit and state right now, for a review that must name the commit it saw.

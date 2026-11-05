@@ -78,6 +78,16 @@ private func read(_ pr: [String: Any], _ repo: [String: Any] = repository()) thr
         #expect(info.canWrite == true)
     }
 
+    @Test func aStackOfAnySizeIsStacked() throws {
+        #expect(try read(pullRequest(extra: ["stack": ["size": 1]])).isStacked)
+        #expect(try read(pullRequest(extra: ["stack": ["size": 3]])).isStacked)
+        #expect(try !read(pullRequest(extra: ["stack": NSNull()])).isStacked)
+    }
+
+    @Test func aMissingRepositoryGivesNoMergeInfo() {
+        #expect(MergeInfo.read(pullRequest: pullRequest(), repository: nil) == nil)
+    }
+
     @Test func methodsNarrowToTheBranchRules() throws {
         let allowed = try read(pullRequest(rules: [rule("PULL_REQUEST", methods: ["SQUASH"])]))
         #expect(allowed.allowedMethods == [.squash])

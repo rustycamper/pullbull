@@ -107,9 +107,9 @@ public struct MergeInfo: Codable, Equatable, Sendable {
     }
 
     /// The merge state from the detail query's `pullRequest` and its `repository`; nil when GitHub
-    /// returned no node id or base branch.
-    static func read(pullRequest pr: [String: Any], repository repo: [String: Any]) -> MergeInfo? {
-        guard let nodeID = pr["id"] as? String, let base = pr["baseRefName"] as? String else { return nil }
+    /// returned no repository, node id or base branch.
+    static func read(pullRequest pr: [String: Any], repository: [String: Any]?) -> MergeInfo? {
+        guard let repo = repository, let nodeID = pr["id"] as? String, let base = pr["baseRefName"] as? String else { return nil }
 
         let commit = ((pr["commits"] as? [String: Any])?["nodes"] as? [[String: Any]])?.last?["commit"] as? [String: Any]
         let contexts = (commit?["statusCheckRollup"] as? [String: Any])?["contexts"] as? [String: Any]
@@ -134,7 +134,7 @@ public struct MergeInfo: Codable, Equatable, Sendable {
             status: MergeStatus(github: pr["mergeStateStatus"] as? String),
             hasConflicts: pr["mergeable"] as? String == "CONFLICTING",
             usesMergeQueue: pr["isMergeQueueEnabled"] as? Bool ?? false,
-            isStacked: ((pr["stack"] as? [String: Any])?["size"] as? Int ?? 0) > 1,
+            isStacked: pr["stack"] is [String: Any],
             isDraft: pr["isDraft"] as? Bool ?? false,
             autoMerge: (pr["autoMergeRequest"] as? [String: Any]).map {
                 AutoMerge(enabledBy: ($0["enabledBy"] as? [String: Any])?["login"] as? String)
