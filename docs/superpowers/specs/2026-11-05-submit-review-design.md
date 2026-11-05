@@ -82,7 +82,7 @@ The review reuses the comment field, because a review is a comment with a verdic
 - **The head is pinned on entering.** Review mode records the detail's head commit at that moment, and the panel shows that commit from then on. A background refresh can replace the detail while the panel is open; it never moves the pin, so a push during review mode is caught by the check below rather than slipping past. A refresh before entering counts as shown: the page already displays it.
 - **Review mode needs the field focused.** It ends when the field loses focus, the route changes, the popover closes or the account changes. The draft stays; the verdict doesn't. So ⌘↩ submits only with the field focused in review mode. With the field unfocused, ⌘↩ opens on GitHub as it always has, and can never become an accidental approval.
 - **A click on the page isn't a loss of focus.** Clicking text in the detail doesn't take focus from the field, so review mode and its panel stay until Esc, and ⌘↩ still submits there. This lets the reviewer read and scroll the PR while reviewing. The cost is known and accepted: ⌘↩ after clicking away submits instead of opening GitHub. Clicking something that takes focus (another field, a picker) ends the mode. The Review, Cancel and verdict buttons take no focus, so using them never ends it.
-- **Reopening the popover** with the field still focused leaves ⌘↩ a plain comment post: closing ended the mode and the panel is gone, while the draft stays.
+- **Reopening the popover** leaves the field unfocused: `popoverDidShow` resigns any text first responder on every open that isn't a search, so ⌘↩ opens GitHub. Closing ended the mode and the panel is gone, while the draft stays.
 - VoiceOver: the verdict is an adjustable control labelled "Review verdict"; the field gains a "Submit review" action in review mode, and "Post comment" goes while it's there; entering says "Reviewing. Approve selected." and reads the summary line. Submitting a Request changes with no text announces the placeholder.
 
 ### The Review button
@@ -99,7 +99,7 @@ The review reuses the comment field, because a review is a comment with a verdic
 | <kbd>⌘</kbd><kbd>↩</kbd> | Submit the review | Review mode |
 | <kbd>Esc</kbd> | Leave review mode, keeping the text | Review mode |
 
-- ⌥⌘V is free today. `SearchKeyMonitor.letterV` exists; `commandKey` gains it, so non-Latin layouts reach it by key position. It goes by the typed letter in the field as well as outside it. On a row or search result it does nothing.
+- `SearchKeyMonitor.letterV` and `commandKey` carry ⌥⌘V, so non-Latin layouts reach it by key position. It goes by the typed letter in the field as well as outside it. On a row or search result it does nothing.
 - The Keyboard Shortcuts window adds a Reviewing section after Commenting: Review ⌥⌘V, noted "Pull request detail", and Submit ⌘↩, noted "In review mode". It's a section of its own because a section lists each key once. The manual's key tables say the same.
 
 ### Submitting
@@ -124,10 +124,11 @@ Follows the comments spec's Posting section, with these differences.
 
 ### Overrides
 
-- `EditChange` gains a review case: state, head commit and viewer. `EditOverrides.apply` lays it over `latestReviews`, replacing the viewer's entry, and takes the viewer's own user entry off `reviewRequests`, so `ReviewRules.status` gives `approvedByMe` or `reviewedByMe` at once and the PR leaves Needs your review without waiting for search.
-- For a PR in no list there is no row to change, so the overlay applies to the detail's `reviews` and `requests` only.
+- `EditChange` has a review case: state, head commit, viewer and the text sent. `EditOverrides.apply` lays it over `latestReviews`, replacing the viewer's entry, and takes the viewer's own user entry off `reviewRequests`, so `ReviewRules.status` gives `approvedByMe` or `reviewedByMe` at once and the PR leaves Needs your review without waiting for search.
+- For a PR in no list there is no row to change, so the overlay applies to the detail's `reviews` and `requests` only. The overlay's `Review` carries the text sent, and the Conversation and the default verdict read through it, so a sent review's text shows at once, in place of an earlier review's.
+- A newer review by the viewer replaces an older self-request in the overlay: GitHub drops the viewer's own request on a review, so the request would never agree and would re-request the viewer once the review retired.
 - It agrees with a fetch when the fetched `latestReviews` has the viewer's review at that commit with that state. It lives for `EditOverrides.lifetime` like other edits.
-- GitHub answers a review before its reads catch up. On a real repo the lag measured up to about 1.5 s, in 2 of 3 rounds: `reviewRequests` still listed the viewer and `latestReviews` lacked the review. So a detail read right after the send can lack the review while the list agrees, and showing it once the overlay retired would drop the review from the page. Therefore a review's overlay stays while the held detail lacks it, even when the list agrees, and each refresh reads that detail again until it shows the review; the lifetime still ends it. That holds for a PR in no list too, which no list could ever confirm. There are no timers: the next refresh decides, which usually costs one extra detail read per affected review, and a detail that never shows the review is read on each refresh and holds the overlay for 5 minutes at most.
+- GitHub answers a review before its reads catch up. On a real repo the lag measured up to about 1.5 s, in 2 of 3 rounds: `reviewRequests` still listed the viewer and `latestReviews` lacked the review. So a detail read right after the send can lack the review while the list agrees, and showing it once the overlay retired would drop the review from the page. Therefore a review's overlay stays while the held detail lacks it, even when the list agrees, and each refresh that finished without an error reads that detail again until it shows the review, once at a time per PR when it is off screen; the lifetime still ends it. That holds for a PR in no list too, which no list could ever confirm. There are no timers: the next refresh decides, which usually costs one extra detail read per affected review, and a detail that never shows the review is read on each clean refresh and holds the overlay for 5 minutes at most.
 - It never enters `EditUndo`. It never reaches `ChangeDetector`, which compares raw snapshots and already skips the viewer's own reviews, so your review raises no Approved or Changes requested notification. A test pins this.
 - The Stats reviews figure comes from search and catches up with its 15-minute cache, unchanged.
 
@@ -150,28 +151,29 @@ The detail fetches no review text today, so a Request changes note would vanish 
 | Submit | REST `POST /repos/{owner}/{repo}/pulls/{n}/reviews` with `event` (`APPROVE`, `REQUEST_CHANGES`), `body`, `commit_id` |
 
 - REST rather than GraphQL because `postComment` already has this path: `restAnswer` with `keepingTransportFailures: true` and `CommentFailure.classify`, which a review reuses as it is. The body is trimmed and left out when empty. A refusal's reason is read from an `errors` list of objects or of plain strings, as this endpoint answers either way.
-- The detail query adds `headRefOid`, `state` and `author{login}` at the pull request level, and `PRDetail` keeps them; a deleted author is kept as "ghost". `PRDetail` is `Codable` and cached: new fields are optional, and a cached detail without them can't start a review until it's fetched again.
+- The detail query reads `headRefOid`, `state` and `author{login}` at the pull request level, and `PRDetail` keeps them; a deleted author is kept as "ghost". `PRDetail` is `Codable` and cached: new fields are optional, and a cached detail without them can't start a review until it's fetched again.
 - The review panel reads its summary from the detail on screen, the same data the page shows. A review can start from a held detail that is refreshing, since the head check covers it; it can't start before a detail with these fields is held.
 
 ## Permissions
 
-- `EditField` gains `review`, gated like reviewers: `installation.canWritePullRequests` for a GitHub App account, `.ready` for `gh`.
+- `EditField` has a `review` case, gated like reviewers: `installation.canWritePullRequests` for a GitHub App account, `.ready` for `gh`.
 - A missing permission shows as it does for comments: the note takes the field's place and links to accepting it. The live App already has Pull requests write, so nobody should see this.
 - Pull requests write is enough to submit a review: the owner approved and requested changes on a private test repo (rustycamper/pullbar#78) through the App's token, so the feature needs no new App permissions and no one has to accept any.
 - Sign in with GitHub needs a team-signed build, so testing the feature against the App's token needs a Developer ID build; a Debug build is ad-hoc signed and can't sign in.
 
 ## Docs and copy
 
-- README's privacy table: "… and comments you write, only when you pick or send them. Never merges, approves or closes" becomes "… comments you write and reviews you submit, only when you pick or send them. Never merges or closes".
-- README's feature table gains a row in the style of the Comment row, and its keys table lists ⌥⌘V and ⌘↩.
+- README's privacy table: "… and comments you write, only when you pick or send them. Never merges, approves or closes" reads "… comments you write and reviews you submit, only when you pick or send them. Never merges or closes".
+- README's feature table has a row in the style of the Comment row, and its keys table lists ⌥⌘V and ⌘↩.
 - `docs/github-app-setup.md`: "It never merges or closes", and the Issues/Pull requests write sentence names reviews. The App's description on GitHub carries the same sentence; the owner changes that one by hand at release.
+- `SECURITY.md`'s list of what PullBull writes names the comments you write and the reviews you submit.
 - `docs/manual.md`: a Reviewing section after Commenting, and the key tables.
 - `ShortcutCatalog` as above. Release notes mention it.
 
 ## Testing
 
 - **Kit (Swift Testing):** who can review; the head check's three outcomes; a background detail refresh leaves the pin alone; failure classification; unknown-outcome matching; overrides apply, agree and expire, and the PR leaves Needs your review; `ChangeDetector` stays silent; Conversation merge order; a cached detail without new fields decodes.
-- **Real GitHub, on rustycamper/pullbar#78 with a Developer ID build, signed in through the App:** Approve; Request changes with text; the empty and blank Request changes refused; the popover reopening on the last verdict; Esc keeping the text, after which ⌘↩ posts a comment; the field released after a send, after which ⌘↩ opens GitHub; the bottom row and panel at 360 pt. The lag in Overrides was found here. An approved PR leaves the Review list, as it no longer needs the viewer: that is the list's existing rule.
+- **Real GitHub, on rustycamper/pullbar#78 with a Developer ID build, signed in through the App:** Approve; Request changes with text; the empty and blank Request changes refused; ⌥⌘V opening on the viewer's last verdict; Esc keeping the text, after which ⌘↩ posts a comment; the field released after a send, after which ⌘↩ opens GitHub; the bottom row and panel at 360 pt. The lag in Overrides was found here. A PR reviewed with Request changes leaves the Review list, and an approved one leaves it while "Hide PRs I approved" is on (the default) and stays dimmed otherwise: that is the list's existing rule (`TabBuilder`).
 - **Not run on real GitHub:** a slowed connection, a push while in review mode, VoiceOver, a pending review started on the web, a draft PR, a closed PR, and a `gh` login.
 
 ## Left to the builder
