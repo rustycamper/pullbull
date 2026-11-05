@@ -239,12 +239,18 @@ public struct PRDetail: Codable, Sendable {
     public let requests: [Reviewer]?
     /// Every comment on the PR; `comments` holds the newest 50. Nil in details cached before it was stored.
     public let commentCount: Int?
+    /// The head commit, the author ("ghost" for a deleted account) and the state when this detail was
+    /// fetched; nil in details cached before they were stored.
+    public let headOid: String?
+    public let author: String?
+    public let state: PRState?
 
     public init(
         key: PRKey, body: String, checks: [Check], reviews: [Review],
         comments: [Comment], files: [ChangedFile], updatedAt: Date? = nil, ci: CIState? = nil,
         changedFiles: Int? = nil, additions: Int? = nil, deletions: Int? = nil, checkCount: Int? = nil,
-        requests: [Reviewer]? = nil, commentCount: Int? = nil
+        requests: [Reviewer]? = nil, commentCount: Int? = nil,
+        headOid: String? = nil, author: String? = nil, state: PRState? = nil
     ) {
         self.key = key
         self.body = body
@@ -260,6 +266,9 @@ public struct PRDetail: Codable, Sendable {
         self.checkCount = checkCount
         self.requests = requests
         self.commentCount = commentCount
+        self.headOid = headOid
+        self.author = author
+        self.state = state
     }
 
     public var commentTotal: Int { max(commentCount ?? 0, comments.count) }
@@ -737,7 +746,36 @@ public struct GitHubAPI: Sendable {
             deletions: pr["deletions"] as? Int,
             checkCount: checkCount,
             requests: requestNodes.compactMap(Decoding.reviewer),
-            commentCount: (commentsConnection?["totalCount"] as? Int).map { $0 - (commentNodes.count - comments.count) })
+            commentCount: (commentsConnection?["totalCount"] as? Int).map { $0 - (commentNodes.count - comments.count) },
+            headOid: pr["headRefOid"] as? String,
+            author: (pr["author"] as? [String: Any])?["login"] as? String ?? "ghost",
+            state: (pr["state"] as? String).flatMap { PRState(rawValue: $0.lowercased()) })
+    }
+
+    /// The pull request's head commit and state right now, for a review that must name the commit it saw.
+    public func prHead(_ key: PRKey) async throws -> PRHead {
+        let parts = key.repo.split(separator: "/", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { throw APIError.graphQL("bad repo \(key.repo)") }
+        let (data, errors) = try await executeReportingErrors(
+            Queries.prHead, ["owner": parts[0], "name": parts[1], "n": key.number])
+        guard let pr = (data["repository"] as? [String: Any])?["pullRequest"] as? [String: Any] else {
+            throw Self.missing(data, errors, "pull request \(key.repo)#\(key.number) not found")
+        }
+        guard let oid = pr["headRefOid"] as? String,
+              let state = (pr["state"] as? String).flatMap({ PRState(rawValue: $0.lowercased()) })
+        else { throw APIError.graphQL("malformed pull request head") }
+        return PRHead(oid: oid, state: state)
+    }
+
+    /// Submits a review on `commit`, with `body` trimmed and left out when empty. A refusal throws
+    /// `writeRefused` with GitHub's reason; a timeout or dropped connection throws `CommentTransportError`,
+    /// since the review may have landed.
+    public func submitReview(on key: PRKey, verdict: ReviewVerdict, body: String, commit: String) async throws {
+        let path = "/repos/\(key.repo)/pulls/\(key.number)/reviews"
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        var payload: [String: Any] = ["event": verdict.rawValue, "commit_id": commit]
+        if !trimmed.isEmpty { payload["body"] = trimmed }
+        _ = try await restAnswer("POST", path, payload, keepingTransportFailures: true)
     }
 
     /// Issue `key` with who last closed it; nil when it is gone (deleted, transferred, no access) or
@@ -1245,7 +1283,8 @@ public struct GitHubAPI: Sendable {
         if let limited = APIError.rateLimited(in: response, body: data, now: now()) { return limited }
         if refusing, [403, 404, 410, 422].contains(status) {
             let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-            let detail = (body?["errors"] as? [[String: Any]])?.first?["message"] as? String
+            let first = (body?["errors"] as? [Any])?.first
+            let detail = (first as? [String: Any])?["message"] as? String ?? first as? String
             let reason = [detail, body?["message"] as? String].compactMap { $0 }.first { !$0.isEmpty }
             return .writeRefused(reason ?? "GitHub didn't apply the change")
         }

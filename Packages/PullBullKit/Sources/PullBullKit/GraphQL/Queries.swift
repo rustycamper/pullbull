@@ -237,18 +237,24 @@ enum Queries {
     \(issueRowFields)
     """
 
+    static let prHead = """
+    query($owner:String!,$name:String!,$n:Int!){
+      repository(owner:$owner, name:$name){pullRequest(number:$n){headRefOid state}}
+    }
+    """
+
     static let detail = """
     query($owner:String!,$name:String!,$n:Int!){
       repository(owner:$owner, name:$name){
         pullRequest(number:$n){
-          body updatedAt changedFiles additions deletions
+          body updatedAt changedFiles additions deletions headRefOid state author{login}
           commits(last:1){nodes{commit{statusCheckRollup{state contexts(first:50){totalCount \(rollupCounts) nodes{
             __typename
             ... on CheckRun{name conclusion status detailsUrl}
             ... on StatusContext{context state targetUrl}
           }}}}}}
           reviewRequests(first:20){nodes{requestedReviewer{__typename ... on User{login} ... on Team{slug name}}}}
-          latestReviews(first:20){nodes{author{login} state submittedAt}}
+          latestReviews(first:20){nodes{author{login} state submittedAt body commit{oid}}}
           comments(last:50){totalCount nodes{id author{__typename login} body createdAt}}
           files(first:100){totalCount nodes{path additions deletions}}
         }

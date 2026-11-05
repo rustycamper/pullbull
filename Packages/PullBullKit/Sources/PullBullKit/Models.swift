@@ -53,13 +53,19 @@ public struct Review: Hashable, Codable, Sendable {
     public let commitOid: String?
     /// Whether a bot (Copilot, a review app) wrote it; nil when unknown (older caches, detail reviews).
     public let byBot: Bool?
+    /// The review's text; only the detail fetch reads it, so nil on list copies and older caches.
+    public let body: String?
 
-    public init(author: String, state: ReviewState, submittedAt: Date?, commitOid: String? = nil, byBot: Bool? = nil) {
+    public init(
+        author: String, state: ReviewState, submittedAt: Date?, commitOid: String? = nil, byBot: Bool? = nil,
+        body: String? = nil
+    ) {
         self.author = author
         self.state = state
         self.submittedAt = submittedAt
         self.commitOid = commitOid
         self.byBot = byBot
+        self.body = body
     }
 }
 
