@@ -116,13 +116,23 @@ import Testing
     }
 
     @Test func thePanelReadsOnlyWhatWasShown() {
-        let mode = shown(info(failing: 0))
-        let before = (mode.warnings, mode.sentence, mode.summary, mode.methods)
-        _ = read(info(base: "dev", failing: 5, changes: true))
-        #expect(mode.warnings == before.0)
-        #expect(mode.sentence == before.1)
-        #expect(mode.summary == before.2)
-        #expect(mode.methods == before.3)
+        var mode = shown(info())
+        let newer = read(info(base: "dev", failing: 5, changes: true))
+        #expect(mode.warnings.isEmpty)
+        #expect(mode.sentence == "Squash and merge #88 into main")
+        #expect(mode.summary == "3 commits · 2 approvals · 12 checks passing")
+        #expect(mode.read != newer)
+
+        mode.show(newer, at: at(1))
+        #expect(mode.warnings == [.checksFailing(5), .changesRequested])
+        #expect(mode.sentence == "Squash and merge #88 into dev")
+        #expect(mode.summary == "3 commits · 2 approvals · 5 of 12 checks failing")
+    }
+
+    @Test func failingAndRunningShowOnlyFailingInTheSummary() {
+        let mode = shown(info(failing: 2, running: 3))
+        #expect(mode.summary == "3 commits · 2 approvals · 2 of 12 checks failing")
+        #expect(mode.warnings == [.checksFailing(2), .checksRunning(3)])
     }
 
     @Test func warningsNeedASecondStep() {
@@ -235,6 +245,6 @@ import Testing
         #expect(base != MergeFacts(detail: detail(info(approvals: 1)), offer: .action(.merge)))
         #expect(base != MergeFacts(detail: detail(info(changes: true)), offer: .action(.merge)))
         let none = MergeFacts(detail: detail(nil), offer: .hidden)
-        #expect(none.action == nil && none.approvals == 0 && none.tally.total == 0)
+        #expect(none.action == nil && none.approvals == 0 && none.tally.total == 0 && none.base == "")
     }
 }

@@ -141,12 +141,12 @@ public struct MergeMode: Equatable, Sendable {
     public mutating func show(_ read: MergeRead, at now: Date) {
         self.read = read
         let allowed = methods
-        if let method, allowed.contains(method) {
-            // keep it
-        } else if let preferred = read.info?.defaultMethod, allowed.contains(preferred) {
-            method = preferred
-        } else {
-            method = allowed.first
+        if method.map(allowed.contains) != true {
+            if let preferred = read.info?.defaultMethod, allowed.contains(preferred) {
+                method = preferred
+            } else {
+                method = allowed.first
+            }
         }
         phase = .ready
         isSecondStep = false
