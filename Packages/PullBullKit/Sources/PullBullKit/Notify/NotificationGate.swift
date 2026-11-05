@@ -51,14 +51,12 @@ public struct NotificationGate: Sendable {
         ownRequests[key] = date.addingTimeInterval(Self.selfRequestWindow)
     }
 
-    /// The PR events of `changes(...)`.
-    public mutating func events(
+    /// The PR events of `changes(...)`, with nothing merged here. For tests: the app calls `changes`.
+    mutating func events(
         snapshot: Snapshot?, status: RefreshStatus, toggles: NotificationToggles,
-        filters: ReviewFilters = .none, mergedHere: Set<PRKey> = [], now: Date = Date()
+        filters: ReviewFilters = .none, now: Date = Date()
     ) -> [PREvent] {
-        changes(
-            snapshot: snapshot, status: status, toggles: toggles, filters: filters, mergedHere: mergedHere, now: now
-        ).prs
+        changes(snapshot: snapshot, status: status, toggles: toggles, filters: filters, mergedHere: [], now: now).prs
     }
 
     /// `mergedHere`: the pull requests merged from PullBull this session, which `ChangeDetector` keeps silent.

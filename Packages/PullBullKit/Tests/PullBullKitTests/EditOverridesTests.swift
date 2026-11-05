@@ -870,6 +870,28 @@ private func mergeDetail(state: PRState? = .open, merge: MergeInfo? = nil) -> PR
         #expect(o.isEmpty)
     }
 
+    // A Merge when ready can land inside the lifetime, and a detail that isn't open has no auto-merge to show.
+    @Test func autoMergeSettlesOnceTheDetailIsNoLongerOpen() {
+        let there = editSnapshot(closed: [editPR(77, state: .merged)])
+        var o = EditOverrides()
+        o.record(.autoMerge(enabled: true, viewer: "pb"), on: editKey(77), at: t0)
+
+        // A detail cached before `state` was stored might still be open, so it's read again.
+        #expect(o.mergesAhead(of: [editKey(77): mergeDetail(state: nil, merge: mergeInfo())]) == [editKey(77)])
+        #expect(o.mergesAhead(of: [editKey(77): mergeDetail(state: .closed, merge: mergeInfo())]).isEmpty)
+
+        let none = o.mergesAhead(of: [editKey(77): mergeDetail(state: .merged, merge: mergeInfo())])
+        #expect(none.isEmpty)
+        o.reconcile(with: there, now: t0 + 30, holdingMerges: none)
+        #expect(o.isEmpty)
+
+        // Some PRs keep their auto-merge request after merging, which a cancel would otherwise wait out.
+        var cancel = EditOverrides()
+        cancel.record(.autoMerge(enabled: false, viewer: "pb"), on: editKey(77), at: t0)
+        let kept = mergeInfo(autoMerge: AutoMerge(enabledBy: "pb"))
+        #expect(cancel.mergesAhead(of: [editKey(77): mergeDetail(state: .merged, merge: kept)]).isEmpty)
+    }
+
     @Test func aCancelIsHeldWhileTheDetailStillShowsAutoMerge() {
         var o = EditOverrides()
         o.record(.autoMerge(enabled: false, viewer: "pb"), on: editKey(77), at: t0)

@@ -92,7 +92,8 @@ public struct EditOverrides: Equatable, Sendable {
     }
 
     /// The pull requests whose detail in `details` lacks the newest merge or auto-merge edit laid over it.
-    /// GitHub answers before its reads catch up, and no list says whether auto-merge is set.
+    /// GitHub answers before its reads catch up, and no list says whether auto-merge is set. A detail that
+    /// is no longer open is never behind on auto-merge, as there's none left for it to show.
     public func mergesAhead(of details: [PRKey: PRDetail]) -> Set<PRKey> {
         var newest: [PRKey: Entry] = [:]
         for entry in entries where Self.isMerge(entry.change) { newest[entry.key] = entry }
@@ -100,8 +101,10 @@ public struct EditOverrides: Equatable, Sendable {
             guard let detail = details[key] else { return nil }
             switch entry.change {
             case .merged: return detail.state == .merged ? nil : key
-            case .autoMerge(let enabled, _): return (detail.merge?.autoMerge != nil) == enabled ? nil : key
-            default: return nil
+            case .autoMerge(let enabled, _):
+                if let state = detail.state, state != .open { return nil }
+                return (detail.merge?.autoMerge != nil) == enabled ? nil : key
+            case .status, .labels, .assignees, .reviewers, .review: return nil
             }
         })
     }
@@ -379,7 +382,7 @@ public struct EditOverrides: Equatable, Sendable {
     private static func isMerge(_ change: EditChange) -> Bool {
         switch change {
         case .merged, .autoMerge: true
-        default: false
+        case .status, .labels, .assignees, .reviewers, .review: false
         }
     }
 
