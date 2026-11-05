@@ -29,7 +29,8 @@ struct PopoverView: View {
     /// Set when ← leaves a detail: the held key's repeats do nothing, in the list too, until another key.
     @State private var swallowArrowRepeats = false
     /// Held after submitting a review, ⌘↩ is one press: its repeats would otherwise submit again after a
-    /// failure, post the text as a comment or open GitHub once review mode ended.
+    /// failure, post the text as a comment or open GitHub once review mode ended. ⌃⌘↩ in the merge panel
+    /// sets it too.
     @State private var swallowSubmitRepeats = false
     /// On screen: the panel is created once and only ordered out, so the views stay mounted while closed.
     @State private var shown = false
@@ -608,9 +609,9 @@ struct PopoverView: View {
                 }
                 return true
             }
-            // ⌥⌘M comments and ⌥⌘V reviews only in a detail, where the item is in view; here they're taken
-            // and do nothing.
-            if ["m", "v"].contains(where: { Self.isOptionCommand(event, flags: flags, letter: $0) }) { return true }
+            // ⌥⌘M comments, ⌥⌘V reviews and ⌥⌘G merges only in a detail, where the item is in view; here
+            // they're taken and do nothing.
+            if ["m", "v", "g"].contains(where: { Self.isOptionCommand(event, flags: flags, letter: $0) }) { return true }
             // ⌘Z: takes back the last edit while it can be; typing since hands ⌘Z back to the field.
             if Self.isCommandZ(event, flags: flags) {
                 return model.undoLastEdit()
@@ -896,13 +897,37 @@ struct PopoverView: View {
     /// The detail views have no search: Esc, ← and ⌘[ go back, ⌥↓ / ⌥↑ step through the list it came
     /// from, ⌘↩ opens the page on GitHub, ⌘C copies its link (unless text is selected), ⌘⇧C its
     /// reference, ⌥⌘C its Markdown link, ⌘R fetches it again, ⌥⌘M focuses the comment field, ⌥⌘V starts a
-    /// review. Every other key passes through. While the comment field has focus it owns the keyboard
-    /// (`CommentFieldKeys`), but for ⌥⌘V.
+    /// review, ⌥⌘G opens the merge panel. Every other key passes through. While the comment field has focus
+    /// it owns the keyboard (`CommentFieldKeys`), but for ⌥⌘V and ⌥⌘G. The open merge panel takes every key
+    /// (`MergePanelKeys`).
     private func handleDetailKey(_ event: NSEvent, flags: NSEvent.ModifierFlags, in window: NSWindow) -> Bool {
+        if let mode = model.mergeMode {
+            switch MergePanelKeys.route(
+                keyCode: event.keyCode, flags: KeyCombo.Modifiers(flags), isRepeat: event.isARepeat)
+            {
+            case .confirm:
+                // ⌃⌘↩ is one press: its repeats would otherwise reach the detail once the panel has closed,
+                // where letting go of ⌃ first makes them a ⌘↩ that opens GitHub.
+                swallowSubmitRepeats = true
+                model.confirmMerge(on: mode.key)
+            case .changeMethod(let offset):
+                model.changeMergeMethod(by: offset)
+            case .close:
+                model.leaveMergeMode()
+            case .swallow:
+                break
+            }
+            return true
+        }
         if let field = window.firstResponder as? CommentEditor, let key = field.key {
             // ⌥⌘V goes by the typed letter here too; text already in the field becomes the review's.
             if !field.hasMarkedText(), Self.isOptionCommand(event, flags: flags, letter: "v") {
                 if field.isPullRequest { model.enterReviewMode(on: key) }
+                return true
+            }
+            // ⌥⌘G too; the field's text stays where it is.
+            if !field.hasMarkedText(), Self.isOptionCommand(event, flags: flags, letter: "g") {
+                if field.isPullRequest { model.enterMergeMode(on: key) }
                 return true
             }
             let action = CommentFieldKeys.route(
@@ -985,6 +1010,11 @@ struct PopoverView: View {
         // ⌥⌘V: review mode on a PR, where it's offered; on an issue it's taken and does nothing.
         if Self.isOptionCommand(event, flags: flags, letter: "v") {
             if case .detail(let key) = model.route { model.enterReviewMode(on: key) }
+            return true
+        }
+        // ⌥⌘G: the merge panel on a PR, where it's offered; on an issue it's taken and does nothing.
+        if Self.isOptionCommand(event, flags: flags, letter: "g") {
+            if case .detail(let key) = model.route { model.enterMergeMode(on: key) }
             return true
         }
         if Self.isOptionCommand(event, flags: flags, letter: "s") {
@@ -1182,6 +1212,8 @@ struct PopoverView: View {
             model.moveStatusPicker(by: event.keyCode == SearchKeyMonitor.downArrow ? 1 : -1)
             return true
         case SearchKeyMonitor.return, SearchKeyMonitor.enter:
+            // ⌃⌘↩ confirms a merge and means nothing else anywhere.
+            guard !flags.isSuperset(of: [.control, .command]) else { return false }
             model.applyStatusPicker()
             return true
         case SearchKeyMonitor.escape:
@@ -1262,6 +1294,7 @@ struct PopoverView: View {
         case SearchKeyMonitor.letterL: return "l"
         case SearchKeyMonitor.letterM: return "m"
         case SearchKeyMonitor.letterV: return "v"
+        case SearchKeyMonitor.letterG: return "g"
         default: return typed
         }
     }

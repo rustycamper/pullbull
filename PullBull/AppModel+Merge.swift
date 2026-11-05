@@ -16,12 +16,14 @@ extension AppModel {
             viewer: runningAccount?.login, permission: setEditPermission(.merge, for: key))
     }
 
-    /// ⌥⌘G or Merge: pins the head on screen, ends review mode keeping its text, and reads the PR afresh.
+    /// ⌥⌘G or Merge: pins the head on screen, ends review mode keeping its text, takes the keyboard from
+    /// the comment field, and reads the PR afresh.
     func enterMergeMode(on key: PRKey) {
         guard mergeMode == nil, case .action = mergeOffer(for: key), reviewMode?.phase != .sending,
               !isPostInFlight(for: key), let head = details[key]?.headOid, let account = runningAccount
         else { return }
         endReviewMode(on: nil)
+        releaseCommentField(on: key)
         mergeMode = MergeMode(key: key, pinnedHead: head)
         let client = api(for: account)
         mergeTask = Task { [weak self] in

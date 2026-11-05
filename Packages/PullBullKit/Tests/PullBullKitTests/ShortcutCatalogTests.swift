@@ -8,7 +8,7 @@ private let modifierOrder = ["⌃", "⌥", "⇧", "⌘"]
     @Test func sectionsInOrder() {
         #expect(ShortcutCatalog.sections(toggle: nil).map(\.title)
             == ["PullBull", "Lists", "Copy and open", "Search", "Completion list", "Editing", "Detail",
-                "Commenting", "Reviewing", "Ask AI answers"])
+                "Commenting", "Reviewing", "Merging", "Ask AI answers"])
     }
 
     @Test func arrowShortcutsNameChips() throws {
@@ -33,6 +33,18 @@ private let modifierOrder = ["⌃", "⌥", "⇧", "⌘"]
         #expect(reviewing.shortcuts == [
             Shortcut("Review", [["⌥", "⌘", "V"]], note: "Pull request detail"),
             Shortcut("Submit", [["⌘", "↩"]], note: "In review mode"),
+        ])
+    }
+
+    @Test func catalogListsMerging() throws {
+        let sections = ShortcutCatalog.sections(toggle: nil)
+        let reviewing = try #require(sections.firstIndex { $0.title == "Reviewing" })
+        #expect(sections[reviewing + 1].title == "Merging")
+        #expect(sections[reviewing + 1].shortcuts == [
+            Shortcut("Open the merge panel", [["⌥", "⌘", "G"]], note: "Pull request detail"),
+            Shortcut("Change the method", [["⌥", "←"], ["⌥", "→"]], note: "In the merge panel"),
+            Shortcut("Confirm", [["⌃", "⌘", "↩"]], note: "In the merge panel"),
+            Shortcut("Close the panel", [["Esc"]], note: "In the merge panel"),
         ])
     }
 

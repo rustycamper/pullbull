@@ -386,8 +386,9 @@ final class AppModel {
     @ObservationIgnored private var statesTask: Task<Void, Never>?
     /// Trims the detail and avatar disk caches a minute after launch, then once a day.
     @ObservationIgnored private var cacheTrimTask: Task<Void, Never>?
-    /// What `GET /user/installations` last returned per app account; the source of `orgAccess`.
-    @ObservationIgnored private var installations: [AccountRef: InstallationsState] = [:]
+    /// What `GET /user/installations` last returned per app account; the source of `orgAccess`. Observed, as
+    /// `mergeOffer` waits for it: a detail open before it loads shows its Merge when it does.
+    private var installations: [AccountRef: InstallationsState] = [:]
     /// The last read of each app account's own-account repository list; the source of `personalRepos`.
     @ObservationIgnored private var personalRepoReads: [AccountRef: PersonalRepos] = [:]
     @ObservationIgnored private var personalReposTask: (account: AccountRef, task: Task<Void, Never>)?

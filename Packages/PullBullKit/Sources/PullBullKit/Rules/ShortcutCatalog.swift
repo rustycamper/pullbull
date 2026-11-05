@@ -106,6 +106,12 @@ public enum ShortcutCatalog {
                 Shortcut("Review", [["⌥", "⌘", "V"]], note: "Pull request detail"),
                 Shortcut("Submit", [["⌘", "↩"]], note: "In review mode"),
             ]),
+            ShortcutSection("Merging", [
+                Shortcut("Open the merge panel", [["⌥", "⌘", "G"]], note: "Pull request detail"),
+                Shortcut("Change the method", [["⌥", "←"], ["⌥", "→"]], note: "In the merge panel"),
+                Shortcut("Confirm", [["⌃", "⌘", "↩"]], note: "In the merge panel"),
+                Shortcut("Close the panel", [["Esc"]], note: "In the merge panel"),
+            ]),
             ShortcutSection("Ask AI answers", [
                 Shortcut("Move the highlight", [["↑"], ["↓"]]),
                 Shortcut("Open in PullBull", [["↩"]]),
