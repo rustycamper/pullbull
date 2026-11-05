@@ -277,7 +277,9 @@ extension AppModel {
         case .headMoved:
             mergeFailed(merge, EditMessage.mergeHeadMoved(on: key), dropsOverlay: true, reloads: true)
         case .notOpen(let merged):
-            // Closed, the overlay would claim a merge that never happened until its lifetime ran out.
+            // Closed, the overlay would claim a merge that never happened until its lifetime ran out. Merged, it
+            // stays true, but the merge wasn't ours, so it should notify.
+            if merged, runningAccount == merge.account { mergedHere.remove(key) }
             mergeFailed(merge, EditMessage.reviewNotOpen(on: key, merged: merged), dropsOverlay: !merged, reloads: true)
         case .checkFailed(let reason):
             mergeFailed(merge, EditMessage.mergeCheckFailed(on: key, reason: reason), dropsOverlay: false, reloads: false)
@@ -337,9 +339,10 @@ extension AppModel {
     /// nothing else may change otherwise.
     private func settleMerge(_ merge: PendingMerge) -> Bool {
         postsInFlight.remove(account: merge.account.login, key: merge.key)
-        sendingMerges.remove(merge.key)
         if confirmingMerge?.key == merge.key, confirmingMerge?.account == merge.account { confirmingMerge = nil }
-        return runningAccount == merge.account
+        guard runningAccount == merge.account else { return false }
+        sendingMerges.remove(merge.key)
+        return true
     }
 
     /// Also takes the key off `mergedHere`, so a later real merge notifies.
