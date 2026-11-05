@@ -3053,6 +3053,11 @@ extension AppModel {
             key: key, range: range, replacement: replacement, caret: caret, n: (mentionInsertion?.n ?? 0) + 1)
     }
 
+    /// Keeps a detail read outside `loadDetail`; the caller has checked its account still runs.
+    func keepDetail(_ fresh: PRDetail) {
+        details[fresh.key] = fresh
+    }
+
     /// Fetches the detail of `key` once with `account`, outside `loadDetail`'s cancelling, keeps it as
     /// `loadDetail` does while `account` still runs, and returns the comments it holds.
     func fetchDetailComments(_ key: PRKey, isPullRequest: Bool, account: AccountRef) async throws -> [Comment] {

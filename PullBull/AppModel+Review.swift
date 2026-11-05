@@ -140,6 +140,7 @@ extension AppModel {
             guard settleReview(review) else { return }
             backToComposing(on: key)
             showReviewFailure(EditMessage.reviewNotOpen(on: key, merged: merged), review)
+            reloadReviewedDetail(review)
         case .checkFailed(let reason):
             guard settleReview(review) else { return }
             backToComposing(on: key)
@@ -156,17 +157,19 @@ extension AppModel {
 
     /// The write had no clear answer: the field stays read-only while a fresh detail decides. A failed read
     /// counts as unconfirmed, and nothing is ever sent again. Runs with the posting account even after a
-    /// switch, so the slot goes. Its own task, which nothing cancels.
+    /// switch, so the slot goes. Its own task, which nothing cancels. The read is kept either way, so the
+    /// Reviewers section the unconfirmed line points at shows what GitHub has.
     private func confirmReview(_ review: PendingReview, client: GitHubAPI) {
         Task { [weak self] in
             let fresh = try? await client.detail(review.key)
             guard let self else { return }
             if let fresh, ReviewCheck.landed(
                 review.verdict, by: review.account.login, since: review.since, in: fresh.reviews) != nil {
-                self.reviewSent(review)
+                self.reviewSent(review, read: fresh)
                 return
             }
             guard self.settleReview(review) else { return }
+            if let fresh { self.keepDetail(fresh) }
             self.dropReviewOverlay(review)
             self.endReviewMode(on: review.key)
             self.releaseCommentField(on: review.key)
@@ -174,15 +177,20 @@ extension AppModel {
         }
     }
 
-    /// GitHub has the review. The posting account's draft goes even when another account now runs.
-    private func reviewSent(_ review: PendingReview) {
+    /// GitHub has the review. The posting account's draft goes even when another account now runs. `read`
+    /// is the detail that showed it landed, which stands in for fetching it again.
+    private func reviewSent(_ review: PendingReview, read: PRDetail? = nil) {
         let isCurrent = settleReview(review)
         commentDrafts[account: review.account.login, key: review.key] = nil
         guard isCurrent else { return }
         endReviewMode(on: review.key)
         resetCommentField(on: review.key)
         releaseCommentField(on: review.key)
-        reloadReviewedDetail(review)
+        if let read {
+            keepDetail(read)
+        } else {
+            reloadReviewedDetail(review)
+        }
         let done = switch review.verdict {
         case .approve: "Approved #\(review.key.number)"
         case .requestChanges: "Requested changes on #\(review.key.number)"

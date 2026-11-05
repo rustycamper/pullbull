@@ -926,9 +926,10 @@ struct PopoverView: View {
                 // With nothing to take yet ("Loading people…"), Return and Tab type as usual.
                 return model.acceptMention()
             case .submitReview:
-                // The model refuses it during the check and the write.
+                // The model refuses it during the check and the write. A repeat never submits: ⌘↩ may
+                // already be held when Review is clicked. The key is taken either way.
                 swallowSubmitRepeats = true
-                model.submitReview(on: key)
+                if !event.isARepeat { model.submitReview(on: key) }
                 return true
             case .leaveReview:
                 // Focus stays in the field. The model refuses it during the write.
