@@ -839,8 +839,10 @@ public struct GitHubAPI: Sendable {
 
     /// Sends an auto-merge mutation. Only GitHub's validation answers are a refusal: a `data` object whose
     /// payload is null with an `UNPROCESSABLE` error (as "Pull request is in clean status") or a `FORBIDDEN`
-    /// one. Any other type, such as `INTERNAL`, and a body that can't be read or has no `data` object, stay
-    /// `graphQL`, which leaves the outcome unknown, as the change may have landed.
+    /// one, and a `FORBIDDEN` error with no `data` object at all, which `executeReportingErrors` throws as a
+    /// refusal, since nothing executed. Any other type on a null payload, such as `INTERNAL`, and a body that
+    /// can't be read, or has no `data` object and no error it recognises, stay `graphQL`, which leaves the
+    /// outcome unknown, as the change may have landed.
     private func autoMergeMutation(_ mutation: String, _ variables: [String: Any], payload: String) async throws {
         let (data, errors) = try await executeReportingErrors(mutation, variables)
         if data[payload] is [String: Any] { return }

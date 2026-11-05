@@ -294,6 +294,26 @@ private final class GraphQLQueue: GraphQLTransport, @unchecked Sendable {
         }
     }
 
+    @Test func aForbiddenEnableWithNoDataIsARefusal() async {
+        let t = GraphQLQueue([#"{"errors":[{"type":"FORBIDDEN","message":"Not allowed"}]}"#])
+        do {
+            try await api(t).enableAutoMerge(key, nodeID: "PR_1", head: "a", method: .squash)
+            Issue.record("sent")
+        } catch {
+            #expect(CommentFailure.classify(error) == .refused("Not allowed"))
+        }
+    }
+
+    @Test func aForbiddenDisableWithNoDataIsARefusal() async {
+        let t = GraphQLQueue([#"{"errors":[{"type":"FORBIDDEN","message":"Not allowed"}]}"#])
+        do {
+            try await api(t).disableAutoMerge(key, nodeID: "PR_1")
+            Issue.record("sent")
+        } catch {
+            #expect(CommentFailure.classify(error) == .refused("Not allowed"))
+        }
+    }
+
     @Test func anInternalEnableErrorOnANullPayloadStaysUnknown() async {
         let t = GraphQLQueue([#"{"data":{"enablePullRequestAutoMerge":null},"errors":[{"type":"INTERNAL","message":"Something went wrong"}]}"#])
         do {
