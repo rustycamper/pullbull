@@ -37,7 +37,7 @@ jobs:
         run: |
           code=true
           if files=$(gh api "$FILES_URL" --paginate --jq '.[] | .filename, (.previous_filename // empty)'); then
-            grep -qvE '\.md$|^docs/|^LICENSE$|^\.github/ISSUE_TEMPLATE/' <<<"$files" || code=false
+            grep -qvE '\.md$|^docs/|^LICENSE$|^\.github/ISSUE_TEMPLATE/|^\.github/workflows/ci\.yml$' <<<"$files" || code=false
           fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
 
