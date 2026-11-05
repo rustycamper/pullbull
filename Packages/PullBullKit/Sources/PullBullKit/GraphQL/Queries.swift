@@ -246,9 +246,14 @@ enum Queries {
     static let detail = """
     query($owner:String!,$name:String!,$n:Int!){
       repository(owner:$owner, name:$name){
+        viewerPermission mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed viewerDefaultMergeMethod
         pullRequest(number:$n){
           body updatedAt changedFiles additions deletions headRefOid state author{login}
-          commits(last:1){nodes{commit{statusCheckRollup{state contexts(first:50){totalCount \(rollupCounts) nodes{
+          id isDraft mergeable mergeStateStatus isMergeQueueEnabled baseRefName canBeRebased
+          viewerCanEnableAutoMerge viewerCanDisableAutoMerge stack{size} autoMergeRequest{enabledBy{login}}
+          commitTotal: commits{totalCount}
+          baseRef{rules(first:50){nodes{type parameters{... on PullRequestParameters{allowedMergeMethods}}}}}
+          commits(last:1){nodes{commit{statusCheckRollup{state contexts(first:50){totalCount \(rollupCounts) statusContextCountsByState{state count} nodes{
             __typename
             ... on CheckRun{name conclusion status detailsUrl}
             ... on StatusContext{context state targetUrl}

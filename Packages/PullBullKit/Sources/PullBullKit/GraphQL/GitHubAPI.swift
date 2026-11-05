@@ -244,13 +244,16 @@ public struct PRDetail: Codable, Sendable {
     public let headOid: String?
     public let author: String?
     public let state: PRState?
+    /// What the merge panel needs; nil in details cached before it was stored.
+    public let merge: MergeInfo?
 
     public init(
         key: PRKey, body: String, checks: [Check], reviews: [Review],
         comments: [Comment], files: [ChangedFile], updatedAt: Date? = nil, ci: CIState? = nil,
         changedFiles: Int? = nil, additions: Int? = nil, deletions: Int? = nil, checkCount: Int? = nil,
         requests: [Reviewer]? = nil, commentCount: Int? = nil,
-        headOid: String? = nil, author: String? = nil, state: PRState? = nil
+        headOid: String? = nil, author: String? = nil, state: PRState? = nil,
+        merge: MergeInfo? = nil
     ) {
         self.key = key
         self.body = body
@@ -269,6 +272,7 @@ public struct PRDetail: Codable, Sendable {
         self.headOid = headOid
         self.author = author
         self.state = state
+        self.merge = merge
     }
 
     public var commentTotal: Int { max(commentCount ?? 0, comments.count) }
@@ -762,7 +766,8 @@ public struct GitHubAPI: Sendable {
             commentCount: (commentsConnection?["totalCount"] as? Int).map { $0 - (commentNodes.count - comments.count) },
             headOid: pr["headRefOid"] as? String,
             author: (pr["author"] as? [String: Any])?["login"] as? String ?? "ghost",
-            state: (pr["state"] as? String).flatMap { PRState(rawValue: $0.lowercased()) })
+            state: (pr["state"] as? String).flatMap { PRState(rawValue: $0.lowercased()) },
+            merge: MergeInfo.read(pullRequest: pr, repository: data["repository"] as? [String: Any] ?? [:]))
     }
 
     /// The pull request's head commit and state right now, for a review that must name the commit it saw.
