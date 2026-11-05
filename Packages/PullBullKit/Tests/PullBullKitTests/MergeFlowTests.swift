@@ -39,6 +39,75 @@ import Testing
             key: key, body: "", checks: [], reviews: [], comments: [], files: [], headOid: "abc", state: state, merge: merge)
     }
 
+    // MARK: Confirming an unknown outcome
+
+    private struct ReadFailed: Error {}
+
+    private func confirm(_ results: [PRDetail?], sleepThrowsAt: Int? = nil) async -> (
+        outcome: (landed: Bool, last: PRDetail?), reads: Int, sleeps: [Duration]
+    ) {
+        var reads = 0
+        var sleeps: [Duration] = []
+        let outcome = await MergeFlow.confirmLanded(
+            .merged(viewer: "pb"),
+            read: {
+                defer { reads += 1 }
+                guard let result = results[reads] else { throw ReadFailed() }
+                return result
+            },
+            sleep: { duration in
+                sleeps.append(duration)
+                if sleepThrowsAt == sleeps.count { throw ReadFailed() }
+            })
+        return (outcome, reads, sleeps)
+    }
+
+    @Test func anUnknownOutcomeLandsOnTheFirstReadWithNoSleep() async {
+        let r = await confirm([detail(state: .merged), nil, nil])
+        #expect(r.outcome.landed)
+        #expect(r.outcome.last?.state == .merged)
+        #expect(r.reads == 1)
+        #expect(r.sleeps.isEmpty)
+    }
+
+    @Test func anUnknownOutcomeLandsOnTheThirdReadAfterTwoGaps() async {
+        let r = await confirm([detail(state: .open), detail(state: .open), detail(state: .merged)])
+        #expect(r.outcome.landed)
+        #expect(r.outcome.last?.state == .merged)
+        #expect(r.reads == 3)
+        #expect(r.sleeps == [.seconds(2), .seconds(2)])
+    }
+
+    @Test func anUnknownOutcomeThatNeverLandsReadsThreeTimes() async {
+        let r = await confirm([detail(state: .open), detail(state: .open), detail(state: .closed)])
+        #expect(!r.outcome.landed)
+        #expect(r.outcome.last?.state == .closed)
+        #expect(r.reads == 3)
+        #expect(r.sleeps == [.seconds(2), .seconds(2)])
+    }
+
+    @Test func aFailedConfirmReadCountsAndLastSkipsIt() async {
+        let r = await confirm([detail(state: .open), nil, nil])
+        #expect(!r.outcome.landed)
+        #expect(r.outcome.last?.state == .open)
+        #expect(r.reads == 3)
+        #expect(r.sleeps.count == 2)
+    }
+
+    @Test func everyConfirmReadFailingLeavesNoLast() async {
+        let r = await confirm([nil, nil, nil])
+        #expect(!r.outcome.landed)
+        #expect(r.outcome.last == nil)
+        #expect(r.reads == 3)
+    }
+
+    @Test func aThrowingSleepEndsTheConfirmReads() async {
+        let r = await confirm([detail(state: .open), detail(state: .merged), nil], sleepThrowsAt: 1)
+        #expect(!r.outcome.landed)
+        #expect(r.outcome.last?.state == .open)
+        #expect(r.reads == 1)
+    }
+
     @Test func aDirectMergeLandedOnlyWhenTheDetailShowsItMerged() {
         let sent = EditChange.merged(viewer: "pb")
         #expect(MergeFlow.landed(sent, in: detail(state: .merged)))

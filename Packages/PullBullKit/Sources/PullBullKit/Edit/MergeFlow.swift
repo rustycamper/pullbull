@@ -21,6 +21,10 @@ public enum MergeFlow {
     public static let pollInterval: Duration = .seconds(1)
     public static let pollLimit = 30
 
+    /// GitHub's reads trail its writes by about 1.5 s, so one read can miss a write that landed.
+    public static let unknownReads = 3
+    public static let unknownReadGap: Duration = .seconds(2)
+
     private static let notReachable = "PullBull can't reach this repository. Add it to the install on GitHub."
 
     @MainActor public static func run(
@@ -84,6 +88,24 @@ public enum MergeFlow {
         case .status, .labels, .assignees, .reviewers, .review, .autoMerge:
             return false
         }
+    }
+
+    /// Reads up to `unknownReads` times, `unknownReadGap` apart, until `sent` shows. A failed read counts as
+    /// one; `last` is the newest read that succeeded. A throwing sleep ends the reads with what it has.
+    @MainActor public static func confirmLanded(
+        _ sent: EditChange, read: @MainActor () async throws -> PRDetail,
+        sleep: @MainActor (Duration) async throws -> Void
+    ) async -> (landed: Bool, last: PRDetail?) {
+        var last: PRDetail?
+        for attempt in 0..<unknownReads {
+            if attempt > 0 {
+                do { try await sleep(unknownReadGap) } catch { break }
+            }
+            guard let fresh = try? await read() else { continue }
+            last = fresh
+            if landed(sent, in: fresh) { return (true, last) }
+        }
+        return (false, last)
     }
 
     /// Anything the poll or the sleep throws is unknown: GitHub accepted the merge, so calling it refused

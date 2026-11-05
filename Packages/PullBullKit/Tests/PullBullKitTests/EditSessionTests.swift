@@ -247,6 +247,45 @@ private func status(_ key: PRKey, _ session: EditSession, in snapshot: Snapshot 
         #expect(s.failure == commentFailure)
     }
 
+    // MARK: Lines about a sent write
+
+    private let sentLine = EditFailure(text: "Couldn't merge", url: url412, key: k412, staysOnLeaving: true)
+
+    @Test func aStayingLineSurvivesLeavingItsOwnItem() {
+        var s = EditSession()
+        s.showFailure(sentLine)
+        s.dismissFailure(on: k412)
+        #expect(s.failure == sentLine)
+    }
+
+    @Test func dismissingClearsAStayingLine() {
+        var s = EditSession()
+        s.showFailure(sentLine)
+        s.dismissFailure()
+        #expect(s.failure == nil)
+    }
+
+    @Test func startingOnAnotherItemKeepsAStayingLine() {
+        var s = EditSession()
+        s.showFailure(sentLine)
+        s.dismissFailure(startingOn: k413)
+        #expect(s.failure == sentLine)
+    }
+
+    @Test func startingOnTheSameItemClearsAStayingLine() {
+        var s = EditSession()
+        s.showFailure(sentLine)
+        s.dismissFailure(startingOn: k412)
+        #expect(s.failure == nil)
+    }
+
+    @Test func startingOnAnotherItemClearsALineThatDoesNotStay() {
+        var s = EditSession()
+        s.showFailure(commentFailure)
+        s.dismissFailure(startingOn: k413)
+        #expect(s.failure == nil)
+    }
+
     @Test func showFailureLeavesAnArmedUndoTakeable() {
         var s = EditSession()
         let id = s.begin(move, on: k412, at: t0)

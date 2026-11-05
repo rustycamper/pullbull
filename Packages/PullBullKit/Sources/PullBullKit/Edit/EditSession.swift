@@ -5,20 +5,25 @@ public struct EditFailure: Equatable, Sendable {
     public let text: String
     /// The item on GitHub, for **Open on GitHub**.
     public let url: URL
-    /// The item it's about: leaving that item clears the line.
+    /// The item it's about: leaving that item clears the line, unless `staysOnLeaving`.
     public let key: PRKey
+    /// The line is about a write that was sent. Its answer can land with the popover closed, and reopening
+    /// counts as leaving, so only dismissing or the next edit clears it.
+    public let staysOnLeaving: Bool
 
-    public init(text: String, url: URL, key: PRKey) {
+    public init(text: String, url: URL, key: PRKey, staysOnLeaving: Bool = false) {
         self.text = text
         self.url = url
         self.key = key
+        self.staysOnLeaving = staysOnLeaving
     }
 }
 
 /// The edits PullBull is showing before GitHub agrees, the one ⌘Z can take back, and the last failure.
 public struct EditSession: Equatable, Sendable {
     public private(set) var overrides = EditOverrides()
-    /// Shown until dismissed or the next edit.
+    /// Shown until dismissed or the next edit, or, unless it's about a sent write, until the viewer leaves
+    /// the item it's about.
     public private(set) var failure: EditFailure?
     private var undo = EditUndo()
     /// The edit `begin` returned last; only its answer can arm ⌘Z.
@@ -108,9 +113,15 @@ public struct EditSession: Equatable, Sendable {
         failure = nil
     }
 
-    /// The viewer left `key`: its line goes. One about another item stays, as it may not have been seen.
+    /// The viewer left `key`: its line goes, unless it's about a sent write, which may not have been seen.
+    /// One about another item stays too.
     public mutating func dismissFailure(on key: PRKey) {
-        if failure?.key == key { failure = nil }
+        if let failure, failure.key == key, !failure.staysOnLeaving { self.failure = nil }
+    }
+
+    /// A new write on `key` starts: the line goes, but a sent write's line about another item stays.
+    public mutating func dismissFailure(startingOn key: PRKey) {
+        if let failure, failure.key == key || !failure.staysOnLeaving { self.failure = nil }
     }
 
     /// Ends the edits `fetched` agrees with, but for reviews on `held` and merges on `heldMerges`. A fetch of
