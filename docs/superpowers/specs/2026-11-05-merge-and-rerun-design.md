@@ -1,6 +1,6 @@
 # Merge a pull request and re-run its failed checks
 
-Status: merging is built and tested on real GitHub (PR 1). Re-running is designed and ships in the second PR.
+Status: merging is built and tested on real GitHub (PR 1). Re-running is built (PR 2); its API calls were proved by the permission test and it has Kit tests only.
 
 PullBull lets you merge a pull request, or set it to merge by itself once its requirements pass, from the PR's detail, and re-run failed GitHub Actions jobs. With reviews (`2026-11-05-submit-review-design.md`, merged as #62) this finishes the loop for most PRs: from "needs you" to merged without opening the browser.
 
@@ -162,7 +162,14 @@ The methods offered are what the repository allows (`mergeCommitAllowed`, `squas
 - All of a PR's checks are paged in for this. The detail's `contexts(first:50)` can miss failures on a big PR: `grafana#134874` has 2 failures in 127 contexts, none in the first 50.
 - If only external checks failed, the button isn't there.
 - It reads "Re-running…", then the detail is read again and the existing CI follow takes over.
-- When some runs are refused, the rest carry on and the line says "Couldn't re-run 1 of 3 workflow runs."
+- When some runs are refused, the rest carry on and the line says "Couldn't re-run 1 of 3 workflow runs." When every run is refused, the line gives the first refusal's reason: "Couldn't re-run failed jobs on #88: …". The line stays with the default `staysOnLeaving: false`, as nothing is lost by leaving.
+- **When the plan is made:** each time a detail for an open PR with a failing rollup arrives on screen (its fetch or a held read), `rerunPlans[key]` comes from `detail.checks` when the detail holds every check, else from `allChecks`, paged in. A detail that isn't open or isn't failing clears the plan. A paged plan is dropped if the head moved or the account changed while it loaded.
+- **When the button is pressed:** `allChecks` is read afresh and the runs are worked out again, so a run restarted since isn't sent. Runs go one after another. If that read fails, the line gives its reason and nothing is sent. Pressing again while one is under way does nothing.
+- **After the sends:** the detail is read once, kept as any detail is, and only then does "Re-running…" go. A failure of that read is silent: the next refresh shows the checks.
+- **The account changed while it ran:** nothing on screen changes and no line shows, as for a comment. `clearAccountData` drops the plans and the in-flight set. A press after switching back finds the runs already restarted, and GitHub refuses a run still going.
+- **Without the permission:** the button is replaced by the permission's line, in the Checks section under the list rather than in its header, which has no room for a sentence, with **Open on GitHub** (the approval page, or the install page when there is no installation). The section shows it only where the button would show. A viewer without write access (`viewerPermission`) sees neither.
+- A draft PR can be re-run; only the open state and write access decide.
+- No keyboard shortcut.
 
 ## Data and GitHub API
 
@@ -191,7 +198,7 @@ Measured on real GitHub with `ghu_` tokens from a test App, as GitHub documents 
 - `docs/manual.md` has a Merging section after Reviewing, with the key tables. Its Reviewing section lists merging as something reviews don't do, which stays true: a review doesn't merge.
 - The Keyboard Shortcuts window has a Merging section after Reviewing.
 - The Merged notification toggle's note, and the manual's notification table, say a merge outside PullBull notifies, including the viewer's own.
-- The App's description, `docs/github-app-setup.md`, the README privacy row and `SECURITY.md` no longer say PullBull never merges. They say it merges only what the viewer confirms, never bypassing the repository's rules; neither names Contents write, which `docs/github-app-setup.md` and the App's own permissions carry. The owner changes the App's own description and permissions by hand at release, with the exact text given then. Actions write and the wording about re-running join the same files with the second PR.
+- The App's description, `docs/github-app-setup.md`, the README privacy row and `SECURITY.md` no longer say PullBull never merges. They say it merges only what the viewer confirms, never bypassing the repository's rules; neither names Contents write, which `docs/github-app-setup.md` and the App's own permissions carry. The owner changes the App's own description and permissions by hand at release, with the exact text given then. Actions write and the wording about re-running join the same files with the second PR: `SECURITY.md` and the README privacy row say it writes the failed jobs the viewer re-runs, and `docs/github-app-setup.md` lists Actions as Read and write and says it is for re-running. `docs/manual.md` has a Re-running failed jobs section after Merging.
 
 ## Testing
 
@@ -224,7 +231,7 @@ Two merges happened that weren't test steps (#40 and #43): each was the owner's 
 - An install on the old permissions, and a repository left out of a selected-repositories install.
 - A merge queue and a stacked PR, which only show a line.
 
-**Re-running** is tested with PR 2.
+**Re-running** has Kit tests only: the run ID from a check's URL, one entry per run, the rules for which runs count, `allChecks` paging past 50, the POST with an empty body, a refusal as a write refusal, the permission and its note, and the two re-run lines. The owner skipped the real-GitHub test and the test repository is deleted, so nothing re-ran by click. The API calls were proved by the permission test: `201` on a failed run, and `403` "This workflow is already running" on one still going. The button, the Checks section's note and the refusal lines have not been seen on a Mac.
 
 ## As built
 

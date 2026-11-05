@@ -118,6 +118,11 @@ final class AppModel {
     var mergeMode: MergeMode?
     /// Items whose merge or auto-merge change is being written to GitHub. `clearAccountData` drops them.
     var sendingMerges: Set<PRKey> = []
+    /// The runs each open PR with failed checks could re-run, worked out as its detail arrives.
+    /// `clearAccountData` drops them.
+    var rerunPlans: [PRKey: RerunPlan] = [:]
+    /// Items whose failed jobs are being re-run. `clearAccountData` drops them.
+    var rerunning: Set<PRKey> = []
     /// The panel's read, or its confirm's. Closing the panel cancels it until the merge is sent.
     @ObservationIgnored var mergeTask: Task<Void, Never>?
     /// The confirm `mergeTask` is checking, whose slot closing the panel releases. Nil once it sends.
@@ -2142,6 +2147,8 @@ final class AppModel {
         endMergeMode(on: nil)
         sendingMerges.removeAll()
         mergedHere.removeAll()
+        rerunPlans.removeAll()
+        rerunning.removeAll()
         snapshot = nil
         people = .empty
         labels = .empty
@@ -2512,6 +2519,7 @@ extension AppModel {
                 self.details[key] = fresh
                 if self.detailFetch?.key == key { self.detailFetch = nil }
                 self.rereadMergeState(on: key)
+                self.planRerun(for: fresh, account: ref)
                 try? await store.saveDetail(fresh, account: account)
             } catch is CancellationError {
                 return
@@ -3106,6 +3114,7 @@ extension AppModel {
     func storeDetail(_ fresh: PRDetail, account: AccountRef) {
         keepDetail(fresh)
         if detailFetch?.key == fresh.key { detailFetch = nil }
+        planRerun(for: fresh, account: account)
         let store = snapshotStore
         let login = account.login
         Task { try? await store.saveDetail(fresh, account: login) }

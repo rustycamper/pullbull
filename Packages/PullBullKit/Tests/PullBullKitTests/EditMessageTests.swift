@@ -39,3 +39,12 @@ import Testing
             == "Couldn't confirm auto-merge was cancelled on #88. Check it on GitHub.")
     }
 }
+
+@Suite struct RerunMessageTests {
+    private let key = PRKey(repo: "acme/app", number: 88)
+
+    @Test func rerunLinesReadAsWritten() {
+        #expect(EditMessage.rerunPartlyRefused(refused: 1, of: 3) == "Couldn't re-run 1 of 3 workflow runs.")
+        #expect(EditMessage.rerunRefused(on: key, reason: "nope") == "Couldn't re-run failed jobs on #88: nope")
+    }
+}
