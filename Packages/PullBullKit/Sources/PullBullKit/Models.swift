@@ -49,17 +49,23 @@ public struct Review: Hashable, Codable, Sendable {
     public let author: String
     public let state: ReviewState
     public let submittedAt: Date?
-    /// The commit the review was submitted on; nil when unknown (older caches, detail reviews).
+    /// The commit the review was submitted on; nil when unknown (older caches).
     public let commitOid: String?
     /// Whether a bot (Copilot, a review app) wrote it; nil when unknown (older caches, detail reviews).
     public let byBot: Bool?
+    /// The review's text; only the detail fetch reads it, so nil on list copies and older caches.
+    public let body: String?
 
-    public init(author: String, state: ReviewState, submittedAt: Date?, commitOid: String? = nil, byBot: Bool? = nil) {
+    public init(
+        author: String, state: ReviewState, submittedAt: Date?, commitOid: String? = nil, byBot: Bool? = nil,
+        body: String? = nil
+    ) {
         self.author = author
         self.state = state
         self.submittedAt = submittedAt
         self.commitOid = commitOid
         self.byBot = byBot
+        self.body = body
     }
 }
 
@@ -148,7 +154,8 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
     public internal(set) var lastCommentAuthor: String?
     /// Whether the newest comment's author is a bot; nil with no comment and in snapshots cached before it was stored.
     public internal(set) var lastCommentByBot: Bool?
-    public let latestReviews: [Review]
+    /// Set by edit overrides too.
+    public internal(set) var latestReviews: [Review]
     /// Set by edit overrides too.
     public internal(set) var reviewRequests: [Reviewer]
     /// The head commit's oid; nil in snapshots cached before it was stored.

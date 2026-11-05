@@ -1,9 +1,9 @@
 import Foundation
 
-/// What an edit changes on GitHub. `comment` posts a comment rather than changing a field, and gates
-/// like the item's other edits.
+/// What an edit changes on GitHub. `comment` posts a comment and `review` submits one with a verdict,
+/// rather than changing a field; `comment` gates like the item's other edits, `review` like reviewers.
 public enum EditField: Sendable {
-    case status, labels, assignees, reviewers, comment
+    case status, labels, assignees, reviewers, comment, review
 }
 
 /// Whether the current account may make an edit, and if not, what it needs.
@@ -34,7 +34,7 @@ public enum EditPermission: Equatable, Sendable {
             // GitHub gives apps no permission for user-owned boards.
             if field == .status, boardOwner?.isUser == true { return .unavailable }
             let canWrite = field == .status ? installation.canWriteProjects
-                : onPullRequest || field == .reviewers ? installation.canWritePullRequests
+                : onPullRequest || field == .reviewers || field == .review ? installation.canWritePullRequests
                 : installation.canWriteIssues
             if canWrite { return .ready }
             return .needsAppApproval(
@@ -49,7 +49,12 @@ public enum EditPermission: Equatable, Sendable {
     /// The one line shown in place of the picker or the comment field for `field`; nil when there's
     /// nothing to say.
     public func note(for field: EditField) -> String? {
-        note(doing: field == .comment ? "Commenting" : "Editing")
+        let doing = switch field {
+        case .comment: "Commenting"
+        case .review: "Reviewing"
+        default: "Editing"
+        }
+        return note(doing: doing)
     }
 
     private func note(doing: String) -> String? {

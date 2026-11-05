@@ -286,7 +286,8 @@ public enum Decoding {
             state: state,
             submittedAt: try optionalDate(node["submittedAt"]),
             commitOid: (node["commit"] as? [String: Any])?["oid"] as? String,
-            byBot: author.map { $0["__typename"] as? String == "Bot" }
+            byBot: author.map { $0["__typename"] as? String == "Bot" },
+            body: node["body"] as? String
         )
     }
 

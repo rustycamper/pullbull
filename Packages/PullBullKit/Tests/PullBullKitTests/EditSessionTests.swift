@@ -29,6 +29,22 @@ private func status(_ key: PRKey, _ session: EditSession, in snapshot: Snapshot 
         #expect(status(k412, s) == doing)
     }
 
+    @Test func recordReviewLeavesUndoAlone() {
+        var s = EditSession()
+        let label = EditChange.labels(added: [bug], removed: [])
+        let id = s.begin(label, on: k412, at: t0)
+        let record = EditRecord(key: k412, change: label, madeAt: t0, addedItemId: nil)
+        s.applied(id, record)
+        let review = EditChange.review(state: .approved, commit: "abc", viewer: "me")
+        let reviewId = s.recordReview(review, on: k412, at: t0 + 1)
+        #expect(s.canUndo(now: t0 + 2))
+        #expect(s.takeUndo(now: t0 + 2) == record)
+        s.showFailure(EditFailure(text: "boom", url: url412))
+        s.dropReview(reviewId)
+        #expect(s.failure?.text == "boom")
+        #expect(s.overrides.apply(to: editPR(412)).latestReviews.isEmpty)
+    }
+
     @Test func appliedEditCanBeUndoneOnce() {
         var s = EditSession()
         let id = s.begin(move, on: k412, at: t0)

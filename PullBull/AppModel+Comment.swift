@@ -77,6 +77,8 @@ extension AppModel {
     /// Posts the draft on `key`, trimmed. Shows it as sending at once; GitHub's answer makes it the real
     /// comment, takes it back with the reason, or, when the outcome is unknown, a fresh detail decides.
     func postComment(on key: PRKey, isPullRequest: Bool) {
+        // In review mode the field's text is the review's, and goes nowhere else.
+        guard reviewMode?.key != key else { return }
         guard let account = runningAccount,
               commentPermission(for: key, isPullRequest: isPullRequest) == .ready,
               let draft = commentDrafts[account: account.login, key: key] else { return }
@@ -196,15 +198,18 @@ extension AppModel {
         updateMention(typed: false)
     }
 
-    /// The comment field on `key` lost focus: its @ list closes.
+    /// The comment field on `key` lost focus: review mode ends and its @ list closes. After a refused
+    /// review `mentionField` is nil, so review mode can't wait for the guard.
     func commentFieldBlurred(key: PRKey) {
+        endReviewMode(on: key)
         guard mentionField?.key == key else { return }
         endMentions()
     }
 
     /// The focused field's text or caret changed (`typed` when the text did): the @ list follows the
-    /// token at the caret.
+    /// token at the caret, and typing takes the warning off an empty Request changes.
     func commentTextChanged(key: PRKey, isPullRequest: Bool, text: String, caret: Int?, typed: Bool) {
+        if typed, reviewMode?.key == key, reviewMode?.missingText == true { reviewMode?.missingText = false }
         let dismissed = typed ? nil : mentionField.flatMap { $0.key == key ? $0.dismissedAt : nil }
         mentionField = MentionField(
             key: key, isPullRequest: isPullRequest, text: text, caret: caret, dismissedAt: dismissed)
@@ -271,7 +276,9 @@ extension AppModel {
         }
         guard let field = mentionField, let account = runningAccount, let caret = field.caret,
               let token = MentionToken.at(field.text, caret: caret),
-              token.range.lowerBound != field.dismissedAt else {
+              token.range.lowerBound != field.dismissedAt,
+              // Once a review is submitted Esc is Cancel, so no list opens to take it.
+              reviewMode?.key != field.key || reviewMode?.phase == .composing else {
             mention = nil
             return
         }

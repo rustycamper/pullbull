@@ -104,6 +104,17 @@ final class AppModel {
     private(set) var commentFieldReset: CommentFieldSignal?
     /// Bumped when a post on `key` was refused: the comment field on `key` takes focus.
     private(set) var commentFieldFocusRequest: CommentFieldSignal?
+    /// Bumped when a review on `key` ended review mode for good: the comment field on `key` gives up focus,
+    /// so a following ⌘↩ opens GitHub.
+    private(set) var commentFieldRelease: CommentFieldSignal?
+    /// The review the focused comment field is writing, or nil (see AppModel+Review.swift).
+    var reviewMode: ReviewMode?
+    /// Items whose review is being written to GitHub, shown dimmed. `clearAccountData` drops them.
+    var sendingReviews: Set<PRKey> = []
+    /// Held details being read again off screen, one read per key (see `rereadReviewedDetails`).
+    @ObservationIgnored var reviewRereads: Set<PRKey> = []
+    /// The newest submit's check and write. Only `leaveReviewMode` cancels it; everything else lets it run.
+    @ObservationIgnored var reviewCheckTask: Task<Void, Never>?
     /// The @ list over the focused comment field, or nil (see AppModel+Comment.swift).
     var mention: MentionState?
     /// Set when a row of the @ list is taken: the comment field on its key makes the replacement.
@@ -201,8 +212,13 @@ final class AppModel {
         }
     }
     var route: Route = .list {
-        // Another detail or screen: the @ list belongs to the field that was showing.
-        didSet { if route != oldValue { endMentions() } }
+        // Another detail or screen: the @ list and review mode belong to the field that was showing.
+        didSet {
+            if route != oldValue {
+                endMentions()
+                endReviewMode(on: nil)
+            }
+        }
     }
 
     /// The tab whose sort the filter bar's sort button and Sort By change: the tab search results are laid
@@ -667,6 +683,7 @@ final class AppModel {
     /// opened on, which Back returns to. A search kept open no longer goes back to the chip typing started
     /// on unless that is the scope it opens on, so its Esc hint stops naming it.
     func popoverDidClose() {
+        endReviewMode(on: nil)
         var showsPRDetail = false
         if mode == .pullRequests, case .detail = route { showsPRDetail = true }
         if !showsPRDetail {
@@ -2084,6 +2101,9 @@ final class AppModel {
         mentionFilterTask = nil
         mentionFetches.values.forEach { $0.cancel() }
         mentionFetches.removeAll()
+        // A submit under way carries on: its task and `postsInFlight` stay.
+        endReviewMode(on: nil)
+        sendingReviews.removeAll()
         snapshot = nil
         people = .empty
         labels = .empty
@@ -2113,8 +2133,10 @@ final class AppModel {
         if status.activity == .unsupported, let account = running?.ref { activityUnsupported.insert(account) }
         notifyChanges(snapshot, status)
         if let snapshot {
-            edits.reconcile(with: snapshot, now: Date())
+            let behind = edits.overrides.reviewsAhead(of: details)
+            edits.reconcile(with: snapshot, now: Date(), holdingReviews: behind)
             postedComments.reconcile(with: snapshot, now: Date())
+            if !status.isRefreshing, status.error == nil { rereadReviewedDetails(behind) }
         }
         self.snapshot = snapshot
         var status = status
@@ -3023,11 +3045,21 @@ extension AppModel {
         commentFieldFocusRequest = CommentFieldSignal(key: key, n: (commentFieldFocusRequest?.n ?? 0) + 1)
     }
 
+    /// Tells the comment field on `key` to give up focus.
+    func releaseCommentField(on key: PRKey) {
+        commentFieldRelease = CommentFieldSignal(key: key, n: (commentFieldRelease?.n ?? 0) + 1)
+    }
+
     /// Asks the comment field on `key` to replace `range` (UTF-16) with `replacement` and put the caret
     /// at `caret`.
     func requestMentionInsertion(on key: PRKey, range: Range<Int>, replacement: String, caret: Int) {
         mentionInsertion = MentionInsertion(
             key: key, range: range, replacement: replacement, caret: caret, n: (mentionInsertion?.n ?? 0) + 1)
+    }
+
+    /// Keeps a detail read outside `loadDetail`; the caller has checked its account still runs.
+    func keepDetail(_ fresh: PRDetail) {
+        details[fresh.key] = fresh
     }
 
     /// Fetches the detail of `key` once with `account`, outside `loadDetail`'s cancelling, keeps it as

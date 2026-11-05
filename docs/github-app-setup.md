@@ -26,12 +26,12 @@ Description (Markdown, shown on the install and sign-in pages):
 ```
 A native macOS menu bar app for the pull requests and issues that need you: reviews requested, your open PRs, your team's work, and assigned issues, with a badge count and notifications.
 
-PullBull writes to GitHub only what you pick: an issue's board Status, assignees and labels, a pull request's reviewers, assignees and labels, and comments you write. It never merges, approves or closes, and your sign-in stays in your Mac's Keychain.
+PullBull writes to GitHub only what you pick: an issue's board Status, assignees and labels, a pull request's reviewers, assignees and labels, comments you write and reviews you submit. It never merges or closes, and your sign-in stays in your Mac's Keychain.
 ```
 
 ### Permissions
 
-**Issues**, **Pull requests** and **Projects** are **Read and write**: for an issue's board Status, a pull request's reviewers, and the assignees and labels of issues and pull requests. The rest are **Read-only**. Everything else: No access.
+**Issues**, **Pull requests** and **Projects** are **Read and write**: for an issue's board Status, a pull request's reviewers, the assignees and labels of issues and pull requests, and the reviews you submit. The rest are **Read-only**. Everything else: No access.
 
 | Repository | Organization |
 |---|---|

@@ -102,6 +102,10 @@ public enum ShortcutCatalog {
                 Shortcut("Comment", [["⌥", "⌘", "M"]], note: "Issue or pull request detail"),
                 Shortcut("Post", [["⌘", "↩"]], note: "In the comment field; elsewhere ⌘↩ opens on GitHub"),
             ]),
+            ShortcutSection("Reviewing", [
+                Shortcut("Review", [["⌥", "⌘", "V"]], note: "Pull request detail"),
+                Shortcut("Submit", [["⌘", "↩"]], note: "In review mode"),
+            ]),
             ShortcutSection("Ask AI answers", [
                 Shortcut("Move the highlight", [["↑"], ["↓"]]),
                 Shortcut("Open in PullBull", [["↩"]]),

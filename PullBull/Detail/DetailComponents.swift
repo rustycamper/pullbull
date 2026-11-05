@@ -87,6 +87,8 @@ struct EmptyLine: View {
 struct CommentLine: View {
     let comment: Comment
     let now: Date
+    /// The verdict, on a review's row.
+    var tag: ReviewTag?
     /// A comment posted from here that GitHub hasn't answered for yet: dimmed and marked "Sending…".
     var isSending = false
 
@@ -100,6 +102,11 @@ struct CommentLine: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
+                    if let tag {
+                        Text("· \(tag.rawValue)")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
                     if isSending {
                         Text("· Sending…")
                             .font(.system(size: 11))
@@ -249,6 +256,37 @@ struct OutlinedIconButton: View {
         .onHover { hovering = $0 }
         .help(name)
         .accessibilityLabel(name)
+    }
+}
+
+/// An outlined button with a word for a label, as tall as `OutlinedIconButton`, for a detail's bottom bar.
+/// It takes no focus: a click that took it from the comment field would end review mode before the
+/// button acted.
+struct OutlinedTextButton: View {
+    let title: String
+    var help = ""
+    let action: () -> Void
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, 6)
+                .frame(height: 24)
+                .background(RoundedRectangle(cornerRadius: 6).fill(hovering && isEnabled ? Palette.fill : .clear))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.separator))
+                .contentShape(Rectangle())
+                .opacity(isEnabled ? 1 : 0.5)
+        }
+        .buttonStyle(PressableStyle())
+        .focusable(false)
+        .onHover { hovering = $0 }
+        .help(help)
     }
 }
 
@@ -406,14 +444,12 @@ struct FlowLayout: Layout {
 /// A PR or issue page's Conversation: the newest comments, with any earlier ones counted above them and
 /// a link to the rest on GitHub. One view for both pages, so they read alike.
 struct ConversationSection: View {
-    /// Oldest first.
-    let comments: [Comment]
+    /// Oldest first, the post still sending last (`ConversationEntry.merged`).
+    let entries: [ConversationEntry]
     /// Every comment on the item, shown or not, and how many of them are older than those shown
     /// (`PRDetail` / `IssueDetail`'s `commentTotal` and `earlierCommentCount`).
     let total: Int
     let earlier: Int
-    /// Where in `comments` the post still sending sits (`PostedComments.conversation`), if any.
-    let sendingIndex: Int?
     let webURL: URL
     let now: Date
 
@@ -430,13 +466,13 @@ struct ConversationSection: View {
                     .foregroundStyle(.secondary)
                     .padding(.leading, 28)
                 }
-                if comments.isEmpty {
+                if entries.isEmpty {
                     Text("No comments")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(Array(comments.enumerated()), id: \.offset) { index, comment in
-                        CommentLine(comment: comment, now: now, isSending: index == sendingIndex)
+                    ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
+                        CommentLine(comment: entry.comment, now: now, tag: entry.tag, isSending: entry.isSending)
                     }
                 }
             }

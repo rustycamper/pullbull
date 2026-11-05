@@ -268,6 +268,8 @@ extension AppModel {
                 case .status:
                     added = try await StatusEditor(api: client).apply(
                         change, on: key, itemId: itemId, contentId: contentId, board: board)
+                case .review:
+                    break
                 case .labels, .assignees, .reviewers:
                     let result = try await SetEditor(api: client).apply(change, on: key, contentId: contentId)
                     if result.addApplied, case .reviewers(let added, _) = change, self?.asksViewer(added) == true {
@@ -308,7 +310,7 @@ extension AppModel {
 
     /// Keeps the edited row selected in its new lane and scrolls to it; when it left the list, selects
     /// the row after it, and the row again when an undo or failure brings it back.
-    private func followEditedRow(_ key: PRKey, from before: [PRKey]) {
+    func followEditedRow(_ key: PRKey, from before: [PRKey]) {
         switch editSelection.follow(key, selection: listSelection, from: before, to: shownListKeys()) {
         case .none: break
         case .scroll: editScrollRequest += 1
@@ -316,7 +318,7 @@ extension AppModel {
         }
     }
 
-    private func shownListKeys() -> [PRKey] {
+    func shownListKeys() -> [PRKey] {
         listKeys(doneExpanded: listExpansion.done)
     }
 

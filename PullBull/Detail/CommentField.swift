@@ -2,49 +2,58 @@ import AppKit
 import PullBullKit
 import SwiftUI
 
-/// A detail's bottom row: the comment field, the item's second button (Copy branch or View on board),
-/// and Open on GitHub last; the buttons never change. Unfocused, the field is one line as tall as the
+/// A detail's bottom row: the comment field, the item's own buttons (Review and Copy branch, or View on
+/// board), and Open on GitHub last. Unfocused, the field is one line as tall as the
 /// buttons, reading "Comment…" with ⌥⌘M at its end, or a pencil and a waiting draft's first line. ⌥⌘M or
 /// a click focuses it: ⌘↩ shows at its end, as the way to post, and it grows upward with the text to 8
 /// lines, then scrolls. While a post is in flight, "Sending…" takes the hint's place. Where the account
-/// can't comment yet, the note saying what it needs takes the field's place.
+/// can't comment yet, the note saying what it needs takes the field's place. In review mode the panel
+/// sits on top of the row, and the empty field reads what the verdict asks for.
 struct CommentField<Secondary: View>: View {
     let model: AppModel
     let key: PRKey
     let isPullRequest: Bool
     /// Where Open on GitHub goes.
     let webURL: URL
-    /// Copy branch on a PR, View on board on an issue on the board.
+    /// Review and Copy branch on a PR, View on board on an issue on the board.
     @ViewBuilder let secondary: Secondary
 
     @State private var isFocused = false
     /// The text's laid-out height, reported by the text view.
     @State private var contentHeight = CommentTextView.oneLineHeight
+    /// Whether the text view holds nothing but spaces and new lines, as `ReviewGate.canSubmit` reads it,
+    /// counting an input method's unfinished text as text. Only the review placeholder reads this.
+    @State private var isEmpty = true
 
     private var account: String? { model.runningAccount?.login }
     private var draftText: String {
         account.flatMap { model.commentDrafts[account: $0, key: key]?.text } ?? ""
     }
     private var isSending: Bool { model.isPostInFlight(for: key) }
+    /// The review this field is writing, or nil.
+    private var review: ReviewMode? { model.reviewMode.flatMap { $0.key == key ? $0 : nil } }
 
     var body: some View {
         let permission = model.commentPermission(for: key, isPullRequest: isPullRequest)
         let ready = permission == .ready
-        HStack(alignment: .bottom, spacing: 8) {
-            if ready {
-                field
-            } else if let note = permission.note(for: .comment) {
-                permissionSlot(note: note, permission: permission)
-            } else {
-                Spacer(minLength: 0)
+        VStack(spacing: 0) {
+            if let review { ReviewPanel(model: model, mode: review) }
+            HStack(alignment: .bottom, spacing: 8) {
+                if ready {
+                    field
+                } else if let note = permission.note(for: .comment) {
+                    permissionSlot(note: note, permission: permission)
+                } else {
+                    Spacer(minLength: 0)
+                }
+                secondary
+                OutlinedIconButton(name: "Open on GitHub", systemImage: "arrow.up.right.square") {
+                    NSWorkspace.shared.open(webURL)
+                }
             }
-            secondary
-            OutlinedIconButton(name: "Open on GitHub", systemImage: "arrow.up.right.square") {
-                NSWorkspace.shared.open(webURL)
-            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
         .overlay(alignment: .top) { Hairline() }
         // A field taken away while focused (the permission lost) comes back unfocused, and its @ list ends:
         // the torn-down text view never reports the blur.
@@ -53,8 +62,8 @@ struct CommentField<Secondary: View>: View {
             isFocused = false
             model.commentFieldBlurred(key: key)
         }
-        // The @ list floats over the detail's scroll area, its bottom on the row's top, so it rises as the
-        // field grows.
+        // The @ list floats over the detail's scroll area, its bottom on the top of the row or the review
+        // panel, so it rises as the field grows.
         .overlay(alignment: .top) {
             if ready, let mention, isFocused {
                 MentionList(model: model, mention: mention)
@@ -78,16 +87,22 @@ struct CommentField<Secondary: View>: View {
         HStack(alignment: .bottom, spacing: 6) {
             CommentTextView(
                 model: model, key: key, isPullRequest: isPullRequest, account: account, isSending: isSending,
-                reset: model.commentFieldReset, focusRequest: model.commentFieldFocusRequest,
-                insertion: model.mentionInsertion, isFocused: $isFocused, contentHeight: $contentHeight)
+                isReviewing: review != nil, reset: model.commentFieldReset,
+                focusRequest: model.commentFieldFocusRequest, release: model.commentFieldRelease,
+                insertion: model.mentionInsertion, isFocused: $isFocused, contentHeight: $contentHeight,
+                isEmpty: $isEmpty)
                 .frame(height: textHeight)
                 .overlay(alignment: .leading) {
                     if !isFocused { unfocusedText }
                 }
+                // On the first line, however many blank lines the field has grown to.
+                .overlay(alignment: .topLeading) {
+                    if isFocused, let review, isEmpty { reviewPlaceholder(review) }
+                }
             // At the end of the last line, beside the text rather than under it.
             if let hint = CommentRow.hint(
                 focused: isFocused, sending: isSending,
-                hasDraft: CommentRow.preview(of: draftText) != nil)
+                hasDraft: CommentRow.preview(of: draftText) != nil, checking: review?.phase == .checking)
             {
                 Text(hint)
                     .font(.system(size: 11))
@@ -133,6 +148,18 @@ struct CommentField<Secondary: View>: View {
         .truncationMode(.tail)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    /// Focused and blank in review mode, what the verdict asks for; a Request changes sent blank warns.
+    private func reviewPlaceholder(_ review: ReviewMode) -> some View {
+        Text(CommentRow.reviewPlaceholder(review.verdict))
+            .font(.system(size: CommentTextView.fontSize))
+            .foregroundStyle(review.missingText ? Palette.amberGlyph : Palette.tertiary)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(height: CommentTextView.oneLineHeight)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 
     /// In the field's place, a field-shaped box reading what the account needs. With the page where the
@@ -186,13 +213,18 @@ struct CommentTextView: NSViewRepresentable {
     let account: String?
     /// Read-only while the post is in flight.
     let isSending: Bool
-    /// `AppModel.commentFieldReset` and `commentFieldFocusRequest`, acted on when their key is `key`.
+    /// In review mode, VoiceOver's action submits the review.
+    let isReviewing: Bool
+    /// `AppModel.commentFieldReset`, `commentFieldFocusRequest` and `commentFieldRelease`, acted on when
+    /// their key is `key`.
     let reset: CommentFieldSignal?
     let focusRequest: CommentFieldSignal?
+    let release: CommentFieldSignal?
     /// `AppModel.mentionInsertion`, made when its key is `key`.
     let insertion: MentionInsertion?
     @Binding var isFocused: Bool
     @Binding var contentHeight: CGFloat
+    @Binding var isEmpty: Bool
 
     static let fontSize: CGFloat = 12
     /// The unfocused field's height, an outlined icon button's, so the bottom row is 40 pt.
@@ -247,9 +279,11 @@ struct CommentTextView: NSViewRepresentable {
         coordinator.textView = textView
         coordinator.seenReset = reset
         coordinator.seenFocusRequest = focusRequest
+        coordinator.seenRelease = release
         coordinator.seenInsertion = insertion
         textView.onFocusChange = { [weak coordinator] focused in coordinator?.focusChanged(focused) }
         textView.onPost = { [model, key, isPullRequest] in model.postComment(on: key, isPullRequest: isPullRequest) }
+        textView.onSubmitReview = { [model, key] in model.submitReview(on: key) }
         coordinator.observeFrame()
         coordinator.load(account: account)
         return scrollView
@@ -260,6 +294,7 @@ struct CommentTextView: NSViewRepresentable {
         coordinator.parent = self
         guard let textView = coordinator.textView else { return }
         textView.isEditable = !isSending
+        textView.isReviewing = isReviewing
         if account != coordinator.loadedAccount { coordinator.load(account: account) }
         if reset != coordinator.seenReset {
             coordinator.seenReset = reset
@@ -270,6 +305,16 @@ struct CommentTextView: NSViewRepresentable {
             // A covered layer is disabled; its field leaves the request to the detail on top.
             if focusRequest?.key == key, context.environment.isEnabled {
                 DispatchQueue.main.async { [weak textView] in textView?.requestFocus() }
+            }
+        }
+        if release != coordinator.seenRelease {
+            coordinator.seenRelease = release
+            if release?.key == key {
+                DispatchQueue.main.async { [weak textView] in
+                    // Only its own focus: a covered field never takes it from a picker or another field.
+                    guard let textView, let window = textView.window, window.firstResponder === textView else { return }
+                    window.makeFirstResponder(nil)
+                }
             }
         }
         if insertion != coordinator.seenInsertion {
@@ -298,6 +343,7 @@ struct CommentTextView: NSViewRepresentable {
         var loadedAccount: String?
         var seenReset: CommentFieldSignal?
         var seenFocusRequest: CommentFieldSignal?
+        var seenRelease: CommentFieldSignal?
         var seenInsertion: MentionInsertion?
         /// The focus the last update laid out for.
         var shownFocused = false
@@ -325,6 +371,7 @@ struct CommentTextView: NSViewRepresentable {
             textView.breakUndoCoalescing()
             undo.removeAllActions()
             reportHeight()
+            reportEmpty()
             // A focused field's @ list reads the new text, after the current update.
             if textView.window?.firstResponder === textView {
                 DispatchQueue.main.async { [weak self, weak textView] in
@@ -387,6 +434,7 @@ struct CommentTextView: NSViewRepresentable {
                 if !inserting { reportMention(textView, typed: true) }
             }
             reportHeight()
+            reportEmpty()
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
@@ -429,6 +477,15 @@ struct CommentTextView: NSViewRepresentable {
             guard height != parent.contentHeight else { return }
             DispatchQueue.main.async { [weak self] in self?.parent.contentHeight = height }
         }
+
+        /// Whether the view holds only spaces and new lines, for the review placeholder; passed on after
+        /// the current update.
+        private func reportEmpty() {
+            guard let textView else { return }
+            let empty = textView.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            guard empty != parent.isEmpty else { return }
+            DispatchQueue.main.async { [weak self] in self?.parent.isEmpty = empty }
+        }
     }
 }
 
@@ -441,6 +498,10 @@ final class CommentEditor: NSTextView {
     var onFocusChange: ((Bool) -> Void)?
     /// Posts the text, as ⌘↩ does; VoiceOver's "Post comment" action, since there is no button.
     var onPost: (() -> Void)?
+    /// Submits the review, as ⌘↩ does in review mode; VoiceOver's "Submit review" action.
+    var onSubmitReview: (() -> Void)?
+    /// In review mode the field's action is "Submit review", and "Post comment" goes while it's there.
+    var isReviewing = false
     private var focusAllowed = false
 
     override var acceptsFirstResponder: Bool { focusAllowed && super.acceptsFirstResponder }
@@ -455,12 +516,13 @@ final class CommentEditor: NSTextView {
     }
 
     override func accessibilityCustomActions() -> [NSAccessibilityCustomAction]? {
-        let post = NSAccessibilityCustomAction(name: "Post comment") { [weak self] in
-            guard let onPost = self?.onPost else { return false }
-            onPost()
+        let reviewing = isReviewing
+        let send = NSAccessibilityCustomAction(name: reviewing ? "Submit review" : "Post comment") { [weak self] in
+            guard let perform = reviewing ? self?.onSubmitReview : self?.onPost else { return false }
+            perform()
             return true
         }
-        return [post] + (super.accessibilityCustomActions() ?? [])
+        return [send] + (super.accessibilityCustomActions() ?? [])
     }
 
     func requestFocus() {

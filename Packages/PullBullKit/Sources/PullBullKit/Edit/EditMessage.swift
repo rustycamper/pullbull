@@ -22,7 +22,7 @@ public enum EditMessage {
             return result.addApplied
                 ? "Asked \(asked) to review #\(key.number), but couldn't remove \(removedNames): \(reason)"
                 : "Removed \(removedNames) from #\(key.number), but couldn't ask \(asked): \(reason)"
-        case .status:
+        case .status, .review:
             return failure(change, on: key, reason: reason)
         }
         let number = "#\(key.number)"
@@ -41,6 +41,7 @@ public enum EditMessage {
         case .labels: "change labels on \(number)"
         case .assignees: "change assignees on \(number)"
         case .reviewers: "change reviewers on \(number)"
+        case .review: "review \(number)"
         }
         return "Couldn't \(what): \(reason)"
     }
@@ -53,6 +54,24 @@ public enum EditMessage {
     /// A comment whose post had no clear answer, and that a fresh detail doesn't hold.
     public static func commentUnconfirmed(on key: PRKey) -> String {
         "Couldn't confirm your comment on #\(key.number). Check the Conversation before sending again."
+    }
+
+    /// A review GitHub refused; `reason` is GitHub's words, or PullBull's when it never got there.
+    public static func reviewRefused(on key: PRKey, reason: String) -> String {
+        "Couldn't review #\(key.number): \(reason)"
+    }
+
+    /// A review whose write had no clear answer, and that a fresh detail doesn't hold.
+    public static func reviewUnconfirmed(on key: PRKey) -> String {
+        "Couldn't confirm your review of #\(key.number). Check the Reviewers section before sending again."
+    }
+
+    public static func reviewHeadMoved(on key: PRKey) -> String {
+        "New commits on #\(key.number) since you started reviewing. Look again, then review."
+    }
+
+    public static func reviewNotOpen(on key: PRKey, merged: Bool) -> String {
+        "#\(key.number) was \(merged ? "merged" : "closed")."
     }
 
     /// GitHub's own words when it refused the write; the refresh wording for anything else.

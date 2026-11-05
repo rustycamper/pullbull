@@ -8,7 +8,7 @@ private let modifierOrder = ["⌃", "⌥", "⇧", "⌘"]
     @Test func sectionsInOrder() {
         #expect(ShortcutCatalog.sections(toggle: nil).map(\.title)
             == ["PullBull", "Lists", "Copy and open", "Search", "Completion list", "Editing", "Detail",
-                "Commenting", "Ask AI answers"])
+                "Commenting", "Reviewing", "Ask AI answers"])
     }
 
     @Test func arrowShortcutsNameChips() throws {
@@ -25,6 +25,14 @@ private let modifierOrder = ["⌃", "⌥", "⇧", "⌘"]
         #expect(commenting.shortcuts == [
             Shortcut("Comment", [["⌥", "⌘", "M"]], note: "Issue or pull request detail"),
             Shortcut("Post", [["⌘", "↩"]], note: "In the comment field; elsewhere ⌘↩ opens on GitHub"),
+        ])
+    }
+
+    @Test func reviewingShortcuts() throws {
+        let reviewing = try #require(ShortcutCatalog.sections(toggle: nil).first { $0.title == "Reviewing" })
+        #expect(reviewing.shortcuts == [
+            Shortcut("Review", [["⌥", "⌘", "V"]], note: "Pull request detail"),
+            Shortcut("Submit", [["⌘", "↩"]], note: "In review mode"),
         ])
     }
 

@@ -50,8 +50,9 @@ public struct EditOverrides: Equatable, Sendable {
     }
 
     /// Drops each edit `fetched` agrees with, along with the older edits to the same item it replaced;
-    /// each older than `lifetime`; and each Status edit to an option the board no longer has.
-    public mutating func reconcile(with fetched: Snapshot, now: Date) {
+    /// each older than `lifetime`; and each Status edit to an option the board no longer has. A review on
+    /// a key in `held` stays although `fetched` agrees, as its going would uncover an older detail.
+    public mutating func reconcile(with fetched: Snapshot, now: Date, holdingReviews held: Set<PRKey> = []) {
         let options = fetched.boardStatusOptions.flatMap { $0.isEmpty ? nil : Set($0.map(\.id)) }
         var retired = Set<UUID>()
         for (index, entry) in entries.enumerated() {
@@ -60,6 +61,7 @@ public struct EditOverrides: Equatable, Sendable {
             } else if case .status(_, let to?, _) = entry.change, let options, !options.contains(to.optionId) {
                 retired.insert(entry.id)
             } else if Self.agrees(entry, with: fetched) {
+                if case .review = entry.change, held.contains(entry.key) { continue }
                 retired.insert(entry.id)
                 for older in entries[..<index] where older.key == entry.key && Self.overlaps(older.change, entry.change) {
                     retired.insert(older.id)
@@ -67,6 +69,22 @@ public struct EditOverrides: Equatable, Sendable {
             }
         }
         entries.removeAll { retired.contains($0.id) }
+    }
+
+    /// The pull requests whose detail in `details` lacks the newest review laid over it. GitHub answers a
+    /// review before its reads catch up, so the detail fetched straight after one can miss it.
+    public func reviewsAhead(of details: [PRKey: PRDetail]) -> Set<PRKey> {
+        var newest: [PRKey: Entry] = [:]
+        for entry in entries {
+            if case .review = entry.change { newest[entry.key] = entry }
+        }
+        return Set(newest.compactMap { key, entry -> PRKey? in
+            guard case .review(let state, let commit, let viewer, _) = entry.change, let detail = details[key] else { return nil }
+            let shows = detail.reviews.contains {
+                Self.same($0.author, viewer) && $0.state == state && $0.commitOid == commit
+            }
+            return shows ? nil : key
+        })
     }
 
     // MARK: Applying
@@ -112,8 +130,20 @@ public struct EditOverrides: Equatable, Sendable {
     /// `requests` on pull request `key` with its reviewer edits laid over: the detail's own requests.
     public func apply(toRequests requests: [Reviewer], on key: PRKey) -> [Reviewer] {
         entries.reduce(requests) { requests, entry in
-            guard entry.key == key, case .reviewers(let added, let removed) = entry.change else { return requests }
-            return Self.changeRequests(requests, added, removed)
+            guard entry.key == key else { return requests }
+            switch entry.change {
+            case .reviewers(let added, let removed): return Self.changeRequests(requests, added, removed)
+            case .review(_, _, let viewer, _): return Self.changeRequests(requests, [], [.user(viewer)])
+            default: return requests
+            }
+        }
+    }
+
+    /// `reviews` on pull request `key` with the viewer's submitted review laid over: the detail's own reviews.
+    public func apply(toReviews reviews: [Review], on key: PRKey) -> [Review] {
+        entries.reduce(reviews) { reviews, entry in
+            guard entry.key == key, case .review(let state, let commit, let viewer, let body) = entry.change else { return reviews }
+            return Self.changeReviews(reviews, state, commit, viewer, body, at: entry.madeAt)
         }
     }
 
@@ -137,7 +167,7 @@ public struct EditOverrides: Equatable, Sendable {
             (issue.labels, issue.labelColors) = changeLabels(issue.labels, issue.labelColors, added, removed)
         case .assignees(let added, let removed):
             issue.assignees = changeAssignees(issue.assignees, added, removed)
-        case .reviewers:
+        case .reviewers, .review:
             break
         }
         return issue
@@ -161,6 +191,10 @@ public struct EditOverrides: Equatable, Sendable {
             for key in added.map(\.key) where !before.contains(key) {
                 pr.reviewRequestTimes[key] = entry.madeAt
             }
+        case .review(let state, let commit, let viewer, let body):
+            pr.latestReviews = changeReviews(pr.latestReviews, state, commit, viewer, body, at: entry.madeAt)
+            // The review answers a direct request; a team's request stays until GitHub drops it.
+            pr.reviewRequests = changeRequests(pr.reviewRequests, [], [.user(viewer)])
         }
         return pr
     }
@@ -185,6 +219,17 @@ public struct EditOverrides: Equatable, Sendable {
             requests.append(reviewer)
         }
         return requests
+    }
+
+    /// `reviews` with the viewer's earlier reviews replaced by the one just submitted, logins compared
+    /// case-insensitively.
+    private static func changeReviews(
+        _ reviews: [Review], _ state: ReviewState, _ commit: String, _ viewer: String, _ body: String, at date: Date
+    ) -> [Review] {
+        var reviews = reviews
+        reviews.removeAll { same($0.author, viewer) }
+        reviews.append(Review(author: viewer, state: state, submittedAt: date, commitOid: commit, body: body))
+        return reviews
     }
 
     /// Labels and their colours by position; colours missing from an old cache are padded with nil so
@@ -277,6 +322,11 @@ public struct EditOverrides: Equatable, Sendable {
             let listed = Set(fetched.reviewCandidates.first { $0.key == entry.key }?.reviewRequests.map(\.key) ?? [])
             return added.allSatisfy { !mine.contains($0.key) || listed.contains($0.key) }
                 && !removed.contains { mine.contains($0.key) && listed.contains($0.key) }
+        case .review(let state, let commit, let viewer, _):
+            let copies = prs(in: fetched).filter { $0.key == entry.key }
+            return !copies.isEmpty && copies.allSatisfy { copy in
+                copy.latestReviews.contains { same($0.author, viewer) && $0.state == state && $0.commitOid == commit }
+            }
         }
     }
 
@@ -285,7 +335,8 @@ public struct EditOverrides: Equatable, Sendable {
         Set([Reviewer.user(org.viewer).key] + org.myTeams.map { Reviewer.team(slug: $0, name: $0).key })
     }
 
-    /// Whether `newer` sets something `older` set: the Status, or one of the same labels or people.
+    /// Whether `newer` sets something `older` set: the Status, or one of the same labels or people; a review
+    /// also replaces an older request for the reviewer.
     private static func overlaps(_ older: EditChange, _ newer: EditChange) -> Bool {
         func shared(_ a: [String], _ b: [String]) -> Bool {
             a.contains { name in b.contains { same($0, name) } }
@@ -299,6 +350,12 @@ public struct EditOverrides: Equatable, Sendable {
             return shared((a1 + r1).map(\.login), (a2 + r2).map(\.login))
         case (.reviewers(let a1, let r1), .reviewers(let a2, let r2)):
             return !Set((a1 + r1).map(\.key)).isDisjoint(with: (a2 + r2).map(\.key))
+        case (.review, .review):
+            return true
+        case (.reviewers(let added, let removed), .review(_, _, let viewer, _)):
+            // GitHub drops the viewer's own request on a review, so an older self-add never agrees. An edit
+            // that does more stays, as going would take its other changes off the screen.
+            return removed.isEmpty && added.map(\.key) == [Reviewer.user(viewer).key]
         default:
             return false
         }

@@ -114,3 +114,58 @@ private func detail(updatedAt: Date?, ci: CIState?) -> PRDetail {
         #expect(back.ci == .failure)
     }
 }
+
+private final class DetailTransport: GraphQLTransport, @unchecked Sendable {
+    let data: Data
+    init(_ json: String) { data = Data(json.utf8) }
+
+    func send(_ body: Data, token: String) async throws -> (Data, HTTPURLResponse) {
+        (data, HTTPURLResponse(
+            url: URL(string: "https://api.github.com/graphql")!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+    }
+}
+
+private func detailJSON(author: String = #"{"login":"alice"}"#) -> String {
+    #"""
+    {"data":{"repository":{"pullRequest":{
+      "body":"b","updatedAt":"2026-11-02T10:00:00Z","headRefOid":"abc123","state":"MERGED","author":\#(author),
+      "commits":{"nodes":[]},
+      "latestReviews":{"nodes":[
+        {"author":{"login":"bob"},"state":"CHANGES_REQUESTED","submittedAt":"2026-11-02T10:00:00Z","body":"Please fix","commit":{"oid":"abc123"}}]},
+      "reviewRequests":{"nodes":[]},"comments":{"totalCount":0,"nodes":[]},"files":{"totalCount":0,"nodes":[]}}}}}
+    """#
+}
+
+private func fetched(_ json: String) async throws -> PRDetail {
+    try await GitHubAPI(transport: DetailTransport(json), auth: StaticTokenSource("t")).detail(key)
+}
+
+@Suite struct PRDetailHeadTests {
+    @Test func detailKeepsHeadAuthorState() async throws {
+        let d = try await fetched(detailJSON())
+        #expect(d.headOid == "abc123")
+        #expect(d.author == "alice")
+        #expect(d.state == .merged)
+    }
+
+    @Test func detailKeepsReviewBody() async throws {
+        let d = try await fetched(detailJSON())
+        #expect(d.reviews.first?.body == "Please fix")
+        #expect(d.reviews.first?.commitOid == "abc123")
+    }
+
+    @Test func deletedAuthorReadsGhost() async throws {
+        let d = try await fetched(detailJSON(author: "null"))
+        #expect(d.author == "ghost")
+    }
+
+    @Test func detailCachedBeforeHeadDecodes() throws {
+        let json = #"{"key":{"repo":"o/r","number":7},"body":"b","checks":[],"reviews":[],"comments":[],"files":[]}"#
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .secondsSince1970
+        let decoded = try decoder.decode(PRDetail.self, from: Data(json.utf8))
+        #expect(decoded.headOid == nil)
+        #expect(decoded.author == nil)
+        #expect(decoded.state == nil)
+    }
+}

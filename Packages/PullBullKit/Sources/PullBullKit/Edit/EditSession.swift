@@ -34,6 +34,16 @@ public struct EditSession: Equatable, Sendable {
         return id
     }
 
+    /// Shows the viewer's submitted review at once. Unlike `begin` it leaves ⌘Z and the failure line alone.
+    public mutating func recordReview(_ change: EditChange, on key: PRKey, at now: Date) -> UUID {
+        overrides.record(change, on: key, at: now)
+    }
+
+    /// Takes a review back off the screen, as when GitHub refused it. The failure line is the caller's.
+    public mutating func dropReview(_ id: UUID) {
+        overrides.drop(id)
+    }
+
     /// GitHub applied the edit `id`; ⌘Z can now take it back when it's still the last edit. Not called
     /// for an undo, which isn't undoable.
     public mutating func applied(_ id: UUID, _ record: EditRecord) {
@@ -85,14 +95,15 @@ public struct EditSession: Equatable, Sendable {
         failure = nil
     }
 
-    /// Ends the edits `fetched` agrees with. A fetch of another board drops them all, and the undo.
-    public mutating func reconcile(with fetched: Snapshot, now: Date) {
+    /// Ends the edits `fetched` agrees with, but for reviews on `held`. A fetch of another board drops them
+    /// all, and the undo.
+    public mutating func reconcile(with fetched: Snapshot, now: Date, holdingReviews held: Set<PRKey> = []) {
         if let board, fetched.board != board {
             self = EditSession()
             self.board = fetched.board
             return
         }
         board = fetched.board
-        overrides.reconcile(with: fetched, now: now)
+        overrides.reconcile(with: fetched, now: now, holdingReviews: held)
     }
 }
