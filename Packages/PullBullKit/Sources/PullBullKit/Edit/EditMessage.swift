@@ -112,8 +112,8 @@ public enum EditMessage {
     }
 
     /// Some of the runs were re-run and `refused` of `total` were not.
-    public static func rerunPartlyRefused(refused: Int, of total: Int) -> String {
-        "Couldn't re-run \(refused) of \(total) workflow runs."
+    public static func rerunPartlyRefused(refused: Int, of total: Int, on key: PRKey) -> String {
+        "Couldn't re-run \(refused) of \(total) workflow runs on #\(key.number)."
     }
 
     /// GitHub's own words when it refused the write; the refresh wording for anything else.

@@ -44,7 +44,7 @@ import Testing
     private let key = PRKey(repo: "acme/app", number: 88)
 
     @Test func rerunLinesReadAsWritten() {
-        #expect(EditMessage.rerunPartlyRefused(refused: 1, of: 3) == "Couldn't re-run 1 of 3 workflow runs.")
+        #expect(EditMessage.rerunPartlyRefused(refused: 1, of: 3, on: PRKey(repo: "o/r", number: 88)) == "Couldn't re-run 1 of 3 workflow runs on #88.")
         #expect(EditMessage.rerunRefused(on: key, reason: "nope") == "Couldn't re-run failed jobs on #88: nope")
     }
 }

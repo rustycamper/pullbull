@@ -123,6 +123,7 @@ final class AppModel {
     var rerunPlans: [PRKey: RerunPlan] = [:]
     /// Items whose failed jobs are being re-run. `clearAccountData` drops them.
     var rerunning: Set<PRKey> = []
+    var rerunPlanLoads: [PRKey: Task<Void, Never>] = [:]
     /// The panel's read, or its confirm's. Closing the panel cancels it until the merge is sent.
     @ObservationIgnored var mergeTask: Task<Void, Never>?
     /// The confirm `mergeTask` is checking, whose slot closing the panel releases. Nil once it sends.
@@ -2149,6 +2150,7 @@ final class AppModel {
         mergedHere.removeAll()
         rerunPlans.removeAll()
         rerunning.removeAll()
+        rerunPlanLoads.removeAll()
         snapshot = nil
         people = .empty
         labels = .empty
@@ -2494,7 +2496,10 @@ extension AppModel {
         guard let ref = running?.ref else { return nil }
         let account = ref.login
         guard let fresh = try? await api(for: ref).detail(key) else { return nil }
-        if running?.account == account { details[key] = fresh }
+        if running?.account == account {
+            details[key] = fresh
+            keepRerunPlan(in: key)
+        }
         return fresh.checks
     }
 
@@ -2559,6 +2564,7 @@ extension AppModel {
                     let fresh = try await api.detail(pr.key)
                     guard !Task.isCancelled, self.running?.account == account else { return }
                     self.details[pr.key] = fresh
+                    self.keepRerunPlan(in: pr.key)
                     if self.detailFetch?.key == pr.key { self.detailFetch = nil }
                     try? await store.saveDetail(fresh, account: account)
                 } catch {
@@ -3108,13 +3114,13 @@ extension AppModel {
     /// Keeps a detail read outside `loadDetail`; the caller has checked its account still runs.
     func keepDetail(_ fresh: PRDetail) {
         details[fresh.key] = fresh
+        keepRerunPlan(in: fresh.key)
     }
 
     /// Stores a detail read outside `loadDetail` as `loadDetail` does; the caller has checked `account` still runs.
     func storeDetail(_ fresh: PRDetail, account: AccountRef) {
         keepDetail(fresh)
         if detailFetch?.key == fresh.key { detailFetch = nil }
-        planRerun(for: fresh, account: account)
         let store = snapshotStore
         let login = account.login
         Task { try? await store.saveDetail(fresh, account: login) }
@@ -3130,6 +3136,7 @@ extension AppModel {
             let fresh = try await api.detail(key)
             if running?.account == login {
                 details[key] = fresh
+                keepRerunPlan(in: key)
                 if detailFetch?.key == key { detailFetch = nil }
                 try? await store.saveDetail(fresh, account: login)
             }
