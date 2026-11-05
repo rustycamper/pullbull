@@ -1,14 +1,9 @@
 name: CI
-# Docs-only changes skip the macOS job; secrets.yml still scans them.
+# Docs-only changes skip the macOS job; secrets.yml still scans them. A pull request always triggers this
+# workflow, because `test` is a required check and has to report: see `changes`.
 on:
   pull_request:
     branches: [main]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'LICENSE'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.github/pull_request_template.md'
   push:
     branches: [main]
     paths-ignore:
@@ -23,7 +18,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Whether a pull request touches anything but docs. A job skipped by its `if` counts as passing, so a
+  # docs-only pull request gets `test` without a macOS run. Lists the same paths as `push` above; a renamed
+  # file counts by both names. If the list can't be read, `test` runs.
+  changes:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    outputs:
+      code: ${{ steps.files.outputs.code }}
+    steps:
+      - id: files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FILES_URL: repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files
+        run: |
+          code=true
+          if files=$(gh api "$FILES_URL" --paginate --jq '.[] | .filename, (.previous_filename // empty)'); then
+            grep -qvE '\.md$|^docs/|^LICENSE$|^\.github/ISSUE_TEMPLATE/' <<<"$files" || code=false
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
   test:
+    needs: changes
+    # Runs on a push, where `changes` is skipped, and if `changes` itself failed.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
