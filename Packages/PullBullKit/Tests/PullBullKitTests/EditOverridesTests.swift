@@ -274,6 +274,23 @@ private func card(_ snapshot: Snapshot, _ key: PRKey) -> BoardIssue? {
         #expect(o.apply(toReviews: [bob], on: editKey(78)) == [bob])
     }
 
+    @Test func reviewCarriesItsTextToTheDetailReviews() {
+        var o = EditOverrides()
+        let earlier = Review(author: "pb", state: .changesRequested, submittedAt: t0 - 60, commitOid: "abc", body: "Old words")
+        o.record(
+            .review(state: .approved, commit: "abc", viewer: "pb", body: "Looks good"), on: editKey(77), at: t0)
+        let reviews = o.apply(toReviews: [earlier], on: editKey(77))
+        #expect(reviews.count == 1)
+        #expect(reviews[0].state == .approved)
+        #expect(reviews[0].body == "Looks good")
+    }
+
+    @Test func reviewWithoutTextShowsNoText() {
+        var o = EditOverrides()
+        o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
+        #expect(o.apply(toReviews: [], on: editKey(77))[0].body == "")
+    }
+
     @Test func reviewAgreesWhenEveryCopyHasIt() {
         let mine = Review(author: "PB", state: .approved, submittedAt: t0, commitOid: "abc")
         let lagging = editPR(77, requests: [.user("pb")])
@@ -380,6 +397,27 @@ private func card(_ snapshot: Snapshot, _ key: PRKey) -> BoardIssue? {
         o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
         let shown = o.apply(to: editPR(77, headOid: "def"))
         #expect(ReviewRules.status(of: shown, me: "pb", myTeams: []) == .needsReview(.newCommitsSinceReview))
+    }
+
+    // GitHub drops the viewer's own request when they review, so a self-add made just before never agrees
+    // and would put the viewer back as re-requested once the review retires.
+    @Test func newerReviewRetiresAnOlderSelfRequest() {
+        var o = EditOverrides()
+        o.record(.reviewers(added: [.user("PB")], removed: []), on: editKey(77), at: t0)
+        o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0 + 10)
+        let approved = editPR(77, reviews: [Review(author: "pb", state: .approved, submittedAt: t0 + 10, commitOid: "abc")])
+        o.reconcile(with: editSnapshot(review: [approved], team: [approved]), now: t0 + 30)
+        #expect(o.isEmpty)
+        #expect(o.apply(toRequests: [], on: editKey(77)).isEmpty)
+    }
+
+    @Test func newerReviewLeavesAnOlderRequestOfSomeoneElse() {
+        var o = EditOverrides()
+        o.record(.reviewers(added: [.user("bob")], removed: []), on: editKey(77), at: t0)
+        o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0 + 10)
+        let approved = editPR(77, reviews: [Review(author: "pb", state: .approved, submittedAt: t0 + 10, commitOid: "abc")])
+        o.reconcile(with: editSnapshot(review: [approved], team: [approved]), now: t0 + 30)
+        #expect(!o.isEmpty)
     }
 
     @Test func selfAddWaitsForReviewCandidates() {

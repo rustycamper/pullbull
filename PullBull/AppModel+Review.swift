@@ -16,7 +16,7 @@ extension AppModel {
         guard isReviewOffered(for: key), !isPostInFlight(for: key), reviewMode?.key != key,
               let detail = details[key], let head = detail.headOid, let viewer = runningAccount?.login
         else { return }
-        let last = detail.reviews
+        let last = edits.overrides.apply(toReviews: detail.reviews, on: key)
             .filter { $0.author.caseInsensitiveCompare(viewer) == .orderedSame }
             .max { ($0.submittedAt ?? .distantPast) < ($1.submittedAt ?? .distantPast) }
         let mode = ReviewMode(key: key, head: head, lastReview: last?.state)
@@ -60,6 +60,8 @@ extension AppModel {
         /// As at ⌘↩; the verdict can't change under the check.
         let verdict: ReviewVerdict
         let head: String
+        /// The trimmed text sent, which the overlay shows in the Conversation until the detail holds it.
+        let body: String
         let account: AccountRef
         /// The item on GitHub, for the failure line's **Open on GitHub**.
         let url: URL
@@ -90,7 +92,7 @@ extension AppModel {
         let url = fetchedPullRequest(for: key)?.url ?? GitHubLinks.pullRequest(key)
         let client = api(for: account)
         var review = PendingReview(
-            key: key, verdict: verdict, head: mode.head, account: account, url: url, since: Date())
+            key: key, verdict: verdict, head: mode.head, body: text, account: account, url: url, since: Date())
         reviewCheckTask = Task { [weak self] in
             let outcome = await ReviewFlow.run(
                 pinned: review.head,
@@ -114,7 +116,8 @@ extension AppModel {
         guard runningAccount == review.account else { return }
         if reviewMode?.key == review.key { reviewMode?.phase = .sending }
         let before = shownListKeys()
-        let change = EditChange.review(state: review.verdict.state, commit: review.head, viewer: review.account.login)
+        let change = EditChange.review(
+            state: review.verdict.state, commit: review.head, viewer: review.account.login, body: review.body)
         review.overlay = edits.recordReview(change, on: review.key, at: Date())
         sendingReviews.insert(review.key)
         refreshShown()
@@ -222,8 +225,9 @@ extension AppModel {
         edits.showFailure(EditFailure(text: text, url: review.url))
     }
 
-    /// A held detail is missing a review on screen: each refresh reads it again until it shows it, whether
-    /// or not a list holds the PR. A read under way is left to finish, as a refresh can report more than once.
+    /// A held detail is missing a review on screen: a refresh that finished cleanly reads it again, whether
+    /// or not a list holds the PR. A read under way is left to finish, on screen (`detailFetch`) or off
+    /// (`reviewRereads`), as a refresh can report more than once.
     func rereadReviewedDetails(_ keys: Set<PRKey>) {
         guard let account = runningAccount else { return }
         for key in keys where !(route == .detail(key) && detailFetch?.isLoading == true) {
@@ -235,9 +239,10 @@ extension AppModel {
     private func reloadReviewedDetail(_ key: PRKey, account: AccountRef) {
         if route == .detail(key) {
             reloadDetail()
-        } else if details[key] != nil {
+        } else if details[key] != nil, reviewRereads.insert(key).inserted {
             Task { [weak self] in
                 _ = try? await self?.fetchDetailComments(key, isPullRequest: true, account: account)
+                self?.reviewRereads.remove(key)
             }
         }
     }

@@ -53,8 +53,8 @@ public enum EditChange: Hashable, Sendable {
     case assignees(added: [PersonRef], removed: [PersonRef])
     /// A pull request's review requests: people by login, teams by slug.
     case reviewers(added: [Reviewer], removed: [Reviewer])
-    /// The viewer's submitted review of a pull request, on `commit`; never undone or part-applied.
-    case review(state: ReviewState, commit: String, viewer: String)
+    /// The viewer's submitted review of a pull request, on `commit`, with the text sent; never undone or part-applied.
+    case review(state: ReviewState, commit: String, viewer: String, body: String = "")
 
     /// The edit that puts things back.
     public var inverse: EditChange {

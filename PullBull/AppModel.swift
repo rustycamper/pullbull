@@ -111,6 +111,8 @@ final class AppModel {
     var reviewMode: ReviewMode?
     /// Items whose review is being written to GitHub, shown dimmed. `clearAccountData` drops them.
     var sendingReviews: Set<PRKey> = []
+    /// Held details being read again off screen, one read per key (see `rereadReviewedDetails`).
+    @ObservationIgnored var reviewRereads: Set<PRKey> = []
     /// The newest submit's check and write. Only `leaveReviewMode` cancels it; everything else lets it run.
     @ObservationIgnored var reviewCheckTask: Task<Void, Never>?
     /// The @ list over the focused comment field, or nil (see AppModel+Comment.swift).
@@ -2134,7 +2136,7 @@ final class AppModel {
             let behind = edits.overrides.reviewsAhead(of: details)
             edits.reconcile(with: snapshot, now: Date(), holdingReviews: behind)
             postedComments.reconcile(with: snapshot, now: Date())
-            rereadReviewedDetails(behind)
+            if !status.isRefreshing, status.error == nil { rereadReviewedDetails(behind) }
         }
         self.snapshot = snapshot
         var status = status

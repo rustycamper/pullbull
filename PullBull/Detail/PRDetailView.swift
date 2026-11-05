@@ -322,7 +322,8 @@ struct PRDetailView: View {
         let shown = model.postedComments.conversation(
             for: key, held: detail.comments, total: detail.commentTotal, keep: nil, now: now)
         let entries = ConversationEntry.merged(
-            comments: shown.comments, sendingIndex: shown.sendingIndex, reviews: detail.reviews)
+            comments: shown.comments, sendingIndex: shown.sendingIndex,
+            reviews: model.edits.overrides.apply(toReviews: detail.reviews, on: key))
         return ConversationSection(
             entries: entries, total: shown.total, earlier: shown.earlier, webURL: webURL, now: now)
     }
