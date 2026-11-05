@@ -837,15 +837,17 @@ public struct GitHubAPI: Sendable {
         try await autoMergeMutation(Mutations.disableAutoMerge, ["pr": nodeID], payload: "disablePullRequestAutoMerge")
     }
 
-    /// Sends an auto-merge mutation. Only a real answer is a refusal: a `data` object whose payload is
-    /// null with an error that has a `type` (GitHub's validation, as "Pull request is in clean status"),
-    /// or FORBIDDEN. A body that can't be read, or has no `data` object, stays `graphQL`, which leaves
-    /// the outcome unknown.
+    /// Sends an auto-merge mutation. Only GitHub's validation answers are a refusal: a `data` object whose
+    /// payload is null with an `UNPROCESSABLE` error (as "Pull request is in clean status") or a `FORBIDDEN`
+    /// one. Any other type, such as `INTERNAL`, and a body that can't be read or has no `data` object, stay
+    /// `graphQL`, which leaves the outcome unknown, as the change may have landed.
     private func autoMergeMutation(_ mutation: String, _ variables: [String: Any], payload: String) async throws {
         let (data, errors) = try await executeReportingErrors(mutation, variables)
         if data[payload] is [String: Any] { return }
         let message = errors.first?["message"] as? String ?? "GitHub didn't apply the change"
-        if errors.contains(where: { $0["type"] is String }) { throw APIError.writeRefused(message) }
+        if errors.contains(where: { ["UNPROCESSABLE", "FORBIDDEN"].contains($0["type"] as? String) }) {
+            throw APIError.writeRefused(message)
+        }
         throw APIError.graphQL(message)
     }
 

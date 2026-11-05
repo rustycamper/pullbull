@@ -274,6 +274,48 @@ private final class GraphQLQueue: GraphQLTransport, @unchecked Sendable {
         }
     }
 
+    @Test func aForbiddenEnableOnANullPayloadIsARefusal() async {
+        let t = GraphQLQueue([#"{"data":{"enablePullRequestAutoMerge":null},"errors":[{"type":"FORBIDDEN","message":"Not allowed"}]}"#])
+        do {
+            try await api(t).enableAutoMerge(key, nodeID: "PR_1", head: "a", method: .squash)
+            Issue.record("sent")
+        } catch {
+            #expect(CommentFailure.classify(error) == .refused("Not allowed"))
+        }
+    }
+
+    @Test func aForbiddenDisableOnANullPayloadIsARefusal() async {
+        let t = GraphQLQueue([#"{"data":{"disablePullRequestAutoMerge":null},"errors":[{"type":"FORBIDDEN","message":"Not allowed"}]}"#])
+        do {
+            try await api(t).disableAutoMerge(key, nodeID: "PR_1")
+            Issue.record("sent")
+        } catch {
+            #expect(CommentFailure.classify(error) == .refused("Not allowed"))
+        }
+    }
+
+    @Test func anInternalEnableErrorOnANullPayloadStaysUnknown() async {
+        let t = GraphQLQueue([#"{"data":{"enablePullRequestAutoMerge":null},"errors":[{"type":"INTERNAL","message":"Something went wrong"}]}"#])
+        do {
+            try await api(t).enableAutoMerge(key, nodeID: "PR_1", head: "a", method: .squash)
+            Issue.record("sent")
+        } catch {
+            #expect(isGraphQL(error))
+            #expect(CommentFailure.classify(error) == .unknown)
+        }
+    }
+
+    @Test func anInternalDisableErrorOnANullPayloadStaysUnknown() async {
+        let t = GraphQLQueue([#"{"data":{"disablePullRequestAutoMerge":null},"errors":[{"type":"INTERNAL","message":"Something went wrong"}]}"#])
+        do {
+            try await api(t).disableAutoMerge(key, nodeID: "PR_1")
+            Issue.record("sent")
+        } catch {
+            #expect(isGraphQL(error))
+            #expect(CommentFailure.classify(error) == .unknown)
+        }
+    }
+
     @Test func aNullPayloadWithATypelessErrorStaysUnknown() async {
         let t = GraphQLQueue([#"{"data":{"enablePullRequestAutoMerge":null},"errors":[{"message":"odd"}]}"#])
         do {
