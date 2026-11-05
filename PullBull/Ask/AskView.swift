@@ -93,7 +93,6 @@ struct AskView: View {
                     .lineSpacing(2)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityLabel("Answer: \(answer.answer)")
             }
             Text(verbatim: Self.sourceLine(answer))
                 .font(.system(size: 11))
