@@ -111,6 +111,23 @@ final class AppModel {
     var reviewMode: ReviewMode?
     /// Items whose review is being written to GitHub, shown dimmed. `clearAccountData` drops them.
     var sendingReviews: Set<PRKey> = []
+    /// Pull requests merged directly from here this session, whose merge raises no notification. A Merge
+    /// when ready isn't one: it notifies when it lands. `clearAccountData` drops them.
+    var mergedHere: Set<PRKey> = []
+    /// The merge panel on screen, or nil (see AppModel+Merge.swift).
+    var mergeMode: MergeMode?
+    /// Items whose merge or auto-merge change is being written to GitHub. `clearAccountData` drops them.
+    var sendingMerges: Set<PRKey> = []
+    /// The panel's read, or its confirm's. Closing the panel cancels it until the merge is sent.
+    @ObservationIgnored var mergeTask: Task<Void, Never>?
+    /// The confirm `mergeTask` is checking, whose slot closing the panel releases. Nil once it sends.
+    @ObservationIgnored var confirmingMerge: PendingMerge?
+    /// A merge's failure or unknown line per login, whose answer landed with another account running. Shown
+    /// when that account runs again, so account changes keep it.
+    @ObservationIgnored var heldMergeLines: [String: EditFailure] = [:]
+    /// Details on screen being read again for their merge state, by key; true for a read after a review
+    /// (see `rereadMergeState`).
+    @ObservationIgnored var mergeRereads: [PRKey: Bool] = [:]
     /// Held details being read again off screen, one read per key (see `rereadReviewedDetails`).
     @ObservationIgnored var reviewRereads: Set<PRKey> = []
     /// The newest submit's check and write. Only `leaveReviewMode` cancels it; everything else lets it run.
@@ -217,6 +234,11 @@ final class AppModel {
             if route != oldValue {
                 endMentions()
                 endReviewMode(on: nil)
+                endMergeMode(on: nil)
+                switch oldValue {
+                case .detail(let key), .issueDetail(let key): edits.dismissFailure(on: key)
+                default: break
+                }
             }
         }
     }
@@ -368,8 +390,9 @@ final class AppModel {
     @ObservationIgnored private var statesTask: Task<Void, Never>?
     /// Trims the detail and avatar disk caches a minute after launch, then once a day.
     @ObservationIgnored private var cacheTrimTask: Task<Void, Never>?
-    /// What `GET /user/installations` last returned per app account; the source of `orgAccess`.
-    @ObservationIgnored private var installations: [AccountRef: InstallationsState] = [:]
+    /// What `GET /user/installations` last returned per app account; the source of `orgAccess`. Observed, as
+    /// `mergeOffer` waits for it: a detail open before it loads shows its Merge when it does.
+    private var installations: [AccountRef: InstallationsState] = [:]
     /// The last read of each app account's own-account repository list; the source of `personalRepos`.
     @ObservationIgnored private var personalRepoReads: [AccountRef: PersonalRepos] = [:]
     @ObservationIgnored private var personalReposTask: (account: AccountRef, task: Task<Void, Never>)?
@@ -542,6 +565,15 @@ final class AppModel {
     /// The account the lists were fetched with; edits go through it too.
     var runningAccount: AccountRef? { running?.ref }
 
+    /// Whether an `.unavailable` from `setEditPermission` can be believed: an app account's installations
+    /// have loaded, or the account is a `gh` login, which has none to wait for.
+    var editPermissionsKnown: Bool {
+        guard let account = running?.ref else { return false }
+        guard account.source == .gitHubApp else { return true }
+        if case .loaded = installations[account] { return true }
+        return false
+    }
+
     private enum InstallationsState: Equatable {
         case loaded([Installation])
         case ssoRequired(URL?)
@@ -684,6 +716,7 @@ final class AppModel {
     /// on unless that is the scope it opens on, so its Esc hint stops naming it.
     func popoverDidClose() {
         endReviewMode(on: nil)
+        endMergeMode(on: nil)
         var showsPRDetail = false
         if mode == .pullRequests, case .detail = route { showsPRDetail = true }
         if !showsPRDetail {
@@ -1960,6 +1993,7 @@ final class AppModel {
         updatesTask?.cancel()
         if let old = coordinator { Task { await old.stop() } }
         clearAccountData()
+        showHeldMergeLine()
         status = RefreshStatus(lastSuccess: nil, error: nil, isRefreshing: false)
 
         // An app account's cache shows only once its sign-in is known not to have ended, so a revoked
@@ -2104,6 +2138,10 @@ final class AppModel {
         // A submit under way carries on: its task and `postsInFlight` stay.
         endReviewMode(on: nil)
         sendingReviews.removeAll()
+        // So does a merge sending; anything before that stops here.
+        endMergeMode(on: nil)
+        sendingMerges.removeAll()
+        mergedHere.removeAll()
         snapshot = nil
         people = .empty
         labels = .empty
@@ -2134,9 +2172,10 @@ final class AppModel {
         notifyChanges(snapshot, status)
         if let snapshot {
             let behind = edits.overrides.reviewsAhead(of: details)
-            edits.reconcile(with: snapshot, now: Date(), holdingReviews: behind)
+            let mergesBehind = edits.overrides.mergesAhead(of: details)
+            edits.reconcile(with: snapshot, now: Date(), holdingReviews: behind, holdingMerges: mergesBehind)
             postedComments.reconcile(with: snapshot, now: Date())
-            if !status.isRefreshing, status.error == nil { rereadReviewedDetails(behind) }
+            if !status.isRefreshing, status.error == nil { rereadReviewedDetails(behind.union(mergesBehind)) }
         }
         self.snapshot = snapshot
         var status = status
@@ -2187,7 +2226,7 @@ final class AppModel {
             searchField.refresh(people: people, labels: labels, statuses: statuses, repos: repos)
         }
         let now = Date()
-        let built = TabBuilder.build(snapshot, settings: settings, now: now)
+        let built = TabBuilder.build(snapshot, settings: settings, now: now, merging: edits.overrides.directMerges)
         tabs = built
         issueTabs = IssueTabBuilder.build(snapshot, settings: settings, now: now)
         hiddenApprovedCount = built.hiddenApprovedCount
@@ -2472,6 +2511,7 @@ extension AppModel {
                 guard let self, !Task.isCancelled, self.running?.account == account else { return }
                 self.details[key] = fresh
                 if self.detailFetch?.key == key { self.detailFetch = nil }
+                self.rereadMergeState(on: key)
                 try? await store.saveDetail(fresh, account: account)
             } catch is CancellationError {
                 return
@@ -3060,6 +3100,15 @@ extension AppModel {
     /// Keeps a detail read outside `loadDetail`; the caller has checked its account still runs.
     func keepDetail(_ fresh: PRDetail) {
         details[fresh.key] = fresh
+    }
+
+    /// Stores a detail read outside `loadDetail` as `loadDetail` does; the caller has checked `account` still runs.
+    func storeDetail(_ fresh: PRDetail, account: AccountRef) {
+        keepDetail(fresh)
+        if detailFetch?.key == fresh.key { detailFetch = nil }
+        let store = snapshotStore
+        let login = account.login
+        Task { try? await store.saveDetail(fresh, account: login) }
     }
 
     /// Fetches the detail of `key` once with `account`, outside `loadDetail`'s cancelling, keeps it as

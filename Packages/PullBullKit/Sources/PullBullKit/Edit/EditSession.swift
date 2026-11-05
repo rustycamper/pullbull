@@ -5,17 +5,25 @@ public struct EditFailure: Equatable, Sendable {
     public let text: String
     /// The item on GitHub, for **Open on GitHub**.
     public let url: URL
+    /// The item it's about: leaving that item clears the line, unless `staysOnLeaving`.
+    public let key: PRKey
+    /// The line is about a write that was sent. Its answer can land with the popover closed, and reopening
+    /// counts as leaving, so only dismissing or the next edit clears it.
+    public let staysOnLeaving: Bool
 
-    public init(text: String, url: URL) {
+    public init(text: String, url: URL, key: PRKey, staysOnLeaving: Bool = false) {
         self.text = text
         self.url = url
+        self.key = key
+        self.staysOnLeaving = staysOnLeaving
     }
 }
 
 /// The edits PullBull is showing before GitHub agrees, the one ⌘Z can take back, and the last failure.
 public struct EditSession: Equatable, Sendable {
     public private(set) var overrides = EditOverrides()
-    /// Shown until dismissed or the next edit.
+    /// Shown until dismissed or the next edit, or, unless it's about a sent write, until the viewer leaves
+    /// the item it's about.
     public private(set) var failure: EditFailure?
     private var undo = EditUndo()
     /// The edit `begin` returned last; only its answer can arm ⌘Z.
@@ -44,6 +52,16 @@ public struct EditSession: Equatable, Sendable {
         overrides.drop(id)
     }
 
+    /// Shows a merge or an auto-merge change at once. Unlike `begin` it leaves ⌘Z and the failure line alone.
+    public mutating func recordMerge(_ change: EditChange, on key: PRKey, at now: Date) -> UUID {
+        overrides.record(change, on: key, at: now)
+    }
+
+    /// Takes a merge back off the screen, as when GitHub refused it. The failure line is the caller's.
+    public mutating func dropMerge(_ id: UUID) {
+        overrides.drop(id)
+    }
+
     /// GitHub applied the edit `id`; ⌘Z can now take it back when it's still the last edit. Not called
     /// for an undo, which isn't undoable.
     public mutating func applied(_ id: UUID, _ record: EditRecord) {
@@ -54,7 +72,7 @@ public struct EditSession: Equatable, Sendable {
     /// GitHub refused or couldn't be reached: take the edit back off the screen and say why.
     public mutating func failed(_ id: UUID, change: EditChange, on key: PRKey, url: URL, error: any Error) {
         overrides.drop(id)
-        failure = EditFailure(text: EditMessage.failure(change, on: key, error: error), url: url)
+        failure = EditFailure(text: EditMessage.failure(change, on: key, error: error), url: url, key: key)
     }
 
     /// GitHub applied part of edit `id`: the refused half leaves the screen, the failure line says
@@ -66,7 +84,7 @@ public struct EditSession: Equatable, Sendable {
     ) {
         let applied = change.keeping(result)
         overrides.replace(id, with: applied)
-        failure = EditMessage.partial(change, on: key, result: result).map { EditFailure(text: $0, url: url) }
+        failure = EditMessage.partial(change, on: key, result: result).map { EditFailure(text: $0, url: url, key: key) }
         if !isUndo, id == last, !applied.isEmpty {
             undo.remember(EditRecord(key: key, change: applied, madeAt: now, addedItemId: nil))
         }
@@ -95,15 +113,28 @@ public struct EditSession: Equatable, Sendable {
         failure = nil
     }
 
-    /// Ends the edits `fetched` agrees with, but for reviews on `held`. A fetch of another board drops them
-    /// all, and the undo.
-    public mutating func reconcile(with fetched: Snapshot, now: Date, holdingReviews held: Set<PRKey> = []) {
+    /// The viewer left `key`: its line goes, unless it's about a sent write, which may not have been seen.
+    /// One about another item stays too.
+    public mutating func dismissFailure(on key: PRKey) {
+        if let failure, failure.key == key, !failure.staysOnLeaving { self.failure = nil }
+    }
+
+    /// A new write on `key` starts: the line goes, but a sent write's line about another item stays.
+    public mutating func dismissFailure(startingOn key: PRKey) {
+        if let failure, failure.key == key || !failure.staysOnLeaving { self.failure = nil }
+    }
+
+    /// Ends the edits `fetched` agrees with, but for reviews on `held` and merges on `heldMerges`. A fetch of
+    /// another board drops them all, and the undo.
+    public mutating func reconcile(
+        with fetched: Snapshot, now: Date, holdingReviews held: Set<PRKey> = [], holdingMerges heldMerges: Set<PRKey> = []
+    ) {
         if let board, fetched.board != board {
             self = EditSession()
             self.board = fetched.board
             return
         }
         board = fetched.board
-        overrides.reconcile(with: fetched, now: now, holdingReviews: held)
+        overrides.reconcile(with: fetched, now: now, holdingReviews: held, holdingMerges: heldMerges)
     }
 }

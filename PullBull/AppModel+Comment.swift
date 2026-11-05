@@ -163,7 +163,7 @@ extension AppModel {
         guard runningAccount == post.account else { return }
         postedComments.drop(post.id)
         refreshShown()
-        edits.showFailure(EditFailure(text: text, url: post.url))
+        edits.showFailure(EditFailure(text: text, url: post.url, key: post.key))
         let shown: Route = post.isPullRequest ? .detail(post.key) : .issueDetail(post.key)
         if focus, route == shown, statusPicker == nil, setPicker == nil { requestCommentFieldFocus(on: post.key) }
     }

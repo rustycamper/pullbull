@@ -4,7 +4,7 @@ import Testing
 
 /// Answers each REST request in turn with a status and a JSON body, or a thrown error, and records what was sent.
 final class RESTQueue: GraphQLTransport, @unchecked Sendable {
-    struct Sent { let method: String; let path: String; let body: [String: Any] }
+    struct Sent { let method: String; let path: String; let body: [String: Any]; let rawBody: Data }
 
     private enum Answer {
         case response(Int, String)
@@ -15,10 +15,18 @@ final class RESTQueue: GraphQLTransport, @unchecked Sendable {
     private var queue: [Answer]
     private var log: [Sent] = []
 
-    init(_ answers: [(Int, String)]) { queue = answers.map { .response($0.0, $0.1) } }
+    private let headers: [String: String]
+
+    init(_ answers: [(Int, String)], headers: [String: String] = [:]) {
+        queue = answers.map { .response($0.0, $0.1) }
+        self.headers = headers
+    }
 
     /// A transport whose one answer is `error`.
-    init(failing error: any Error) { queue = [.failure(error)] }
+    init(failing error: any Error) {
+        queue = [.failure(error)]
+        headers = [:]
+    }
 
     var sent: [Sent] { lock.withLock { log } }
 
@@ -31,7 +39,7 @@ final class RESTQueue: GraphQLTransport, @unchecked Sendable {
         let answer = lock.withLock {
             log.append(Sent(
                 method: method, path: path,
-                body: (try? JSONSerialization.jsonObject(with: body) as? [String: Any]) ?? [:]))
+                body: (try? JSONSerialization.jsonObject(with: body) as? [String: Any]) ?? [:], rawBody: body))
             return queue.removeFirst()
         }
         switch answer {
@@ -39,7 +47,7 @@ final class RESTQueue: GraphQLTransport, @unchecked Sendable {
             throw error
         case .response(let status, let json):
             let response = HTTPURLResponse(
-                url: URL(string: "https://api.github.com\(path)")!, statusCode: status, httpVersion: nil, headerFields: nil)!
+                url: URL(string: "https://api.github.com\(path)")!, statusCode: status, httpVersion: nil, headerFields: headers)!
             return (Data(json.utf8), response)
         }
     }

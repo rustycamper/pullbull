@@ -96,7 +96,7 @@ struct SetPickerView: View {
         switch field {
         case .labels: "Labels"
         case .reviewers: "Reviewers"
-        case .assignees, .status, .comment, .review: "Assignees"
+        case .assignees, .status, .comment, .review, .merge, .rerun: "Assignees"
         }
     }
 
@@ -175,7 +175,7 @@ private struct SetPickerRowView: View {
         switch field {
         case .labels: "applied"
         case .reviewers: "requested"
-        case .assignees, .status, .comment, .review: "assigned"
+        case .assignees, .status, .comment, .review, .merge, .rerun: "assigned"
         }
     }
 }

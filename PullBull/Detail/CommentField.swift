@@ -2,8 +2,8 @@ import AppKit
 import PullBullKit
 import SwiftUI
 
-/// A detail's bottom row: the comment field, the item's own buttons (Review and Copy branch, or View on
-/// board), and Open on GitHub last. Unfocused, the field is one line as tall as the
+/// A detail's bottom row: the comment field, the item's own buttons (Review, Merge and Copy branch, or View
+/// on board), and Open on GitHub last. Unfocused, the field is one line as tall as the
 /// buttons, reading "Comment…" with ⌥⌘M at its end, or a pencil and a waiting draft's first line. ⌥⌘M or
 /// a click focuses it: ⌘↩ shows at its end, as the way to post, and it grows upward with the text to 8
 /// lines, then scrolls. While a post is in flight, "Sending…" takes the hint's place. Where the account
@@ -15,7 +15,7 @@ struct CommentField<Secondary: View>: View {
     let isPullRequest: Bool
     /// Where Open on GitHub goes.
     let webURL: URL
-    /// Review and Copy branch on a PR, View on board on an issue on the board.
+    /// Review, Merge and Copy branch on a PR, View on board on an issue on the board.
     @ViewBuilder let secondary: Secondary
 
     @State private var isFocused = false
@@ -101,7 +101,7 @@ struct CommentField<Secondary: View>: View {
                 }
             // At the end of the last line, beside the text rather than under it.
             if let hint = CommentRow.hint(
-                focused: isFocused, sending: isSending,
+                focused: isFocused, sending: isSending && !model.sendingMerges.contains(key),
                 hasDraft: CommentRow.preview(of: draftText) != nil, checking: review?.phase == .checking)
             {
                 Text(hint)

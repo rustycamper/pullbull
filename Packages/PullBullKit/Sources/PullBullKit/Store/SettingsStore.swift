@@ -50,7 +50,7 @@ public struct NotificationToggles: Codable, Equatable, Sendable {
     public var changesRequested = true
     public var ciFailed = true
     public var newComment = true
-    /// My pull request merged by someone else.
+    /// My pull request merged outside PullBull: by someone else, by me on GitHub, or by auto-merge.
     public var merged = true
     /// Off by default: an issue newly assigned to me by someone else.
     public var issueAssigned = false

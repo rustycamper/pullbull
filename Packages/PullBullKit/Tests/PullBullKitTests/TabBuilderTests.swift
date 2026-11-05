@@ -271,3 +271,158 @@ private func snap(
         #expect(built.review.rows.map(\.id.number) == [1, 2])
     }
 }
+
+/// A direct merge on its way: the overlay marks the PR merged before GitHub answers, and the row must not
+/// leave at the send.
+@Suite struct MergingRowTests {
+    private let key = PRKey(repo: "r", number: 1)
+
+    private func merging(_ snapshot: Snapshot) -> (shown: Snapshot, overrides: EditOverrides, id: UUID) {
+        var overrides = EditOverrides()
+        let id = overrides.record(.merged(viewer: "me"), on: key, at: now)
+        return (overrides.apply(to: snapshot), overrides, id)
+    }
+
+    private func build(_ shown: Snapshot, _ overrides: EditOverrides, settings: AppSettings = AppSettings()) -> BuiltTabs {
+        TabBuilder.build(shown, settings: settings, now: now, merging: overrides.directMerges)
+    }
+
+    @Test func staysInMineDimmed() {
+        let (shown, overrides, _) = merging(snap(mine: [pr(1, author: "me"), pr(2, author: "me")]))
+        let rows = build(shown, overrides).mine.rows
+        #expect(rows.map(\.id.number) == [1, 2])
+        #expect(rows.map(\.dimmed) == [true, false])
+    }
+
+    @Test func staysInTeamDimmed() {
+        let (shown, overrides, _) = merging(snap(team: [pr(1), pr(2)]))
+        let rows = build(shown, overrides).team.rows
+        #expect(rows.map(\.id.number) == [1, 2])
+        #expect(rows.map(\.dimmed) == [true, false])
+    }
+
+    @Test func isNoLongerCounted() {
+        let (shown, overrides, _) = merging(snap(mine: [pr(1, author: "me"), pr(2, author: "me")], team: [pr(1), pr(2)]))
+        let built = build(shown, overrides)
+        #expect(built.mine.count == 1)
+        #expect(built.team.count == 1)
+    }
+
+    @Test func staysInItsSection() {
+        // Ready to merge puts it in Your PRs, and a PR reading merged isn't ready.
+        let ready = pr(1, author: "me", reviews: [Review(author: "bob", state: .approved, submittedAt: ago(1))])
+        let (shown, overrides, _) = merging(snap(mine: [ready]))
+        let built = build(shown, overrides)
+        #expect(built.yourPRs.rows.map(\.id.number) == [1])
+        #expect(built.waitingOnOthers.rows.isEmpty)
+    }
+
+    @Test func keepsItsPlaceInAWaitSort() {
+        var settings = AppSettings()
+        settings.setSort(.waitingLongest, for: PRTab.team)
+        let (shown, overrides, _) = merging(snap(team: [pr(1, waits: [9]), pr(2, waits: [3])]))
+        #expect(build(shown, overrides, settings: settings).team.rows.map(\.id.number) == [1, 2])
+    }
+
+    @Test func teamFiltersStillApply() {
+        var settings = AppSettings()
+        settings.hideOlderThanTwoMonths = true
+        let (shown, overrides, _) = merging(snap(team: [pr(1, updated: 90)]))
+        #expect(build(shown, overrides, settings: settings).team.rows.isEmpty)
+    }
+
+    @Test func aRefusalPutsItBackUndimmed() {
+        var (_, overrides, id) = merging(snap())
+        overrides.drop(id)
+        let fetched = snap(mine: [pr(1, author: "me")], team: [pr(1)])
+        let built = build(overrides.apply(to: fetched), overrides)
+        #expect(built.mine.rows.map(\.dimmed) == [false])
+        #expect(built.mine.count == 1)
+        #expect(built.team.rows.map(\.dimmed) == [false])
+        #expect(built.team.count == 1)
+    }
+
+    @Test func movesOnceTheOverlaySettles() {
+        var (_, overrides, _) = merging(snap())
+        let fetched = snap(
+            mine: [pr(1, author: "me", state: .merged)], team: [pr(1, state: .merged)],
+            closed: [pr(1, author: "me", closed: 0, state: .merged)])
+        overrides.reconcile(with: fetched, now: now.addingTimeInterval(30))
+        let built = build(overrides.apply(to: fetched), overrides)
+        #expect(built.mine.rows.isEmpty)
+        #expect(built.team.rows.isEmpty)
+        #expect(built.recentlyClosed.map(\.key.number) == [1])
+    }
+
+    @Test func staysWhileTheDetailHoldsTheOverlay() {
+        var (_, overrides, _) = merging(snap())
+        let fetched = snap(mine: [pr(1, author: "me", state: .merged)])
+        overrides.reconcile(with: fetched, now: now.addingTimeInterval(30), holdingMerges: [key])
+        #expect(build(overrides.apply(to: fetched), overrides).mine.rows.map(\.dimmed) == [true])
+    }
+
+    @Test func aMergeGitHubReportsWithNoOverlayLeavesAsBefore() {
+        let fetched = snap(mine: [pr(1, author: "me", state: .merged)], team: [pr(1, state: .merged)])
+        let built = TabBuilder.build(fetched, settings: AppSettings(), now: now)
+        #expect(built.mine.rows.isEmpty)
+        #expect(built.team.rows.isEmpty)
+    }
+
+    @Test func staysInReviewDimmedAndUncounted() {
+        let (shown, overrides, _) = merging(snap(review: [pr(1), pr(2)]))
+        let built = build(shown, overrides)
+        #expect(built.review.rows.map(\.id.number) == [1, 2])
+        #expect(built.review.rows.map(\.dimmed) == [true, false])
+        #expect(built.review.count == 1)
+        #expect(built.review.rows.first?.pr.state == .open)
+        #expect(built.review.rows.first?.reviewReason == .requested)
+    }
+
+    @Test func isNotListedInTeamToo() {
+        let (shown, overrides, _) = merging(snap(review: [pr(1)], team: [pr(1), pr(2)]))
+        #expect(build(shown, overrides).teamSection.rows.map(\.id.number) == [2])
+    }
+
+    @Test func keepsItsPlaceInReviewsWaitSort() {
+        // With its reason #1 shows the viewer's own 1d wait; without one it would show the oldest request's 9d.
+        var settings = AppSettings()
+        settings.setSort(.waitingLongest, for: PRTab.review)
+        let requests: [Reviewer] = [.user("zed"), .user("me")]
+        let prs = [pr(1, requests: requests, waits: [9, 1]), pr(2, waits: [3])]
+        let (shown, overrides, _) = merging(snap(review: prs))
+        #expect(build(shown, overrides, settings: settings).review.rows.map(\.id.number) == [2, 1])
+    }
+
+    @Test func aHiddenApprovedRowStaysHidden() {
+        var settings = AppSettings()
+        settings.hideApprovedByMe = true
+        let (shown, overrides, _) = merging(snap(review: [approvedByMe(1)]))
+        let built = build(shown, overrides, settings: settings)
+        #expect(built.review.rows.isEmpty)
+        #expect(built.hiddenApprovedCount == 1)
+    }
+
+    @Test func isNotListedInRecentlyClosedToo() {
+        // Search lags: Mine still returns the PR while Recently closed already has it.
+        let closed = pr(1, author: "me", closed: 0, state: .merged)
+        let (shown, overrides, _) = merging(snap(mine: [pr(1, author: "me")], closed: [closed]))
+        let built = build(shown, overrides)
+        #expect(built.mine.rows.map(\.id.number) == [1])
+        #expect(built.recentlyClosed.isEmpty)
+    }
+
+    @Test func staysInRecentlyClosedOnceNoOtherListHasIt() {
+        // The lists caught up while the detail still holds the overlay: this is the only place it's listed.
+        let closed = pr(1, author: "me", closed: 0, state: .merged)
+        let (shown, overrides, _) = merging(snap(closed: [closed]))
+        #expect(build(shown, overrides).recentlyClosed.map(\.key.number) == [1])
+    }
+
+    @Test func anAutoMergeKeepsTheRowUndimmed() {
+        var overrides = EditOverrides()
+        overrides.record(.autoMerge(enabled: true, viewer: "me"), on: key, at: now)
+        let built = build(overrides.apply(to: snap(mine: [pr(1, author: "me")])), overrides)
+        #expect(built.mine.rows.map(\.dimmed) == [false])
+        #expect(built.mine.count == 1)
+    }
+}

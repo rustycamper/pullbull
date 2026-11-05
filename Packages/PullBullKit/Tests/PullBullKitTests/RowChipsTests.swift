@@ -141,8 +141,8 @@ import Testing
         #expect(Self.chips(Self.row(), .review) == RowChips(action: nil, info: []))
     }
 
-    @Test func reviewDimmedRequestShowsApprovedNotReq() {
-        #expect(Self.chips(Self.row(dimmed: true, reason: .requested), .review).info == [.youApprovedNotCounted])
+    @Test func reviewDimmedWithAReasonKeepsTheReason() {
+        #expect(Self.chips(Self.row(dimmed: true, reason: .requested), .review).info == [.requested])
     }
 
     @Test func reviewReqComesBeforeTheWaitAndConflicts() {

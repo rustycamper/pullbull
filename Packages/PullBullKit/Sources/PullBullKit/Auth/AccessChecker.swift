@@ -32,6 +32,12 @@ public struct Installation: Sendable, Equatable {
     /// Labels and assignees on pull requests.
     public var canWritePullRequests: Bool { ["write", "admin"].contains(permissions["pull_requests"] ?? "") }
 
+    /// Merging a pull request.
+    public var canWriteContents: Bool { ["write", "admin"].contains(permissions["contents"] ?? "") }
+
+    /// Re-running a pull request's failed checks.
+    public var canWriteActions: Bool { ["write", "admin"].contains(permissions["actions"] ?? "") }
+
     /// A board item's Status, and adding an issue to the board.
     public var canWriteProjects: Bool { ["write", "admin"].contains(permissions["organization_projects"] ?? "") }
 }

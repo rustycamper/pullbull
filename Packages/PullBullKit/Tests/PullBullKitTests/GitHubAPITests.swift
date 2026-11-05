@@ -393,6 +393,29 @@ private func page(_ nodes: [String], cursor: String, next: Bool) -> String {
         #expect(Queries.detail.contains("comments(last:50){totalCount nodes{"))
     }
 
+    @Test func detailFillsTheMergeInfo() async throws {
+        let body = """
+        {"data":{"repository":{"viewerPermission":"WRITE","mergeCommitAllowed":true,"squashMergeAllowed":true,\
+        "rebaseMergeAllowed":false,"viewerDefaultMergeMethod":"SQUASH","pullRequest":{"body":"",\
+        "updatedAt":"2026-10-25T14:03:11Z","id":"PR_abc","isDraft":false,"mergeable":"MERGEABLE",\
+        "mergeStateStatus":"CLEAN","isMergeQueueEnabled":false,"baseRefName":"main","canBeRebased":true,\
+        "viewerCanEnableAutoMerge":false,"viewerCanDisableAutoMerge":false,"stack":null,"autoMergeRequest":null,\
+        "commitTotal":{"totalCount":2},\
+        "baseRef":{"rules":{"nodes":[{"type":"REQUIRED_LINEAR_HISTORY","parameters":null}]}},\
+        "commits":{"nodes":[{"commit":{"statusCheckRollup":{"state":"FAILURE","contexts":{"totalCount":4,\
+        "checkRunCountsByState":[{"state":"SUCCESS","count":2},{"state":"FAILURE","count":1}],\
+        "statusContextCountsByState":[{"state":"PENDING","count":1}],"nodes":[]}}}}]},\
+        "latestReviews":{"nodes":[{"state":"APPROVED"}]},"comments":{"nodes":[]},\
+        "files":{"totalCount":0,"nodes":[]}}}}}
+        """
+        let api = api(StubTransport(json: [body]))
+        let merge = try #require(await api.detail(PRKey(repo: "o/r", number: 1)).merge)
+        #expect(merge.nodeID == "PR_abc")
+        #expect(merge.allowedMethods == [.squash])
+        #expect(merge.tally == CheckTally(failing: 1, running: 1, total: 4))
+        #expect(merge.approvals == 1)
+    }
+
     @Test func detailTotalsIgnoreUndecodableNodes() async throws {
         let body = """
         {"data":{"repository":{"pullRequest":{"body":"","updatedAt":"2026-10-25T14:03:11Z",\

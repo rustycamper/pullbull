@@ -112,7 +112,8 @@ public struct RowChips: Equatable, Sendable {
             if pr.hasConflicts { info.append(.conflicts) }
             self.init(action: nil, info: info)
         case .review:
-            let reason: Info? = if row.dimmed {
+            // A row dimmed with a reason is a merge on its way, which says nothing of a review.
+            let reason: Info? = if row.dimmed, row.reviewReason == nil {
                 .youApprovedNotCounted
             } else {
                 switch row.reviewReason {

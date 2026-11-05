@@ -39,10 +39,35 @@ private func status(_ key: PRKey, _ session: EditSession, in snapshot: Snapshot 
         let reviewId = s.recordReview(review, on: k412, at: t0 + 1)
         #expect(s.canUndo(now: t0 + 2))
         #expect(s.takeUndo(now: t0 + 2) == record)
-        s.showFailure(EditFailure(text: "boom", url: url412))
+        s.showFailure(EditFailure(text: "boom", url: url412, key: k412))
         s.dropReview(reviewId)
         #expect(s.failure?.text == "boom")
         #expect(s.overrides.apply(to: editPR(412)).latestReviews.isEmpty)
+    }
+
+    @Test func recordMergeLeavesUndoAlone() {
+        var s = EditSession()
+        let label = EditChange.labels(added: [bug], removed: [])
+        let id = s.begin(label, on: k412, at: t0)
+        let record = EditRecord(key: k412, change: label, madeAt: t0, addedItemId: nil)
+        s.applied(id, record)
+        let mergeId = s.recordMerge(.merged(viewer: "me"), on: k412, at: t0 + 1)
+        #expect(s.overrides.apply(to: editPR(412)).state == .merged)
+        #expect(s.canUndo(now: t0 + 2))
+        #expect(s.takeUndo(now: t0 + 2) == record)
+        s.showFailure(EditFailure(text: "boom", url: url412, key: k412))
+        s.dropMerge(mergeId)
+        #expect(s.failure?.text == "boom")
+        #expect(s.overrides.apply(to: editPR(412)).state == .open)
+    }
+
+    @Test func reconcilePassesHeldMergesOn() {
+        var s = EditSession()
+        _ = s.recordMerge(.merged(viewer: "me"), on: k412, at: t0)
+        s.reconcile(with: editSnapshot(), now: t0 + 30, holdingMerges: [k412])
+        #expect(!s.overrides.isEmpty)
+        s.reconcile(with: editSnapshot(), now: t0 + 60)
+        #expect(s.overrides.isEmpty)
     }
 
     @Test func appliedEditCanBeUndoneOnce() {
@@ -116,7 +141,7 @@ private func status(_ key: PRKey, _ session: EditSession, in snapshot: Snapshot 
         s.failed(a, change: move, on: k412, url: url412, error: APIError.writeRefused("nope"))
         #expect(status(k412, s) == todo)
         #expect(status(k413, s) == doing)
-        #expect(s.failure == EditFailure(text: "Couldn't set Status on #412: nope", url: url412))
+        #expect(s.failure == EditFailure(text: "Couldn't set Status on #412: nope", url: url412, key: k412))
     }
 
     @Test func staleFetchKeepsTheEdit() {
@@ -205,7 +230,61 @@ private func status(_ key: PRKey, _ session: EditSession, in snapshot: Snapshot 
     // MARK: Comment failures
 
     private let commentFailure = EditFailure(
-        text: EditMessage.commentRefused(on: k412, reason: "Issues are locked"), url: url412)
+        text: EditMessage.commentRefused(on: k412, reason: "Issues are locked"), url: url412, key: k412)
+
+    @Test func leavingAnItemClearsItsFailure() {
+        var s = EditSession()
+        s.showFailure(commentFailure)
+        s.dismissFailure(on: k412)
+        #expect(s.failure == nil)
+    }
+
+    // It arrived after the viewer left the item it's about, so they haven't seen it yet.
+    @Test func leavingAnotherItemKeepsTheFailure() {
+        var s = EditSession()
+        s.showFailure(commentFailure)
+        s.dismissFailure(on: k413)
+        #expect(s.failure == commentFailure)
+    }
+
+    // MARK: Lines about a sent write
+
+    private let sentLine = EditFailure(text: "Couldn't merge", url: url412, key: k412, staysOnLeaving: true)
+
+    @Test func aStayingLineSurvivesLeavingItsOwnItem() {
+        var s = EditSession()
+        s.showFailure(sentLine)
+        s.dismissFailure(on: k412)
+        #expect(s.failure == sentLine)
+    }
+
+    @Test func dismissingClearsAStayingLine() {
+        var s = EditSession()
+        s.showFailure(sentLine)
+        s.dismissFailure()
+        #expect(s.failure == nil)
+    }
+
+    @Test func startingOnAnotherItemKeepsAStayingLine() {
+        var s = EditSession()
+        s.showFailure(sentLine)
+        s.dismissFailure(startingOn: k413)
+        #expect(s.failure == sentLine)
+    }
+
+    @Test func startingOnTheSameItemClearsAStayingLine() {
+        var s = EditSession()
+        s.showFailure(sentLine)
+        s.dismissFailure(startingOn: k412)
+        #expect(s.failure == nil)
+    }
+
+    @Test func startingOnAnotherItemClearsALineThatDoesNotStay() {
+        var s = EditSession()
+        s.showFailure(commentFailure)
+        s.dismissFailure(startingOn: k413)
+        #expect(s.failure == nil)
+    }
 
     @Test func showFailureLeavesAnArmedUndoTakeable() {
         var s = EditSession()

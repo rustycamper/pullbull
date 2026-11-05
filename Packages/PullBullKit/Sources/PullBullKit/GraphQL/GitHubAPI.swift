@@ -3,7 +3,7 @@ import Foundation
 
 public protocol GraphQLTransport: Sendable {
     func send(_ body: Data, token: String) async throws -> (Data, HTTPURLResponse)
-    /// A REST request to `https://api.github.com` + `path` with a JSON body.
+    /// A REST request to `https://api.github.com` + `path` with a JSON body; an empty body means none.
     func send(_ method: String, path: String, body: Data, token: String) async throws -> (Data, HTTPURLResponse)
 }
 
@@ -244,13 +244,16 @@ public struct PRDetail: Codable, Sendable {
     public let headOid: String?
     public let author: String?
     public let state: PRState?
+    /// What the merge panel needs; nil in details cached before it was stored.
+    public let merge: MergeInfo?
 
     public init(
         key: PRKey, body: String, checks: [Check], reviews: [Review],
         comments: [Comment], files: [ChangedFile], updatedAt: Date? = nil, ci: CIState? = nil,
         changedFiles: Int? = nil, additions: Int? = nil, deletions: Int? = nil, checkCount: Int? = nil,
         requests: [Reviewer]? = nil, commentCount: Int? = nil,
-        headOid: String? = nil, author: String? = nil, state: PRState? = nil
+        headOid: String? = nil, author: String? = nil, state: PRState? = nil,
+        merge: MergeInfo? = nil
     ) {
         self.key = key
         self.body = body
@@ -269,6 +272,7 @@ public struct PRDetail: Codable, Sendable {
         self.headOid = headOid
         self.author = author
         self.state = state
+        self.merge = merge
     }
 
     public var commentTotal: Int { max(commentCount ?? 0, comments.count) }
@@ -402,11 +406,13 @@ public struct URLSessionTransport: GraphQLTransport {
         var request = URLRequest(url: URL(string: "https://api.github.com\(path)")!)
         request.httpMethod = method
         request.timeoutInterval = 20
+        // GitHub marks GETs max-age=60, and a poll must see the answer change.
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = body
+        request.httpBody = body.isEmpty ? nil : body
         return request
     }
 }
@@ -762,7 +768,8 @@ public struct GitHubAPI: Sendable {
             commentCount: (commentsConnection?["totalCount"] as? Int).map { $0 - (commentNodes.count - comments.count) },
             headOid: pr["headRefOid"] as? String,
             author: (pr["author"] as? [String: Any])?["login"] as? String ?? "ghost",
-            state: (pr["state"] as? String).flatMap { PRState(rawValue: $0.lowercased()) })
+            state: (pr["state"] as? String).flatMap { PRState(rawValue: $0.lowercased()) },
+            merge: MergeInfo.read(pullRequest: pr, repository: data["repository"] as? [String: Any]))
     }
 
     /// The pull request's head commit and state right now, for a review that must name the commit it saw.
@@ -789,6 +796,94 @@ public struct GitHubAPI: Sendable {
         var payload: [String: Any] = ["event": verdict.rawValue, "commit_id": commit]
         if !trimmed.isEmpty { payload["body"] = trimmed }
         _ = try await restAnswer("POST", path, payload, keepingTransportFailures: true)
+    }
+
+    /// Asks GitHub to merge `key` at `head`, never bypassing its rules. A refusal throws `writeRefused`
+    /// with GitHub's reason; a timeout or dropped connection throws `CommentTransportError`, since the
+    /// merge may have been accepted. An answer that can't be read throws, which callers treat as unknown.
+    public func requestMerge(_ key: PRKey, head: String, method: MergeMethod) async throws -> MergeRequestState {
+        let path = "/repos/\(key.repo)/pulls/\(key.number)/merge-async"
+        let payload: [String: Any] = [
+            "sha": head, "merge_method": method.rawValue.lowercased(),
+            "merge_action": "direct_merge", "bypass_rules": false,
+        ]
+        let (status, data, response) = try await restExchange("PUT", path, payload, keepingTransportFailures: true)
+        switch status {
+        case 200, 202, 409:
+            return try Self.mergeState(data, uuid: nil)
+        case 400:
+            throw APIError.writeRefused(Self.mergeMessage(data) ?? "GitHub didn't apply the change")
+        default:
+            throw httpError(data, response, refusing: true) ?? APIError.server(status)
+        }
+    }
+
+    /// Reads the merge request `uuid` that `requestMerge` was given. Sends no body. Whatever it throws
+    /// leaves the merge's outcome unknown.
+    public func mergeResult(_ key: PRKey, uuid: String) async throws -> MergeRequestState {
+        let path = "/repos/\(key.repo)/pulls/\(key.number)/merge-async/\(uuid)"
+        let (status, data, response) = try await restExchange("GET", path, nil, keepingTransportFailures: false)
+        if (200..<300).contains(status) { return try Self.mergeState(data, uuid: uuid) }
+        if status == 400, case .failed(let reason) = try? Self.mergeState(data, uuid: uuid) { return .failed(reason) }
+        throw httpError(data, response) ?? APIError.server(status)
+    }
+
+    /// Turns on auto-merge for the pull request node. GitHub's validation answers throw `writeRefused`.
+    public func enableAutoMerge(_ key: PRKey, nodeID: String, head: String, method: MergeMethod) async throws {
+        let variables: [String: Any] = ["pr": nodeID, "head": head, "method": method.rawValue]
+        try await autoMergeMutation(Mutations.enableAutoMerge, variables, payload: "enablePullRequestAutoMerge")
+    }
+
+    /// Turns off auto-merge for the pull request node. GitHub's validation answers throw `writeRefused`.
+    public func disableAutoMerge(_ key: PRKey, nodeID: String) async throws {
+        try await autoMergeMutation(Mutations.disableAutoMerge, ["pr": nodeID], payload: "disablePullRequestAutoMerge")
+    }
+
+    /// Sends an auto-merge mutation. Only GitHub's validation answers are a refusal: a `data` object whose
+    /// payload is null with an `UNPROCESSABLE` error (as "Pull request is in clean status") or a `FORBIDDEN`
+    /// one, and a `FORBIDDEN` error with no `data` object at all, which `executeReportingErrors` throws as a
+    /// refusal, since nothing executed. Any other type on a null payload, such as `INTERNAL`, and a body that
+    /// can't be read, or has no `data` object and no error it recognises, stay `graphQL`, which leaves the
+    /// outcome unknown, as the change may have landed.
+    private func autoMergeMutation(_ mutation: String, _ variables: [String: Any], payload: String) async throws {
+        let (data, errors) = try await executeReportingErrors(mutation, variables)
+        if data[payload] is [String: Any] { return }
+        let message = errors.first?["message"] as? String ?? "GitHub didn't apply the change"
+        if errors.contains(where: { ["UNPROCESSABLE", "FORBIDDEN"].contains($0["type"] as? String) }) {
+            throw APIError.writeRefused(message)
+        }
+        throw APIError.graphQL(message)
+    }
+
+    /// The state a `merge-async` body names. A pending request needs a uuid, from `details` or `uuid`.
+    private static func mergeState(_ data: Data, uuid: String?) throws -> MergeRequestState {
+        guard let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let status = body["status"] as? String
+        else { throw APIError.graphQL("malformed merge answer") }
+        let details = body["details"] as? [String: Any]
+        switch status {
+        case "merged":
+            return .merged
+        case "enqueued":
+            return .enqueued
+        case "failed":
+            return .failed(mergeMessage(data) ?? "GitHub didn't merge the pull request")
+        case "pending":
+            guard let id = uuid ?? details?["uuid"] as? String else { throw APIError.graphQL("merge answer has no uuid") }
+            return .pending(uuid: id)
+        default:
+            throw APIError.graphQL("unknown merge status")
+        }
+    }
+
+    /// GitHub's words for a merge answer: `details.message`, else a top-level `message`, with whitespace
+    /// runs (newlines too) collapsed to one space and the ends trimmed, for a one-line message.
+    private static func mergeMessage(_ data: Data) -> String? {
+        let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let raw = (body?["details"] as? [String: Any])?["message"] as? String ?? body?["message"] as? String
+        guard let raw else { return nil }
+        let line = raw.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return line.isEmpty ? nil : line
     }
 
     /// Issue `key` with who last closed it; nil when it is gone (deleted, transferred, no access) or
@@ -1326,6 +1421,23 @@ public struct GitHubAPI: Sendable {
         }
         if let error = httpError(answer, response, refusing: true) { throw error }
         return answer
+    }
+
+    /// Sends one REST request and returns its status and body, whatever the status. No body is sent when
+    /// `body` is nil.
+    private func restExchange(
+        _ method: String, _ path: String, _ body: [String: Any]?, keepingTransportFailures: Bool
+    ) async throws -> (status: Int, data: Data, response: HTTPURLResponse) {
+        try Task.checkCancellation()
+        let data = try body.map { try JSONSerialization.data(withJSONObject: $0, options: [.sortedKeys]) } ?? Data()
+        let (answer, response) = try await sendAuthorized(with: auth) { token in
+            do {
+                return try await transport.send(method, path: path, body: data, token: token)
+            } catch let error as URLError where keepingTransportFailures && error.code != .cancelled {
+                throw CommentTransportError(code: error.code)
+            }
+        }
+        return (response.statusCode, answer, response)
     }
 
     /// `execute`, also returning the errors that came alongside partial data, for callers that tell a

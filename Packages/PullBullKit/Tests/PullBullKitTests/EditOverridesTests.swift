@@ -21,6 +21,18 @@ private func card(_ snapshot: Snapshot, _ key: PRKey) -> BoardIssue? {
     snapshot.boardIssues.first { $0.key == key }
 }
 
+private func mergeInfo(autoMerge: AutoMerge? = nil, canDisable: Bool = false) -> MergeInfo {
+    MergeInfo(
+        nodeID: "PR_1", status: .blocked, hasConflicts: false, usesMergeQueue: false, isStacked: false, isDraft: false,
+        autoMerge: autoMerge, canEnableAutoMerge: true, canDisableAutoMerge: canDisable, canWrite: true,
+        allowedMethods: [.squash], defaultMethod: .squash, base: "main", commitCount: 1, approvals: 0,
+        tally: CheckTally(failing: 0, running: 1, total: 1), changesRequested: false)
+}
+
+private func mergeDetail(state: PRState? = .open, merge: MergeInfo? = nil) -> PRDetail {
+    PRDetail(key: editKey(77), body: "", checks: [], reviews: [], comments: [], files: [], state: state, merge: merge)
+}
+
 @Suite struct EditOverridesTests {
     // MARK: Status
 
@@ -733,6 +745,208 @@ private func card(_ snapshot: Snapshot, _ key: PRKey) -> BoardIssue? {
         var o = EditOverrides()
         o.record(.assignees(added: [me], removed: []), on: k500, at: t0)
         o.reconcile(with: editSnapshot(board: [editIssue(500, assignees: ["me"], isOpen: false)], assigned: []), now: t0 + 30)
+        #expect(o.isEmpty)
+    }
+
+    // MARK: Merging
+
+    @Test func mergedShowsAtOnce() {
+        var o = EditOverrides()
+        o.record(.merged(viewer: "pb"), on: editKey(77), at: t0)
+        let shown = o.apply(to: editPR(77))
+        #expect(shown.state == .merged)
+        #expect(shown.mergedBy == "pb")
+        #expect(o.apply(to: editPR(78)).state == .open)
+        #expect(o.apply(to: editSnapshot(mine: [editPR(77)])).mine.first?.state == .merged)
+        #expect(o.apply(toState: .open, on: editKey(77)) == .merged)
+        #expect(o.apply(toState: nil, on: editKey(77)) == .merged)
+        #expect(o.apply(toState: .open, on: editKey(78)) == .open)
+        #expect(o.apply(to: editIssue(77)) == editIssue(77))
+    }
+
+    @Test func mergedAgreesWhenTheListSaysSo() {
+        var o = EditOverrides()
+        o.record(.merged(viewer: "pb"), on: editKey(77), at: t0)
+        o.reconcile(with: editSnapshot(mine: [editPR(77)]), now: t0 + 30)
+        #expect(!o.isEmpty)
+        // One list can trail another: every copy has to have moved on.
+        o.reconcile(with: editSnapshot(mine: [editPR(77, state: .merged)], review: [editPR(77)]), now: t0 + 60)
+        #expect(!o.isEmpty)
+        o.reconcile(with: editSnapshot(mine: [editPR(77, state: .merged)]), now: t0 + 90)
+        #expect(o.isEmpty)
+    }
+
+    @Test func aMergedPRLeavingTheListsAgrees() {
+        var gone = EditOverrides()
+        gone.record(.merged(viewer: "pb"), on: editKey(77), at: t0)
+        gone.reconcile(with: editSnapshot(mine: [editPR(78)]), now: t0 + 30)
+        #expect(gone.isEmpty)
+
+        var closed = EditOverrides()
+        closed.record(.merged(viewer: "pb"), on: editKey(77), at: t0)
+        closed.reconcile(with: editSnapshot(closed: [editPR(77, state: .merged)]), now: t0 + 30)
+        #expect(closed.isEmpty)
+    }
+
+    // The list agreeing must not uncover a detail still reading open, or Merge would come back.
+    @Test func mergeHeldWhileTheDetailShowsOpen() {
+        let there = editSnapshot(closed: [editPR(77, state: .merged)])
+        var o = EditOverrides()
+        o.record(.merged(viewer: "pb"), on: editKey(77), at: t0)
+
+        let held = o.mergesAhead(of: [editKey(77): mergeDetail(state: .open)])
+        #expect(held == [editKey(77)])
+        o.reconcile(with: there, now: t0 + 30, holdingMerges: held)
+        #expect(!o.isEmpty)
+        #expect(o.apply(toState: .open, on: editKey(77)) == .merged)
+
+        // A detail cached before `state` was stored shows no merge either.
+        #expect(o.mergesAhead(of: [editKey(77): mergeDetail(state: nil)]) == [editKey(77)])
+
+        let none = o.mergesAhead(of: [editKey(77): mergeDetail(state: .merged)])
+        #expect(none.isEmpty)
+        o.reconcile(with: there, now: t0 + 60, holdingMerges: none)
+        #expect(o.isEmpty)
+    }
+
+    @Test func holdingReviewsAndHoldingMergesAreSeparate() {
+        let mine = Review(author: "pb", state: .approved, submittedAt: t0, commitOid: "abc")
+        let there = editSnapshot(closed: [editPR(77, state: .merged, reviews: [mine])])
+
+        var merge = EditOverrides()
+        merge.record(.merged(viewer: "pb"), on: editKey(77), at: t0)
+        merge.reconcile(with: there, now: t0 + 30, holdingReviews: [editKey(77)])
+        #expect(merge.isEmpty)
+
+        var review = EditOverrides()
+        review.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
+        review.reconcile(with: there, now: t0 + 30, holdingMerges: [editKey(77)])
+        #expect(review.isEmpty)
+    }
+
+    @Test func heldMergeStillEndsAtLifetime() {
+        var o = EditOverrides()
+        o.record(.merged(viewer: "pb"), on: editKey(77), at: t0)
+        o.reconcile(
+            with: editSnapshot(closed: [editPR(77, state: .merged)]), now: t0 + EditOverrides.lifetime,
+            holdingMerges: [editKey(77)])
+        #expect(o.isEmpty)
+    }
+
+    @Test func directMergesAreTheLiveMergedEdits() {
+        var o = EditOverrides()
+        #expect(o.directMerges.isEmpty)
+        let merged = o.record(.merged(viewer: "pb"), on: editKey(77), at: t0)
+        o.record(.autoMerge(enabled: true, viewer: "pb"), on: editKey(78), at: t0)
+        o.record(.labels(added: [], removed: []), on: editKey(79), at: t0)
+        #expect(o.directMerges == [editKey(77)])
+        o.drop(merged)
+        #expect(o.directMerges.isEmpty)
+    }
+
+    @Test func autoMergeShowsOnTheDetail() {
+        var on = EditOverrides()
+        on.record(.autoMerge(enabled: true, viewer: "pb"), on: editKey(77), at: t0)
+        let enabled = on.apply(toMerge: mergeInfo(), on: editKey(77))
+        #expect(enabled?.autoMerge == AutoMerge(enabledBy: "pb"))
+        #expect(enabled?.canDisableAutoMerge == true)
+        #expect(enabled?.status == .blocked)
+        #expect(on.apply(toMerge: mergeInfo(), on: editKey(78)) == mergeInfo())
+        #expect(on.apply(toMerge: nil, on: editKey(77)) == nil)
+
+        var off = EditOverrides()
+        off.record(.autoMerge(enabled: false, viewer: "pb"), on: editKey(77), at: t0)
+        let set = mergeInfo(autoMerge: AutoMerge(enabledBy: "pb"), canDisable: true)
+        #expect(off.apply(toMerge: set, on: editKey(77)) == mergeInfo())
+
+        // List pull requests carry no auto-merge data.
+        #expect(on.apply(to: editPR(77)) == editPR(77))
+        #expect(on.apply(toState: .open, on: editKey(77)) == .open)
+    }
+
+    @Test func autoMergeHeldUntilTheDetailShowsIt() {
+        let there = editSnapshot(mine: [editPR(77)])
+        var o = EditOverrides()
+        o.record(.autoMerge(enabled: true, viewer: "pb"), on: editKey(77), at: t0)
+
+        let held = o.mergesAhead(of: [editKey(77): mergeDetail(merge: mergeInfo())])
+        #expect(held == [editKey(77)])
+        o.reconcile(with: there, now: t0 + 30, holdingMerges: held)
+        #expect(!o.isEmpty)
+
+        let shows = mergeInfo(autoMerge: AutoMerge(enabledBy: "pb"), canDisable: true)
+        let none = o.mergesAhead(of: [editKey(77): mergeDetail(merge: shows)])
+        #expect(none.isEmpty)
+        o.reconcile(with: there, now: t0 + 60, holdingMerges: none)
+        #expect(o.isEmpty)
+    }
+
+    // A Merge when ready can land inside the lifetime, and a detail that isn't open has no auto-merge to show.
+    @Test func autoMergeSettlesOnceTheDetailIsNoLongerOpen() {
+        let there = editSnapshot(closed: [editPR(77, state: .merged)])
+        var o = EditOverrides()
+        o.record(.autoMerge(enabled: true, viewer: "pb"), on: editKey(77), at: t0)
+
+        // A detail cached before `state` was stored might still be open, so it's read again.
+        #expect(o.mergesAhead(of: [editKey(77): mergeDetail(state: nil, merge: mergeInfo())]) == [editKey(77)])
+        #expect(o.mergesAhead(of: [editKey(77): mergeDetail(state: .closed, merge: mergeInfo())]).isEmpty)
+
+        let none = o.mergesAhead(of: [editKey(77): mergeDetail(state: .merged, merge: mergeInfo())])
+        #expect(none.isEmpty)
+        o.reconcile(with: there, now: t0 + 30, holdingMerges: none)
+        #expect(o.isEmpty)
+
+        // Some PRs keep their auto-merge request after merging, which a cancel would otherwise wait out.
+        var cancel = EditOverrides()
+        cancel.record(.autoMerge(enabled: false, viewer: "pb"), on: editKey(77), at: t0)
+        let kept = mergeInfo(autoMerge: AutoMerge(enabledBy: "pb"))
+        #expect(cancel.mergesAhead(of: [editKey(77): mergeDetail(state: .merged, merge: kept)]).isEmpty)
+    }
+
+    @Test func aCancelIsHeldWhileTheDetailStillShowsAutoMerge() {
+        var o = EditOverrides()
+        o.record(.autoMerge(enabled: false, viewer: "pb"), on: editKey(77), at: t0)
+        let set = mergeInfo(autoMerge: AutoMerge(enabledBy: "pb"), canDisable: true)
+        #expect(o.mergesAhead(of: [editKey(77): mergeDetail(merge: set)]) == [editKey(77)])
+        #expect(o.mergesAhead(of: [editKey(77): mergeDetail(merge: mergeInfo())]).isEmpty)
+    }
+
+    @Test func mergesAheadNeedsALoadedDetailAndAMerge() {
+        var o = EditOverrides()
+        o.record(.merged(viewer: "pb"), on: editKey(77), at: t0)
+        #expect(o.mergesAhead(of: [:]).isEmpty)
+        var review = EditOverrides()
+        review.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
+        #expect(review.mergesAhead(of: [editKey(77): mergeDetail()]).isEmpty)
+    }
+
+    @Test func mergeNeverUndoes() {
+        let changes: [EditChange] = [.merged(viewer: "pb"), .autoMerge(enabled: true, viewer: "pb")]
+        for change in changes {
+            #expect(change.inverse == change)
+            #expect(change.keeping(SetChangeResult(addApplied: false, removeApplied: false, refusal: nil)) == change)
+            #expect(!change.isEmpty)
+        }
+    }
+
+    @Test func enablingThenCancellingAutoMergeSettles() {
+        let there = editSnapshot(mine: [editPR(77)])
+        let set = mergeInfo(autoMerge: AutoMerge(enabledBy: "pb"), canDisable: true)
+        var o = EditOverrides()
+        o.record(.autoMerge(enabled: true, viewer: "pb"), on: editKey(77), at: t0)
+        o.record(.autoMerge(enabled: false, viewer: "pb"), on: editKey(77), at: t0 + 10)
+
+        // The detail read between the two shows the enable: the cancel is what it's behind.
+        let behind = o.mergesAhead(of: [editKey(77): mergeDetail(merge: set)])
+        #expect(behind == [editKey(77)])
+        o.reconcile(with: there, now: t0 + 20, holdingMerges: behind)
+        #expect(!o.isEmpty)
+        #expect(o.apply(toMerge: set, on: editKey(77)) == mergeInfo())
+
+        // Only the newest counts: the enable no longer asks for an auto-merge the detail won't show.
+        let none = o.mergesAhead(of: [editKey(77): mergeDetail(merge: mergeInfo())])
+        #expect(none.isEmpty)
+        o.reconcile(with: there, now: t0 + 30, holdingMerges: none)
         #expect(o.isEmpty)
     }
 }

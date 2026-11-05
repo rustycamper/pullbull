@@ -13,6 +13,8 @@ struct PRDetailView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var checksExpanded = false
     @State private var filesExpanded = false
+    /// The bottom row's Cancel, which a click outside the merge panel leaves alone.
+    @State private var mergeCancelAnchor = MenuAnchor()
 
     /// Files listed before the rest fold behind "Show N more".
     private static let foldedFileCount = 5
@@ -121,7 +123,9 @@ struct PRDetailView: View {
                 .textSelection(.enabled)
             if let pr {
                 HStack(spacing: 8) {
+                    // A merge on its way shows as merged, dimmed, as a review sending is.
                     StatePill(pr: pr)
+                        .opacity(pr.state == .merged && model.sendingMerges.contains(key) ? 0.5 : 1)
                     HStack(spacing: 6) {
                         AvatarView(login: pr.author, url: pr.authorAvatarURL, size: 20)
                         Byline(parts: OpenedLine.parts(
@@ -206,6 +210,7 @@ struct PRDetailView: View {
             reviewersSection(reviews: reviews, pr: nil, detail: detail)
         }
         checksSection(detail)
+        MergeSection(model: model, key: key, webURL: webURL)
     }
 
     private func checksSection(_ detail: PRDetail) -> some View {
@@ -393,11 +398,17 @@ struct PRDetailView: View {
 
     // MARK: Bottom bar
 
-    /// The comment field, Review, Copy branch and Open on GitHub, on one row.
+    /// The comment field, Review, Merge, Copy branch and Open on GitHub, on one row, under the merge panel.
     private var bottomBar: some View {
-        CommentField(model: model, key: key, isPullRequest: true, webURL: webURL) {
-            reviewButton
-            if let pr { CopyBranchButton(pr: pr) }
+        VStack(spacing: 0) {
+            if let mode = model.mergeMode, mode.key == key {
+                MergePanel(model: model, mode: mode, cancelAnchor: mergeCancelAnchor)
+            }
+            CommentField(model: model, key: key, isPullRequest: true, webURL: webURL) {
+                reviewButton
+                mergeButton
+                if let pr { CopyBranchButton(pr: pr) }
+            }
         }
     }
 
@@ -409,6 +420,16 @@ struct PRDetailView: View {
                 .disabled(!mode.canCancel)
         } else if model.isReviewOffered(for: key), !model.isPostInFlight(for: key) {
             OutlinedTextButton(title: "Review", help: "Review (⌥⌘V)") { model.enterReviewMode(on: key) }
+        }
+    }
+
+    /// Merge where the detail offers it and nothing is on its way; Cancel with the panel open.
+    @ViewBuilder private var mergeButton: some View {
+        if model.mergeMode?.key == key {
+            OutlinedTextButton(title: "Cancel") { model.leaveMergeMode() }
+                .background(MenuAnchorView(anchor: mergeCancelAnchor))
+        } else if case .action = model.mergeOffer(for: key), !model.isPostInFlight(for: key) {
+            OutlinedTextButton(title: "Merge", help: "Merge (⌥⌘G)") { model.enterMergeMode(on: key) }
         }
     }
 }

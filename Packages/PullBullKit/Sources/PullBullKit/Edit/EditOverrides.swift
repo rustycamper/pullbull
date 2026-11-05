@@ -51,8 +51,11 @@ public struct EditOverrides: Equatable, Sendable {
 
     /// Drops each edit `fetched` agrees with, along with the older edits to the same item it replaced;
     /// each older than `lifetime`; and each Status edit to an option the board no longer has. A review on
-    /// a key in `held` stays although `fetched` agrees, as its going would uncover an older detail.
-    public mutating func reconcile(with fetched: Snapshot, now: Date, holdingReviews held: Set<PRKey> = []) {
+    /// a key in `held`, or a merge on a key in `heldMerges`, stays although `fetched` agrees, as its going
+    /// would uncover an older detail.
+    public mutating func reconcile(
+        with fetched: Snapshot, now: Date, holdingReviews held: Set<PRKey> = [], holdingMerges heldMerges: Set<PRKey> = []
+    ) {
         let options = fetched.boardStatusOptions.flatMap { $0.isEmpty ? nil : Set($0.map(\.id)) }
         var retired = Set<UUID>()
         for (index, entry) in entries.enumerated() {
@@ -62,6 +65,7 @@ public struct EditOverrides: Equatable, Sendable {
                 retired.insert(entry.id)
             } else if Self.agrees(entry, with: fetched) {
                 if case .review = entry.change, held.contains(entry.key) { continue }
+                if Self.isMerge(entry.change), heldMerges.contains(entry.key) { continue }
                 retired.insert(entry.id)
                 for older in entries[..<index] where older.key == entry.key && Self.overlaps(older.change, entry.change) {
                     retired.insert(older.id)
@@ -84,6 +88,33 @@ public struct EditOverrides: Equatable, Sendable {
                 Self.same($0.author, viewer) && $0.state == state && $0.commitOid == commit
             }
             return shows ? nil : key
+        })
+    }
+
+    /// The pull requests whose detail in `details` lacks the newest merge or auto-merge edit laid over it.
+    /// GitHub answers before its reads catch up, and no list says whether auto-merge is set. A detail that
+    /// is no longer open is never behind on auto-merge, as there's none left for it to show.
+    public func mergesAhead(of details: [PRKey: PRDetail]) -> Set<PRKey> {
+        var newest: [PRKey: Entry] = [:]
+        for entry in entries where Self.isMerge(entry.change) { newest[entry.key] = entry }
+        return Set(newest.compactMap { key, entry -> PRKey? in
+            guard let detail = details[key] else { return nil }
+            switch entry.change {
+            case .merged: return detail.state == .merged ? nil : key
+            case .autoMerge(let enabled, _):
+                if let state = detail.state, state != .open { return nil }
+                return (detail.merge?.autoMerge != nil) == enabled ? nil : key
+            case .status, .labels, .assignees, .reviewers, .review: return nil
+            }
+        })
+    }
+
+    /// The pull requests with a direct merge laid over them, whose rows `TabBuilder` keeps in place until
+    /// the edit settles. An auto-merge edit isn't one: its PR stays open.
+    public var directMerges: Set<PRKey> {
+        Set(entries.compactMap { entry -> PRKey? in
+            guard case .merged = entry.change else { return nil }
+            return entry.key
         })
     }
 
@@ -147,6 +178,24 @@ public struct EditOverrides: Equatable, Sendable {
         }
     }
 
+    /// `info` on pull request `key` with the viewer's auto-merge edits laid over: the detail's own merge state.
+    public func apply(toMerge info: MergeInfo?, on key: PRKey) -> MergeInfo? {
+        entries.reduce(info) { info, entry in
+            guard entry.key == key, case .autoMerge(let enabled, let viewer) = entry.change, var info else { return info }
+            info.autoMerge = enabled ? AutoMerge(enabledBy: viewer) : nil
+            info.canDisableAutoMerge = enabled
+            return info
+        }
+    }
+
+    /// `state` on pull request `key` with a merge laid over: the detail's own state.
+    public func apply(toState state: PRState?, on key: PRKey) -> PRState? {
+        entries.reduce(state) { state, entry in
+            guard entry.key == key, case .merged = entry.change else { return state }
+            return .merged
+        }
+    }
+
     public func apply(to issue: BoardIssue) -> BoardIssue {
         entries.reduce(issue) { Self.change($0, $1) }
     }
@@ -167,18 +216,18 @@ public struct EditOverrides: Equatable, Sendable {
             (issue.labels, issue.labelColors) = changeLabels(issue.labels, issue.labelColors, added, removed)
         case .assignees(let added, let removed):
             issue.assignees = changeAssignees(issue.assignees, added, removed)
-        case .reviewers, .review:
+        case .reviewers, .review, .merged, .autoMerge:
             break
         }
         return issue
     }
 
-    /// Pull requests carry no Status here.
+    /// Pull requests carry no Status or auto-merge here.
     private static func change(_ pr: PullRequest, _ entry: Entry) -> PullRequest {
         guard pr.key == entry.key else { return pr }
         var pr = pr
         switch entry.change {
-        case .status:
+        case .status, .autoMerge:
             break
         case .labels(let added, let removed):
             (pr.labels, pr.labelColors) = changeLabels(pr.labels, pr.labelColors, added, removed)
@@ -195,6 +244,9 @@ public struct EditOverrides: Equatable, Sendable {
             pr.latestReviews = changeReviews(pr.latestReviews, state, commit, viewer, body, at: entry.madeAt)
             // The review answers a direct request; a team's request stays until GitHub drops it.
             pr.reviewRequests = changeRequests(pr.reviewRequests, [], [.user(viewer)])
+        case .merged(let viewer):
+            pr.state = .merged
+            pr.mergedBy = viewer
         }
         return pr
     }
@@ -327,6 +379,19 @@ public struct EditOverrides: Equatable, Sendable {
             return !copies.isEmpty && copies.allSatisfy { copy in
                 copy.latestReviews.contains { same($0.author, viewer) && $0.state == state && $0.commitOid == commit }
             }
+        case .merged:
+            // A merged PR leaves the open lists, and may not reach Recently closed: gone counts as agreeing.
+            return !prs(in: fetched).contains { $0.key == entry.key && $0.state == .open }
+        case .autoMerge:
+            // No list says; `mergesAhead` holds it until the detail does.
+            return true
+        }
+    }
+
+    private static func isMerge(_ change: EditChange) -> Bool {
+        switch change {
+        case .merged, .autoMerge: true
+        case .status, .labels, .assignees, .reviewers, .review: false
         }
     }
 
@@ -335,8 +400,8 @@ public struct EditOverrides: Equatable, Sendable {
         Set([Reviewer.user(org.viewer).key] + org.myTeams.map { Reviewer.team(slug: $0, name: $0).key })
     }
 
-    /// Whether `newer` sets something `older` set: the Status, or one of the same labels or people; a review
-    /// also replaces an older request for the reviewer.
+    /// Whether `newer` sets something `older` set: the Status, one of the same labels or people, or the
+    /// review, merge or auto-merge; a review also replaces an older request for the reviewer.
     private static func overlaps(_ older: EditChange, _ newer: EditChange) -> Bool {
         func shared(_ a: [String], _ b: [String]) -> Bool {
             a.contains { name in b.contains { same($0, name) } }
@@ -350,7 +415,7 @@ public struct EditOverrides: Equatable, Sendable {
             return shared((a1 + r1).map(\.login), (a2 + r2).map(\.login))
         case (.reviewers(let a1, let r1), .reviewers(let a2, let r2)):
             return !Set((a1 + r1).map(\.key)).isDisjoint(with: (a2 + r2).map(\.key))
-        case (.review, .review):
+        case (.review, .review), (.merged, .merged), (.autoMerge, .autoMerge):
             return true
         case (.reviewers(let added, let removed), .review(_, _, let viewer, _)):
             // GitHub drops the viewer's own request on a review, so an older self-add never agrees. An edit

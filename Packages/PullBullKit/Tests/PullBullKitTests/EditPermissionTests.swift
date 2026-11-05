@@ -229,3 +229,61 @@ private func install(
         #expect(needs.note(for: .review) == "Reviewing needs PullBull's new permissions. Accept them on GitHub.")
     }
 }
+
+@Suite struct MergeRerunPermissionTests {
+    private func permission(_ field: EditField, _ perms: [String: String]) -> EditPermission {
+        EditPermission.of(
+            field, account: app, boardOwner: nil, installation: install(perms), ghAccounts: [], onPullRequest: true)
+    }
+
+    @Test func mergeNeedsContentsWrite() {
+        #expect(permission(.merge, ["contents": "write", "pull_requests": "read"]) == .ready)
+        #expect(permission(.merge, ["contents": "admin"]) == .ready)
+        guard case .needsAppApproval = permission(.merge, ["contents": "read", "pull_requests": "write"])
+        else { Issue.record("merging needs Contents write, not Pull requests write"); return }
+        #expect(install(["contents": "write"]).canWriteContents)
+        #expect(!install(["contents": "read"]).canWriteContents)
+    }
+
+    @Test func rerunNeedsActionsWrite() {
+        #expect(permission(.rerun, ["actions": "write", "pull_requests": "read"]) == .ready)
+        guard case .needsAppApproval = permission(.rerun, ["actions": "read", "pull_requests": "write"])
+        else { Issue.record("re-running needs Actions write, not Pull requests write"); return }
+        #expect(install(["actions": "write"]).canWriteActions)
+        #expect(!install(["actions": "read"]).canWriteActions)
+    }
+
+    @Test func oldInstallKeepsOtherEditsWorking() {
+        let old = ["issues": "write", "pull_requests": "write", "organization_projects": "write"]
+        guard case .needsAppApproval = permission(.merge, old) else { Issue.record("merge needs approval"); return }
+        guard case .needsAppApproval = permission(.rerun, old) else { Issue.record("rerun needs approval"); return }
+        #expect(permission(.review, old) == .ready)
+        #expect(permission(.labels, old) == .ready)
+    }
+
+    @Test func noteNamesMergingAndRerunning() {
+        let needs = permission(.merge, [:])
+        #expect(needs.note(for: .merge)
+            == "Merging needs PullBull's new permissions for acme. An org owner accepts them on GitHub.")
+        #expect(needs.note(for: .rerun)
+            == "Re-running needs PullBull's new permissions for acme. An org owner accepts them on GitHub.")
+    }
+
+    @Test func noInstallGivesALine() {
+        for field in [EditField.merge, .rerun] {
+            let result = EditPermission.of(
+                field, account: app, boardOwner: nil, installation: nil, ghAccounts: [], onPullRequest: true)
+            #expect(result == .unavailable)
+        }
+        #expect(EditPermission.unavailable.note(for: .merge) == "Merging needs PullBull installed here.")
+        #expect(EditPermission.unavailable.note(for: .rerun) == "Re-running needs PullBull installed here.")
+        #expect(EditPermission.unavailable.note(for: .labels) == nil)
+    }
+
+    @Test func ghLoginIsReady() {
+        for field in [EditField.merge, .rerun] {
+            #expect(EditPermission.of(
+                field, account: ghMe, boardOwner: nil, installation: nil, ghAccounts: [], onPullRequest: true) == .ready)
+        }
+    }
+}

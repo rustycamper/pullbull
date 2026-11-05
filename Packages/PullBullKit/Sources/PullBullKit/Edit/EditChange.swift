@@ -55,6 +55,10 @@ public enum EditChange: Hashable, Sendable {
     case reviewers(added: [Reviewer], removed: [Reviewer])
     /// The viewer's submitted review of a pull request, on `commit`, with the text sent; never undone or part-applied.
     case review(state: ReviewState, commit: String, viewer: String, body: String = "")
+    /// The viewer merged a pull request; never undone or part-applied.
+    case merged(viewer: String)
+    /// The viewer set a pull request to merge when ready, or cancelled that; never undone or part-applied.
+    case autoMerge(enabled: Bool, viewer: String)
 
     /// The edit that puts things back.
     public var inverse: EditChange {
@@ -63,14 +67,14 @@ public enum EditChange: Hashable, Sendable {
         case .labels(let added, let removed): .labels(added: removed, removed: added)
         case .assignees(let added, let removed): .assignees(added: removed, removed: added)
         case .reviewers(let added, let removed): .reviewers(added: removed, removed: added)
-        case .review: self
+        case .review, .merged, .autoMerge: self
         }
     }
 
     /// The halves `result` says GitHub applied; a Status change is returned as is.
     public func keeping(_ result: SetChangeResult) -> EditChange {
         switch self {
-        case .status, .review: self
+        case .status, .review, .merged, .autoMerge: self
         case .labels(let added, let removed):
             .labels(added: result.addApplied ? added : [], removed: result.removeApplied ? removed : [])
         case .assignees(let added, let removed):
@@ -87,7 +91,7 @@ public enum EditChange: Hashable, Sendable {
         case .labels(let added, let removed): added.isEmpty && removed.isEmpty
         case .assignees(let added, let removed): added.isEmpty && removed.isEmpty
         case .reviewers(let added, let removed): added.isEmpty && removed.isEmpty
-        case .review: false
+        case .review, .merged, .autoMerge: false
         }
     }
 }

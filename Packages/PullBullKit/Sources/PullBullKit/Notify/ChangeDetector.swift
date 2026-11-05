@@ -49,10 +49,11 @@ public struct IssueEvent: Equatable, Sendable {
 }
 
 public enum ChangeDetector {
-    /// `filters` are the Review tab's: a review request on a PR the tab hides doesn't notify.
+    /// `filters` are the Review tab's: a review request on a PR the tab hides doesn't notify. `mergedHere`
+    /// are the pull requests merged from PullBull this session, which don't notify.
     public static func events(
         old: Snapshot?, new: Snapshot, me: String, myTeams: Set<String>, toggles: NotificationToggles,
-        filters: ReviewFilters = .none, now: Date = Date()
+        filters: ReviewFilters = .none, mergedHere: Set<PRKey> = [], now: Date = Date()
     ) -> [PREvent] {
         guard let old else { return [] }
         var result: [PREvent] = []
@@ -116,7 +117,7 @@ public enum ChangeDetector {
         }
 
         if toggles.merged {
-            result += mergedEvents(old: old, new: new, me: me)
+            result += mergedEvents(old: old, new: new, me: me, mergedHere: mergedHere)
         }
 
         let order = Dictionary(uniqueKeysWithValues: PREventKind.allCases.enumerated().map { ($1, $0) })
@@ -179,10 +180,11 @@ public enum ChangeDetector {
     /// listed the PR as open: the open search can drop a PR a poll before the closed search returns it.
     public static let mergeLag: TimeInterval = 600
 
-    /// My PRs someone else merged since the previous poll: open in it (or merged within `mergeLag`
-    /// of it when it listed the PR nowhere) and not yet among its recently closed. Silent for a merge
-    /// of my own, and for older merges a closed search or a wider scope brings back.
-    private static func mergedEvents(old: Snapshot, new: Snapshot, me: String) -> [PREvent] {
+    /// My PRs merged since the previous poll: open in it (or merged within `mergeLag` of it when it
+    /// listed the PR nowhere) and not yet among its recently closed. Silent for a merge from PullBull
+    /// (`mergedHere`), and for older merges a closed search or a wider scope brings back. `mergedBy` can't
+    /// tell the rest apart: it is whoever set auto-merge, so a merge of my own elsewhere notifies too.
+    private static func mergedEvents(old: Snapshot, new: Snapshot, me: String, mergedHere: Set<PRKey>) -> [PREvent] {
         let wasOpen = Set(old.mine.map(\.key))
         let wasClosed = Set(old.recentlyClosed.map(\.key))
         let since = old.fetchedAt.addingTimeInterval(-mergeLag)
@@ -193,7 +195,7 @@ public enum ChangeDetector {
             && seen.insert(pr.key).inserted
         {
             guard wasOpen.contains(pr.key) || (pr.closedAt ?? .distantPast) >= since else { continue }
-            if let by = pr.mergedBy, same(by, me) { continue }
+            if mergedHere.contains(pr.key) { continue }
             result.append(PREvent(kind: .merged, pr: pr, actor: pr.mergedBy))
         }
         return result

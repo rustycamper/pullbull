@@ -22,7 +22,7 @@ public enum EditMessage {
             return result.addApplied
                 ? "Asked \(asked) to review #\(key.number), but couldn't remove \(removedNames): \(reason)"
                 : "Removed \(removedNames) from #\(key.number), but couldn't ask \(asked): \(reason)"
-        case .status, .review:
+        case .status, .review, .merged, .autoMerge:
             return failure(change, on: key, reason: reason)
         }
         let number = "#\(key.number)"
@@ -42,6 +42,9 @@ public enum EditMessage {
         case .assignees: "change assignees on \(number)"
         case .reviewers: "change reviewers on \(number)"
         case .review: "review \(number)"
+        case .merged: "merge \(number)"
+        case .autoMerge(enabled: true, _): "set auto-merge on \(number)"
+        case .autoMerge(enabled: false, _): "cancel auto-merge on \(number)"
         }
         return "Couldn't \(what): \(reason)"
     }
@@ -72,6 +75,35 @@ public enum EditMessage {
 
     public static func reviewNotOpen(on key: PRKey, merged: Bool) -> String {
         "#\(key.number) was \(merged ? "merged" : "closed")."
+    }
+
+    public static func mergeRefused(on key: PRKey, reason: String) -> String {
+        "Couldn't merge #\(key.number): \(reason)"
+    }
+
+    public static func mergeCheckFailed(on key: PRKey, reason: String) -> String {
+        "Couldn't check #\(key.number) before merging: \(reason)"
+    }
+
+    public static func mergeUnconfirmed(on key: PRKey) -> String {
+        "Couldn't confirm the merge of #\(key.number). Check it before trying again."
+    }
+
+    public static func mergeHeadMoved(on key: PRKey) -> String {
+        "New commits on #\(key.number) since you opened this. Look again, then merge."
+    }
+
+    /// GitHub turned the send down as the PR had changed, with no panel left open to show it.
+    public static func mergeChanged(on key: PRKey) -> String {
+        "#\(key.number) changed before it could merge. Look again, then merge."
+    }
+
+    public static func autoMergeCancelRefused(on key: PRKey, reason: String) -> String {
+        "Couldn't cancel auto-merge on #\(key.number): \(reason)"
+    }
+
+    public static func autoMergeCancelUnconfirmed(on key: PRKey) -> String {
+        "Couldn't confirm auto-merge was cancelled on #\(key.number). Check it on GitHub."
     }
 
     /// GitHub's own words when it refused the write; the refresh wording for anything else.

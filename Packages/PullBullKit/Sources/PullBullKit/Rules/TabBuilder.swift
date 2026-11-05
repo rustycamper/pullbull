@@ -164,7 +164,8 @@ public struct Row: Identifiable, Sendable {
     public let pr: PullRequest
     public let dimmed: Bool
     public let counted: Bool
-    /// On Review, why the PR needs my review; nil on other tabs and for PRs I already approved.
+    /// On Review, why the PR needs my review, which a row dimmed by a merge on its way keeps; nil on other
+    /// tabs and for PRs I already approved.
     public let reviewReason: ReviewReason?
     public var id: PRKey { pr.key }
 
@@ -236,13 +237,23 @@ public struct ReviewFilters: Equatable, Sendable {
 public enum TabBuilder {
     private static let day: TimeInterval = 86_400
 
-    public static func build(_ snap: Snapshot, settings: AppSettings, now: Date) -> BuiltTabs {
+    /// `merging`: the pull requests with a direct merge laid over them (`EditOverrides.directMerges`). Until
+    /// that settles each stays where it was in Review, Mine and Team, as the open PR it was, dimmed and not
+    /// counted, and out of Recently closed while one of them lists it; GitHub may yet refuse it. A PR GitHub
+    /// itself reports merged, with no such edit, leaves as usual.
+    public static func build(_ snap: Snapshot, settings: AppSettings, now: Date, merging: Set<PRKey> = []) -> BuiltTabs {
         let me = snap.org.viewer
         let myTeams = snap.org.myTeams
         let filters = ReviewFilters(settings)
 
+        let asBefore = { (pr: PullRequest) -> PullRequest in
+            guard merging.contains(pr.key) else { return pr }
+            var open = pr
+            open.state = .open
+            return open
+        }
         var hiddenApproved = Set<PRKey>()
-        let review: [Row] = snap.reviewCandidates.filter { filters.keeps($0, now: now) }.compactMap { pr in
+        let review: [Row] = snap.reviewCandidates.map(asBefore).filter { filters.keeps($0, now: now) }.compactMap { pr in
             switch ReviewRules.status(of: pr, me: me, myTeams: myTeams) {
             case .needsReview: break
             case .approvedByMe:
@@ -252,18 +263,28 @@ public enum TabBuilder {
                 }
             case .reviewedByMe, .notRequested: return nil
             }
-            return row(for: pr, on: .review, me: me, myTeams: myTeams)
+            let shown = row(for: pr, on: .review, me: me, myTeams: myTeams)
+            guard merging.contains(pr.key) else { return shown }
+            // The reason stays: `ReviewWait` picks the row's form by it, which a wait sort orders on.
+            return Row(pr: pr, dimmed: true, counted: false, reviewReason: shown.reviewReason)
         }
-        let mine = snap.mine.filter { $0.state == .open }.map { Row(pr: $0, dimmed: false, counted: true) }
-        let team = snap.team
+        let listed = { (pr: PullRequest) -> Row in
+            let isMerging = merging.contains(pr.key)
+            return Row(pr: pr, dimmed: isMerging, counted: !isMerging)
+        }
+        let mine = snap.mine.map(asBefore).filter { $0.state == .open }.map(listed)
+        let team = snap.team.map(asBefore)
             .filter { pr in
                 pr.author.caseInsensitiveCompare(me) != .orderedSame && filters.keeps(pr, now: now)
             }
-            .map { Row(pr: $0, dimmed: false, counted: true) }
+            .map(listed)
 
+        // A lagging search can still return a PR Recently closed already has. Once no other list does, this
+        // is where it shows, overlay or not.
+        let kept = merging.intersection((review + mine + team).map(\.id))
         let closedCutoff = now.addingTimeInterval(-7 * day)
         let closed = snap.recentlyClosed
-            .filter { ($0.closedAt ?? .distantPast) >= closedCutoff }
+            .filter { !kept.contains($0.key) && ($0.closedAt ?? .distantPast) >= closedCutoff }
             .sorted { ($0.closedAt ?? .distantPast) > ($1.closedAt ?? .distantPast) }
 
         return BuiltTabs(
