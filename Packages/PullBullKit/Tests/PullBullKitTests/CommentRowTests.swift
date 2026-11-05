@@ -34,3 +34,16 @@ import Testing
         #expect(CommentRow.unfocusedValue(of: "\n  Looks good\nThanks") == "Draft: Looks good")
     }
 }
+
+@Suite struct ReviewRowTests {
+    @Test func checkingReadsAheadOfSending() {
+        #expect(CommentRow.hint(focused: true, sending: true, hasDraft: false, checking: true) == "Checking…")
+        #expect(CommentRow.hint(focused: false, sending: false, hasDraft: false, checking: true) == "Checking…")
+        #expect(CommentRow.hint(focused: true, sending: true, hasDraft: false) == "Sending…")
+    }
+
+    @Test func placeholderFollowsVerdict() {
+        #expect(CommentRow.reviewPlaceholder(.approve) == "Add a note (optional)…")
+        #expect(CommentRow.reviewPlaceholder(.requestChanges) == "Say what needs changing…")
+    }
+}

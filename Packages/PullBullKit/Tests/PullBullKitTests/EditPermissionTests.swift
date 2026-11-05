@@ -204,3 +204,28 @@ private func install(
         #expect(EditPermission.ready.note(for: .comment) == nil)
     }
 }
+
+@Suite struct ReviewPermissionTests {
+    @Test func reviewNeedsPullRequestsWrite() {
+        let readOnly = install(["issues": "write", "pull_requests": "read"])
+        #expect(EditPermission.of(
+            .review, account: app, boardOwner: nil, installation: readOnly, ghAccounts: [])
+            == .needsAppApproval(
+                owner: "acme", isOrganization: true,
+                url: URL(string: "https://github.com/organizations/acme/settings/installations/9")))
+        #expect(EditPermission.of(
+            .review, account: app, boardOwner: nil, installation: install(["pull_requests": "write"]),
+            ghAccounts: []) == .ready)
+        #expect(EditPermission.of(.review, account: app, boardOwner: nil, installation: nil, ghAccounts: []) == .unavailable)
+    }
+
+    @Test func reviewReadyOnGh() {
+        #expect(EditPermission.of(
+            .review, account: ghMe, boardOwner: nil, installation: nil, ghAccounts: []) == .ready)
+    }
+
+    @Test func reviewNote() {
+        let needs = EditPermission.needsAppApproval(owner: "acme", isOrganization: false, url: nil)
+        #expect(needs.note(for: .review) == "Reviewing needs PullBull's new permissions. Accept them on GitHub.")
+    }
+}
