@@ -406,6 +406,8 @@ public struct URLSessionTransport: GraphQLTransport {
         var request = URLRequest(url: URL(string: "https://api.github.com\(path)")!)
         request.httpMethod = method
         request.timeoutInterval = 20
+        // GitHub marks GETs max-age=60, and a poll must see the answer change.
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")

@@ -111,6 +111,12 @@ private final class GraphQLQueue: GraphQLTransport, @unchecked Sendable {
         }
     }
 
+    // GitHub answers these with max-age=60, so a cached first "pending" would stand in for every later poll.
+    @Test func aRestRequestNeverReadsTheCache() {
+        let request = URLSessionTransport.restRequest("GET", path: "/x", body: Data(), token: "t")
+        #expect(request.cachePolicy == .reloadIgnoringLocalCacheData)
+    }
+
     @Test func aPollSendsNoBody() async throws {
         let t = RESTQueue([(200, pollMerged)])
         let state = try await api(t).mergeResult(key, uuid: "u1")
