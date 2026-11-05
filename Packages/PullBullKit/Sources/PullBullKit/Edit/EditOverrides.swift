@@ -352,9 +352,10 @@ public struct EditOverrides: Equatable, Sendable {
             return !Set((a1 + r1).map(\.key)).isDisjoint(with: (a2 + r2).map(\.key))
         case (.review, .review):
             return true
-        case (.reviewers(let added, _), .review(_, _, let viewer, _)):
-            // GitHub drops the viewer's own request on a review, so an older self-add never agrees.
-            return added.contains { $0.key == Reviewer.user(viewer).key }
+        case (.reviewers(let added, let removed), .review(_, _, let viewer, _)):
+            // GitHub drops the viewer's own request on a review, so an older self-add never agrees. An edit
+            // that does more stays, as going would take its other changes off the screen.
+            return removed.isEmpty && added.map(\.key) == [Reviewer.user(viewer).key]
         default:
             return false
         }

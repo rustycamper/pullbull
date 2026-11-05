@@ -392,6 +392,17 @@ private func card(_ snapshot: Snapshot, _ key: PRKey) -> BoardIssue? {
         #expect(o.isEmpty)
     }
 
+    // Retiring the whole edit would take another reviewer's request off the screen with it.
+    @Test func reviewKeepsAnOlderEditThatAlsoAddsSomeoneElse() {
+        var o = EditOverrides()
+        o.record(.reviewers(added: [.user("pb"), .user("bob")], removed: []), on: editKey(77), at: t0)
+        o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0 + 10)
+        let approved = editPR(77, reviews: [Review(author: "pb", state: .approved, submittedAt: t0 + 10, commitOid: "abc")])
+        o.reconcile(with: editSnapshot(review: [approved]), now: t0 + 30)
+        #expect(!o.isEmpty)
+        #expect(o.apply(toRequests: [], on: editKey(77)).contains(.user("bob")))
+    }
+
     @Test func reviewPastPushNeedsReviewAgain() {
         var o = EditOverrides()
         o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
