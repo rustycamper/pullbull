@@ -2,8 +2,9 @@ import Foundation
 
 /// What an edit changes on GitHub. `comment` posts a comment and `review` submits one with a verdict,
 /// rather than changing a field; `comment` gates like the item's other edits, `review` like reviewers.
+/// `merge` and `rerun` act on a pull request's state: Contents write and Actions write.
 public enum EditField: Sendable {
-    case status, labels, assignees, reviewers, comment, review
+    case status, labels, assignees, reviewers, comment, review, merge, rerun
 }
 
 /// Whether the current account may make an edit, and if not, what it needs.
@@ -33,9 +34,14 @@ public enum EditPermission: Equatable, Sendable {
             guard let installation else { return .unavailable }
             // GitHub gives apps no permission for user-owned boards.
             if field == .status, boardOwner?.isUser == true { return .unavailable }
-            let canWrite = field == .status ? installation.canWriteProjects
-                : onPullRequest || field == .reviewers || field == .review ? installation.canWritePullRequests
-                : installation.canWriteIssues
+            let canWrite = switch field {
+            case .merge: installation.canWriteContents
+            case .rerun: installation.canWriteActions
+            case .status: installation.canWriteProjects
+            case .reviewers, .review: installation.canWritePullRequests
+            case .labels, .assignees, .comment:
+                onPullRequest ? installation.canWritePullRequests : installation.canWriteIssues
+            }
             if canWrite { return .ready }
             return .needsAppApproval(
                 owner: installation.org, isOrganization: installation.isOrganization,
@@ -49,9 +55,18 @@ public enum EditPermission: Equatable, Sendable {
     /// The one line shown in place of the picker or the comment field for `field`; nil when there's
     /// nothing to say.
     public func note(for field: EditField) -> String? {
+        if case .unavailable = self {
+            switch field {
+            case .merge: return "Merging needs PullBull installed here."
+            case .rerun: return "Re-running needs PullBull installed here."
+            default: break
+            }
+        }
         let doing = switch field {
         case .comment: "Commenting"
         case .review: "Reviewing"
+        case .merge: "Merging"
+        case .rerun: "Re-running"
         default: "Editing"
         }
         return note(doing: doing)
