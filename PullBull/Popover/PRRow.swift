@@ -535,13 +535,15 @@ struct Pill: View {
     }
 }
 
-/// Mine's single pill once a PR is approved, green and has no change requests: gray, like the review
-/// pills it replaces.
+/// Mine's single pill once a PR is approved, green and has no change requests: a green glyph, the text
+/// gray like the review pills it replaces.
 struct ReadyToMergePill: View {
     var fill = Palette.fill
 
     var body: some View {
-        Pill(symbol: "arrow.triangle.merge", text: "Ready to merge", foreground: Palette.pillText, fill: fill)
+        Pill(
+            symbol: "arrow.triangle.merge", text: "Ready to merge", foreground: Palette.pillText, fill: fill,
+            symbolColor: Palette.approved)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Ready to merge")
     }

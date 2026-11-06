@@ -106,7 +106,7 @@ struct CommentField<Secondary: View>: View {
             {
                 Text(hint)
                     .font(.system(size: 11))
-                    .foregroundStyle(Palette.tertiary)
+                    .foregroundStyle(Palette.secondaryText)
                     .frame(height: CommentTextView.oneLineHeight)
                     .fixedSize()
                     .allowsHitTesting(false)

@@ -88,7 +88,7 @@ struct SignInView: View {
     @ViewBuilder private func signedIn(_ outcome: SignInOutcome) -> some View {
         switch outcome {
         case .ready(let identity):
-            Image(systemName: "checkmark.circle.fill").font(.system(size: 28)).foregroundStyle(.green)
+            Image(systemName: "checkmark.circle.fill").font(.system(size: 28)).foregroundStyle(Palette.approved)
             AvatarView(login: identity.login, url: identity.avatarURL, size: 48)
             Text("Signed in as \(Text(identity.login).bold())")
         case .needsApproval(_, let org, let installURL):

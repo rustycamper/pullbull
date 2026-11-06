@@ -38,6 +38,18 @@ enum Palette {
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
             ? NSColor.white.withAlphaComponent(0.8) : NSColor.black.withAlphaComponent(0.7)
     })
+    /// Text and glyphs on an accent-filled button: white, or black where the user's accent is too light or
+    /// too gray for white (`OnAccentText`). Resolved per appearance, since the system accent differs between them.
+    static let onAccent = Color(nsColor: NSColor(name: nil) { appearance in
+        var black = false
+        appearance.performAsCurrentDrawingAppearance {
+            if let c = NSColor.controlAccentColor.usingColorSpace(.sRGB) {
+                black = OnAccentText.prefersBlack(
+                    red: Double(c.redComponent), green: Double(c.greenComponent), blue: Double(c.blueComponent))
+            }
+        }
+        return black ? .black : .white
+    })
     static let separator = Color(nsColor: .separatorColor)
     static let fill = Color.primary.opacity(0.06)
     /// The skeleton's sweeping highlight: a lighter fill in light mode, a brighter one in dark mode.
@@ -53,13 +65,16 @@ enum Palette {
     static let rowFlashText = Color(nsColor: .alternateSelectedControlTextColor)
     static let field = dynamic(light: 0xFFFFFF, dark: 0xFFFFFF, alpha: (1, 0.07))
 
-    static let changesRequested = dynamic(light: 0x9A4400, dark: 0xFF9F45)
-    /// The Approved check in the PR detail and the diffstat's addition blocks. Never on rows or text.
+    static let changesRequested = dynamic(light: 0xA13007, dark: 0xFF9468)
+    /// Go and done: the Ready to merge glyph on rows and in the detail, the Approved check, the diffstat's
+    /// addition blocks, and a finished step in Settings and setup.
     static let approved = dynamic(light: 0x1F7A3A, dark: 0x56C26F)
     static let amberFill = dynamic(light: 0xB07000, dark: 0xF5B041, alpha: (0.13, 0.15))
     static let amberGlyph = dynamic(light: 0x8A5700, dark: 0xF5B041)
     static let mergedText = dynamic(light: 0x7339AE, dark: 0xC69EF0)
     static let mergedFill = dynamic(light: 0x7339AE, dark: 0xC69EF0, alpha: (0.09, 0.11))
+    /// Red for something wrong in the popover and Settings: a closed PR, a rejected key, an invalid field.
+    /// A failing check keeps the system red in `ciGlyph`, a filled disc rather than text.
     static let closedText = dynamic(light: 0xB1271F, dark: 0xFF7B73)
     static let closedFill = dynamic(light: 0xB1271F, dark: 0xFF7B73, alpha: (0.08, 0.1))
 
@@ -90,7 +105,7 @@ extension Palette {
         }
     }
 
-    /// Colour only where a PR has ended: open and draft stay gray, so the list itself stays monochrome.
+    /// Colour only where a PR has ended: open and draft stay gray.
     static func prGlyphColor(_ g: PRGlyph) -> Color {
         switch g {
         case .open, .draft: .secondary
