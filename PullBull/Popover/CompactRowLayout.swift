@@ -85,7 +85,7 @@ struct CompactChipGlyphs: View {
         if chips.action == .readyToMerge {
             Image(systemName: "arrow.triangle.merge")
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Palette.secondaryText)
+                .foregroundStyle(Palette.approved)
                 .help("Ready to merge")
                 .accessibilityLabel("Ready to merge")
         }
