@@ -4,8 +4,8 @@ import PullBullKit
 
 /// The detail of one issue inside the popover: state and author, a board card (Status, Assignees, Labels,
 /// each changeable where offered), the pull requests that close it, the description and the last two
-/// comments, with the comment field, View on board and Open on GitHub pinned at the bottom. It shows the
-/// list data and the cached detail at once; `AppModel` refreshes the detail in place.
+/// comments, with the comment field and View on board pinned at the bottom. It shows the list data and the
+/// cached detail at once; `AppModel` refreshes the detail in place.
 struct IssueDetailView: View {
     let model: AppModel
     let key: PRKey

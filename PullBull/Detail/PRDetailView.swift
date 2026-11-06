@@ -3,9 +3,8 @@ import SwiftUI
 import PullBullKit
 
 /// The detail of one PR inside the popover: summary, details (assignees, labels), description, checks,
-/// reviewers, conversation and changed files, with the comment field, Copy branch and Open on GitHub
-/// pinned at the bottom. It shows the list data and the cached detail at once; `AppModel` refreshes the
-/// detail in place.
+/// reviewers, conversation and changed files, with the comment field, Review and Merge pinned at the
+/// bottom. It shows the list data and the cached detail at once; `AppModel` refreshes the detail in place.
 struct PRDetailView: View {
     let model: AppModel
     let key: PRKey
@@ -816,7 +815,6 @@ private struct CopyBranchButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .layoutPriority(1)
         .help(name)
         .accessibilityLabel(name)
     }

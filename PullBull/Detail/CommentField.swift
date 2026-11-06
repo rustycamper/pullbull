@@ -43,8 +43,9 @@ struct CommentField<Secondary: View>: View {
                     } else if let note = permission.note(for: .comment) {
                         permissionSlot(note: note, permission: permission)
                     } else {
-                        // Nothing to say while the installations load: the row keeps its height, so the bar
-                        // doesn't jump. Once they have, an account that can't comment has no field to hold.
+                        // Until the installations are known, loading or not readable, the row keeps its
+                        // height, so the bar doesn't jump. Once they are, an account that can't comment has
+                        // no field to hold.
                         Spacer(minLength: 0)
                             .frame(height: model.editPermissionsKnown ? 0 : CommentTextView.rowHeight)
                     }
@@ -221,8 +222,8 @@ private struct HiddenWhenEmpty: Layout {
         child.place(
             at: CGPoint(x: bounds.minX + insets.leading, y: bounds.minY + insets.top), anchor: .topLeading,
             proposal: ProposedViewSize(
-                width: bounds.width - insets.leading - insets.trailing,
-                height: bounds.height - insets.top - insets.bottom))
+                width: max(bounds.width - insets.leading - insets.trailing, 0),
+                height: max(bounds.height - insets.top - insets.bottom, 0)))
     }
 }
 
