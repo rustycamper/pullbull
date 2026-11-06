@@ -67,7 +67,7 @@ enum Palette {
 
     static let changesRequested = dynamic(light: 0xA13007, dark: 0xFF9468)
     /// Go and done: the Ready to merge glyph on rows and in the detail, the Approved check, the diffstat's
-    /// addition blocks, and a finished step in Settings and setup. A glyph or block, never text.
+    /// addition blocks, and a finished step in Settings and setup.
     static let approved = dynamic(light: 0x1F7A3A, dark: 0x56C26F)
     static let amberFill = dynamic(light: 0xB07000, dark: 0xF5B041, alpha: (0.13, 0.15))
     static let amberGlyph = dynamic(light: 0x8A5700, dark: 0xF5B041)
