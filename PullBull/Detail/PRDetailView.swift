@@ -3,9 +3,8 @@ import SwiftUI
 import PullBullKit
 
 /// The detail of one PR inside the popover: summary, details (assignees, labels), description, checks,
-/// reviewers, conversation and changed files, with the comment field, Copy branch and Open on GitHub
-/// pinned at the bottom. It shows the list data and the cached detail at once; `AppModel` refreshes the
-/// detail in place.
+/// reviewers, conversation and changed files, with the comment field, Review and Merge pinned at the
+/// bottom. It shows the list data and the cached detail at once; `AppModel` refreshes the detail in place.
 struct PRDetailView: View {
     let model: AppModel
     let key: PRKey
@@ -72,6 +71,9 @@ struct PRDetailView: View {
                 title: backTitle, position: model.detailWalk?.position(showing: key, kind: .pullRequest),
                 action: model.closeDetail)
             Spacer(minLength: 0)
+            DetailIconButton(symbol: "arrow.up.right.square", help: "Open on GitHub") {
+                NSWorkspace.shared.open(webURL)
+            }
             // A checkmark for a moment after ⌥⌘C.
             DetailIconButton(
                 symbol: CopyConfirmation.shared.message == nil ? "link" : "checkmark", help: "Copy Link"
@@ -92,7 +94,7 @@ struct PRDetailView: View {
                 .monospacedDigit()
                 .lineLimit(1)
                 // Clear of the back button's "2 of 6" too, so the title doesn't move when it shows.
-                .padding(.horizontal, 96)
+                .padding(.horizontal, 104)
         }
         .padding(.horizontal, 8)
         .frame(height: 44)
@@ -143,7 +145,7 @@ struct PRDetailView: View {
                         .accessibilityHidden(true)
                     // Equal priority: a chip that fits keeps its width and the other takes the rest; when
                     // neither fits they split the line, so neither collapses.
-                    BranchChip(name: pr.headRef)
+                    BranchChip(name: pr.headRef) { CopyBranchButton(pr: pr) }
                     Image(systemName: "arrow.right")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.tertiary)
@@ -424,16 +426,15 @@ struct PRDetailView: View {
 
     // MARK: Bottom bar
 
-    /// The comment field, Review, Merge, Copy branch and Open on GitHub, on one row, under the merge panel.
+    /// The comment field, Review and Merge, on one row, under the merge panel.
     private var bottomBar: some View {
         VStack(spacing: 0) {
             if let mode = model.mergeMode, mode.key == key {
                 MergePanel(model: model, mode: mode, cancelAnchor: mergeCancelAnchor)
             }
-            CommentField(model: model, key: key, isPullRequest: true, webURL: webURL) {
+            CommentField(model: model, key: key, isPullRequest: true) {
                 reviewButton
                 mergeButton
-                if let pr { CopyBranchButton(pr: pr) }
             }
         }
     }
@@ -771,37 +772,60 @@ private struct FileLine: View {
 
 /// One line, truncated in the middle; the tooltip and VoiceOver always get the full name.
 /// No `.accessibilityLabel`: with `.textSelection` it can send SwiftUI's label lookup into a loop that overflows the stack.
-private struct BranchChip: View {
+private struct BranchChip<Accessory: View>: View {
     let name: String
+    /// Sits at the chip's end, beside the text and outside its `.textSelection`.
+    @ViewBuilder let accessory: Accessory
 
     var body: some View {
-        Text(name)
-            .font(.system(size: 11, design: .monospaced))
-            .lineLimit(1)
-            .truncationMode(.middle)
-            .padding(.horizontal, 6)
-            .frame(height: 20)
-            .background(RoundedRectangle(cornerRadius: 5).fill(Palette.fill))
-            .textSelection(.enabled)
-            .help(name)
+        HStack(spacing: 0) {
+            Text(name)
+                .font(.system(size: 11, design: .monospaced))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .padding(.horizontal, 6)
+                .textSelection(.enabled)
+                .help(name)
+            accessory
+        }
+        .frame(height: 20)
+        .background(RoundedRectangle(cornerRadius: 5).fill(Palette.fill))
     }
 }
 
+extension BranchChip where Accessory == EmptyView {
+    init(name: String) {
+        self.init(name: name) { EmptyView() }
+    }
+}
+
+/// A 20 pt icon at the end of the head chip, the branch it copies. Beside the chip's text, never inside it:
+/// `.textSelection` and an accessibility label don't mix.
 private struct CopyBranchButton: View {
     let pr: PullRequest
     @State private var copied = false
+    @State private var hovering = false
 
     var body: some View {
-        OutlinedIconButton(
-            name: copied ? "Branch name copied" : "Copy branch \(pr.headRef)",
-            systemImage: copied ? "checkmark" : "doc.on.doc"
-        ) {
+        let name = copied ? "Branch name copied" : "Copy branch \(pr.headRef)"
+        Button {
             PRActions.copyBranch(pr)
             copied = true
             Task {
                 try? await Task.sleep(for: .seconds(1.5))
                 copied = false
             }
+        } label: {
+            Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                .font(.system(size: 10.5))
+                .foregroundStyle(.secondary)
+                .frame(width: 20, height: 20)
+                .background(RoundedRectangle(cornerRadius: 5).fill(hovering ? Palette.fill : .clear))
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(name)
+        .accessibilityLabel(name)
     }
 }

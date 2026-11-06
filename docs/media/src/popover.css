@@ -376,8 +376,8 @@ body {
 .detail { display: flex; flex-direction: column; height: 100%; color: var(--label); }
 .detail-header { position: relative; height: 44px; padding: 0 8px; display: flex; align-items: center; gap: 4px; flex: none; }
 .detail-icon { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; flex: none; }
-/* The title overlays the whole bar, centred, 72 clear of each side. */
-.detail-title { position: absolute; left: 0; right: 0; padding: 0 72px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+/* The title overlays the whole bar, centred, 112 clear of each side (the app's 104 inside the bar's 8 padding). */
+.detail-title { position: absolute; left: 0; right: 0; padding: 0 112px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 .detail-scroll { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 .detail-content { padding-bottom: 14px; }
 .detail-summary { padding: 14px 16px 0; }
@@ -399,6 +399,9 @@ body {
   display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: 5px; background: var(--fill);
   font: 11px/14px ui-monospace, "SF Mono", Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
 }
+.branch-chip.with-copy { padding-right: 0; }
+.branch-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.copy-branch { width: 20px; height: 20px; margin-left: 6px; display: flex; align-items: center; justify-content: center; flex: none; }
 .diffstat { display: inline-flex; gap: 1px; align-self: center; }
 .diff-block { width: 7px; height: 7px; border-radius: 1.5px; }
 .diff-count { width: 64px; text-align: right; flex: none; font-family: ui-monospace, "SF Mono", Menlo, monospace; }

@@ -4,8 +4,8 @@ import PullBullKit
 
 /// The detail of one issue inside the popover: state and author, a board card (Status, Assignees, Labels,
 /// each changeable where offered), the pull requests that close it, the description and the last two
-/// comments, with the comment field, View on board and Open on GitHub pinned at the bottom. It shows the
-/// list data and the cached detail at once; `AppModel` refreshes the detail in place.
+/// comments, with the comment field and View on board pinned at the bottom. It shows the list data and the
+/// cached detail at once; `AppModel` refreshes the detail in place.
 struct IssueDetailView: View {
     let model: AppModel
     let key: PRKey
@@ -76,6 +76,9 @@ struct IssueDetailView: View {
                 title: backTitle, position: model.detailWalk?.position(showing: key, kind: .issue),
                 action: model.closeIssueDetail)
             Spacer(minLength: 0)
+            DetailIconButton(symbol: "arrow.up.right.square", help: "Open on GitHub") {
+                NSWorkspace.shared.open(webURL)
+            }
             // A checkmark for a moment after ⌥⌘C.
             DetailIconButton(
                 symbol: CopyConfirmation.shared.message == nil ? "link" : "checkmark", help: "Copy Link"
@@ -96,7 +99,7 @@ struct IssueDetailView: View {
                 .monospacedDigit()
                 .lineLimit(1)
                 // Clear of the back button's "2 of 6" too, so the title doesn't move when it shows.
-                .padding(.horizontal, 96)
+                .padding(.horizontal, 104)
         }
         .padding(.horizontal, 8)
         .frame(height: 44)
@@ -270,9 +273,9 @@ struct IssueDetailView: View {
 
     // MARK: Bottom bar
 
-    /// The comment field, View on board and Open on GitHub, on one row.
+    /// The comment field and View on board, on one row.
     private var bottomBar: some View {
-        CommentField(model: model, key: key, isPullRequest: false, webURL: webURL) {
+        CommentField(model: model, key: key, isPullRequest: false) {
             if let boardURL {
                 OutlinedIconButton(
                     name: model.snapshot?.boardTitle.map { "Open in \($0)" } ?? "View on board",
