@@ -263,7 +263,7 @@ struct BoardUnavailableView: View {
         return VStack(spacing: 0) {
             Image(systemName: "lock")
                 .font(.system(size: 24, weight: .light))
-                .foregroundStyle(Palette.tertiary)
+                .foregroundStyle(Color.secondary)
             Text(isAppAccount ? "Personal boards need a GitHub CLI login" : "Needs the read:project scope")
                 .font(.system(size: 13, weight: .semibold))
                 .multilineTextAlignment(.center)
@@ -332,7 +332,7 @@ struct BoardUnavailableView: View {
         VStack(spacing: 0) {
             Image(systemName: "lock")
                 .font(.system(size: 24, weight: .light))
-                .foregroundStyle(Palette.tertiary)
+                .foregroundStyle(Color.secondary)
             Text("\(boardTitle) needs project access")
                 .font(.system(size: 13, weight: .semibold))
                 .multilineTextAlignment(.center)
