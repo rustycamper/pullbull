@@ -145,8 +145,7 @@ struct PRDetailView: View {
                         .accessibilityHidden(true)
                     // Equal priority: a chip that fits keeps its width and the other takes the rest; when
                     // neither fits they split the line, so neither collapses.
-                    BranchChip(name: pr.headRef)
-                    CopyBranchButton(pr: pr)
+                    BranchChip(name: pr.headRef) { CopyBranchButton(pr: pr) }
                     Image(systemName: "arrow.right")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.tertiary)
@@ -773,24 +772,35 @@ private struct FileLine: View {
 
 /// One line, truncated in the middle; the tooltip and VoiceOver always get the full name.
 /// No `.accessibilityLabel`: with `.textSelection` it can send SwiftUI's label lookup into a loop that overflows the stack.
-private struct BranchChip: View {
+private struct BranchChip<Accessory: View>: View {
     let name: String
+    /// Sits at the chip's end, beside the text and outside its `.textSelection`.
+    @ViewBuilder let accessory: Accessory
 
     var body: some View {
-        Text(name)
-            .font(.system(size: 11, design: .monospaced))
-            .lineLimit(1)
-            .truncationMode(.middle)
-            .padding(.horizontal, 6)
-            .frame(height: 20)
-            .background(RoundedRectangle(cornerRadius: 5).fill(Palette.fill))
-            .textSelection(.enabled)
-            .help(name)
+        HStack(spacing: 0) {
+            Text(name)
+                .font(.system(size: 11, design: .monospaced))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .padding(.horizontal, 6)
+                .textSelection(.enabled)
+                .help(name)
+            accessory
+        }
+        .frame(height: 20)
+        .background(RoundedRectangle(cornerRadius: 5).fill(Palette.fill))
     }
 }
 
-/// A 20 pt icon beside the head chip, the branch it copies. Not inside the chip: its `.textSelection` and an
-/// accessibility label don't mix.
+extension BranchChip where Accessory == EmptyView {
+    init(name: String) {
+        self.init(name: name) { EmptyView() }
+    }
+}
+
+/// A 20 pt icon at the end of the head chip, the branch it copies. Beside the chip's text, never inside it:
+/// `.textSelection` and an accessibility label don't mix.
 private struct CopyBranchButton: View {
     let pr: PullRequest
     @State private var copied = false
