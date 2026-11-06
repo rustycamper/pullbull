@@ -90,7 +90,7 @@ private struct GhSetupStepRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: step.done ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(step.done ? Color.green : Color.secondary)
+                    .foregroundStyle(step.done ? Palette.approved : Color.secondary)
                 Text("\(step.number). \(step.title)").font(.system(size: 13, weight: .semibold))
                 Spacer()
                 Text(step.done ? "Done" : "To do")

@@ -136,7 +136,7 @@ struct SearchSettingsTab: View {
             .frame(height: 20)
             .overlay(
                 RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(Color.red, lineWidth: 1)
+                    .strokeBorder(Palette.closedText, lineWidth: 1)
                     .opacity(valid ? 0 : 1))
     }
 

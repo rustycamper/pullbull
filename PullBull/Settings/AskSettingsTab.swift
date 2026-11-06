@@ -105,11 +105,11 @@ struct AskSettingsTab: View {
         case .valid:
             Label("Key saved", systemImage: "checkmark.circle.fill")
                 .font(.system(size: 11))
-                .foregroundStyle(.green)
+                .foregroundStyle(Palette.approved)
         case .invalid(let message):
             Label(message, systemImage: "exclamationmark.triangle.fill")
                 .font(.system(size: 11))
-                .foregroundStyle(.red)
+                .foregroundStyle(Palette.closedText)
         }
     }
 
@@ -203,7 +203,7 @@ struct AskSettingsTab: View {
                     .foregroundStyle(.secondary)
                 } else if let error = model.askOpenError {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Palette.closedText)
                 } else {
                     Text("Indexing starts once an account is running.")
                         .foregroundStyle(.secondary)

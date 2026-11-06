@@ -75,7 +75,7 @@ struct PersonalInstallContent: View {
     @ViewBuilder private var finished: some View {
         Image(systemName: "checkmark.circle.fill")
             .font(.system(size: 28))
-            .foregroundStyle(.green)
+            .foregroundStyle(Palette.approved)
             .accessibilityHidden(true)
         if let line = step.line { Text(line) }
     }
