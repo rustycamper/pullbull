@@ -26,7 +26,7 @@ Description (Markdown, shown on the install and sign-in pages):
 ```
 A native macOS menu bar app for the pull requests and issues that need you: reviews requested, your open PRs, your team's work, and assigned issues, with a badge count and notifications.
 
-PullBull writes to GitHub only what you pick: an issue's board Status, assignees and labels, a pull request's reviewers, assignees and labels, comments you write, reviews you submit, merges you confirm, and failed jobs you re-run. It never bypasses a repository's rules or closes, and your sign-in stays in your Mac's Keychain.
+PullBull writes to GitHub only what you pick: an issue's board Status, assignees and labels, a pull request's reviewers, assignees and labels, comments you write, reviews you submit, merges you confirm, and failed jobs you re-run. It never bypasses a repository's rules and never closes anything, and your sign-in stays in your Mac's Keychain.
 ```
 
 ### Permissions

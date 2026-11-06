@@ -35,6 +35,7 @@ Keyboard-first · Native SwiftUI · Edits only what you pick
 | <img src="docs/media/icons/link.png" width="22" height="22" alt=""> | Finding the PR that closes an issue takes clicks | Issue detail lists its linked PRs. Open one, <kbd>Esc</kbd> returns |
 | <img src="docs/media/icons/bubble-left.png" width="22" height="22" alt=""> | Answering a question in a thread means opening the browser | **Comment** from the detail, <kbd>⌥</kbd><kbd>⌘</kbd><kbd>M</kbd>, `@` to tag people, <kbd>⌘</kbd><kbd>Return</kbd> to send |
 | <img src="docs/media/icons/eye.png" width="22" height="22" alt=""> | The verdict is the one step of a review still in the browser | **Approve** or **Request changes** from the detail, <kbd>⌥</kbd><kbd>⌘</kbd><kbd>V</kbd>, with the commit and the checks in view, <kbd>⌘</kbd><kbd>Return</kbd> to submit |
+| <img src="docs/media/icons/arrow-triangle-merge.png" width="22" height="22" alt=""> | Merging, or restarting a flaky job, means opening the browser | **Merge** from the detail, <kbd>⌥</kbd><kbd>⌘</kbd><kbd>G</kbd>, with what will happen in one sentence, <kbd>⌃</kbd><kbd>⌘</kbd><kbd>↩</kbd> to confirm. **Merge when ready** sets auto-merge. **Re-run failed jobs** in Checks, one click |
 | <img src="docs/media/icons/bolt.png" width="22" height="22" alt=""> | "Where is #123?" means opening a browser | <kbd>⌃</kbd><kbd>⌥</kbd><kbd>P</kbd>, type `#123` or paste the link, <kbd>Return</kbd> |
 | <img src="docs/media/icons/person-2.png" width="22" height="22" alt=""> | Work and personal GitHub accounts mean signing out and back in | Switch accounts on the fly from the footer (<kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>). Each comes back with its own org and board |
 | <img src="docs/media/icons/slider-horizontal-3.png" width="22" height="22" alt=""> | Notifications are all or nothing | Toggle each event separately |
@@ -122,6 +123,7 @@ Combine `@`, `~`, `is:`, `status:`, `updated:`, `review:`, `repo:`, `size:` and 
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>R</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>A</kbd> · <kbd>⌥</kbd><kbd>⌘</kbd><kbd>L</kbd> · <kbd>⌘</kbd><kbd>Z</kbd> | Status (issues) · reviewers (PRs) · assignees · labels · undo |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>M</kbd> · <kbd>⌘</kbd><kbd>Return</kbd> | Comment on the open PR or issue · send it |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>V</kbd> · <kbd>⌘</kbd><kbd>Return</kbd> | Review the open PR · submit it |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>G</kbd> · <kbd>⌃</kbd><kbd>⌘</kbd><kbd>↩</kbd> | Merge the open PR · confirm it |
 | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>Return</kbd> | Ask (once turned on) |
 | <kbd>⌘</kbd><kbd>/</kbd> | Every shortcut, by section, with a filter. Also Settings → General |
 | <kbd>Esc</kbd> | Back, clear, close |
