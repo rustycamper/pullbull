@@ -95,7 +95,7 @@
    *  8 apart, 12/8 padding. */
   function bottomBar(symbols, titles = []) {
     return `<div class="detail-bar"><span class="comment-field f12"><span class="c-tertiary">Comment…</span>` +
-      `<span class="f11 c-tertiary">⌥⌘M</span></span>` +
+      `<span class="f11 c-secondary-text">⌥⌘M</span></span>` +
       titles.map((t) => `<span class="outlined-text-button c-secondary">${esc(t)}</span>`).join("") +
       symbols.map((s) => `<span class="outlined-button c-secondary">${sym(s, 12, "medium")}</span>`).join("") + `</div>`;
   }
@@ -186,7 +186,7 @@
   /** StatePill for an open PR: Draft, Ready to merge (on strongFill) or Open. */
   function prStatePill(pr) {
     if (pr.state === "merged") return pill("Merged", { symbol: "pullbull.pullrequest.merged", fg: "var(--merged-text)", fill: "var(--merged-fill)" });
-    if (pr.readyToMerge) return pill("Ready to merge", { symbol: "arrow.triangle.merge", fg: "var(--pill-text)", fill: "var(--strong-fill)" });
+    if (pr.readyToMerge) return pill("Ready to merge", { symbol: "arrow.triangle.merge", fg: "var(--pill-text)", fill: "var(--strong-fill)", symbolColor: "var(--approved)" });
     return pill("Open", { symbol: "pullbull.pullrequest", fg: "var(--pill-text)", fill: "var(--strong-fill)" });
   }
 

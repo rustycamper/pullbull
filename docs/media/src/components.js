@@ -177,7 +177,7 @@
     if (pr.comments > 0) meta += `<span class="label count" style="gap:3px">${sym("bubble.left", 9.5)}<span>${pr.comments}</span></span>`;
     // RowChips.Action: Mine's one capsule (PRRow.actionCapsule)
     if (pr.action === "readyToMerge") {
-      meta += `<span class="pill ready" style="margin-left:4px">${sym("arrow.triangle.merge", 9, "semibold")}<span>Ready to merge</span></span>`;
+      meta += `<span class="pill ready" style="margin-left:4px">${sym("arrow.triangle.merge", 9, "semibold", { color: "var(--approved)" })}<span>Ready to merge</span></span>`;
     } else if (pr.action && pr.action.changesRequested) {
       meta += `<span class="pill changes" style="margin-left:4px">${sym("arrow.uturn.backward", 9, "semibold")}<span>Changes requested · ${esc(pr.action.changesRequested.join(", "))}</span></span>`;
     }

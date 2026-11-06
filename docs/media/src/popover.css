@@ -22,13 +22,13 @@
   --strong-fill: rgba(255, 255, 255, 0.1);
   /* Palette.field is white at 0.07; vibrancy makes it read as about 0.09. */
   --field: rgba(255, 255, 255, 0.09);
-  --changes-requested: #ff9f45;
+  --changes-requested: #ff9468;
   --amber-glyph: #f5b041;
   --merged-text: #c69ef0;
   --merged-fill: rgba(198, 158, 240, 0.11);
   --closed-text: #ff7b73;
   --closed-fill: rgba(255, 123, 115, 0.1);
-  --changes-fill: rgba(255, 159, 69, 0.12);
+  --changes-fill: rgba(255, 148, 104, 0.12);
   --row-hover: rgba(255, 255, 255, 0.05);
   --approved: #56c26f;
   --card-fill: rgba(255, 255, 255, 0.035);
@@ -73,13 +73,13 @@
   --fill: rgba(0, 0, 0, 0.06);
   --strong-fill: rgba(0, 0, 0, 0.1);
   --field: #ffffff;
-  --changes-requested: #9a4400;
+  --changes-requested: #a13007;
   --amber-glyph: #8a5700;
   --merged-text: #7339ae;
   --merged-fill: rgba(115, 57, 174, 0.09);
   --closed-text: #b1271f;
   --closed-fill: rgba(177, 39, 31, 0.08);
-  --changes-fill: rgba(154, 68, 0, 0.12);
+  --changes-fill: rgba(161, 48, 7, 0.12);
   --row-hover: rgba(0, 0, 0, 0.05);
   --approved: #1f7a3a;
   --card-fill: rgba(0, 0, 0, 0.035);
@@ -311,7 +311,7 @@ body {
 .pill.draft { color: var(--secondary-text); box-shadow: inset 0 0 0 0.5px var(--separator); }
 .pill.merged { color: var(--merged-text); background: var(--merged-fill); }
 .pill.closed { color: var(--closed-text); background: var(--closed-fill); }
-/* ReadyToMergePill: gray on Palette.fill; the changes-requested Pill: amber at 0.12 */
+/* ReadyToMergePill: gray text and a green glyph on Palette.fill; the changes-requested Pill: orange at 0.12 */
 .pill.ready { color: var(--pill-text); background: var(--fill); }
 .pill.changes { color: var(--changes-requested); background: var(--changes-fill); }
 
