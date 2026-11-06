@@ -3,11 +3,12 @@ import PullBullKit
 import SwiftUI
 
 /// A detail's bottom row: the comment field, then the item's own buttons (Review and Merge, or View on
-/// board). Unfocused, the field is one line as tall as the buttons, reading "Comment…" with ⌥⌘M at its end, or a pencil and a waiting draft's first line. ⌥⌘M or
-/// a click focuses it: ⌘↩ shows at its end, as the way to post, and it grows upward with the text to 8
-/// lines, then scrolls. While a post is in flight, "Sending…" takes the hint's place. Where the account
-/// can't comment yet, the note saying what it needs takes the field's place. In review mode the panel
-/// sits on top of the row, and the empty field reads what the verdict asks for.
+/// board). Unfocused, the field is one line as tall as the buttons, reading "Comment…" with ⌥⌘M at its
+/// end, or a pencil and a waiting draft's first line. ⌥⌘M or a click focuses it: ⌘↩ shows at its end, as
+/// the way to post, and it grows upward with the text to 8 lines, then scrolls. While a post is in flight,
+/// "Sending…" takes the hint's place. Where the account can't comment yet, the note saying what it needs
+/// takes the field's place. In review mode the panel sits on top of the row, and the empty field reads
+/// what the verdict asks for.
 struct CommentField<Secondary: View>: View {
     let model: AppModel
     let key: PRKey

@@ -376,7 +376,7 @@ body {
 .detail { display: flex; flex-direction: column; height: 100%; color: var(--label); }
 .detail-header { position: relative; height: 44px; padding: 0 8px; display: flex; align-items: center; gap: 4px; flex: none; }
 .detail-icon { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; flex: none; }
-/* The title overlays the whole bar, centred, 72 clear of each side. */
+/* The title overlays the whole bar, centred, 104 clear of each side. */
 .detail-title { position: absolute; left: 0; right: 0; padding: 0 104px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 .detail-scroll { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 .detail-content { padding-bottom: 14px; }
