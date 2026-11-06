@@ -12,6 +12,8 @@ window.SCENES["pr-detail"] = {
     author: "devon", opened: "2d ago · updated 2h ago",
     headRef: "devon/webhook-retry-budget", baseRef: "main",
     checksExpanded: false,
+    // Review is left out: GitHub doesn't let devon review their own PR (ReviewGate.canReview).
+    bottomButtons: ["Merge"],
     checks: [
       { name: "build", state: "success", url: true },
       { name: "test (macOS)", state: "success", url: true },

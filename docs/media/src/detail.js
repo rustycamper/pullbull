@@ -91,10 +91,12 @@
   }
 
   /** The bottom row: CommentField unfocused ("Comment…" with ⌥⌘M at its end, 24 pt tall, taking the
-   *  width the buttons leave), then OutlinedIconButtons, 30×24; 8 apart, 12/8 padding. */
-  function bottomBar(symbols) {
+   *  width the buttons leave), then OutlinedTextButtons (Review, Merge) and OutlinedIconButtons, 30×24;
+   *  8 apart, 12/8 padding. */
+  function bottomBar(symbols, titles = []) {
     return `<div class="detail-bar"><span class="comment-field f12"><span class="c-tertiary">Comment…</span>` +
       `<span class="f11 c-tertiary">⌥⌘M</span></span>` +
+      titles.map((t) => `<span class="outlined-text-button c-secondary">${esc(t)}</span>`).join("") +
       symbols.map((s) => `<span class="outlined-button c-secondary">${sym(s, 12, "medium")}</span>`).join("") + `</div>`;
   }
 
@@ -203,7 +205,7 @@
       reviewersSection(pr, d.viewer.login) + checksSection(pr) + description +
       conversationSection(pr.comments, pr.commentTotal ?? pr.comments.length) + filesSection(pr);
     return `<div class="detail">${detailHeader(`${pr.repo} #${pr.number}`)}<div class="detail-scroll"><div class="detail-content">${body}</div></div>` +
-      bottomBar(["doc.on.doc", "arrow.up.right.square"]) + `</div>`;
+      bottomBar(["doc.on.doc", "arrow.up.right.square"], pr.bottomButtons) + `</div>`;
   }
 
   // ---------- Issue detail ----------
