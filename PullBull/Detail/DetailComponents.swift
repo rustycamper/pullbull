@@ -326,6 +326,42 @@ struct OutlinedTextButton: View {
     }
 }
 
+/// `OutlinedTextButton`'s filled sibling for the one action a panel exists for: the user's accent colour,
+/// with black or white text by `Palette.onAccent`. Disabled, it goes back to the outlined look, so
+/// "Checking…" never looks like a Merge that can be pressed. Increase Contrast adds an outline.
+struct AccentTextButton: View {
+    let title: String
+    var help = ""
+    let action: () -> Void
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.colorSchemeContrast) private var contrast
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(isEnabled ? Palette.onAccent : Color.secondary)
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, 10)
+                .frame(height: 24)
+                .background(RoundedRectangle(cornerRadius: 6).fill(isEnabled ? Color.accentColor : Palette.fill))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6).strokeBorder(
+                        isEnabled
+                            ? (contrast == .increased ? Color.primary.opacity(0.6) : .clear) : Palette.separator))
+                .brightness(hovering && isEnabled ? -0.06 : 0)
+                .contentShape(Rectangle())
+                .opacity(isEnabled ? 1 : 0.5)
+        }
+        .buttonStyle(PressableStyle())
+        .focusable(false)
+        .onHover { hovering = $0 }
+        .help(help)
+    }
+}
+
 struct PressableStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.opacity(configuration.isPressed ? 0.75 : 1)

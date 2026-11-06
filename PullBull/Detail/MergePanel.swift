@@ -83,10 +83,18 @@ struct MergePanel: View {
         model.changeMergeMethod(by: to - from)
     }
 
-    private var confirmButton: some View {
-        OutlinedTextButton(title: confirmTitle) { model.confirmMerge(on: mode.key) }
-            .disabled(mode.phase != .ready)
-            .accessibilityLabel(mode.phase == .ready ? mode.confirmTitle : confirmTitle)
+    /// Merge is the accent-filled button; Merge anyway stays outlined, so the riskier step doesn't look like
+    /// the recommended one.
+    @ViewBuilder private var confirmButton: some View {
+        Group {
+            if mode.isSecondStep {
+                OutlinedTextButton(title: confirmTitle) { model.confirmMerge(on: mode.key) }
+            } else {
+                AccentTextButton(title: confirmTitle) { model.confirmMerge(on: mode.key) }
+            }
+        }
+        .disabled(mode.phase != .ready)
+        .accessibilityLabel(mode.phase == .ready ? mode.confirmTitle : confirmTitle)
     }
 
     private var confirmTitle: String {
