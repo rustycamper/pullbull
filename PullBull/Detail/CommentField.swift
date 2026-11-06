@@ -2,9 +2,8 @@ import AppKit
 import PullBullKit
 import SwiftUI
 
-/// A detail's bottom row: the comment field, the item's own buttons (Review, Merge and Copy branch, or View
-/// on board), and Open on GitHub last. Unfocused, the field is one line as tall as the
-/// buttons, reading "Comment…" with ⌥⌘M at its end, or a pencil and a waiting draft's first line. ⌥⌘M or
+/// A detail's bottom row: the comment field, then the item's own buttons (Review and Merge, or View on
+/// board). Unfocused, the field is one line as tall as the buttons, reading "Comment…" with ⌥⌘M at its end, or a pencil and a waiting draft's first line. ⌥⌘M or
 /// a click focuses it: ⌘↩ shows at its end, as the way to post, and it grows upward with the text to 8
 /// lines, then scrolls. While a post is in flight, "Sending…" takes the hint's place. Where the account
 /// can't comment yet, the note saying what it needs takes the field's place. In review mode the panel
@@ -13,9 +12,7 @@ struct CommentField<Secondary: View>: View {
     let model: AppModel
     let key: PRKey
     let isPullRequest: Bool
-    /// Where Open on GitHub goes.
-    let webURL: URL
-    /// Review, Merge and Copy branch on a PR, View on board on an issue on the board.
+    /// Review and Merge on a PR, View on board on an issue on the board.
     @ViewBuilder let secondary: Secondary
 
     @State private var isFocused = false
@@ -38,21 +35,21 @@ struct CommentField<Secondary: View>: View {
         let ready = permission == .ready
         VStack(spacing: 0) {
             if let review { ReviewPanel(model: model, mode: review) }
-            HStack(alignment: .bottom, spacing: 8) {
-                if ready {
-                    field
-                } else if let note = permission.note(for: .comment) {
-                    permissionSlot(note: note, permission: permission)
-                } else {
-                    Spacer(minLength: 0)
-                }
-                secondary
-                OutlinedIconButton(name: "Open on GitHub", systemImage: "arrow.up.right.square") {
-                    NSWorkspace.shared.open(webURL)
+            HiddenWhenEmpty(insets: EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)) {
+                HStack(alignment: .bottom, spacing: 8) {
+                    if ready {
+                        field
+                    } else if let note = permission.note(for: .comment) {
+                        permissionSlot(note: note, permission: permission)
+                    } else {
+                        // Nothing to say while the installations load: the row keeps its height, so the bar
+                        // doesn't jump. Once they have, an account that can't comment has no field to hold.
+                        Spacer(minLength: 0)
+                            .frame(height: model.editPermissionsKnown ? 0 : CommentTextView.rowHeight)
+                    }
+                    secondary
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
         }
         .overlay(alignment: .top) { Hairline() }
         // A field taken away while focused (the permission lost) comes back unfocused, and its @ list ends:
@@ -200,6 +197,31 @@ struct CommentField<Secondary: View>: View {
         .background(RoundedRectangle(cornerRadius: 6).fill(Palette.fill))
         .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.separator))
         .contentShape(RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+/// Pads its one child, unless the child has no height: then the row takes no space at all.
+private struct HiddenWhenEmpty: Layout {
+    let insets: EdgeInsets
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let child = subviews.first else { return .zero }
+        let inner = ProposedViewSize(
+            width: proposal.width.map { max($0 - insets.leading - insets.trailing, 0) }, height: nil)
+        let size = child.sizeThatFits(inner)
+        guard size.height > 0 else { return .zero }
+        return CGSize(
+            width: size.width + insets.leading + insets.trailing,
+            height: size.height + insets.top + insets.bottom)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let child = subviews.first else { return }
+        child.place(
+            at: CGPoint(x: bounds.minX + insets.leading, y: bounds.minY + insets.top), anchor: .topLeading,
+            proposal: ProposedViewSize(
+                width: bounds.width - insets.leading - insets.trailing,
+                height: bounds.height - insets.top - insets.bottom))
     }
 }
 
