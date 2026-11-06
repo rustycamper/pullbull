@@ -106,6 +106,16 @@ public enum EditMessage {
         "Couldn't confirm auto-merge was cancelled on #\(key.number). Check it on GitHub."
     }
 
+    /// Every workflow run's re-run was refused; `reason` is the first refusal's.
+    public static func rerunRefused(on key: PRKey, reason: String) -> String {
+        "Couldn't re-run failed jobs on #\(key.number): \(reason)"
+    }
+
+    /// Some of the runs were re-run and `refused` of `total` were not.
+    public static func rerunPartlyRefused(refused: Int, of total: Int, on key: PRKey) -> String {
+        "Couldn't re-run \(refused) of \(total) workflow runs on #\(key.number)."
+    }
+
     /// GitHub's own words when it refused the write; the refresh wording for anything else.
     private static func reason(for error: any Error) -> String {
         if case APIError.writeRefused(let message) = error { return message }

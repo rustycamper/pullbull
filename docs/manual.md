@@ -102,7 +102,7 @@ A PR waiting on review shows who it waits on and for how long (🕒 @dana 3d, "+
 > Ready to merge = approved, no changes requested, checks green or none, no conflicts, not a draft. It doesn't see branch protection (required review count).
 
 - **Pending CI:** while checks run on your PRs, PullBull checks up to 5 of them (newest commits first) every 30 s, for up to 20 minutes each, so *CI failed* and *Ready to merge* arrive sooner. Not while offline or rate-limited. Settings → General → Check my pending CI more often
-- **Detail:** who opened it and when it was last updated (the row's age), or when it was merged or closed · assignees, labels and reviewers (click to change) · checks (a cancelled run reads cancelled, not failed, though GitHub still marks the PR failed) · description (long ones fold) · the newest comments, with earlier ones counted above, and the text of each person's latest review among them, tagged Approved, Changes requested or Reviewed · files (click one to open its diff on GitHub). A [comment field](#commenting), with a **Review** button when you can [review](#reviewing) the PR and a **Merge** button when you can [merge](#merging) it, is pinned at the bottom. Markdown incl. `<details>`. **Open Failing Check** beside failed checks
+- **Detail:** who opened it and when it was last updated (the row's age), or when it was merged or closed · assignees, labels and reviewers (click to change) · checks (a cancelled run reads cancelled, not failed, though GitHub still marks the PR failed) · description (long ones fold) · the newest comments, with earlier ones counted above, and the text of each person's latest review among them, tagged Approved, Changes requested or Reviewed · files (click one to open its diff on GitHub). A [comment field](#commenting), with a **Review** button when you can [review](#reviewing) the PR and a **Merge** button when you can [merge](#merging) it, is pinned at the bottom. Markdown incl. `<details>`. **Open Failing Check** beside failed checks, and [**Re-run failed jobs**](#re-running-failed-jobs) when you can
 - **Labels:** up to two chips per row (none in compact cards), each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail's Details card lists them all
 - **Right-click a row:** [Reviewers…](#editing) · [Assignees…](#editing) · [Labels…](#editing) · copy branch, link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · show only updated · search author
 - **Right-click a group header** (repo, author): **Open All *N* on GitHub**, from two PRs up; above 8 it asks first. An author header's menu also offers **Search @*login*** and **Show Only Updated**. Headers in search results get their section's or tab's menus, without Show Only Updated
@@ -243,6 +243,17 @@ Merge a pull request, or set it to merge by itself once its requirements pass, f
 | <kbd>⌥</kbd><kbd>←</kbd> <kbd>⌥</kbd><kbd>→</kbd> | Change the method | Merge panel |
 | <kbd>⌃</kbd><kbd>⌘</kbd><kbd>↩</kbd> | Confirm | Merge panel |
 | <kbd>Esc</kbd> | Close the panel | Merge panel |
+
+## Re-running failed jobs
+
+Re-run the failed jobs of a pull request's GitHub Actions runs from its detail, in one click.
+
+- **Who can:** on an open pull request with a failed check, with write access and Sign in with GitHub's Actions permission or a `gh` login. Without write access nothing is shown; without the Actions permission a note takes the button's place. Only runs that have finished count, so a run with another job still going is left until it ends. External checks can't be re-run here, nor can a run waiting for approval or one that failed to start
+- **Start:** **Re-run failed jobs** in the Checks section, beside **Open Failing Check**. There is no panel and no key. Its tooltip says it re-runs the failed jobs and the jobs that depend on them, since a dependent job can deploy
+- **Sending:** the button reads "Re-running…" and stays so while the detail is read up to three times, 2 s apart, until the runs show as restarted. If GitHub is slower, the button comes back, and pressing it again is safe. A run restarted since the detail loaded isn't sent again
+- **Refused:** if some runs are refused the rest carry on, and a line says "Couldn't re-run 1 of 3 workflow runs on #88." If all are, it gives GitHub's reason, with **Open on GitHub**
+- **Not here:** re-running every job of a run, one job, or a run waiting for approval
+- **Permissions:** Sign in with GitHub needs the Actions permission, which is new. Until an org owner accepts it, a note takes the button's place (click **Open on GitHub** to accept); everything else keeps working. With a `gh` login, `repo` covers it
 
 ## Search
 

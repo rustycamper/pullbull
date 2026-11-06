@@ -218,12 +218,13 @@ struct PRDetailView: View {
         let order: [CIState] = [.failure, .pending, .cancelled, .success, .skipped, .none]
         let sorted = order.flatMap { state in checks.filter { $0.state == state } }
         // On an open PR a green run folds to its summary; anything failed, running or cancelled stays open,
-        // so a cancelled run that GitHub's rollup counts as a failure shows why the row is red.
-        let folded = pr?.state == .open && !checksExpanded && !checks.isEmpty
+        // so a cancelled run that GitHub's rollup counts as a failure shows why the row is red. A failing
+        // rollup never folds: its failures may lie past the first 50 checks.
+        let folded = pr?.state == .open && !checksExpanded && !checks.isEmpty && detail.ci != .failure
             && checks.allSatisfy { [.success, .skipped, .none].contains($0.state) }
         // A folded list that never passed anything (all skipped) keeps the skipped glyph, not a check mark.
         let foldedState: CIState = checks.contains { $0.state == .success } ? .success : .skipped
-        return DetailSection(title: "Checks", summary: Self.checksSummary(checks)) {
+        return DetailSection(title: "Checks", summary: Self.checksSummary(checks), stacksAccessory: true) {
             DetailCard {
                 if sorted.isEmpty {
                     EmptyLine(text: "No checks")
@@ -260,10 +261,33 @@ struct PRDetailView: View {
             if detail.checksTruncated {
                 TruncationNote(shown: checks.count, total: detail.checkTotal, noun: "checks", url: webURL)
             }
+            if let permission = model.rerunNote(for: key), let note = permission.note(for: .rerun) {
+                RerunPermissionNote(note: note, link: Self.rerunLink(for: permission, model: model))
+            }
         } accessory: {
+            if model.isRerunOffered(for: key) {
+                let running = model.rerunning.contains(key)
+                Button(running ? "Re-running…" : "Re-run failed jobs") { model.rerunFailedJobs(on: key) }
+                    .buttonStyle(.link)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .disabled(running)
+                    .help("Re-runs the failed jobs and the jobs that depend on them")
+            }
             if FailingCheck.hasFailure(checks) {
                 Link("Open Failing Check", destination: FailingCheck.url(in: checks, key: key))
+                    .lineLimit(1)
+                    .fixedSize()
             }
+        }
+    }
+
+    /// Where the permission is put right: accepted, or installed where there's no installation.
+    private static func rerunLink(for permission: EditPermission, model: AppModel) -> URL? {
+        switch permission {
+        case .needsAppApproval(_, _, let url): url
+        case .unavailable: model.installURL
+        case .ready, .needsGhScope: nil
         }
     }
 
@@ -634,6 +658,22 @@ private struct TruncationNote: View {
             Text("Showing first \(shown) of \(total) \(noun) ·")
                 .monospacedDigit()
             Link("view on GitHub", destination: url)
+        }
+        .font(.system(size: 11))
+        .foregroundStyle(.secondary)
+        .padding(.leading, 2)
+    }
+}
+
+/// What re-running needs, in the Checks section where the button would be.
+private struct RerunPermissionNote: View {
+    let note: String
+    let link: URL?
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(note)
+            if let link { Link("Open on GitHub", destination: link) }
         }
         .font(.system(size: 11))
         .foregroundStyle(.secondary)

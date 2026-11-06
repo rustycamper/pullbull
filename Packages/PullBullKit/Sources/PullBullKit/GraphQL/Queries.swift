@@ -243,6 +243,21 @@ enum Queries {
     }
     """
 
+    static let allChecks = """
+    query($owner:String!,$name:String!,$n:Int!,$after:String){
+      repository(owner:$owner, name:$name){pullRequest(number:$n){
+        commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100, after:$after){
+          pageInfo{hasNextPage endCursor}
+          nodes{
+            __typename
+            ... on CheckRun{name conclusion status detailsUrl checkSuite{status}}
+            ... on StatusContext{context state targetUrl}
+          }
+        }}}}}
+      }}
+    }
+    """
+
     static let detail = """
     query($owner:String!,$name:String!,$n:Int!){
       repository(owner:$owner, name:$name){
@@ -255,7 +270,7 @@ enum Queries {
           baseRef{rules(first:50){nodes{type parameters{... on PullRequestParameters{allowedMergeMethods}}}}}
           commits(last:1){nodes{commit{statusCheckRollup{state contexts(first:50){totalCount \(rollupCounts) statusContextCountsByState{state count} nodes{
             __typename
-            ... on CheckRun{name conclusion status detailsUrl}
+            ... on CheckRun{name conclusion status detailsUrl checkSuite{status}}
             ... on StatusContext{context state targetUrl}
           }}}}}}
           reviewRequests(first:20){nodes{requestedReviewer{__typename ... on User{login} ... on Team{slug name}}}}

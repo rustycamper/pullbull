@@ -26,12 +26,12 @@ Description (Markdown, shown on the install and sign-in pages):
 ```
 A native macOS menu bar app for the pull requests and issues that need you: reviews requested, your open PRs, your team's work, and assigned issues, with a badge count and notifications.
 
-PullBull writes to GitHub only what you pick: an issue's board Status, assignees and labels, a pull request's reviewers, assignees and labels, comments you write, reviews you submit, and merges you confirm. It never bypasses a repository's rules or closes, and your sign-in stays in your Mac's Keychain.
+PullBull writes to GitHub only what you pick: an issue's board Status, assignees and labels, a pull request's reviewers, assignees and labels, comments you write, reviews you submit, merges you confirm, and failed jobs you re-run. It never bypasses a repository's rules or closes, and your sign-in stays in your Mac's Keychain.
 ```
 
 ### Permissions
 
-**Issues**, **Pull requests**, **Projects** and **Contents** are **Read and write**: for an issue's board Status, a pull request's reviewers, the assignees and labels of issues and pull requests, the reviews you submit, and merging (Contents). Merging needs no other write permission, not even Workflows. The rest are **Read-only**. Everything else: No access.
+**Issues**, **Pull requests**, **Projects**, **Contents** and **Actions** are **Read and write**: for an issue's board Status, a pull request's reviewers, the assignees and labels of issues and pull requests, the reviews you submit, merging (Contents), and re-running failed jobs (Actions). Merging needs no other write permission, not even Workflows. Re-running needs Actions and nothing else. The rest are **Read-only**. Everything else: No access.
 
 | Repository | Organization |
 |---|---|
@@ -39,6 +39,7 @@ PullBull writes to GitHub only what you pick: an issue's board Status, assignees
 | Pull requests: **Read and write** | Projects: **Read and write** |
 | Issues: **Read and write** | |
 | Contents: **Read and write** | |
+| Actions: **Read and write** | |
 | Checks | |
 | Commit statuses | |
 

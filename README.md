@@ -169,7 +169,7 @@ Or download the zip from [Releases](https://github.com/rustycamper/pullbull/rele
 
 | &emsp;&emsp; | | |
 |:-:|---|---|
-| <img src="docs/media/icons/eye.png" width="22" height="22" alt=""> | Writes to GitHub | An issue's board Status, assignees and labels, a pull request's reviewers, assignees and labels, comments you write, reviews you submit and pull requests you merge, only when you pick or confirm them. Merging needs a separate confirm, never bypasses the repository's rules, and never closes |
+| <img src="docs/media/icons/eye.png" width="22" height="22" alt=""> | Writes to GitHub | An issue's board Status, assignees and labels, a pull request's reviewers, assignees and labels, comments you write, reviews you submit, pull requests you merge and failed jobs you re-run, only when you pick or confirm them. Merging needs a separate confirm, never bypasses the repository's rules, and never closes |
 | <img src="docs/media/icons/key-horizontal.png" width="22" height="22" alt=""> | Tokens | App sign-in and Anthropic API key (Ask): Keychain, this Mac only. `gh`: memory only |
 | <img src="docs/media/icons/chart-bar-xaxis-ascending.png" width="22" height="22" alt=""> | Telemetry | None. No server |
 | <img src="docs/media/icons/network.png" width="22" height="22" alt=""> | Network | GitHub API, GitHub avatars, GitHub release feed. Anthropic API, only if you turn Ask on. Nothing else |
