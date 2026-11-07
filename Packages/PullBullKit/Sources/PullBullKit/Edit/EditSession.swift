@@ -36,12 +36,15 @@ public struct EditSession: Equatable, Sendable {
     public init() {}
 
     /// Shows `change` at once. It becomes the last edit, so the one before can no longer be undone.
-    public mutating func begin(_ change: EditChange, on key: PRKey, at now: Date, carrying copy: PullRequest? = nil) -> UUID {
+    /// `issue`: the issue a Status edit is made on, as shown, for the board to show when no list has it.
+    public mutating func begin(
+        _ change: EditChange, on key: PRKey, at now: Date, carrying copy: PullRequest? = nil, issue: BoardIssue? = nil
+    ) -> UUID {
         failure = nil
         waiting.removeAll { $0.key == key }
         showNextHeld()
         undo = EditUndo()
-        let id = overrides.record(change, on: key, at: now, carrying: copy)
+        let id = overrides.record(change, on: key, at: now, carrying: copy, issue: issue)
         last = id
         return id
     }

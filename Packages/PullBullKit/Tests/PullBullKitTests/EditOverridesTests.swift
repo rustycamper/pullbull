@@ -58,6 +58,23 @@ private func mergeDetail(state: PRState? = .open, merge: MergeInfo? = nil) -> PR
         #expect(o.apply(to: editSnapshot(board: [])).boardIssues.isEmpty)
     }
 
+    /// An issue in no list (created since the last fetch, opened from search or a link) goes on the board
+    /// from the copy the edit was made on.
+    @Test func addedInNoListInsertsTheEditedCopy() {
+        var o = EditOverrides()
+        o.record(.status(from: nil, to: todo, placement: .added), on: k500, at: t0, issue: editIssue(500))
+        let shown = o.apply(to: editSnapshot(board: [editIssue(412, status: todo)]))
+        #expect(card(shown, k500)?.status == todo)
+        #expect(shown.boardIssues.count == 2)
+    }
+
+    @Test func addedPrefersTheFetchedCopyToTheEditedOne() {
+        var o = EditOverrides()
+        o.record(.status(from: nil, to: todo, placement: .added), on: k500, at: t0, issue: editIssue(500, labels: ["old"]))
+        let shown = o.apply(to: editSnapshot(board: [], created: [editIssue(500, labels: ["new"])]))
+        #expect(card(shown, k500)?.labels == ["new"])
+    }
+
     @Test func removedFromBoardDrops() {
         var o = EditOverrides()
         o.record(.status(from: todo, to: nil, placement: .removed), on: k412, at: t0)
