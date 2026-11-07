@@ -286,4 +286,27 @@ private func install(
                 field, account: ghMe, boardOwner: nil, installation: nil, ghAccounts: [], onPullRequest: true) == .ready)
         }
     }
+
+    @Test func draftNeedsPullRequestsWrite() {
+        #expect(permission(.draft, ["pull_requests": "write"]) == .ready)
+        #expect(permission(.draft, ["pull_requests": "admin"]) == .ready)
+        #expect(permission(.draft, ["contents": "write", "pull_requests": "read"])
+            == .needsAppApproval(
+                owner: "acme", isOrganization: true,
+                url: URL(string: "https://github.com/organizations/acme/settings/installations/9")))
+        #expect(permission(.draft, [:]).note(for: .draft)
+            == "Marking ready needs PullBull's new permissions for acme. An org owner accepts them on GitHub.")
+    }
+
+    @Test func draftIsReadyOnAGhLogin() {
+        #expect(EditPermission.of(
+            .draft, account: ghMe, boardOwner: nil, installation: nil, ghAccounts: [], onPullRequest: true) == .ready)
+    }
+
+    @Test func draftNoteWithNoInstallation() {
+        #expect(EditPermission.of(
+            .draft, account: app, boardOwner: nil, installation: nil, ghAccounts: [], onPullRequest: true)
+            == .unavailable)
+        #expect(EditPermission.unavailable.note(for: .draft) == "Marking ready needs PullBull installed here.")
+    }
 }

@@ -2,9 +2,10 @@ import Foundation
 
 /// What an edit changes on GitHub. `comment` posts a comment and `review` submits one with a verdict,
 /// rather than changing a field; `comment` gates like the item's other edits, `review` like reviewers.
-/// `merge` and `rerun` act on a pull request's state: Contents write and Actions write.
+/// `merge` and `rerun` act on a pull request's state: Contents write and Actions write. `draft` flips a
+/// pull request between draft and ready, which needs Pull requests write.
 public enum EditField: Sendable {
-    case status, labels, assignees, reviewers, comment, review, merge, rerun
+    case status, labels, assignees, reviewers, comment, review, merge, rerun, draft
 }
 
 /// Whether the current account may make an edit, and if not, what it needs.
@@ -38,7 +39,7 @@ public enum EditPermission: Equatable, Sendable {
             case .merge: installation.canWriteContents
             case .rerun: installation.canWriteActions
             case .status: installation.canWriteProjects
-            case .reviewers, .review: installation.canWritePullRequests
+            case .reviewers, .review, .draft: installation.canWritePullRequests
             case .labels, .assignees, .comment:
                 onPullRequest ? installation.canWritePullRequests : installation.canWriteIssues
             }
@@ -59,6 +60,7 @@ public enum EditPermission: Equatable, Sendable {
             switch field {
             case .merge: return "Merging needs PullBull installed here."
             case .rerun: return "Re-running needs PullBull installed here."
+            case .draft: return "Marking ready needs PullBull installed here."
             default: break
             }
         }
@@ -67,6 +69,7 @@ public enum EditPermission: Equatable, Sendable {
         case .review: "Reviewing"
         case .merge: "Merging"
         case .rerun: "Re-running"
+        case .draft: "Marking ready"
         default: "Editing"
         }
         return note(doing: doing)

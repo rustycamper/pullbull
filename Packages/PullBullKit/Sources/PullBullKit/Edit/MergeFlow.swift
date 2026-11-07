@@ -25,7 +25,7 @@ public enum MergeFlow {
     public static let unknownReads = 3
     public static let unknownReadGap: Duration = .seconds(2)
 
-    private static let notReachable = "PullBull can't reach this repository. Add it to the install on GitHub."
+    static let notReachable = "PullBull can't reach this repository. Add it to the install on GitHub."
 
     @MainActor public static func run(
         shown: MergeFacts, isCancelled: () -> Bool,

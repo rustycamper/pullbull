@@ -45,10 +45,24 @@ public enum EditMessage {
         case .merged: "merge \(number)"
         case .autoMerge(enabled: true, _): "set auto-merge on \(number)"
         case .autoMerge(enabled: false, _): "cancel auto-merge on \(number)"
-        case .draft(isDraft: false, _): "mark \(number) ready for review"
-        case .draft(isDraft: true, _): "convert \(number) to draft"
+        case .draft(let toDraft, _): draftAction(number: number, toDraft: toDraft)
         }
         return "Couldn't \(what): \(reason)"
+    }
+
+    /// A draft flip GitHub refused; `reason` is GitHub's words, or PullBull's when it never got there.
+    public static func draftRefused(on key: PRKey, toDraft: Bool, reason: String) -> String {
+        "Couldn't \(draftAction(number: "#\(key.number)", toDraft: toDraft)): \(reason)"
+    }
+
+    /// A draft flip with no clear answer, and that a fresh detail doesn't show.
+    public static func draftUnconfirmed(on key: PRKey, toDraft: Bool) -> String {
+        "Couldn't confirm #\(key.number) is \(toDraft ? "a draft" : "ready for review"). Check it on GitHub."
+    }
+
+    /// The one wording of a draft flip, for the refusal line and the failure line alike.
+    private static func draftAction(number: String, toDraft: Bool) -> String {
+        toDraft ? "convert \(number) to draft" : "mark \(number) ready for review"
     }
 
     /// A comment GitHub refused; `reason` is GitHub's words, or PullBull's when it never got there.

@@ -21,6 +21,17 @@ import Testing
             == "Couldn't convert #88 to draft: nope")
     }
 
+    @Test func draftRefusedAndUnconfirmedLines() {
+        #expect(EditMessage.draftRefused(on: key, toDraft: false, reason: "nope")
+            == "Couldn't mark #88 ready for review: nope")
+        #expect(EditMessage.draftRefused(on: key, toDraft: true, reason: "nope")
+            == "Couldn't convert #88 to draft: nope")
+        #expect(EditMessage.draftUnconfirmed(on: key, toDraft: false)
+            == "Couldn't confirm #88 is ready for review. Check it on GitHub.")
+        #expect(EditMessage.draftUnconfirmed(on: key, toDraft: true)
+            == "Couldn't confirm #88 is a draft. Check it on GitHub.")
+    }
+
     @Test func reviewLines() {
         #expect(EditMessage.reviewRefused(on: key, reason: "nope") == "Couldn't review #88: nope")
         #expect(EditMessage.reviewUnconfirmed(on: key)
