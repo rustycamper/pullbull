@@ -84,7 +84,9 @@ final class PopoverController: NSObject {
         if let button = statusItem.button {
             button.target = self
             button.action = #selector(statusItemClicked)
-            button.sendAction(on: [.leftMouseDown, .rightMouseDown])
+            // The menu opens on the right button's release: opened on the press, its tracking takes that
+            // release, the button is left mid-click, and the next click on the item goes to finishing it.
+            button.sendAction(on: [.leftMouseDown, .rightMouseUp])
             // The button is in the menu bar from launch; the panel's content first renders when the panel
             // is first shown. So the anchor lives here, and the status item menu can open Settings at once.
             let anchor = NSHostingView(rootView: SettingsOpenerAnchor())
@@ -164,7 +166,7 @@ final class PopoverController: NSObject {
 
     @objc private func statusItemClicked() {
         let event = NSApp.currentEvent
-        let isMenuClick = event?.type == .rightMouseDown
+        let isMenuClick = event?.type == .rightMouseUp
             || (event?.type == .leftMouseDown && event?.modifierFlags.contains(.control) == true)
         if isMenuClick { showMenu() } else { toggle() }
     }
