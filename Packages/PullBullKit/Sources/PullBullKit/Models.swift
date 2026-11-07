@@ -142,7 +142,8 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
     public let authorAvatarURL: URL?
     /// Set by edit overrides too.
     public internal(set) var state: PRState
-    public let isDraft: Bool
+    /// Set by edit overrides too.
+    public internal(set) var isDraft: Bool
     public let createdAt: Date
     public let updatedAt: Date
     public let closedAt: Date?
@@ -183,7 +184,8 @@ public struct PullRequest: Identifiable, Hashable, Codable, Sendable {
     /// has an unknown time. Empty in snapshots cached before it was stored.
     public internal(set) var reviewRequestTimes: [String: Date]
     /// The last ReadyForReviewEvent; nil when the PR was never a draft, and in snapshots cached before it.
-    public let readyForReviewAt: Date?
+    /// Set by edit overrides too.
+    public internal(set) var readyForReviewAt: Date?
     /// The last few ReviewDismissedEvents, oldest first; empty in snapshots cached before they were stored.
     public let reviewDismissals: [ReviewDismissal]
 

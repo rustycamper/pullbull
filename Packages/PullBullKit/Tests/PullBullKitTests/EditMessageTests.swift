@@ -13,6 +13,14 @@ import Testing
             == "Couldn't cancel auto-merge on #88: nope")
     }
 
+    @Test func draftLines() {
+        let refused = APIError.writeRefused("nope")
+        #expect(EditMessage.failure(.draft(isDraft: false, viewer: "me"), on: key, error: refused)
+            == "Couldn't mark #88 ready for review: nope")
+        #expect(EditMessage.failure(.draft(isDraft: true, viewer: "me"), on: key, error: refused)
+            == "Couldn't convert #88 to draft: nope")
+    }
+
     @Test func reviewLines() {
         #expect(EditMessage.reviewRefused(on: key, reason: "nope") == "Couldn't review #88: nope")
         #expect(EditMessage.reviewUnconfirmed(on: key)

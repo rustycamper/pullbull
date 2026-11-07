@@ -15,15 +15,17 @@ func editIssue(
 
 func editPR(
     _ number: Int, labels: [String] = [], assignees: [String] = [], author: String = "al", state: PRState = .open,
-    reviews: [Review] = [], requests: [Reviewer] = [], requestTimes: [String: Date] = [:], headOid: String? = nil
+    reviews: [Review] = [], requests: [Reviewer] = [], requestTimes: [String: Date] = [:], headOid: String? = nil,
+    isDraft: Bool = false, readyForReviewAt: Date? = nil
 ) -> PullRequest {
     let at = Date(timeIntervalSince1970: 1_800_000_000)
     return PullRequest(
         key: editKey(number), title: "PR \(number)", url: URL(string: "https://github.com/o/r/pull/\(number)")!,
-        author: author, authorAvatarURL: nil, state: state, isDraft: false, createdAt: at, updatedAt: at, closedAt: nil,
+        author: author, authorAvatarURL: nil, state: state, isDraft: isDraft, createdAt: at, updatedAt: at, closedAt: nil,
         headRef: "a", baseRef: "main", ci: .none, headCommitDate: nil, commentCount: 0, lastCommentAuthor: nil,
         latestReviews: reviews, reviewRequests: requests, headCommitOid: headOid, labels: labels, labelColors: labels.map { _ in nil },
-        assignees: assignees.map { Assignee(login: $0, avatarURL: nil) }, reviewRequestTimes: requestTimes)
+        assignees: assignees.map { Assignee(login: $0, avatarURL: nil) }, reviewRequestTimes: requestTimes,
+        readyForReviewAt: readyForReviewAt)
 }
 
 func editSnapshot(

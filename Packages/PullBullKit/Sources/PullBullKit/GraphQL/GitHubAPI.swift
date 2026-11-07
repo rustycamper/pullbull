@@ -313,8 +313,8 @@ public struct LinkedPR: Codable, Sendable, Hashable {
     /// "ghost" for a deleted author.
     public let author: String
     public let ci: CIState
-    /// False in details cached before it was stored.
-    public let isDraft: Bool
+    /// False in details cached before it was stored. Set by edit overrides too.
+    public internal(set) var isDraft: Bool
 
     public var glyph: PRGlyph { PRGlyph(state: state, isDraft: isDraft) }
 

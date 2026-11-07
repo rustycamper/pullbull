@@ -22,7 +22,7 @@ public enum EditMessage {
             return result.addApplied
                 ? "Asked \(asked) to review #\(key.number), but couldn't remove \(removedNames): \(reason)"
                 : "Removed \(removedNames) from #\(key.number), but couldn't ask \(asked): \(reason)"
-        case .status, .review, .merged, .autoMerge:
+        case .status, .review, .merged, .autoMerge, .draft:
             return failure(change, on: key, reason: reason)
         }
         let number = "#\(key.number)"
@@ -45,6 +45,8 @@ public enum EditMessage {
         case .merged: "merge \(number)"
         case .autoMerge(enabled: true, _): "set auto-merge on \(number)"
         case .autoMerge(enabled: false, _): "cancel auto-merge on \(number)"
+        case .draft(isDraft: false, _): "mark \(number) ready for review"
+        case .draft(isDraft: true, _): "convert \(number) to draft"
         }
         return "Couldn't \(what): \(reason)"
     }

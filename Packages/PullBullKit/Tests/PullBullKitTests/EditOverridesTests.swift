@@ -21,9 +21,9 @@ private func card(_ snapshot: Snapshot, _ key: PRKey) -> BoardIssue? {
     snapshot.boardIssues.first { $0.key == key }
 }
 
-private func mergeInfo(autoMerge: AutoMerge? = nil, canDisable: Bool = false) -> MergeInfo {
+private func mergeInfo(isDraft: Bool = false, autoMerge: AutoMerge? = nil, canDisable: Bool = false) -> MergeInfo {
     MergeInfo(
-        nodeID: "PR_1", status: .blocked, hasConflicts: false, usesMergeQueue: false, isStacked: false, isDraft: false,
+        nodeID: "PR_1", status: .blocked, hasConflicts: false, usesMergeQueue: false, isStacked: false, isDraft: isDraft,
         autoMerge: autoMerge, canEnableAutoMerge: true, canDisableAutoMerge: canDisable, canWrite: true,
         allowedMethods: [.squash], defaultMethod: .squash, base: "main", commitCount: 1, approvals: 0,
         tally: CheckTally(failing: 0, running: 1, total: 1), changesRequested: false)
@@ -921,7 +921,9 @@ private func mergeDetail(state: PRState? = .open, merge: MergeInfo? = nil) -> PR
     }
 
     @Test func mergeNeverUndoes() {
-        let changes: [EditChange] = [.merged(viewer: "pb"), .autoMerge(enabled: true, viewer: "pb")]
+        let changes: [EditChange] = [
+            .merged(viewer: "pb"), .autoMerge(enabled: true, viewer: "pb"), .draft(isDraft: false, viewer: "pb"),
+        ]
         for change in changes {
             #expect(change.inverse == change)
             #expect(change.keeping(SetChangeResult(addApplied: false, removeApplied: false, refusal: nil)) == change)
@@ -948,5 +950,135 @@ private func mergeDetail(state: PRState? = .open, merge: MergeInfo? = nil) -> PR
         #expect(none.isEmpty)
         o.reconcile(with: there, now: t0 + 30, holdingMerges: none)
         #expect(o.isEmpty)
+    }
+}
+
+private let k77 = editKey(77)
+
+private func linkedPR(_ number: Int, isDraft: Bool = false) -> LinkedPR {
+    LinkedPR(
+        key: editKey(number), title: "PR \(number)", url: URL(string: "https://github.com/o/r/pull/\(number)")!,
+        state: .open, author: "al", ci: .none, isDraft: isDraft)
+}
+
+@Suite struct DraftOverlayTests {
+    @Test func readyFlipsTheRowAndStampsReadyForReview() {
+        var o = EditOverrides()
+        o.record(.draft(isDraft: false, viewer: "pb"), on: k77, at: t0)
+        let shown = o.apply(to: editPR(77, isDraft: true))
+        #expect(!shown.isDraft)
+        #expect(shown.readyForReviewAt == t0)
+        #expect(o.apply(to: editSnapshot(mine: [editPR(77, isDraft: true)])).mine.first?.isDraft == false)
+        #expect(o.apply(to: editPR(78, isDraft: true)).isDraft)
+        #expect(o.apply(to: editIssue(77)) == editIssue(77))
+    }
+
+    @Test func convertFlipsTheRowAndKeepsReadyForReview() {
+        let earlier = t0 - 3600
+        var o = EditOverrides()
+        o.record(.draft(isDraft: true, viewer: "pb"), on: k77, at: t0)
+        let shown = o.apply(to: editPR(77, readyForReviewAt: earlier))
+        #expect(shown.isDraft)
+        #expect(shown.readyForReviewAt == earlier)
+    }
+
+    @Test func aFlipReachesMergeInfoAndLinkedPR() {
+        var o = EditOverrides()
+        o.record(.draft(isDraft: true, viewer: "pb"), on: k77, at: t0)
+        #expect(o.apply(toMerge: mergeInfo(), on: k77) == mergeInfo(isDraft: true))
+        #expect(o.apply(toMerge: mergeInfo(), on: editKey(78)) == mergeInfo())
+        #expect(o.apply(toMerge: nil, on: k77) == nil)
+        #expect(o.apply(toLinked: linkedPR(77)) == linkedPR(77, isDraft: true))
+        #expect(o.apply(toLinked: linkedPR(78)) == linkedPR(78))
+    }
+
+    // A read from before the second flip agrees with the first, and must not settle what's shown.
+    @Test func aStaleReadDoesNotDropTheNewerFlip() {
+        var o = EditOverrides()
+        o.record(.draft(isDraft: false, viewer: "pb"), on: k77, at: t0)
+        o.record(.draft(isDraft: true, viewer: "pb"), on: k77, at: t0 + 10)
+        // Only the newer flip is left: nothing stamps a ready event.
+        #expect(o.apply(to: editPR(77)).readyForReviewAt == nil)
+
+        o.reconcile(with: editSnapshot(mine: [editPR(77, readyForReviewAt: t0 + 5)]), now: t0 + 20)
+        #expect(!o.isEmpty)
+        let shown = o.apply(to: editPR(77))
+        #expect(shown.isDraft)
+        #expect(shown.readyForReviewAt == nil)
+    }
+
+    @Test func aDraftFlipDropsAutoMergeEntries() {
+        var o = EditOverrides()
+        o.record(.autoMerge(enabled: true, viewer: "pb"), on: k77, at: t0)
+        o.record(.autoMerge(enabled: true, viewer: "pb"), on: editKey(78), at: t0)
+        o.record(.draft(isDraft: true, viewer: "pb"), on: k77, at: t0 + 10)
+        #expect(o.apply(toMerge: mergeInfo(), on: k77) == mergeInfo(isDraft: true))
+        #expect(o.apply(toMerge: mergeInfo(), on: editKey(78))?.autoMerge == AutoMerge(enabledBy: "pb"))
+    }
+
+    // Marking ready keeps the review wait's start until GitHub's timeline has the ready event.
+    @Test func readyAgreesOnlyWithAFreshReadyEvent() {
+        var o = EditOverrides()
+        o.record(.draft(isDraft: false, viewer: "pb"), on: k77, at: t0)
+        o.reconcile(with: editSnapshot(mine: [editPR(77)]), now: t0 + 5)
+        #expect(!o.isEmpty)
+        o.reconcile(with: editSnapshot(mine: [editPR(77, readyForReviewAt: t0 - 600)]), now: t0 + 10)
+        #expect(!o.isEmpty)
+        // Every copy has to have moved on.
+        o.reconcile(
+            with: editSnapshot(mine: [editPR(77, readyForReviewAt: t0 - 30)], team: [editPR(77, isDraft: true)]),
+            now: t0 + 15)
+        #expect(!o.isEmpty)
+        o.reconcile(with: editSnapshot(mine: [editPR(77, readyForReviewAt: t0 - 30)]), now: t0 + 20)
+        #expect(o.isEmpty)
+
+        var convert = EditOverrides()
+        convert.record(.draft(isDraft: true, viewer: "pb"), on: k77, at: t0)
+        convert.reconcile(with: editSnapshot(mine: [editPR(77, isDraft: true)]), now: t0 + 10)
+        #expect(convert.isEmpty)
+    }
+
+    // A detail opened from search or a linked PR has no list copy: the detail decides.
+    @Test func aPrInNoListAgreesOnceTheDetailShowsIt() {
+        var o = EditOverrides()
+        o.record(.draft(isDraft: true, viewer: "pb"), on: k77, at: t0)
+
+        let held = o.mergesAhead(of: [k77: mergeDetail(merge: mergeInfo())])
+        #expect(held == [k77])
+        o.reconcile(with: editSnapshot(), now: t0 + 10, holdingMerges: held)
+        #expect(!o.isEmpty)
+
+        let none = o.mergesAhead(of: [k77: mergeDetail(merge: mergeInfo(isDraft: true))])
+        #expect(none.isEmpty)
+        o.reconcile(with: editSnapshot(), now: t0 + 20, holdingMerges: none)
+        #expect(o.isEmpty)
+    }
+
+    @Test func anAutoMergeAfterAFlipKeepsTheFlipHeld() {
+        var o = EditOverrides()
+        o.record(.draft(isDraft: false, viewer: "pb"), on: k77, at: t0)
+        o.record(.autoMerge(enabled: true, viewer: "pb"), on: k77, at: t0 + 10)
+        let set = mergeInfo(isDraft: true, autoMerge: AutoMerge(enabledBy: "pb"), canDisable: true)
+        #expect(o.mergesAhead(of: [k77: mergeDetail(merge: set)]) == [k77])
+    }
+
+    @Test func aClosedDetailDoesNotHoldAFlip() {
+        var o = EditOverrides()
+        o.record(.draft(isDraft: true, viewer: "pb"), on: k77, at: t0)
+        #expect(o.mergesAhead(of: [k77: mergeDetail(state: .closed, merge: mergeInfo())]).isEmpty)
+        #expect(o.mergesAhead(of: [k77: mergeDetail(state: .merged, merge: mergeInfo())]).isEmpty)
+        #expect(o.mergesAhead(of: [k77: mergeDetail()]).isEmpty)
+        // A detail cached before `state` was stored might still be open.
+        #expect(o.mergesAhead(of: [k77: mergeDetail(state: nil, merge: mergeInfo())]) == [k77])
+    }
+
+    @Test func landedReadsTheDetailsDraftState() {
+        let ready = EditChange.draft(isDraft: false, viewer: "pb")
+        #expect(MergeFlow.landed(ready, in: mergeDetail(merge: mergeInfo())))
+        #expect(!MergeFlow.landed(ready, in: mergeDetail(merge: mergeInfo(isDraft: true))))
+        #expect(!MergeFlow.landed(ready, in: mergeDetail()))
+        let convert = EditChange.draft(isDraft: true, viewer: "pb")
+        #expect(MergeFlow.landed(convert, in: mergeDetail(merge: mergeInfo(isDraft: true))))
+        #expect(!MergeFlow.landed(convert, in: mergeDetail(merge: mergeInfo())))
     }
 }
