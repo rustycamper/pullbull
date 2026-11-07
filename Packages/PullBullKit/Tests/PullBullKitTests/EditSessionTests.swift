@@ -247,6 +247,67 @@ private func status(_ key: PRKey, _ session: EditSession, in snapshot: Snapshot 
         #expect(s.failure == commentFailure)
     }
 
+    // MARK: Held lines
+
+    private func line(_ key: PRKey, _ text: String, stays: Bool = true) -> EditFailure {
+        EditFailure(text: text, url: url412, key: key, staysOnLeaving: stays)
+    }
+
+    @Test func heldLinesShowOneAtATimeOldestFirst() {
+        var s = EditSession()
+        s.showHeld([line(k412, "a"), line(k413, "b")])
+        #expect(s.failure?.text == "a")
+        s.dismissFailure()
+        #expect(s.failure?.text == "b")
+        s.dismissFailure()
+        #expect(s.failure == nil)
+    }
+
+    @Test func heldLinesWaitBehindOneAlreadyShowing() {
+        var s = EditSession()
+        s.showFailure(commentFailure)
+        s.showHeld([line(k413, "b")])
+        #expect(s.failure == commentFailure)
+        s.dismissFailure()
+        #expect(s.failure?.text == "b")
+    }
+
+    @Test func leavingAHeldLinesItemShowsTheNext() {
+        var s = EditSession()
+        s.showHeld([line(k412, "a", stays: false), line(k413, "b")])
+        s.dismissFailure(on: k412)
+        #expect(s.failure?.text == "b")
+    }
+
+    // A new write on an item makes a held line about it out of date.
+    @Test func startingAWriteDropsHeldLinesOnThatItem() {
+        var s = EditSession()
+        s.showHeld([line(k413, "a"), line(k412, "b")])
+        s.dismissFailure(startingOn: k412)
+        #expect(s.failure?.text == "a")
+        s.dismissFailure()
+        #expect(s.failure == nil)
+    }
+
+    @Test func aNewEditShowsTheNextHeldLine() {
+        var s = EditSession()
+        let k414 = editKey(414)
+        s.showHeld([line(k413, "a"), line(k412, "b"), line(k414, "c")])
+        _ = s.begin(move, on: k412, at: t0)
+        #expect(s.failure?.text == "c")
+    }
+
+    @Test func heldFailuresKeepOneLinePerItemOldestFirst() {
+        var held = HeldFailures()
+        held.hold(line(k412, "a"), for: "ann")
+        held.hold(line(k413, "b"), for: "ann")
+        held.hold(line(k412, "a2"), for: "ann")
+        held.hold(line(k412, "x"), for: "bob")
+        #expect(held.take(for: "ann").map(\.text) == ["b", "a2"])
+        #expect(held.take(for: "ann").isEmpty)
+        #expect(held.take(for: "bob").map(\.text) == ["x"])
+    }
+
     // MARK: Lines about a sent write
 
     private let sentLine = EditFailure(text: "Couldn't merge", url: url412, key: k412, staysOnLeaving: true)

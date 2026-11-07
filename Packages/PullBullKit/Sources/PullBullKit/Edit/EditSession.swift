@@ -25,6 +25,8 @@ public struct EditSession: Equatable, Sendable {
     /// Shown until dismissed or the next edit, or, unless it's about a sent write, until the viewer leaves
     /// the item it's about.
     public private(set) var failure: EditFailure?
+    /// Held lines waiting behind `failure`, oldest first. The next shows whenever `failure` goes.
+    private var waiting: [EditFailure] = []
     private var undo = EditUndo()
     /// The edit `begin` returned last; only its answer can arm ⌘Z.
     private var last: UUID?
@@ -36,6 +38,8 @@ public struct EditSession: Equatable, Sendable {
     /// Shows `change` at once. It becomes the last edit, so the one before can no longer be undone.
     public mutating func begin(_ change: EditChange, on key: PRKey, at now: Date, carrying copy: PullRequest? = nil) -> UUID {
         failure = nil
+        waiting.removeAll { $0.key == key }
+        showNextHeld()
         undo = EditUndo()
         let id = overrides.record(change, on: key, at: now, carrying: copy)
         last = id
@@ -110,19 +114,35 @@ public struct EditSession: Equatable, Sendable {
         self.failure = failure
     }
 
+    /// Lines held while their account wasn't running, shown one at a time, oldest first, behind any line
+    /// already showing.
+    public mutating func showHeld(_ lines: [EditFailure]) {
+        waiting += lines
+        showNextHeld()
+    }
+
     public mutating func dismissFailure() {
         failure = nil
+        showNextHeld()
     }
 
     /// The viewer left `key`: its line goes, unless it's about a sent write, which may not have been seen.
     /// One about another item stays too.
     public mutating func dismissFailure(on key: PRKey) {
         if let failure, failure.key == key, !failure.staysOnLeaving { self.failure = nil }
+        showNextHeld()
     }
 
-    /// A new write on `key` starts: the line goes, but a sent write's line about another item stays.
+    /// A new write on `key` starts: the line goes, but a sent write's line about another item stays. Held
+    /// lines about `key` are out of date and go too.
     public mutating func dismissFailure(startingOn key: PRKey) {
         if let failure, failure.key == key || !failure.staysOnLeaving { self.failure = nil }
+        waiting.removeAll { $0.key == key }
+        showNextHeld()
+    }
+
+    private mutating func showNextHeld() {
+        if failure == nil, !waiting.isEmpty { failure = waiting.removeFirst() }
     }
 
     /// Ends the edits `fetched` agrees with, but for reviews on `held` and merges on `heldMerges`. A fetch of
