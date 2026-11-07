@@ -167,21 +167,39 @@ final class OutsideClickMonitor {
     }
 }
 
-/// The detail's line on merging: why it can't be done here, what's missing, or the viewer's own auto-merge
-/// with **Cancel auto-merge**. Nothing while there's a Merge button or nothing to say.
+/// The detail's line on merging: why it can't be done here, what's missing, the viewer's own auto-merge
+/// with **Cancel auto-merge**, or a draft with **Ready for review**. Nothing while there's a Merge button or
+/// nothing to say.
 struct MergeSection: View {
     let model: AppModel
     let key: PRKey
     let webURL: URL
 
     var body: some View {
+        switch model.draftOffer(for: key) {
+        case .markReady(let autoMergeSet):
+            let text = autoMergeSet
+                ? "Draft, with auto-merge set. It can't merge until it's ready for review."
+                : "Draft. It can't be merged until it's ready for review."
+            let title = model.draftFlips.contains(key) ? "Marking ready…" : "Ready for review"
+            section(text, link: webURL, button: (title, model.canFlipDraft(on: key), { model.flipDraft(on: key) }))
+        case .permission(let permission):
+            if let note = permission.note(for: .draft) { section(note, link: link(for: permission)) }
+        case .convert, .hidden:
+            mergeBody
+        }
+    }
+
+    @ViewBuilder private var mergeBody: some View {
         switch model.mergeOffer(for: key) {
         case .reason(let text):
             section(text, link: webURL)
         case .permission(let permission):
             if let note = permission.note(for: .merge) { section(note, link: link(for: permission)) }
         case .cancelAutoMerge:
-            section("Merging by itself when its requirements pass.", link: webURL, cancels: true)
+            section(
+                "Merging by itself when its requirements pass.", link: webURL,
+                button: ("Cancel auto-merge", !model.isPostInFlight(for: key), { model.cancelAutoMerge(on: key) }))
         case .action, .waiting, .hidden:
             EmptyView()
         }
@@ -196,7 +214,10 @@ struct MergeSection: View {
         }
     }
 
-    private func section(_ text: String, link: URL?, cancels: Bool = false) -> some View {
+    /// `button` comes first on the row, before **Open on GitHub**.
+    private func section(
+        _ text: String, link: URL?, button: (title: String, enabled: Bool, action: () -> Void)? = nil
+    ) -> some View {
         DetailSection(title: "Merge") {
             DetailCard {
                 VStack(alignment: .leading, spacing: 4) {
@@ -204,10 +225,10 @@ struct MergeSection: View {
                         .font(.system(size: 12))
                         .fixedSize(horizontal: false, vertical: true)
                     HStack(spacing: 12) {
-                        if cancels {
-                            Button("Cancel auto-merge") { model.cancelAutoMerge(on: key) }
+                        if let button {
+                            Button(button.title, action: button.action)
                                 .buttonStyle(.link)
-                                .disabled(model.isPostInFlight(for: key))
+                                .disabled(!button.enabled)
                         }
                         if let link { Link("Open on GitHub", destination: link) }
                     }
