@@ -199,9 +199,9 @@ struct PRRow: View {
 
     private func metaLine(chips: RowChips, labels: LabelChipSet, fitting: ChipFit) -> some View {
         HStack(spacing: 5) {
-            if pr.isDraft { DraftPill().fixedSize() }
             RepoNumber(key: pr.key, showsRepo: showsRepo)
                 .layoutPriority(-1)
+            if pr.isDraft { DraftPill().fixedSize() }
             MetaDot()
             if chipTab != .mine && !fitting.lean {
                 Text(pr.author)
@@ -411,8 +411,11 @@ struct CIGlyph: View {
     }
 }
 
-/// A row's `repo #num` in the meta style, or `#num` where a repo header already names the repo. A long
-/// repo name truncates; the number never does, and stands out in medium weight.
+/// A row's number and repo in the meta style, or just `#num` where a repo header already names the repo.
+/// Two-line rows lead with the number (`#num repo`), so numbers line up down a list whatever the repo's
+/// length. Compact rows keep `repo #num`, which puts the number against the fixed-width age column, so it
+/// lines up there. The number never truncates and stands out in medium weight and the primary colour; a
+/// long repo name truncates.
 struct RepoNumber: View {
     let key: PRKey
     var showsRepo = true
@@ -421,15 +424,29 @@ struct RepoNumber: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            if showsRepo {
-                Text(key.repo.split(separator: "/").last.map(String.init) ?? key.repo)
-                    .lineLimit(1)
-                    .frame(maxWidth: compact ? 110 : nil)
-                    .layoutPriority(-1)
+            if compact {
+                repo
+                number
+            } else {
+                number
+                repo
             }
-            Text("#\(String(key.number))")
-                .fontWeight(.medium)
-                .fixedSize()
+        }
+    }
+
+    private var number: some View {
+        Text("#\(String(key.number))")
+            .fontWeight(.medium)
+            .foregroundStyle(.primary)
+            .fixedSize()
+    }
+
+    @ViewBuilder private var repo: some View {
+        if showsRepo {
+            Text(key.repo.split(separator: "/").last.map(String.init) ?? key.repo)
+                .lineLimit(1)
+                .frame(maxWidth: compact ? 110 : nil)
+                .layoutPriority(-1)
         }
     }
 }
