@@ -352,3 +352,55 @@ private final class GraphQLQueue: GraphQLTransport, @unchecked Sendable {
         }
     }
 }
+
+@Suite struct DraftAPITests {
+    @Test func markReadySendsTheNodeAndReturnsIsDraft() async throws {
+        let t = GraphQLQueue([#"{"data":{"markPullRequestReadyForReview":{"pullRequest":{"isDraft":false}}}}"#])
+        let isDraft = try await api(t).markReadyForReview(key, nodeID: "PR_1")
+        #expect(isDraft == false)
+        #expect((t.sent[0]["variables"] as? [String: Any])?["pr"] as? String == "PR_1")
+        #expect((t.sent[0]["query"] as? String)?.contains("markPullRequestReadyForReview") == true)
+    }
+
+    @Test func convertSendsTheNodeAndReturnsIsDraft() async throws {
+        let t = GraphQLQueue([#"{"data":{"convertPullRequestToDraft":{"pullRequest":{"isDraft":true}}}}"#])
+        let isDraft = try await api(t).convertToDraft(key, nodeID: "PR_1")
+        #expect(isDraft == true)
+        #expect((t.sent[0]["variables"] as? [String: Any])?["pr"] as? String == "PR_1")
+        #expect((t.sent[0]["query"] as? String)?.contains("convertPullRequestToDraft") == true)
+    }
+
+    @Test func anUnprocessableNullPayloadIsARefusal() async {
+        let t = GraphQLQueue([#"{"data":{"markPullRequestReadyForReview":null},"errors":[{"type":"UNPROCESSABLE","message":"Not a draft"}]}"#])
+        await #expect(throws: APIError.writeRefused("Not a draft")) {
+            _ = try await api(t).markReadyForReview(key, nodeID: "PR_1")
+        }
+    }
+
+    @Test func aForbiddenErrorWithNoDataIsARefusal() async {
+        let t = GraphQLQueue([#"{"errors":[{"type":"FORBIDDEN","message":"m"}]}"#])
+        await #expect(throws: APIError.writeRefused("m")) {
+            _ = try await api(t).convertToDraft(key, nodeID: "PR_1")
+        }
+    }
+
+    @Test func anInternalErrorStaysUnknown() async {
+        let t = GraphQLQueue([#"{"data":{"markPullRequestReadyForReview":null},"errors":[{"type":"INTERNAL","message":"Something went wrong"}]}"#])
+        do {
+            _ = try await api(t).markReadyForReview(key, nodeID: "PR_1")
+            Issue.record("sent")
+        } catch {
+            if case APIError.graphQL = error {} else { Issue.record("not graphQL: \(error)") }
+        }
+    }
+
+    @Test func aPayloadWithoutIsDraftStaysUnknown() async {
+        let t = GraphQLQueue([#"{"data":{"convertPullRequestToDraft":{"pullRequest":{}}}}"#])
+        do {
+            _ = try await api(t).convertToDraft(key, nodeID: "PR_1")
+            Issue.record("sent")
+        } catch {
+            if case APIError.graphQL = error {} else { Issue.record("not graphQL: \(error)") }
+        }
+    }
+}
