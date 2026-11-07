@@ -34,6 +34,18 @@ enum Mutations {
     }
     """
 
+    static let markReadyForReview = """
+    mutation($pr:ID!){
+      markPullRequestReadyForReview(input:{pullRequestId:$pr}){pullRequest{isDraft}}
+    }
+    """
+
+    static let convertToDraft = """
+    mutation($pr:ID!){
+      convertPullRequestToDraft(input:{pullRequestId:$pr}){pullRequest{isDraft}}
+    }
+    """
+
     static let deleteProjectItem = """
     mutation($project:ID!,$item:ID!){
       deleteProjectV2Item(input:{projectId:$project, itemId:$item}){deletedItemId}

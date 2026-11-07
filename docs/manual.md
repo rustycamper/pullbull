@@ -217,11 +217,25 @@ Approve a pull request or request changes on it from its detail. It goes out onl
 - **Not here:** line comments, suggested changes, a Comment verdict, dismissing a review. Merging is [its own step](#merging)
 - **Permissions:** the same Pull requests permission as reviewers and comments, so nothing new to accept. With a `gh` login, `repo` covers it
 
+## Drafts
+
+Mark a draft pull request ready for review, or turn an open one back into a draft, from its detail. Either way is one click, and the other undoes it.
+
+- **Who can:** the author of the pull request, or anyone with write access, once the detail has loaded. Anyone else sees nothing. Needs Sign in with GitHub's Pull requests permission or a `gh` login
+- **Where:** **Ready for review** is in the Merge section of a draft, which reads "Draft. It can't be merged until it's ready for review." (with auto-merge set: "Draft, with auto-merge set. It can't merge until it's ready for review."). **Convert to draft** is a link in the header of Reviewers on an open pull request, even when it has no reviewers. Hover it for what it does: it can't be merged until it's ready again
+- **One click:** no panel, no confirmation and no key. The label reads "Marking ready…" or "Converting…" and is disabled while it's on its way. Until GitHub says yes the state doesn't change; the comment field is read-only and Review and Merge are hidden, as during a merge. Both wait while the merge panel is open or a comment, review or merge is on its way
+- **Done:** the state, the rows in the lists and the Merge section follow at once, without flickering back while GitHub's reads catch up. A PR of yours can move between Your PRs and Waiting on others. Someone else's PR you convert leaves Review. Marking ready can notify the requested reviewers and code owners, which is the point. Your own click raises no **Review requested** notification
+- **Refused:** a line above the field says "Couldn't mark #88 ready for review: …" or "Couldn't convert #88 to draft: …" with GitHub's reason and **Open on GitHub**. Nothing on screen changes. The line stays until you dismiss it or make the next edit, even if you leave the PR
+- **Not sure:** after a timeout or a dropped connection PullBull reads the PR a few times. If it shows the new state, that counts. If not, the line says "Couldn't confirm #88 is ready for review. Check it on GitHub." or "Couldn't confirm #88 is a draft. Check it on GitHub." and stays until you dismiss it or make the next edit. Nothing is sent twice. Check on GitHub first
+- **Auto-merge:** converting a PR that has auto-merge set is allowed. GitHub turns its auto-merge off, so set it again after marking the PR ready
+- **Not here:** changing it from a row or for several PRs at once, opening a PR as a draft
+- **Permissions:** the same Pull requests permission as reviewers, comments and reviews, so nothing new to accept. If PullBull isn't installed here, or the install lacks Pull requests write, a draft shows a note in place of **Ready for review** ("Marking ready needs PullBull installed here." when not installed), and **Convert to draft** is hidden. With a `gh` login, `repo` covers it
+
 ## Merging
 
 Merge a pull request, or set it to merge by itself once its requirements pass, from its detail. Nothing merges without a deliberate second action, and it can't be taken back.
 
-- **Who can:** on an open pull request that isn't a draft, once the detail has loaded, with write access and Sign in with GitHub's Contents permission or a `gh` login. Without write access nothing is shown; without the Contents permission a note takes the button's place. Otherwise the detail says why not, with **Open on GitHub**: part of a stack, a merge queue, merge conflicts, behind the base branch, the branch's rules not met yet, or auto-merge set by someone else. Stacks and merge queues are merged on GitHub
+- **Who can:** on an open pull request that isn't a draft (a draft shows **Ready for review** instead, see [Drafts](#drafts)), once the detail has loaded, with write access and Sign in with GitHub's Contents permission or a `gh` login. Without write access nothing is shown; without the Contents permission a note takes the button's place. Otherwise the detail says why not, with **Open on GitHub**: part of a stack, a merge queue, merge conflicts, behind the base branch, the branch's rules not met yet, or auto-merge set by someone else. Stacks and merge queues are merged on GitHub
 - **Start:** <kbd>⌥</kbd><kbd>⌘</kbd><kbd>G</kbd>, or the **Merge** button in the bottom row, opens the merge panel above it. It works with the comment field focused, and does nothing on a PR with nothing to offer. The commit you see is pinned
 - **The panel:** what will happen as a sentence ("Squash and merge #88 into main"), the method when the repository allows more than one, and a summary: `3 commits · 2 approvals · 1 of 12 checks failing`. Warnings show in amber. What it shows is read when you open it and doesn't change while you look
 - **Method:** <kbd>⌥</kbd><kbd>←</kbd> <kbd>⌥</kbd><kbd>→</kbd>, or a click. Only the methods the repository and the branch's rules allow are offered, opening on your GitHub default. Where a branch's linear history comes from classic protection PullBull can't see it, so Merge commit stays offered and GitHub refuses it with its own reason
@@ -485,7 +499,7 @@ Reopen within a minute and the detail is still there.
 | | Status changed on the board | off |
 | | Closed or reopened | on |
 
-With Settings → General → Check my pending CI more often, CI failed and Ready to merge arrive within about 30 s while your checks run: for up to 5 of your PRs, for 20 minutes each, and not at a 1-minute refresh interval. Your own comments, moves, closes and merges made in PullBull never notify, nor does asking yourself or one of your teams to review. Several comments on one issue between refreshes make one notification ("3 new comments"). A dismissed review that also puts the PR back in Review notifies once, as the dismissal. Status changes count on the board the Board chip shows, as "In Progress → In Review"; moves the board's automation makes after a close or a merge don't notify, the close does.
+With Settings → General → Check my pending CI more often, CI failed and Ready to merge arrive within about 30 s while your checks run: for up to 5 of your PRs, for 20 minutes each, and not at a 1-minute refresh interval. Your own comments, moves, closes and merges made in PullBull never notify, nor does asking yourself or one of your teams to review. Review requested stays silent for about 15 minutes after you mark a pull request ready for review yourself, as GitHub may ask the code owners then. A re-request after that still notifies. Several comments on one issue between refreshes make one notification ("3 new comments"). A dismissed review that also puts the PR back in Review notifies once, as the dismissal. Status changes count on the board the Board chip shows, as "In Progress → In Review"; moves the board's automation makes after a close or a merge don't notify, the close does.
 
 Click a notification to open the detail.
 

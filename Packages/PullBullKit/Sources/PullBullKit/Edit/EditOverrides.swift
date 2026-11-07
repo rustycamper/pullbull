@@ -6,6 +6,8 @@ import Foundation
 /// so notifications keep comparing raw fetches.
 public struct EditOverrides: Equatable, Sendable {
     public static let lifetime: TimeInterval = 300
+    /// How far GitHub's clock may trail the Mac's, for a ready event stamped just before the edit was recorded.
+    private static let clockSkew: TimeInterval = 60
 
     private struct Entry: Equatable, Sendable {
         let id: UUID
@@ -13,7 +15,8 @@ public struct EditOverrides: Equatable, Sendable {
         let change: EditChange
         let madeAt: Date
         /// The pull request as it was when a reviewers edit was made, for Review to show it when the
-        /// viewer asks themselves before a fetch lists it there.
+        /// viewer asks themselves before a fetch lists it there; or when a draft flip was sent, to tell
+        /// whether marking it ready readies it now.
         let copy: PullRequest?
     }
 
@@ -24,9 +27,20 @@ public struct EditOverrides: Equatable, Sendable {
 
     public var isEmpty: Bool { entries.isEmpty }
 
-    /// `copy`: the pull request a reviewers edit is made on, as fetched.
+    /// `copy`: the pull request a reviewers edit is made on, as fetched, or a draft flip is sent on, as shown.
+    /// A draft flip replaces the PR's earlier flips, so a stale read agreeing with one can't settle it, and
+    /// its auto-merge edits, which would replay an auto-merge GitHub may have turned off since.
     @discardableResult
     public mutating func record(_ change: EditChange, on key: PRKey, at date: Date, carrying copy: PullRequest? = nil) -> UUID {
+        if case .draft = change {
+            entries.removeAll { entry in
+                guard entry.key == key else { return false }
+                switch entry.change {
+                case .draft, .autoMerge: return true
+                default: return false
+                }
+            }
+        }
         let id = UUID()
         entries.append(Entry(id: id, key: key, change: change, madeAt: date, copy: copy))
         return id
@@ -51,8 +65,8 @@ public struct EditOverrides: Equatable, Sendable {
 
     /// Drops each edit `fetched` agrees with, along with the older edits to the same item it replaced;
     /// each older than `lifetime`; and each Status edit to an option the board no longer has. A review on
-    /// a key in `held`, or a merge on a key in `heldMerges`, stays although `fetched` agrees, as its going
-    /// would uncover an older detail.
+    /// a key in `held`, or a merge, auto-merge or draft edit on a key in `heldMerges`, stays although
+    /// `fetched` agrees, as its going would uncover an older detail.
     public mutating func reconcile(
         with fetched: Snapshot, now: Date, holdingReviews held: Set<PRKey> = [], holdingMerges heldMerges: Set<PRKey> = []
     ) {
@@ -91,22 +105,36 @@ public struct EditOverrides: Equatable, Sendable {
         })
     }
 
-    /// The pull requests whose detail in `details` lacks the newest merge or auto-merge edit laid over it.
-    /// GitHub answers before its reads catch up, and no list says whether auto-merge is set. A detail that
-    /// is no longer open is never behind on auto-merge, as there's none left for it to show.
+    /// The pull requests whose detail in `details` lacks the newest merge or auto-merge edit, or the newest
+    /// draft flip, laid over it. GitHub answers before its reads catch up, and no list says whether
+    /// auto-merge is set. The newest flip is found apart from the merges, so an auto-merge set after a flip
+    /// can't end the flip's hold. A detail that is no longer open is never behind on auto-merge, as there's
+    /// none left for it to show, nor on a flip, as it has nothing left to merge; nor is one with no merge state.
     public func mergesAhead(of details: [PRKey: PRDetail]) -> Set<PRKey> {
         var newest: [PRKey: Entry] = [:]
-        for entry in entries where Self.isMerge(entry.change) { newest[entry.key] = entry }
-        return Set(newest.compactMap { key, entry -> PRKey? in
-            guard let detail = details[key] else { return nil }
-            switch entry.change {
-            case .merged: return detail.state == .merged ? nil : key
-            case .autoMerge(let enabled, _):
-                if let state = detail.state, state != .open { return nil }
-                return (detail.merge?.autoMerge != nil) == enabled ? nil : key
-            case .status, .labels, .assignees, .reviewers, .review: return nil
-            }
-        })
+        var newestFlip: [PRKey: Entry] = [:]
+        for entry in entries where Self.isMerge(entry.change) {
+            if case .draft = entry.change { newestFlip[entry.key] = entry } else { newest[entry.key] = entry }
+        }
+        return Set(newest.keys).union(newestFlip.keys).filter { key in
+            guard let detail = details[key] else { return false }
+            return [newest[key], newestFlip[key]].compactMap { $0 }.contains { Self.isAhead($0.change, of: detail) }
+        }
+    }
+
+    /// Whether `detail` doesn't show merge-type edit `change` yet.
+    private static func isAhead(_ change: EditChange, of detail: PRDetail) -> Bool {
+        switch change {
+        case .merged: return detail.state != .merged
+        case .autoMerge(let enabled, _):
+            if let state = detail.state, state != .open { return false }
+            return (detail.merge?.autoMerge != nil) != enabled
+        case .draft(let isDraft, _):
+            if let state = detail.state, state != .open { return false }
+            guard let merge = detail.merge else { return false }
+            return merge.isDraft != isDraft
+        case .status, .labels, .assignees, .reviewers, .review: return false
+        }
     }
 
     /// The pull requests with a direct merge laid over them, whose rows `TabBuilder` keeps in place until
@@ -178,13 +206,31 @@ public struct EditOverrides: Equatable, Sendable {
         }
     }
 
-    /// `info` on pull request `key` with the viewer's auto-merge edits laid over: the detail's own merge state.
+    /// `info` on pull request `key` with the viewer's auto-merge edits and draft flips laid over: the
+    /// detail's own merge state.
     public func apply(toMerge info: MergeInfo?, on key: PRKey) -> MergeInfo? {
         entries.reduce(info) { info, entry in
-            guard entry.key == key, case .autoMerge(let enabled, let viewer) = entry.change, var info else { return info }
-            info.autoMerge = enabled ? AutoMerge(enabledBy: viewer) : nil
-            info.canDisableAutoMerge = enabled
+            guard entry.key == key, var info else { return info }
+            switch entry.change {
+            case .autoMerge(let enabled, let viewer):
+                info.autoMerge = enabled ? AutoMerge(enabledBy: viewer) : nil
+                info.canDisableAutoMerge = enabled
+            case .draft(let isDraft, _):
+                info.isDraft = isDraft
+            default:
+                break
+            }
             return info
+        }
+    }
+
+    /// `pr`, a pull request linked from an issue's detail, with a draft flip laid over.
+    public func apply(toLinked pr: LinkedPR) -> LinkedPR {
+        entries.reduce(pr) { pr, entry in
+            guard entry.key == pr.key, case .draft(let isDraft, _) = entry.change else { return pr }
+            var pr = pr
+            pr.isDraft = isDraft
+            return pr
         }
     }
 
@@ -216,7 +262,7 @@ public struct EditOverrides: Equatable, Sendable {
             (issue.labels, issue.labelColors) = changeLabels(issue.labels, issue.labelColors, added, removed)
         case .assignees(let added, let removed):
             issue.assignees = changeAssignees(issue.assignees, added, removed)
-        case .reviewers, .review, .merged, .autoMerge:
+        case .reviewers, .review, .merged, .autoMerge, .draft:
             break
         }
         return issue
@@ -247,6 +293,10 @@ public struct EditOverrides: Equatable, Sendable {
         case .merged(let viewer):
             pr.state = .merged
             pr.mergedBy = viewer
+        case .draft(let isDraft, _):
+            pr.isDraft = isDraft
+            // Marking ready starts the review wait now, until GitHub's ready event arrives.
+            if readiesNow(entry) { pr.readyForReviewAt = entry.madeAt }
         }
         return pr
     }
@@ -385,12 +435,29 @@ public struct EditOverrides: Equatable, Sendable {
         case .autoMerge:
             // No list says; `mergesAhead` holds it until the detail does.
             return true
+        case .draft(let isDraft, _):
+            // As for a merge, a PR in no list agrees, and `mergesAhead` holds it until the detail does. Marking
+            // ready waits for the ready event too, or the review wait would jump back to the PR's full age.
+            return prs(in: fetched).allSatisfy { copy in
+                guard copy.key == entry.key else { return true }
+                guard copy.isDraft == isDraft else { return false }
+                guard readiesNow(entry) else { return true }
+                guard let ready = copy.readyForReviewAt else { return false }
+                return ready >= entry.madeAt - clockSkew
+            }
         }
+    }
+
+    /// Whether `entry` marks ready a pull request that was a draft when it was sent, or whose list copy
+    /// wasn't known. One already ready, which a stale detail can offer, keeps GitHub's ready time.
+    private static func readiesNow(_ entry: Entry) -> Bool {
+        guard case .draft(isDraft: false, _) = entry.change else { return false }
+        return entry.copy?.isDraft != false
     }
 
     private static func isMerge(_ change: EditChange) -> Bool {
         switch change {
-        case .merged, .autoMerge: true
+        case .merged, .autoMerge, .draft: true
         case .status, .labels, .assignees, .reviewers, .review: false
         }
     }
@@ -401,7 +468,7 @@ public struct EditOverrides: Equatable, Sendable {
     }
 
     /// Whether `newer` sets something `older` set: the Status, one of the same labels or people, or the
-    /// review, merge or auto-merge; a review also replaces an older request for the reviewer.
+    /// review, merge, auto-merge or draft flip; a review also replaces an older request for the reviewer.
     private static func overlaps(_ older: EditChange, _ newer: EditChange) -> Bool {
         func shared(_ a: [String], _ b: [String]) -> Bool {
             a.contains { name in b.contains { same($0, name) } }
@@ -415,7 +482,7 @@ public struct EditOverrides: Equatable, Sendable {
             return shared((a1 + r1).map(\.login), (a2 + r2).map(\.login))
         case (.reviewers(let a1, let r1), .reviewers(let a2, let r2)):
             return !Set((a1 + r1).map(\.key)).isDisjoint(with: (a2 + r2).map(\.key))
-        case (.review, .review), (.merged, .merged), (.autoMerge, .autoMerge):
+        case (.review, .review), (.merged, .merged), (.autoMerge, .autoMerge), (.draft, .draft):
             return true
         case (.reviewers(let added, let removed), .review(_, _, let viewer, _)):
             // GitHub drops the viewer's own request on a review, so an older self-add never agrees. An edit

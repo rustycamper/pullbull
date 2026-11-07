@@ -208,7 +208,7 @@ struct PRDetailView: View {
         let reviews = model.edits.overrides.apply(toReviews: detail.reviews, on: key)
         if let pr {
             reviewersSection(reviews: reviews, pr: pr, detail: detail)
-        } else if !reviews.isEmpty || detail.requests?.isEmpty == false {
+        } else if !reviews.isEmpty || detail.requests?.isEmpty == false || model.draftOffer(for: key) == .convert {
             reviewersSection(reviews: reviews, pr: nil, detail: detail)
         }
         checksSection(detail)
@@ -307,7 +307,8 @@ struct PRDetailView: View {
         return text.isEmpty ? nil : text.joined(separator: " · ")
     }
 
-    /// Clickable where the reviewers can be changed, with the picker anchored on the card.
+    /// Clickable where the reviewers can be changed, with the picker anchored on the card. **Convert to draft**
+    /// sits in the header, outside the card's button, so its click doesn't open the picker.
     @ViewBuilder
     private func reviewersSection(reviews: [Review], pr: PullRequest?, detail: PRDetail? = nil) -> some View {
         let entries = ReviewerEntry.entries(
@@ -324,7 +325,7 @@ struct PRDetailView: View {
                 }
             }
         }
-        DetailSection(title: "Reviewers") {
+        DetailSection(title: "Reviewers", stacksAccessory: true) {
             if model.isReviewersOffered(for: key) {
                 Button { model.openSetPicker(.reviewers, for: key) } label: {
                     card.contentShape(Rectangle())
@@ -335,6 +336,20 @@ struct PRDetailView: View {
                 .editPickerAnchor(for: key, field: .reviewers, model: model)
             } else {
                 card
+            }
+        } accessory: {
+            if model.draftOffer(for: key) == .convert {
+                let enabled = model.canFlipDraft(on: key)
+                Button(model.draftFlips.contains(key) ? "Converting…" : "Convert to draft") {
+                    model.flipDraft(on: key)
+                }
+                .buttonStyle(.link)
+                .font(.system(size: 11))
+                .foregroundStyle(enabled ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                .lineLimit(1)
+                .fixedSize()
+                .disabled(!enabled)
+                .help("Marks it as still in progress. It can't be merged until it's ready again.")
             }
         }
     }

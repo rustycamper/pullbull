@@ -25,7 +25,7 @@ public enum MergeFlow {
     public static let unknownReads = 3
     public static let unknownReadGap: Duration = .seconds(2)
 
-    private static let notReachable = "PullBull can't reach this repository. Add it to the install on GitHub."
+    static let notReachable = "PullBull can't reach this repository. Add it to the install on GitHub."
 
     @MainActor public static func run(
         shown: MergeFacts, isCancelled: () -> Bool,
@@ -76,7 +76,8 @@ public enum MergeFlow {
     }
 
     /// Whether `detail` shows what was sent, when GitHub's answer didn't say. An auto-merge can land at once,
-    /// so a merged PR counts for it too. Only the viewer's own request counts as theirs.
+    /// so a merged PR counts for it too. Only the viewer's own request counts as theirs. A draft flip landed
+    /// when the detail's merge state shows it.
     public static func landed(_ sent: EditChange, in detail: PRDetail) -> Bool {
         switch sent {
         case .merged:
@@ -85,6 +86,8 @@ public enum MergeFlow {
             if detail.state == .merged { return true }
             guard detail.state == .open, let name = detail.merge?.autoMerge?.enabledBy else { return false }
             return name.caseInsensitiveCompare(viewer) == .orderedSame
+        case .draft(let isDraft, _):
+            return detail.merge?.isDraft == isDraft
         case .status, .labels, .assignees, .reviewers, .review, .autoMerge:
             return false
         }

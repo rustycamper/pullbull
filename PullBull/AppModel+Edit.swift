@@ -268,7 +268,7 @@ extension AppModel {
                 case .status:
                     added = try await StatusEditor(api: client).apply(
                         change, on: key, itemId: itemId, contentId: contentId, board: board)
-                case .review, .merged, .autoMerge:
+                case .review, .merged, .autoMerge, .draft:
                     break
                 case .labels, .assignees, .reviewers:
                     let result = try await SetEditor(api: client).apply(change, on: key, contentId: contentId)

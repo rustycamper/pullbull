@@ -50,10 +50,13 @@ public struct IssueEvent: Equatable, Sendable {
 
 public enum ChangeDetector {
     /// `filters` are the Review tab's: a review request on a PR the tab hides doesn't notify. `mergedHere`
-    /// are the pull requests merged from PullBull this session, which don't notify.
+    /// are the pull requests merged from PullBull this session, which don't notify. `readiedHere` are those
+    /// marked ready from PullBull: GitHub may request the viewer's review at that moment (code owners), and
+    /// that request is their own click.
     public static func events(
         old: Snapshot?, new: Snapshot, me: String, myTeams: Set<String>, toggles: NotificationToggles,
-        filters: ReviewFilters = .none, mergedHere: Set<PRKey> = [], now: Date = Date()
+        filters: ReviewFilters = .none, mergedHere: Set<PRKey> = [], readiedHere: Set<PRKey> = [],
+        now: Date = Date()
     ) -> [PREvent] {
         guard let old else { return [] }
         var result: [PREvent] = []
@@ -64,7 +67,7 @@ public enum ChangeDetector {
             let before = Dictionary(old.reviewCandidates.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
             let since = old.fetchedAt.addingTimeInterval(-reviewRequestLag)
             let said = Set(dismissed.map(\.pr.key))
-            for pr in new.reviewCandidates where filters.keeps(pr, now: now) && !said.contains(pr.key) {
+            for pr in new.reviewCandidates where filters.keeps(pr, now: now) && !said.contains(pr.key) && !readiedHere.contains(pr.key) {
                 guard let reason = ReviewRules.status(of: pr, me: me, myTeams: myTeams).reviewReason else { continue }
                 if let prev = before[pr.key] {
                     if ReviewRules.status(of: prev, me: me, myTeams: myTeams).reviewReason != nil { continue }
@@ -141,6 +144,9 @@ public enum ChangeDetector {
     /// request (closed and reopened, or missing from one poll) stays silent; so does a first-time request
     /// the search shows more than this late.
     public static let reviewRequestLag: TimeInterval = 600
+
+    /// How long the app keeps a PR in `readiedHere`: the edit's override lifetime plus the request lag.
+    public static let readiedHereWindow: TimeInterval = EditOverrides.lifetime + reviewRequestLag
 
     /// When the reason `pr` needs my review arose: the newest pending request to me or to a team of mine,
     /// or the head commit for new commits since my review. Nil when unknown, which notifies as before.

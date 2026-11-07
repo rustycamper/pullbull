@@ -313,8 +313,8 @@ public struct LinkedPR: Codable, Sendable, Hashable {
     /// "ghost" for a deleted author.
     public let author: String
     public let ci: CIState
-    /// False in details cached before it was stored.
-    public let isDraft: Bool
+    /// False in details cached before it was stored. Set by edit overrides too.
+    public internal(set) var isDraft: Bool
 
     public var glyph: PRGlyph { PRGlyph(state: state, isDraft: isDraft) }
 
@@ -858,11 +858,38 @@ public struct GitHubAPI: Sendable {
     private func autoMergeMutation(_ mutation: String, _ variables: [String: Any], payload: String) async throws {
         let (data, errors) = try await executeReportingErrors(mutation, variables)
         if data[payload] is [String: Any] { return }
+        throw Self.mutationFailure(errors)
+    }
+
+    /// Marks the pull request node ready for review and returns the `isDraft` GitHub answers with. Refusals
+    /// follow `autoMergeMutation`'s rules.
+    public func markReadyForReview(_ key: PRKey, nodeID: String) async throws -> Bool {
+        try await draftMutation(Mutations.markReadyForReview, nodeID: nodeID, payload: "markPullRequestReadyForReview")
+    }
+
+    /// Converts the pull request node to a draft and returns the `isDraft` GitHub answers with. Refusals
+    /// follow `autoMergeMutation`'s rules.
+    public func convertToDraft(_ key: PRKey, nodeID: String) async throws -> Bool {
+        try await draftMutation(Mutations.convertToDraft, nodeID: nodeID, payload: "convertPullRequestToDraft")
+    }
+
+    /// Sends a draft-state mutation and reads `isDraft` from its payload. A payload without a Boolean
+    /// `isDraft` is `graphQL`, or a refusal when the errors say so, as the outcome is then unknown.
+    private func draftMutation(_ mutation: String, nodeID: String, payload: String) async throws -> Bool {
+        let (data, errors) = try await executeReportingErrors(mutation, ["pr": nodeID])
+        let pullRequest = (data[payload] as? [String: Any])?["pullRequest"] as? [String: Any]
+        if let isDraft = pullRequest?["isDraft"] as? Bool { return isDraft }
+        throw Self.mutationFailure(errors)
+    }
+
+    /// The error for a mutation whose payload is missing: `writeRefused` when any error is `UNPROCESSABLE`
+    /// or `FORBIDDEN`, else `graphQL`.
+    private static func mutationFailure(_ errors: [[String: Any]]) -> APIError {
         let message = errors.first?["message"] as? String ?? "GitHub didn't apply the change"
         if errors.contains(where: { ["UNPROCESSABLE", "FORBIDDEN"].contains($0["type"] as? String) }) {
-            throw APIError.writeRefused(message)
+            return .writeRefused(message)
         }
-        throw APIError.graphQL(message)
+        return .graphQL(message)
     }
 
     /// The state a `merge-async` body names. A pending request needs a uuid, from `details` or `uuid`.

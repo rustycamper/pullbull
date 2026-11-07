@@ -57,7 +57,7 @@ This would be a failure even if it technically worked:
 
 ## What can be done
 
-A PR gets the Merge section only if it's open, not a draft, and the viewer has write access. Without those, nothing is shown: no button, no reason. The first row that applies decides:
+A PR gets the Merge section only if it's open, not a draft (a draft gets Ready for review instead, see `2026-11-07-draft-and-ready-design.md`), and the viewer has write access. Without those, nothing is shown: no button, no reason. The first row that applies decides:
 
 | Situation | Offered | Line in the detail |
 |---|---|---|

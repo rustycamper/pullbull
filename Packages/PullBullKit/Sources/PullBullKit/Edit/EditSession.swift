@@ -52,9 +52,10 @@ public struct EditSession: Equatable, Sendable {
         overrides.drop(id)
     }
 
-    /// Shows a merge or an auto-merge change at once. Unlike `begin` it leaves ⌘Z and the failure line alone.
-    public mutating func recordMerge(_ change: EditChange, on key: PRKey, at now: Date) -> UUID {
-        overrides.record(change, on: key, at: now)
+    /// Shows a merge, auto-merge or draft change at once. Unlike `begin` it leaves ⌘Z and the failure line
+    /// alone. `copy`: a draft flip's pull request as shown when it was sent.
+    public mutating func recordMerge(_ change: EditChange, on key: PRKey, at now: Date, carrying copy: PullRequest? = nil) -> UUID {
+        overrides.record(change, on: key, at: now, carrying: copy)
     }
 
     /// Takes a merge back off the screen, as when GitHub refused it. The failure line is the caller's.

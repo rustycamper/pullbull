@@ -222,9 +222,11 @@ struct IssueDetailView: View {
                 DetailCard { EmptyLine(text: "No linked pull requests") }
             }
         } else {
+            // A draft flipped from here shows on its chip before the issue's detail is read again.
+            let shown = prs.map(model.edits.overrides.apply(toLinked:))
             DetailSection(title: "Linked pull requests", summary: String(prs.count)) {
                 DetailCard {
-                    ForEach(Array(prs.enumerated()), id: \.element.key) { index, pr in
+                    ForEach(Array(shown.enumerated()), id: \.element.key) { index, pr in
                         if index > 0 { CardDivider() }
                         LinkedPRLine(pr: pr) { model.openDetail(pr.key) }
                     }
