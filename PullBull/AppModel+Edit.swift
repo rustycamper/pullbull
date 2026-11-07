@@ -257,7 +257,8 @@ extension AppModel {
         let board = snapshot?.boardIds
         let before = shownListKeys()
         let copy: PullRequest? = if case .reviewers = change { fetchedPullRequest(for: key) } else { nil }
-        let id = edits.begin(change, on: key, at: Date(), carrying: copy)
+        let edited: BoardIssue? = if case .status = change { held } else { nil }
+        let id = edits.begin(change, on: key, at: Date(), carrying: copy, issue: edited)
         refreshShown()
         followEditedRow(key, from: before)
         let client = api(for: account)

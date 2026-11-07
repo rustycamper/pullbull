@@ -18,6 +18,9 @@ public struct EditOverrides: Equatable, Sendable {
         /// viewer asks themselves before a fetch lists it there; or when a draft flip was sent, to tell
         /// whether marking it ready readies it now.
         let copy: PullRequest?
+        /// The issue as shown when a Status edit was made, for the board to show it on when no list
+        /// has it, as when it was created since the last fetch.
+        let issue: BoardIssue?
     }
 
     /// In the order the edits were made, which is the order they apply in.
@@ -28,10 +31,13 @@ public struct EditOverrides: Equatable, Sendable {
     public var isEmpty: Bool { entries.isEmpty }
 
     /// `copy`: the pull request a reviewers edit is made on, as fetched, or a draft flip is sent on, as shown.
+    /// `issue`: the issue a Status edit is made on, as shown.
     /// A draft flip replaces the PR's earlier flips, so a stale read agreeing with one can't settle it, and
     /// its auto-merge edits, which would replay an auto-merge GitHub may have turned off since.
     @discardableResult
-    public mutating func record(_ change: EditChange, on key: PRKey, at date: Date, carrying copy: PullRequest? = nil) -> UUID {
+    public mutating func record(
+        _ change: EditChange, on key: PRKey, at date: Date, carrying copy: PullRequest? = nil, issue: BoardIssue? = nil
+    ) -> UUID {
         if case .draft = change {
             entries.removeAll { entry in
                 guard entry.key == key else { return false }
@@ -42,7 +48,7 @@ public struct EditOverrides: Equatable, Sendable {
             }
         }
         let id = UUID()
-        entries.append(Entry(id: id, key: key, change: change, madeAt: date, copy: copy))
+        entries.append(Entry(id: id, key: key, change: change, madeAt: date, copy: copy, issue: issue))
         return id
     }
 
@@ -59,7 +65,8 @@ public struct EditOverrides: Equatable, Sendable {
             entries.remove(at: index)
         } else {
             let old = entries[index]
-            entries[index] = Entry(id: old.id, key: old.key, change: change, madeAt: old.madeAt, copy: old.copy)
+            entries[index] = Entry(
+                id: old.id, key: old.key, change: change, madeAt: old.madeAt, copy: old.copy, issue: old.issue)
         }
     }
 
@@ -153,7 +160,7 @@ public struct EditOverrides: Equatable, Sendable {
         var shown = snapshot
         for entry in entries {
             if case .status(_, let to, let placement) = entry.change {
-                Self.place(entry.key, status: to, placement: placement, in: &shown)
+                Self.place(entry.key, status: to, placement: placement, edited: entry.issue, in: &shown)
                 continue
             }
             shown.boardIssues = shown.boardIssues.map { Self.change($0, entry) }
@@ -349,15 +356,17 @@ public struct EditOverrides: Equatable, Sendable {
 
     // MARK: Lists
 
-    /// Moves the card to `status`; adds it to the board from the first other copy for `.added`, and
-    /// takes it off for `.removed`.
-    private static func place(_ key: PRKey, status: BoardStatusValue?, placement: BoardPlacement, in shown: inout Snapshot) {
+    /// Moves the card to `status`; adds it to the board for `.added`, from the first other copy or else
+    /// `edited`, and takes it off for `.removed`.
+    private static func place(
+        _ key: PRKey, status: BoardStatusValue?, placement: BoardPlacement, edited: BoardIssue?, in shown: inout Snapshot
+    ) {
         switch placement {
         case .removed:
             shown.boardIssues.removeAll { $0.key == key }
         case .added where !shown.boardIssues.contains(where: { $0.key == key }):
             let others = (shown.assignedIssues ?? []) + (shown.createdIssues ?? []) + (shown.closedIssues ?? [])
-            guard var issue = others.first(where: { $0.key == key }) else { return }
+            guard var issue = others.first(where: { $0.key == key }) ?? edited else { return }
             issue.status = status
             shown.boardIssues.append(issue)
         case .added, .already:
