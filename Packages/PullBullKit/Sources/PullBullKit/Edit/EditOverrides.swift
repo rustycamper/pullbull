@@ -15,7 +15,8 @@ public struct EditOverrides: Equatable, Sendable {
         let change: EditChange
         let madeAt: Date
         /// The pull request as it was when a reviewers edit was made, for Review to show it when the
-        /// viewer asks themselves before a fetch lists it there.
+        /// viewer asks themselves before a fetch lists it there; or when a draft flip was sent, to tell
+        /// whether marking it ready readies it now.
         let copy: PullRequest?
     }
 
@@ -26,9 +27,9 @@ public struct EditOverrides: Equatable, Sendable {
 
     public var isEmpty: Bool { entries.isEmpty }
 
-    /// `copy`: the pull request a reviewers edit is made on, as fetched. A draft flip replaces the PR's earlier
-    /// flips, so a stale read agreeing with one can't settle it, and its auto-merge edits, which would replay
-    /// an auto-merge GitHub may have turned off since.
+    /// `copy`: the pull request a reviewers edit is made on, as fetched, or a draft flip is sent on, as shown.
+    /// A draft flip replaces the PR's earlier flips, so a stale read agreeing with one can't settle it, and
+    /// its auto-merge edits, which would replay an auto-merge GitHub may have turned off since.
     @discardableResult
     public mutating func record(_ change: EditChange, on key: PRKey, at date: Date, carrying copy: PullRequest? = nil) -> UUID {
         if case .draft = change {
@@ -295,7 +296,7 @@ public struct EditOverrides: Equatable, Sendable {
         case .draft(let isDraft, _):
             pr.isDraft = isDraft
             // Marking ready starts the review wait now, until GitHub's ready event arrives.
-            if !isDraft { pr.readyForReviewAt = entry.madeAt }
+            if readiesNow(entry) { pr.readyForReviewAt = entry.madeAt }
         }
         return pr
     }
@@ -440,11 +441,18 @@ public struct EditOverrides: Equatable, Sendable {
             return prs(in: fetched).allSatisfy { copy in
                 guard copy.key == entry.key else { return true }
                 guard copy.isDraft == isDraft else { return false }
-                if isDraft { return true }
+                guard readiesNow(entry) else { return true }
                 guard let ready = copy.readyForReviewAt else { return false }
                 return ready >= entry.madeAt - clockSkew
             }
         }
+    }
+
+    /// Whether `entry` marks ready a pull request that was a draft when it was sent, or whose list copy
+    /// wasn't known. One already ready, which a stale detail can offer, keeps GitHub's ready time.
+    private static func readiesNow(_ entry: Entry) -> Bool {
+        guard case .draft(isDraft: false, _) = entry.change else { return false }
+        return entry.copy?.isDraft != false
     }
 
     private static func isMerge(_ change: EditChange) -> Bool {

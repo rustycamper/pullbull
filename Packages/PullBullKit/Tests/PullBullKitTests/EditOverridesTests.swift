@@ -1007,6 +1007,24 @@ private func linkedPR(_ number: Int, isDraft: Bool = false) -> LinkedPR {
         #expect(shown.readyForReviewAt == nil)
     }
 
+    // A stale detail can offer Ready on a PR readied long ago: its rows keep GitHub's ready time.
+    @Test func readyOnAnAlreadyReadyPRKeepsItsReadyTimeAndSettles() {
+        let long = t0 - 86_400
+        let ready = editPR(77, readyForReviewAt: long)
+        var o = EditOverrides()
+        o.record(.draft(isDraft: false, viewer: "pb"), on: k77, at: t0, carrying: ready)
+        #expect(o.apply(to: ready).readyForReviewAt == long)
+        o.reconcile(with: editSnapshot(mine: [ready]), now: t0 + 10)
+        #expect(o.isEmpty)
+
+        // A copy that was a draft still starts the wait now, and waits for the ready event.
+        var fromDraft = EditOverrides()
+        fromDraft.record(.draft(isDraft: false, viewer: "pb"), on: k77, at: t0, carrying: editPR(77, isDraft: true))
+        #expect(fromDraft.apply(to: ready).readyForReviewAt == t0)
+        fromDraft.reconcile(with: editSnapshot(mine: [ready]), now: t0 + 10)
+        #expect(!fromDraft.isEmpty)
+    }
+
     @Test func aDraftFlipDropsAutoMergeEntries() {
         var o = EditOverrides()
         o.record(.autoMerge(enabled: true, viewer: "pb"), on: k77, at: t0)

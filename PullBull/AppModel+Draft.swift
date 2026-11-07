@@ -41,6 +41,9 @@ extension AppModel {
         let flip = PendingMerge(
             key: key, change: .draft(isDraft: toDraft, viewer: account.login), account: account,
             url: mergeURL(for: key), sent: true)
+        // As shown before anything is sent, a flip made just before included: marking ready a PR already
+        // ready keeps its ready time.
+        let copy = pullRequest(for: key)
         let client = api(for: account)
         Task { [weak self] in
             let result = await DraftFlow.run(
@@ -52,13 +55,13 @@ extension AppModel {
                 },
                 read: { try await client.detail(key) },
                 sleep: { duration in try await Task.sleep(for: duration) })
-            self?.draftAnswered(flip, result.outcome, read: result.read)
+            self?.draftAnswered(flip, result.outcome, read: result.read, copy: copy)
         }
     }
 
     /// With another account running, nothing is stored or shown for the sending one: `settleMerge` and
     /// `mergeFailed` release its slot and hold its line, and its next refresh and detail load show the flip.
-    private func draftAnswered(_ flip: PendingMerge, _ outcome: DraftOutcome, read: PRDetail?) {
+    private func draftAnswered(_ flip: PendingMerge, _ outcome: DraftOutcome, read: PRDetail?, copy: PullRequest?) {
         let key = flip.key
         let runs = runningAccount == flip.account
         // `clearAccountData` emptied these on a switch, so with another account running they're its own.
@@ -69,7 +72,7 @@ extension AppModel {
         case .done:
             guard settleMerge(flip) else { return }
             let before = shownListKeys()
-            _ = edits.recordMerge(flip.change, on: key, at: Date())
+            _ = edits.recordMerge(flip.change, on: key, at: Date(), carrying: copy)
             refreshShown()
             followEditedRow(key, from: before)
             // The window counts from GitHub's answer.
