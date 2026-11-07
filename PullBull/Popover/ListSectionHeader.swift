@@ -97,7 +97,10 @@ struct ListSectionHeader: View {
                     .frame(width: compact ? 16 : 20)
             }
             HStack(spacing: 6) {
+                // The title in the label colour stands apart from the rows' grey meta lines; the count, note
+                // and trailing text stay quiet.
                 Text(title)
+                    .foregroundStyle(Color.primary)
                 if let count {
                     Text("\(count)")
                         .fontWeight(.medium)
