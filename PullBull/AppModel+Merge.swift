@@ -124,10 +124,10 @@ extension AppModel {
         fetchedPullRequest(for: key)?.url ?? GitHubLinks.pullRequest(key)
     }
 
-    /// The running account's line from a merge that was answered while another account ran.
+    /// The running account's lines from merges and flips answered while another account ran, one at a time.
     func showHeldMergeLine() {
-        guard let login = runningAccount?.login, let line = heldMergeLines.removeValue(forKey: login) else { return }
-        edits.showFailure(line)
+        guard let login = runningAccount?.login else { return }
+        edits.showHeld(heldMergeLines.take(for: login))
     }
 }
 
@@ -340,7 +340,7 @@ extension AppModel {
     func mergeFailed(_ merge: PendingMerge, _ text: String, dropsOverlay: Bool, reloads: Bool) {
         let failure = EditFailure(text: text, url: merge.url, key: merge.key, staysOnLeaving: merge.sent)
         guard settleMerge(merge) else {
-            heldMergeLines[merge.account.login] = failure
+            heldMergeLines.hold(failure, for: merge.account.login)
             return
         }
         if dropsOverlay { dropMergeOverlay(merge) }

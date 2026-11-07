@@ -134,9 +134,9 @@ final class AppModel {
     @ObservationIgnored var mergeTask: Task<Void, Never>?
     /// The confirm `mergeTask` is checking, whose slot closing the panel releases. Nil once it sends.
     @ObservationIgnored var confirmingMerge: PendingMerge?
-    /// A merge's failure or unknown line per login, whose answer landed with another account running. Shown
-    /// when that account runs again, so account changes keep it.
-    @ObservationIgnored var heldMergeLines: [String: EditFailure] = [:]
+    /// Merge and draft flip failure or unknown lines whose answer landed with another account running, per
+    /// login and item. Shown one at a time when that account runs again, so account changes keep them.
+    @ObservationIgnored var heldMergeLines = HeldFailures()
     /// Details on screen being read again for their merge state, by key; true for a read after a review
     /// (see `rereadMergeState`).
     @ObservationIgnored var mergeRereads: [PRKey: Bool] = [:]
