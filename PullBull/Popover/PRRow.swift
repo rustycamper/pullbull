@@ -414,8 +414,8 @@ struct CIGlyph: View {
 /// A row's number and repo in the meta style, or just `#num` where a repo header already names the repo.
 /// Two-line rows lead with the number (`#num repo`), so numbers line up down a list whatever the repo's
 /// length. Compact rows keep `repo #num`, which puts the number against the fixed-width age column, so it
-/// lines up there. The number never truncates and stands out in medium weight and the primary colour; a
-/// long repo name truncates.
+/// lines up there. The number never truncates and stands out in medium weight, in the meta line's grey so
+/// the title stays the row's one bright line; a long repo name truncates.
 struct RepoNumber: View {
     let key: PRKey
     var showsRepo = true
@@ -437,7 +437,6 @@ struct RepoNumber: View {
     private var number: some View {
         Text("#\(String(key.number))")
             .fontWeight(.medium)
-            .foregroundStyle(.primary)
             .fixedSize()
     }
 
