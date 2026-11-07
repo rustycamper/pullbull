@@ -27,9 +27,12 @@ private func snap(review: [PullRequest] = [], mine: [PullRequest] = [], at: Date
 }
 
 private func events(
-    _ old: Snapshot?, _ new: Snapshot, toggles: NotificationToggles = .init(), mergedHere: Set<PRKey> = []
+    _ old: Snapshot?, _ new: Snapshot, toggles: NotificationToggles = .init(), mergedHere: Set<PRKey> = [],
+    readiedHere: Set<PRKey> = [], myTeams: Set<String> = []
 ) -> [PREvent] {
-    ChangeDetector.events(old: old, new: new, me: "me", myTeams: [], toggles: toggles, mergedHere: mergedHere)
+    ChangeDetector.events(
+        old: old, new: new, me: "me", myTeams: myTeams, toggles: toggles, mergedHere: mergedHere,
+        readiedHere: readiedHere)
 }
 
 @Suite struct ChangeDetectorTests {
@@ -879,5 +882,44 @@ private func boardSnap(
         #expect(issue?.statusMoves.last?.isOn(project: 3, owner: "O") == true)
         #expect(issue?.lastReopen?.actor == "dev-c")
         #expect(Queries.issueSearch(withAssignment: false, withActivity: true).contains("PROJECT_V2_ITEM_STATUS_CHANGED_EVENT"))
+    }
+}
+
+// MARK: - Marked ready here
+
+@Suite struct ReadiedHereTests {
+    private let key = PRKey(repo: "r", number: 1)
+    private var before: Snapshot { snap(review: [pr(1, draft: true)], at: now) }
+
+    private func after(_ request: Reviewer, _ id: String) -> Snapshot {
+        let at = now.addingTimeInterval(30)
+        return snap(review: [pr(1, requests: [request], requestedAt: [id: at])], at: now.addingTimeInterval(60))
+    }
+
+    @Test func aPRMarkedReadyHereRaisesNoReviewRequested() {
+        let ready = after(.user("me"), Reviewer.user("me").key)
+        #expect(events(before, ready, readiedHere: []).map(\.kind) == [.reviewRequested])
+        #expect(events(before, ready, readiedHere: [key]).isEmpty)
+    }
+
+    @Test func aTeamRequestOnReadyIsSilencedToo() {
+        let team = Reviewer.team(slug: "core", name: "core")
+        let ready = after(team, team.key)
+        #expect(events(before, ready, myTeams: ["core"]).map(\.kind) == [.reviewRequested])
+        #expect(events(before, ready, readiedHere: [key], myTeams: ["core"]).isEmpty)
+    }
+
+    @Test func readiedHereWindowIsFifteenMinutes() {
+        #expect(ChangeDetector.readiedHereWindow == EditOverrides.lifetime + ChangeDetector.reviewRequestLag)
+        #expect(ChangeDetector.readiedHereWindow == 900)
+    }
+
+    @Test func readiedHereLeavesReadyToMergeAlone() {
+        var on = NotificationToggles()
+        on.readyToMerge = true
+        let approval = Review(author: "bob", state: .approved, submittedAt: now)
+        let waiting = snap(mine: [pr(1, author: "me", ci: .pending, reviews: [approval])])
+        let ready = snap(mine: [pr(1, author: "me", ci: .success, reviews: [approval])])
+        #expect(events(waiting, ready, toggles: on, readiedHere: [key]).map(\.kind) == [.readyToMerge])
     }
 }
