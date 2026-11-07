@@ -78,7 +78,7 @@ One list in sections, scoped by chips above it. It opens on All, or on the choic
 | Team | Other open PRs in the org, not the ones in Needs you. Group by author: Settings → General. No chip without an org |
 
 - **Chips:** click one to scope the list, click it again for All, or press <kbd>←</kbd> <kbd>→</kbd>. Each shows its count (Needs you in the accent colour when above zero); the counts ignore the repo and time focus
-- **Not grouped by repo:** All and Mine are grouped by their sections, and each row names its repo (`widgets #1305`). Needs you and Team group by repo, or by author for Team, as before
+- **Not grouped by repo:** All and Mine are grouped by their sections, and each row names its repo after the number (`#1305 widgets`). Needs you and Team group by repo, or by author for Team, as before
 
 | Section | Rows | Header |
 |---|---|---|
