@@ -250,9 +250,15 @@ final class PopoverController: NSObject {
         ) { [weak self] note in
             let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
             let isOther = app?.processIdentifier != ProcessInfo.processInfo.processIdentifier
+            let location = NSEvent.mouseLocation
+            let mouseDown = NSEvent.pressedMouseButtons != 0
             MainActor.assumeIsolated {
-                guard isOther else { return }
-                self?.close()
+                guard let self, isOther else { return }
+                // A notification click activates PullBull, which owns no menu bar. A click on our item
+                // then first hands activation back to the menu bar's app; closing here would let the
+                // item's action reopen the panel. That click toggles it instead.
+                if mouseDown, self.statusItemFrame()?.contains(location) == true { return }
+                self.close()
             }
         })
         // Leaving the screen without an activation change: a Space switch (the panel would stay on the
