@@ -114,6 +114,12 @@ final class AppModel {
     /// Pull requests merged directly from here this session, whose merge raises no notification. A Merge
     /// when ready isn't one: it notifies when it lands. `clearAccountData` drops them.
     var mergedHere: Set<PRKey> = []
+    /// Items whose draft flip is on its way, for the control's label (see AppModel+Draft.swift).
+    /// `clearAccountData` drops them.
+    var draftFlips: Set<PRKey> = []
+    /// Pull requests marked ready for review from here, and when, whose review request raises no
+    /// notification. Kept for `ChangeDetector.readiedHereWindow`. `clearAccountData` drops them.
+    @ObservationIgnored var readiedHere: [PRKey: Date] = [:]
     /// The merge panel on screen, or nil (see AppModel+Merge.swift).
     var mergeMode: MergeMode?
     /// Items whose merge or auto-merge change is being written to GitHub. `clearAccountData` drops them.
@@ -2148,6 +2154,8 @@ final class AppModel {
         endMergeMode(on: nil)
         sendingMerges.removeAll()
         mergedHere.removeAll()
+        draftFlips.removeAll()
+        readiedHere.removeAll()
         rerunPlans.removeAll()
         rerunning.removeAll()
         rerunPlanLoads.removeAll()

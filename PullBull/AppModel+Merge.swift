@@ -120,7 +120,7 @@ extension AppModel {
         edits.showFailure(EditFailure(text: text, url: mergeURL(for: key), key: key))
     }
 
-    private func mergeURL(for key: PRKey) -> URL {
+    func mergeURL(for key: PRKey) -> URL {
         fetchedPullRequest(for: key)?.url ?? GitHubLinks.pullRequest(key)
     }
 
@@ -337,7 +337,7 @@ extension AppModel {
 
     /// The answer's final and bad: the panel closes and `text` shows, or waits for the sending account when
     /// another runs, in which case nothing else on screen changes.
-    private func mergeFailed(_ merge: PendingMerge, _ text: String, dropsOverlay: Bool, reloads: Bool) {
+    func mergeFailed(_ merge: PendingMerge, _ text: String, dropsOverlay: Bool, reloads: Bool) {
         let failure = EditFailure(text: text, url: merge.url, key: merge.key, staysOnLeaving: merge.sent)
         guard settleMerge(merge) else {
             heldMergeLines[merge.account.login] = failure
@@ -351,7 +351,7 @@ extension AppModel {
 
     /// The outcome is final: the merge leaves the in-flight tracking. True while its account still runs;
     /// nothing else may change otherwise.
-    private func settleMerge(_ merge: PendingMerge) -> Bool {
+    func settleMerge(_ merge: PendingMerge) -> Bool {
         postsInFlight.remove(account: merge.account.login, key: merge.key)
         if confirmingMerge?.key == merge.key, confirmingMerge?.account == merge.account { confirmingMerge = nil }
         guard runningAccount == merge.account else { return false }
