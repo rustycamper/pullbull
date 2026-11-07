@@ -608,7 +608,7 @@ struct DraftPill: View {
             .foregroundStyle(Palette.secondaryText)
             .padding(.horizontal, 6)
             .frame(height: 16)
-            .overlay(Capsule().strokeBorder(Palette.separator, lineWidth: 0.5))
+            .overlay(Capsule().strokeBorder(Palette.secondaryText.opacity(0.5), lineWidth: 1))
     }
 }
 

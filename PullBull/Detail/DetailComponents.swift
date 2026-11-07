@@ -173,7 +173,7 @@ struct StatePill: View {
         case .open:
             if pr.isDraft {
                 Pill(symbol: Palette.prGlyph(.draft), text: "Draft", foreground: Palette.secondaryText, fill: .clear)
-                    .overlay(Capsule().strokeBorder(Palette.separator, lineWidth: 0.5))
+                    .overlay(Capsule().strokeBorder(Palette.secondaryText.opacity(0.5), lineWidth: 1))
             } else if ReviewRules.isReadyToMerge(pr) {
                 ReadyToMergePill(fill: Palette.strongFill)
             } else {
