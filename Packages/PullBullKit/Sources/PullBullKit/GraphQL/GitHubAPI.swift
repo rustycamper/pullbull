@@ -354,9 +354,12 @@ public struct IssueDetail: Codable, Sendable, Equatable {
     /// Oldest first, at most 2.
     public let lastComments: [Comment]
     public let linkedPRs: [LinkedPR]
+    /// The issue's parent, sub-issues and dependencies; nil in details cached before they were read.
+    public let relations: IssueRelations?
 
     public init(
-        key: PRKey, issue: BoardIssue, body: String, commentTotal: Int, lastComments: [Comment], linkedPRs: [LinkedPR]
+        key: PRKey, issue: BoardIssue, body: String, commentTotal: Int, lastComments: [Comment], linkedPRs: [LinkedPR],
+        relations: IssueRelations? = nil
     ) {
         self.key = key
         self.issue = issue
@@ -364,6 +367,7 @@ public struct IssueDetail: Codable, Sendable, Equatable {
         self.commentTotal = commentTotal
         self.lastComments = lastComments
         self.linkedPRs = linkedPRs
+        self.relations = relations
     }
 
     /// Comments before the ones shown.
@@ -955,7 +959,44 @@ public struct GitHubAPI: Sendable {
             key: key, issue: issue, body: node["body"] as? String ?? "",
             commentTotal: max(commentsConnection?["totalCount"] as? Int ?? issue.commentCount, comments.count),
             lastComments: Array(comments.suffix(2)),
-            linkedPRs: prNodes.compactMap { ($0 as? [String: Any]).flatMap(Self.linkedPR) })
+            linkedPRs: prNodes.compactMap { ($0 as? [String: Any]).flatMap(Self.linkedPR) },
+            relations: Self.relations(node))
+    }
+
+    private static func relations(_ node: [String: Any]) -> IssueRelations {
+        let subSummary = node["subIssuesSummary"] as? [String: Any]
+        let dependencies = node["issueDependenciesSummary"] as? [String: Any]
+        return IssueRelations(
+            parent: relatedIssue(node["parent"]),
+            subIssues: relatedIssues(node["subIssues"]),
+            subIssuesTotal: subSummary?["total"] as? Int ?? 0,
+            subIssuesCompleted: subSummary?["completed"] as? Int ?? 0,
+            blockedBy: relatedIssues(node["blockedBy"]),
+            openBlockedBy: dependencies?["blockedBy"] as? Int,
+            blocking: relatedIssues(node["blocking"]),
+            openBlocking: dependencies?["blocking"] as? Int)
+    }
+
+    /// A connection of related issues. `returned` counts every node, null ones included, so a null
+    /// (an issue the account can't read) doesn't read as "more".
+    static func relatedIssues(_ connection: Any?) -> RelatedIssues {
+        guard let connection = connection as? [String: Any] else { return .empty }
+        let nodes = connection["nodes"] as? [Any] ?? []
+        let items = nodes.compactMap(relatedIssue)
+        return RelatedIssues(
+            items: items, totalCount: connection["totalCount"] as? Int ?? items.count, returned: nodes.count)
+    }
+
+    static func relatedIssue(_ node: Any?) -> RelatedIssue? {
+        guard let node = node as? [String: Any],
+              let number = node["number"] as? Int,
+              let title = node["title"] as? String,
+              let url = (node["url"] as? String).flatMap(URL.init(string:)),
+              let repo = (node["repository"] as? [String: Any])?["nameWithOwner"] as? String
+        else { return nil }
+        return RelatedIssue(
+            key: PRKey(repo: repo, number: number), title: title, url: url,
+            isOpen: node["state"] as? String == "OPEN", stateReason: Decoding.stateReason(node["stateReason"] as? String))
     }
 
     // MARK: Decoding helpers

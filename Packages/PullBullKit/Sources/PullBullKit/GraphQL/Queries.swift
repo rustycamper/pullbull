@@ -231,10 +231,22 @@ enum Queries {
             number title url state isDraft author{login} repository{nameWithOwner}
             commits(last:1){nodes{commit{statusCheckRollup{state contexts{\(rollupCounts)}}}}}
           }}
+          parent{...relatedIssue}
+          subIssuesSummary{total completed}
+          subIssues(first:20){totalCount nodes{...relatedIssue}}
+          issueDependenciesSummary{blockedBy totalBlockedBy blocking totalBlocking}
+          blockedBy(first:20){totalCount nodes{...relatedIssue}}
+          blocking(first:20){totalCount nodes{...relatedIssue}}
         }
       }
     }
     \(issueRowFields)
+    \(relatedIssueFields)
+    """
+
+    /// The fields of an issue named by another issue or PR; enough for a row and its state glyph.
+    static let relatedIssueFields = """
+    fragment relatedIssue on Issue { number title url state stateReason repository{nameWithOwner} }
     """
 
     static let prHead = """
