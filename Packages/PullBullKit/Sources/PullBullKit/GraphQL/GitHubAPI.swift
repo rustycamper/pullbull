@@ -771,6 +771,7 @@ public struct GitHubAPI: Sendable {
                 path: path, additions: node["additions"] as? Int ?? 0, deletions: node["deletions"] as? Int ?? 0)
         }
 
+        let closing = pr["closingIssuesReferences"]
         return PRDetail(
             key: key, body: pr["body"] as? String ?? "", checks: checks,
             reviews: reviews, comments: comments, files: files,
@@ -787,7 +788,8 @@ public struct GitHubAPI: Sendable {
             author: (pr["author"] as? [String: Any])?["login"] as? String ?? "ghost",
             state: (pr["state"] as? String).flatMap { PRState(rawValue: $0.lowercased()) },
             merge: MergeInfo.read(pullRequest: pr, repository: data["repository"] as? [String: Any]),
-            linkedIssues: Self.relatedIssues(pr["closingIssuesReferences"]))
+            // Null (a field-level error) isn't known, so the section stays hidden; an absent field reads as none.
+            linkedIssues: closing is NSNull ? nil : Self.relatedIssues(closing))
     }
 
     /// The pull request's head commit and state right now, for a review that must name the commit it saw.
@@ -968,13 +970,16 @@ public struct GitHubAPI: Sendable {
     }
 
     private static func relations(_ node: [String: Any]) -> IssueRelations {
+        let subIssues = relatedIssues(node["subIssues"])
         let subSummary = node["subIssuesSummary"] as? [String: Any]
         let dependencies = node["issueDependenciesSummary"] as? [String: Any]
         return IssueRelations(
             parent: relatedIssue(node["parent"]),
-            subIssues: relatedIssues(node["subIssues"]),
-            subIssuesTotal: subSummary?["total"] as? Int ?? 0,
-            subIssuesCompleted: subSummary?["completed"] as? Int ?? 0,
+            subIssues: subIssues,
+            // Without the summary, the rows' own count and closed rows stand in, so it never reads "0 of 0".
+            subIssuesTotal: subSummary.map { $0["total"] as? Int ?? 0 } ?? subIssues.totalCount,
+            subIssuesCompleted: subSummary.map { $0["completed"] as? Int ?? 0 }
+                ?? subIssues.items.filter { !$0.isOpen }.count,
             blockedBy: relatedIssues(node["blockedBy"]),
             openBlockedBy: dependencies?["blockedBy"] as? Int,
             blocking: relatedIssues(node["blocking"]),

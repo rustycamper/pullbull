@@ -68,7 +68,7 @@ private func api(_ transport: StubTransport) -> GitHubAPI {
 
     @Test func noRelationsIsEmpty() async throws {
         let d = try await api(StubTransport([(try fixture("issue_detail"), response(200))])).issueDetail(key)
-        #expect(d.relations == IssueRelations.none)
+        #expect(d.relations == IssueRelations.empty)
         #expect(d.relations?.hasDependencies == false)
     }
 
@@ -79,6 +79,23 @@ private func api(_ transport: StubTransport) -> GitHubAPI {
             blocking: RelatedIssues(items: [closed], totalCount: 1, returned: 1), openBlocking: nil)
         #expect(r.blockedBySummary == "1 open")
         #expect(r.blockingSummary == "all closed")
+    }
+
+    @Test func subIssuesSummaryFallsBackToRows() async throws {
+        var object = try #require(JSONSerialization.jsonObject(with: fixture("issue_detail_relations")) as? [String: Any])
+        var data = try #require(object["data"] as? [String: Any])
+        var repository = try #require(data["repository"] as? [String: Any])
+        var issue = try #require(repository["issue"] as? [String: Any])
+        issue["subIssuesSummary"] = nil
+        repository["issue"] = issue
+        data["repository"] = repository
+        object["data"] = data
+        let stub = StubTransport([(try JSONSerialization.data(withJSONObject: object), response(200))])
+        let r = try #require(try await api(stub).issueDetail(key).relations)
+        // Three sub-issues on GitHub; of the two rows read (a third node is null), one is closed.
+        #expect(r.subIssuesTotal == 3)
+        #expect(r.subIssuesCompleted == 1)
+        #expect(r.subIssuesSummary == "1 of 3 done")
     }
 
     @Test func onlyNullNodesIsNotShown() {

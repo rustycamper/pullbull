@@ -595,6 +595,20 @@ private func page(_ nodes: [String], cursor: String, next: Bool) -> String {
         #expect(detail.linkedIssues == .empty)
     }
 
+    @Test func prDetailWithNullClosingIssuesIsNil() async throws {
+        var object = try #require(JSONSerialization.jsonObject(with: fixture("pr_detail")) as? [String: Any])
+        var data = try #require(object["data"] as? [String: Any])
+        var repository = try #require(data["repository"] as? [String: Any])
+        var pullRequest = try #require(repository["pullRequest"] as? [String: Any])
+        pullRequest["closingIssuesReferences"] = NSNull()
+        repository["pullRequest"] = pullRequest
+        data["repository"] = repository
+        object["data"] = data
+        let stub = StubTransport([(try JSONSerialization.data(withJSONObject: object), response(200))])
+        let detail = try await api(stub).detail(PRKey(repo: "initech/gadgets", number: 412))
+        #expect(detail.linkedIssues == nil)
+    }
+
     @Test func detailParses() async throws {
         let stub = StubTransport([(try fixture("pr_detail"), response(200))])
         let key = PRKey(repo: "initech/gadgets", number: 412)
