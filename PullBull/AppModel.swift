@@ -2397,6 +2397,13 @@ extension AppModel {
         }
     }
 
+    /// "2 of 6" for the `kind` detail of `key`, for its own header, so it stays while a hop covers it:
+    /// only the trail's base has one, and without a trail it is the walk's position for `key`.
+    func detailPosition(for key: PRKey, kind: DetailWalk.Kind) -> String? {
+        if let trail = detailTrail, trail.base != .init(kind: kind, key: key) { return nil }
+        return detailWalk?.position(showing: key, kind: kind)
+    }
+
     /// ⌥↓ / ⌥↑ in a detail: the next or previous item of its walk, with the list or search selection
     /// following, so Back lands on it. An item that has left the data, with no detail cached, is skipped.
     /// False when the detail has no walk (the key passes on); true at either end, where nothing happens.
@@ -2450,8 +2457,8 @@ extension AppModel {
     /// from outside a detail, it starts a new trail with `key` as the base.
     func openDetail(_ key: PRKey) {
         let overHop = detailTrail.map { !$0.isOnBase } ?? false
-        // A step keeps the walk; so does a linked PR, whose issue walk resumes on Back. Any other open
-        // (a notification, Ask) has none; a row's walk is set once the detail is open.
+        // A step keeps the walk; so does a notification PR over an issue, whose walk resumes on Back to
+        // it. Any other open (a notification, Ask) has none; a row's walk is set once the detail is open.
         if case .issueDetail = route {} else if detailWalk?.position(showing: key, kind: .pullRequest) == nil {
             detailWalk = nil
         }
@@ -2486,9 +2493,38 @@ extension AppModel {
     /// to, its walk and the list and search selections stay as they are. Nothing happens outside a detail.
     func followLink(_ entry: DetailTrail.Entry) {
         guard var trail = detailTrail else { return }
+        // The issue a PR base was opened over counts as the entry before the base.
+        if trail.base.kind == .pullRequest, entry.kind == .issue,
+           case .issueDetail(let origin) = detailReturnRoute, origin == entry.key {
+            returnToOriginIssue(origin)
+            return
+        }
         trail.follow(entry)
         detailTrail = trail
         showTrailEntry(trail.current)
+    }
+
+    /// Following the issue a PR base was opened over (a notification over its detail), from the base or
+    /// any hop: Back all the way out of the base, as `closeDetail` from the base does. The issue becomes
+    /// the base of a fresh trail, its walk going on from there.
+    private func returnToOriginIssue(_ issue: PRKey) {
+        detailTask?.cancel()
+        detailTask = nil
+        detailFetch = nil
+        if case .issueDetail = route {
+            issueDetailTask?.cancel()
+            issueDetailTask = nil
+            issueDetailFetch = nil
+        }
+        detailBackScope = nil
+        // The PR base pushed `.issueDetail` over the issue's own opener.
+        if !askReturn.isEmpty { _ = askReturn.close() }
+        openedIssue = fetchedIssue(for: issue) ?? issueDetails[issue]?.issue
+        closeCompletion()
+        route = .issueDetail(issue)
+        detailTrail = DetailTrail(base: .init(kind: .issue, key: issue))
+        trailPRs = [:]
+        loadIssueDetail(issue)
     }
 
     /// The back button's title on a hop: "#N" of the detail Back goes to; nil on the base, which names its

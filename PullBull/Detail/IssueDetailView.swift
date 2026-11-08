@@ -77,7 +77,7 @@ struct IssueDetailView: View {
     private var header: some View {
         HStack(spacing: 4) {
             DetailBackButton(
-                title: backTitle, position: model.detailPosition,
+                title: backTitle, position: model.detailPosition(for: key, kind: .issue),
                 action: model.closeIssueDetail)
             Spacer(minLength: 0)
             DetailIconButton(symbol: "arrow.up.right.square", help: "Open on GitHub") {

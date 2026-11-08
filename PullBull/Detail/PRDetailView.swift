@@ -69,7 +69,7 @@ struct PRDetailView: View {
     private var header: some View {
         HStack(spacing: 4) {
             DetailBackButton(
-                title: backTitle, position: model.detailPosition,
+                title: backTitle, position: model.detailPosition(for: key, kind: .pullRequest),
                 action: model.closeDetail)
             Spacer(minLength: 0)
             DetailIconButton(symbol: "arrow.up.right.square", help: "Open on GitHub") {
@@ -112,7 +112,7 @@ struct PRDetailView: View {
     }
 
     @ViewBuilder private func linkedIssuesSection(_ linked: RelatedIssues) -> some View {
-        if linked.totalCount == 0 {
+        if !linked.isShown {
             DetailSection(title: "Linked issues") {
                 DetailCard { EmptyLine(text: "No linked issues") }
             }
