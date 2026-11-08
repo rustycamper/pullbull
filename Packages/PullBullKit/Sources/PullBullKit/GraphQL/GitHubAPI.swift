@@ -256,6 +256,8 @@ public struct PRDetail: Codable, Sendable {
     public let state: PRState?
     /// What the merge panel needs; nil in details cached before it was stored.
     public let merge: MergeInfo?
+    /// The issues the PR closes; nil in details cached before they were read.
+    public let linkedIssues: RelatedIssues?
 
     public init(
         key: PRKey, body: String, checks: [Check], reviews: [Review],
@@ -263,7 +265,7 @@ public struct PRDetail: Codable, Sendable {
         changedFiles: Int? = nil, additions: Int? = nil, deletions: Int? = nil, checkCount: Int? = nil,
         requests: [Reviewer]? = nil, commentCount: Int? = nil,
         headOid: String? = nil, author: String? = nil, state: PRState? = nil,
-        merge: MergeInfo? = nil
+        merge: MergeInfo? = nil, linkedIssues: RelatedIssues? = nil
     ) {
         self.key = key
         self.body = body
@@ -283,6 +285,7 @@ public struct PRDetail: Codable, Sendable {
         self.author = author
         self.state = state
         self.merge = merge
+        self.linkedIssues = linkedIssues
     }
 
     public var commentTotal: Int { max(commentCount ?? 0, comments.count) }
@@ -783,7 +786,8 @@ public struct GitHubAPI: Sendable {
             headOid: pr["headRefOid"] as? String,
             author: (pr["author"] as? [String: Any])?["login"] as? String ?? "ghost",
             state: (pr["state"] as? String).flatMap { PRState(rawValue: $0.lowercased()) },
-            merge: MergeInfo.read(pullRequest: pr, repository: data["repository"] as? [String: Any]))
+            merge: MergeInfo.read(pullRequest: pr, repository: data["repository"] as? [String: Any]),
+            linkedIssues: Self.relatedIssues(pr["closingIssuesReferences"]))
     }
 
     /// The pull request's head commit and state right now, for a review that must name the commit it saw.

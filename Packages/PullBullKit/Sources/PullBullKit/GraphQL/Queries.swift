@@ -289,8 +289,10 @@ enum Queries {
           latestReviews(first:20){nodes{author{login} state submittedAt body commit{oid}}}
           comments(last:50){totalCount nodes{id author{__typename login} body createdAt}}
           files(first:100){totalCount nodes{path additions deletions}}
+          closingIssuesReferences(first:20){totalCount nodes{...relatedIssue}}
         }
       }
     }
+    \(relatedIssueFields)
     """
 }
