@@ -32,7 +32,8 @@ extension AppModel {
         guard let link = shownDetailLink else { return false }
         let title = switch route {
         case .detail(let key): pullRequest(for: key)?.title ?? linkedPR(for: key)?.title
-        case .issueDetail(let key): (issueDetails[key]?.issue ?? issue(for: key))?.title
+        case .issueDetail(let key):
+            (issueDetails[key]?.issue ?? issue(for: key))?.title ?? relatedIssue(for: key)?.title
         case .list, .search, .ask, .stats: String?.none
         }
         PRActions.copyMarkdownLink(title: title, key: link.key, url: link.url)

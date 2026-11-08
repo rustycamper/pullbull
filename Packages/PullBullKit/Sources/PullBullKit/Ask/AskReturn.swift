@@ -18,8 +18,8 @@ public struct AskReturn: Equatable, Sendable {
 
     public init() {}
 
-    /// A detail opens from `place`. An issue opened from Ask pushes `.ask`; a PR linked from that issue
-    /// pushes `.issueDetail`.
+    /// A detail opens from `place`. An issue opened from Ask pushes `.ask`; a PR a notification opens over
+    /// that issue pushes `.issueDetail`.
     public mutating func open(from place: Place) { openers.append(place) }
 
     /// The innermost detail closes: back to its opener, `.list` when nothing is open.

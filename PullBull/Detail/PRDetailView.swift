@@ -36,6 +36,7 @@ struct PRDetailView: View {
                         if let pr { detailsCard(pr) }
                         if let detail {
                             if let error = fetch?.error { RefreshFailedNote(message: error) { model.reloadDetail() } }
+                            if let linked = detail.linkedIssues { linkedIssuesSection(linked) }
                             sections(detail, now: context.date)
                         } else if let pr, pr.state == .open, fetch?.error == nil {
                             // Reviewers, from the list data, sit above the Checks placeholder as in the loaded detail.
@@ -68,7 +69,7 @@ struct PRDetailView: View {
     private var header: some View {
         HStack(spacing: 4) {
             DetailBackButton(
-                title: backTitle, position: model.detailWalk?.position(showing: key, kind: .pullRequest),
+                title: backTitle, position: model.detailPosition(for: key, kind: .pullRequest),
                 action: model.closeDetail)
             Spacer(minLength: 0)
             DetailIconButton(symbol: "arrow.up.right.square", help: "Open on GitHub") {
@@ -101,12 +102,35 @@ struct PRDetailView: View {
     }
 
     private var backTitle: String {
-        if let title = model.askReturn.backTitle { return title }
+        if let title = model.trailBackTitle ?? model.askReturn.backTitle { return title }
         switch model.detailReturnRoute {
         case .issueDetail(let issue): return "#\(issue.number)"
         case .search: return "Search"
         case .stats: return "Stats"
         case .list, .ask, .detail: return model.selectedTabTitle
+        }
+    }
+
+    @ViewBuilder private func linkedIssuesSection(_ linked: RelatedIssues) -> some View {
+        if !linked.isShown {
+            DetailSection(title: "Linked issues") {
+                DetailCard { EmptyLine(text: "No linked issues") }
+            }
+        } else {
+            DetailSection(title: "Linked issues", summary: String(linked.totalCount)) {
+                DetailCard {
+                    ForEach(Array(linked.items.enumerated()), id: \.element.key) { index, issue in
+                        if index > 0 { CardDivider() }
+                        RelatedIssueLine(issue: issue, repo: key.repo) {
+                            model.followLink(.init(kind: .issue, key: issue.key))
+                        }
+                    }
+                    if linked.moreCount > 0 {
+                        if !linked.items.isEmpty { CardDivider() }
+                        MoreOnGitHubLine(count: linked.moreCount, url: webURL)
+                    }
+                }
+            }
         }
     }
 

@@ -21,6 +21,22 @@ private func detail(updatedAt: Date?, ci: CIState?) -> PRDetail {
 }
 
 @Suite struct PRDetailTests {
+    @Test func legacyPRDetailHasNoLinkedIssues() throws {
+        let linked = RelatedIssues(items: [], totalCount: 0, returned: 0)
+        let current = PRDetail(key: key, body: "", checks: [], reviews: [], comments: [], files: [], linkedIssues: linked)
+        let data = try JSONEncoder().encode(current)
+        #expect(try JSONDecoder().decode(PRDetail.self, from: data).linkedIssues == linked)
+        var object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object["linkedIssues"] = nil
+        let old = try JSONDecoder().decode(PRDetail.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(old.linkedIssues == nil)
+    }
+
+    @Test func prDetailQueryAsksForClosingIssues() {
+        #expect(Queries.detail.contains("closingIssuesReferences(first:20)"))
+        #expect(Queries.detail.contains("fragment relatedIssue on Issue"))
+    }
+
     @Test func currentWhenUpdatedAtAndCIMatch() {
         #expect(detail(updatedAt: updated, ci: .success).isCurrent(for: pr()))
     }

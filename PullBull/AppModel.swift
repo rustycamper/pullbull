@@ -252,6 +252,15 @@ final class AppModel {
                 default: break
                 }
             }
+            // The trail lives exactly as long as being in a detail does.
+            switch route {
+            case .detail, .issueDetail: break
+            case .list, .search, .ask, .stats:
+                if detailTrail != nil {
+                    detailTrail = nil
+                    trailPRs = [:]
+                }
+            }
         }
     }
 
@@ -515,6 +524,12 @@ final class AppModel {
     private(set) var detailBackScope: PRScope?
     /// The same for an issue detail: the Issues chip it was opened on.
     private(set) var issueDetailBackScope: IssueScope?
+    /// The details opened one from another through their links, from the one opened from outside a detail
+    /// (the base) to the one on screen; nil outside a detail. Back walks it back before leaving the base.
+    private(set) var detailTrail: DetailTrail?
+    /// The list data each PR on the trail was last shown with, for one that leaves the lists and results
+    /// before Back returns to it; emptied whenever the trail is replaced or ends.
+    @ObservationIgnored private var trailPRs: [PRKey: PullRequest] = [:]
     /// Done as the popover shows it, so a walk's order is the one on screen.
     @ObservationIgnored var listExpansion = ListExpansion()
     /// A notification opened a detail while the popover was closed; the next open shows it as it is.
@@ -729,8 +744,7 @@ final class AppModel {
     func popoverDidClose() {
         endReviewMode(on: nil)
         endMergeMode(on: nil)
-        var showsPRDetail = false
-        if mode == .pullRequests, case .detail = route { showsPRDetail = true }
+        let showsPRDetail = mode == .pullRequests && detailBaseKind == .pullRequest
         if !showsPRDetail {
             detailBackScope = nil
         } else if detailBackScope == nil {
@@ -746,15 +760,27 @@ final class AppModel {
         openOnIssueScope()
     }
 
-    /// An issue detail is on screen in Issues mode, alone or under a linked PR's detail.
+    /// An issue detail is on screen in Issues mode, alone or under a PR's detail: the trail's base is an
+    /// issue, or a PR opened over one.
     private var showsIssueDetail: Bool {
         guard mode == .issues else { return false }
-        switch route {
-        case .issueDetail: return true
-        case .detail:
+        switch detailBaseKind {
+        case .issue: return true
+        case .pullRequest:
             if case .issueDetail = detailReturnRoute { return true }
             return false
-        case .list, .search, .ask, .stats: return false
+        case nil: return false
+        }
+    }
+
+    /// The kind of the detail the trail started from, which a hop of the other kind counts as being in;
+    /// the route's own kind without a trail, nil outside a detail.
+    private var detailBaseKind: DetailWalk.Kind? {
+        if let trail = detailTrail { return trail.base.kind }
+        switch route {
+        case .detail: return .pullRequest
+        case .issueDetail: return .issue
+        case .list, .search, .ask, .stats: return nil
         }
     }
 
@@ -2360,13 +2386,22 @@ extension AppModel {
             ? searchItemKeys : listKeys(doneExpanded: listExpansion.done)
     }
 
-    /// "2 of 6" for the detail on screen; nil when it has no walk.
+    /// "2 of 6" for the detail on screen; nil when it has no walk, and on a hop: the walk belongs to the
+    /// trail's base.
     var detailPosition: String? {
-        switch route {
+        guard detailTrail?.isOnBase ?? true else { return nil }
+        return switch route {
         case .detail(let key): detailWalk?.position(showing: key, kind: .pullRequest)
         case .issueDetail(let key): detailWalk?.position(showing: key, kind: .issue)
         case .list, .search, .ask, .stats: nil
         }
+    }
+
+    /// "2 of 6" for the `kind` detail of `key`, for its own header, so it stays while a hop covers it:
+    /// only the trail's base has one, and without a trail it is the walk's position for `key`.
+    func detailPosition(for key: PRKey, kind: DetailWalk.Kind) -> String? {
+        if let trail = detailTrail, trail.base != .init(kind: kind, key: key) { return nil }
+        return detailWalk?.position(showing: key, kind: kind)
     }
 
     /// ⌥↓ / ⌥↑ in a detail: the next or previous item of its walk, with the list or search selection
@@ -2418,10 +2453,12 @@ extension AppModel {
             org: settings.org, query: searchText, popoverShown: MenuBarPopover.isShown, popoverOpens: popoverOpens)
     }
 
-    /// Shows the detail view for `key` with the cached detail at once, then refreshes it in place.
+    /// Shows the detail view for `key` with the cached detail at once, then refreshes it in place. Opened
+    /// from outside a detail, it starts a new trail with `key` as the base.
     func openDetail(_ key: PRKey) {
-        // A step keeps the walk; so does a linked PR, whose issue walk resumes on Back. Any other open
-        // (a notification, Ask) has none; a row's walk is set once the detail is open.
+        let overHop = detailTrail.map { !$0.isOnBase } ?? false
+        // A step keeps the walk; so does a notification PR over an issue, whose walk resumes on Back to
+        // it. Any other open (a notification, Ask) has none; a row's walk is set once the detail is open.
         if case .issueDetail = route {} else if detailWalk?.position(showing: key, kind: .pullRequest) == nil {
             detailWalk = nil
         }
@@ -2436,26 +2473,119 @@ extension AppModel {
             // A detail opened afresh returns to the chip on screen, not one an earlier detail kept.
             detailBackScope = nil
         }
+        if overHop {
+            // A notification over a hop: Back goes to the list, never to the hop or the old trail's origin.
+            askReturn.reset()
+            detailReturnRoute = .list
+            detailBackScope = nil
+            detailWalk = nil
+        }
         openedPR = fetchedPullRequest(for: key)
         closeCompletion()
         route = .detail(key)
         loadDetail(key)
+        detailTrail = DetailTrail(base: .init(kind: .pullRequest, key: key))
+        trailPRs = openedPR.map { [key: $0] } ?? [:]
     }
 
-    /// Back: the Ask screen when Ask opened the detail, the issue detail a linked PR was opened from
-    /// (fetched again, since it may have changed while the PR was open), Stats when it opened the
-    /// detail, the search (query kept) when the detail was opened from it, else the list.
+    /// A relationship, Linked pull requests or Linked issues row in the detail on screen: opens `entry` as
+    /// the trail's next hop, or goes back to it when it is already on the trail. Where the base returns
+    /// to, its walk and the list and search selections stay as they are. Nothing happens outside a detail.
+    func followLink(_ entry: DetailTrail.Entry) {
+        guard var trail = detailTrail else { return }
+        // The issue a PR base was opened over counts as the entry before the base.
+        if trail.base.kind == .pullRequest, entry.kind == .issue,
+           case .issueDetail(let origin) = detailReturnRoute, origin == entry.key {
+            returnToOriginIssue(origin)
+            return
+        }
+        trail.follow(entry)
+        detailTrail = trail
+        showTrailEntry(trail.current)
+    }
+
+    /// Following the issue a PR base was opened over (a notification over its detail), from the base or
+    /// any hop: Back all the way out of the base, as `closeDetail` from the base does. The issue becomes
+    /// the base of a fresh trail, its walk going on from there.
+    private func returnToOriginIssue(_ issue: PRKey) {
+        detailTask?.cancel()
+        detailTask = nil
+        detailFetch = nil
+        if case .issueDetail = route {
+            issueDetailTask?.cancel()
+            issueDetailTask = nil
+            issueDetailFetch = nil
+        }
+        detailBackScope = nil
+        // The PR base pushed `.issueDetail` over the issue's own opener.
+        if !askReturn.isEmpty { _ = askReturn.close() }
+        openedIssue = fetchedIssue(for: issue) ?? issueDetails[issue]?.issue
+        closeCompletion()
+        route = .issueDetail(issue)
+        detailTrail = DetailTrail(base: .init(kind: .issue, key: issue))
+        trailPRs = [:]
+        loadIssueDetail(issue)
+    }
+
+    /// The back button's title on a hop: "#N" of the detail Back goes to; nil on the base, which names its
+    /// origin.
+    var trailBackTitle: String? {
+        detailTrail?.previous.map { "#\($0.key.number)" }
+    }
+
+    /// Shows the trail's `entry` with its cached detail at once, then fetches it again. Touches none of
+    /// what the base returns to (Ask's return, the return routes, the back scopes), its walk or the
+    /// selections.
+    private func showTrailEntry(_ entry: DetailTrail.Entry) {
+        switch route {
+        case .detail:
+            detailTask?.cancel()
+            detailTask = nil
+            detailFetch = nil
+        case .issueDetail:
+            issueDetailTask?.cancel()
+            issueDetailTask = nil
+            issueDetailFetch = nil
+        case .list, .search, .ask, .stats:
+            break
+        }
+        switch entry.kind {
+        case .pullRequest:
+            openedPR = fetchedPullRequest(for: entry.key) ?? trailPRs[entry.key]
+            if let openedPR { trailPRs[entry.key] = openedPR }
+            closeCompletion()
+            route = .detail(entry.key)
+            loadDetail(entry.key)
+        case .issue:
+            openedIssue = fetchedIssue(for: entry.key) ?? issueDetails[entry.key]?.issue
+            closeCompletion()
+            route = .issueDetail(entry.key)
+            loadIssueDetail(entry.key)
+        }
+    }
+
+    /// Back: on a hop, the detail before it on the trail (its cached copy, then fetched again). From the
+    /// base: the Ask screen when Ask opened the detail, the issue detail a PR was opened over (fetched
+    /// again, since it may have changed while the PR was open), Stats when it opened the detail, the
+    /// search (query kept) when the detail was opened from it, else the list.
     func closeDetail() {
         detailTask?.cancel()
         detailTask = nil
         detailFetch = nil
+        if var trail = detailTrail, let previous = trail.back() {
+            detailTrail = trail
+            showTrailEntry(previous)
+            return
+        }
         let backScope = detailBackScope
         detailBackScope = nil
         if !askReturn.isEmpty, askReturn.close() == .ask {
             route = .ask
         } else if case .issueDetail(let issue) = detailReturnRoute {
-            // The issue's walk, if any, goes on from there.
+            // The issue's walk, if any, goes on from there, as the base of a fresh trail.
             route = detailReturnRoute
+            detailTrail = DetailTrail(base: .init(kind: .issue, key: issue))
+            trailPRs = [:]
             loadIssueDetail(issue)
             return
         } else if detailReturnRoute == .stats {
@@ -2482,12 +2612,16 @@ extension AppModel {
             return true
         case .stats:
             return statsReturnsToSearch
-        case .detail:
-            if case .issueDetail = detailReturnRoute { return issueDetailReturnRoute == .search }
-            if detailReturnRoute == .stats { return statsReturnsToSearch }
-            return detailReturnRoute == .search
-        case .issueDetail:
-            return issueDetailReturnRoute == .search
+        case .detail, .issueDetail:
+            // A hop returns through the trail to its base, so the base's origin decides.
+            switch detailBaseKind {
+            case .pullRequest:
+                if case .issueDetail = detailReturnRoute { return issueDetailReturnRoute == .search }
+                if detailReturnRoute == .stats { return statsReturnsToSearch }
+                return detailReturnRoute == .search
+            case .issue, nil:
+                return issueDetailReturnRoute == .search
+            }
         case .list, .search:
             return false
         }
@@ -2871,9 +3005,10 @@ extension AppModel {
         return runningAccount != nil && shownSnapshot != nil
     }
 
-    /// Stats is on screen, or under the detail on screen.
+    /// Stats is on screen, or under the detail on screen: a PR's opened there, or any hop from one.
     var statsOnScreen: Bool {
         if route == .stats { return true }
+        if let trail = detailTrail { return trail.base.kind == .pullRequest && detailReturnRoute == .stats }
         if case .detail = route { return detailReturnRoute == .stats }
         return false
     }
@@ -3182,13 +3317,34 @@ extension AppModel {
     }
 
     /// A pull request linked from a loaded issue detail, for a PR detail opened from it whose PR is in
-    /// no list (merged or from another org); the issue the PR detail returns to is checked first.
+    /// no list (merged or from another org); the issue details on the trail are checked first, newest first.
     func linkedPR(for key: PRKey) -> LinkedPR? {
-        if case .issueDetail(let issue) = detailReturnRoute,
-           let pr = issueDetails[issue]?.linkedPRs.first(where: { $0.key == key }) {
-            return pr
+        for entry in (detailTrail?.entries ?? []).reversed() where entry.kind == .issue {
+            if let pr = issueDetails[entry.key]?.linkedPRs.first(where: { $0.key == key }) { return pr }
         }
         return issueDetails.values.lazy.compactMap { $0.linkedPRs.first { $0.key == key } }.first
+    }
+
+    /// An issue related to a loaded detail (a parent, sub-issue, blocker or blocked issue, or a PR's
+    /// linked issue), for an issue detail opened from that row whose issue is in no list and has no cached
+    /// detail; the details on the trail are checked first, newest first, then every detail held.
+    func relatedIssue(for key: PRKey) -> RelatedIssue? {
+        for entry in (detailTrail?.entries ?? []).reversed() {
+            let found = switch entry.kind {
+            case .issue: issueDetails[entry.key]?.relations.flatMap { Self.relatedIssue(key, in: $0) }
+            case .pullRequest: details[entry.key]?.linkedIssues?.items.first { $0.key == key }
+            }
+            if let found { return found }
+        }
+        return issueDetails.values.lazy.compactMap { $0.relations.flatMap { Self.relatedIssue(key, in: $0) } }.first
+            ?? details.values.lazy.compactMap { $0.linkedIssues?.items.first { $0.key == key } }.first
+    }
+
+    /// `key` among `relations`' parent and groups.
+    private static func relatedIssue(_ key: PRKey, in relations: IssueRelations) -> RelatedIssue? {
+        if let parent = relations.parent, parent.key == key { return parent }
+        return [relations.subIssues, relations.blockedBy, relations.blocking].lazy
+            .compactMap { $0.items.first { $0.key == key } }.first
     }
 
     /// The issue's Status on the board, as the lists show it; nil when it is not on the board, has no
@@ -3198,8 +3354,10 @@ extension AppModel {
         return IssueTabBuilder.shownStatus(snapshot.boardIssues.first(where: { $0.key == key })?.status, in: snapshot)
     }
 
-    /// Shows the issue detail for `key` with the cached detail at once, then refreshes it in place.
+    /// Shows the issue detail for `key` with the cached detail at once, then refreshes it in place. Opened
+    /// from outside a detail, it starts a new trail with `key` as the base.
     func openIssueDetail(_ key: PRKey) {
+        let overHop = detailTrail.map { !$0.isOnBase } ?? false
         // A step keeps the walk; any other open (a notification, Ask) has none, and a row's walk is set
         // once the detail is open.
         if detailWalk?.position(showing: key, kind: .issue) == nil { detailWalk = nil }
@@ -3228,18 +3386,33 @@ extension AppModel {
         }
         // A detail opened afresh returns to the chip on screen, not one an earlier detail kept.
         if case .issueDetail = route {} else { issueDetailBackScope = nil }
+        if overHop {
+            // A notification over a hop: Back goes to the list, never to the hop or the old trail's origin.
+            askReturn.reset()
+            issueDetailReturnRoute = .list
+            issueDetailBackScope = nil
+            detailWalk = nil
+        }
         openedIssue = fetchedIssue(for: key) ?? issueDetails[key]?.issue
         closeCompletion()
         route = .issueDetail(key)
         loadIssueDetail(key)
+        detailTrail = DetailTrail(base: .init(kind: .issue, key: key))
+        trailPRs = [:]
     }
 
-    /// Back: the Ask screen when Ask opened the issue detail, the search (query kept) when the issue
+    /// Back: on a hop, the detail before it on the trail (its cached copy, then fetched again). From the
+    /// base: the Ask screen when Ask opened the issue detail, the search (query kept) when the issue
     /// detail was opened from it, else the list.
     func closeIssueDetail() {
         issueDetailTask?.cancel()
         issueDetailTask = nil
         issueDetailFetch = nil
+        if var trail = detailTrail, let previous = trail.back() {
+            detailTrail = trail
+            showTrailEntry(previous)
+            return
+        }
         detailWalk = nil
         let backScope = issueDetailBackScope
         issueDetailBackScope = nil

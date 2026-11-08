@@ -2,7 +2,7 @@
 
 Every tab, key and setting. Overview: [README](../README.md).
 
-[Install](#install) · [Sign in](#sign-in) · [Pull Requests](#pull-requests) · [Issues](#issues) · [Stats](#stats) · [Search](#search) · [Ask AI](#ask-ai) · [Keyboard](#keyboard) · [One repo](#one-repo) · [Sorting](#sorting) · [Settings](#settings) · [Data](#data) · [Build](#build-from-source)
+[Install](#install) · [Sign in](#sign-in) · [Pull Requests](#pull-requests) · [Issues](#issues) · [Relationships](#relationships) · [Stats](#stats) · [Search](#search) · [Ask AI](#ask-ai) · [Keyboard](#keyboard) · [One repo](#one-repo) · [Sorting](#sorting) · [Settings](#settings) · [Data](#data) · [Build](#build-from-source)
 
 ## Install
 
@@ -102,7 +102,7 @@ A PR waiting on review shows who it waits on and for how long (🕒 @dana 3d, "+
 > Ready to merge = approved, no changes requested, checks green or none, no conflicts, not a draft. It doesn't see branch protection (required review count).
 
 - **Pending CI:** while checks run on your PRs, PullBull checks up to 5 of them (newest commits first) every 30 s, for up to 20 minutes each, so *CI failed* and *Ready to merge* arrive sooner. Not while offline or rate-limited. Settings → General → Check my pending CI more often
-- **Detail:** who opened it and when it was last updated (the row's age), or when it was merged or closed · assignees, labels and reviewers (click to change) · checks (a cancelled run reads cancelled, not failed, though GitHub still marks the PR failed) · description (long ones fold) · the newest comments, with earlier ones counted above, and the text of each person's latest review among them, tagged Approved, Changes requested or Reviewed · files (click one to open its diff on GitHub). A [comment field](#commenting), with a **Review** button when you can [review](#reviewing) the PR and a **Merge** button when you can [merge](#merging) it, is pinned at the bottom. The header has **Open on GitHub**, Copy Link and Refresh, and **Copy branch** sits at the end of the head branch's chip. Markdown incl. `<details>`. **Open Failing Check** beside failed checks, and [**Re-run failed jobs**](#re-running-failed-jobs) when you can
+- **Detail:** who opened it and when it was last updated (the row's age), or when it was merged or closed · assignees, labels and reviewers (click to change) · the issues it closes ([Linked issues](#relationships)) · checks (a cancelled run reads cancelled, not failed, though GitHub still marks the PR failed) · description (long ones fold) · the newest comments, with earlier ones counted above, and the text of each person's latest review among them, tagged Approved, Changes requested or Reviewed · files (click one to open its diff on GitHub). A [comment field](#commenting), with a **Review** button when you can [review](#reviewing) the PR and a **Merge** button when you can [merge](#merging) it, is pinned at the bottom. The header has **Open on GitHub**, Copy Link and Refresh, and **Copy branch** sits at the end of the head branch's chip. Markdown incl. `<details>`. **Open Failing Check** beside failed checks, and [**Re-run failed jobs**](#re-running-failed-jobs) when you can
 - **Labels:** up to two chips per row (none in compact cards), each led by a dot in the label's GitHub colour, then "+N". A `~label` search puts that label first. The detail's Details card lists them all
 - **Right-click a row:** [Reviewers…](#editing) · [Assignees…](#editing) · [Labels…](#editing) · copy branch, link or Markdown link · open on GitHub · copy checkout command · open files changed (or changes since my review) · open failing check (when checks failed) · show only this repo · show only updated · search author
 - **Right-click a group header** (repo, author): **Open All *N* on GitHub**, from two PRs up; above 8 it asks first. An author header's menu also offers **Search @*login*** and **Show Only Updated**. Headers in search results get their section's or tab's menus, without Show Only Updated
@@ -134,7 +134,17 @@ One list scoped by chips, as on [Pull Requests](#pull-requests). It opens on All
 - **Switch board:** on the Board chip, click its name in the filter row, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>B</kbd>
 - **Right-click a row:** [Status](#editing) (when a board is shown) · [Assignees…](#editing) · [Labels…](#editing) · copy link or Markdown link · open on GitHub · show only this repo · show only updated · search author
 - **Right-click a group header** (a Status lane, No status, Not on board or a repo): **Open All *N* on GitHub**, from two issues up; above 8 it asks first. Done has none. Headers in search results get the chip's menus, without Show Only Updated
-- **Detail:** who opened it and when it was last updated (the row's age), or when it was closed · board card (incl. labels) · linked PRs (<kbd>Esc</kbd> returns) · description (long ones fold) · the last two comments, with earlier ones counted above. Markdown incl. `<details>`. A [comment field](#commenting) is pinned at the bottom. The header has **Open on GitHub**, Copy Link and Refresh
+- **Detail:** who opened it and when it was last updated (the row's age), or when it was closed · board card (incl. labels) · [relationships](#relationships) and sub-issues · linked PRs · description (long ones fold) · the last two comments, with earlier ones counted above. Markdown incl. `<details>`. A [comment field](#commenting) is pinned at the bottom. The header has **Open on GitHub**, Copy Link and Refresh
+
+## Relationships
+
+The issue detail shows what an issue is tied to, and the pull request detail the issues it closes. They're read-only: change them on GitHub.
+
+- **Relationships:** Parent, Blocked by and Blocking, in one card. Blocked by and Blocking say how many are open ("1 open") or "all closed". An issue with none shows nothing extra
+- **Sub-issues:** with how many are done ("1 of 3 done")
+- **Linked issues** on a pull request: the issues it closes, or "No linked issues"
+- **Rows:** state glyph, title, `#N · open` (or `closed`, `not planned`), with `owner/repo#N` for another repo. Closed ones are listed too. Over 20 in a group, "+N more on GitHub" opens the item in the browser
+- **Click a row** to open it in PullBull, as with linked PRs. Keep following links: Back (<kbd>Esc</kbd>) steps back through each item you opened, then to where you started, and is titled with the previous item's number. Opening an item you've already passed goes back to it, so you never loop. <kbd>⌥</kbd><kbd>↓</kbd> <kbd>⌥</kbd><kbd>↑</kbd> step only on the item you started from
 
 ## Stats
 

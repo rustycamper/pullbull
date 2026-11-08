@@ -256,6 +256,8 @@ public struct PRDetail: Codable, Sendable {
     public let state: PRState?
     /// What the merge panel needs; nil in details cached before it was stored.
     public let merge: MergeInfo?
+    /// The issues the PR closes; nil in details cached before they were read.
+    public let linkedIssues: RelatedIssues?
 
     public init(
         key: PRKey, body: String, checks: [Check], reviews: [Review],
@@ -263,7 +265,7 @@ public struct PRDetail: Codable, Sendable {
         changedFiles: Int? = nil, additions: Int? = nil, deletions: Int? = nil, checkCount: Int? = nil,
         requests: [Reviewer]? = nil, commentCount: Int? = nil,
         headOid: String? = nil, author: String? = nil, state: PRState? = nil,
-        merge: MergeInfo? = nil
+        merge: MergeInfo? = nil, linkedIssues: RelatedIssues? = nil
     ) {
         self.key = key
         self.body = body
@@ -283,6 +285,7 @@ public struct PRDetail: Codable, Sendable {
         self.author = author
         self.state = state
         self.merge = merge
+        self.linkedIssues = linkedIssues
     }
 
     public var commentTotal: Int { max(commentCount ?? 0, comments.count) }
@@ -354,9 +357,12 @@ public struct IssueDetail: Codable, Sendable, Equatable {
     /// Oldest first, at most 2.
     public let lastComments: [Comment]
     public let linkedPRs: [LinkedPR]
+    /// The issue's parent, sub-issues and dependencies; nil in details cached before they were read.
+    public let relations: IssueRelations?
 
     public init(
-        key: PRKey, issue: BoardIssue, body: String, commentTotal: Int, lastComments: [Comment], linkedPRs: [LinkedPR]
+        key: PRKey, issue: BoardIssue, body: String, commentTotal: Int, lastComments: [Comment], linkedPRs: [LinkedPR],
+        relations: IssueRelations? = nil
     ) {
         self.key = key
         self.issue = issue
@@ -364,6 +370,7 @@ public struct IssueDetail: Codable, Sendable, Equatable {
         self.commentTotal = commentTotal
         self.lastComments = lastComments
         self.linkedPRs = linkedPRs
+        self.relations = relations
     }
 
     /// Comments before the ones shown.
@@ -764,6 +771,7 @@ public struct GitHubAPI: Sendable {
                 path: path, additions: node["additions"] as? Int ?? 0, deletions: node["deletions"] as? Int ?? 0)
         }
 
+        let closing = pr["closingIssuesReferences"]
         return PRDetail(
             key: key, body: pr["body"] as? String ?? "", checks: checks,
             reviews: reviews, comments: comments, files: files,
@@ -779,7 +787,9 @@ public struct GitHubAPI: Sendable {
             headOid: pr["headRefOid"] as? String,
             author: (pr["author"] as? [String: Any])?["login"] as? String ?? "ghost",
             state: (pr["state"] as? String).flatMap { PRState(rawValue: $0.lowercased()) },
-            merge: MergeInfo.read(pullRequest: pr, repository: data["repository"] as? [String: Any]))
+            merge: MergeInfo.read(pullRequest: pr, repository: data["repository"] as? [String: Any]),
+            // Null (a field-level error) isn't known, so the section stays hidden; an absent field reads as none.
+            linkedIssues: closing is NSNull ? nil : Self.relatedIssues(closing))
     }
 
     /// The pull request's head commit and state right now, for a review that must name the commit it saw.
@@ -955,7 +965,47 @@ public struct GitHubAPI: Sendable {
             key: key, issue: issue, body: node["body"] as? String ?? "",
             commentTotal: max(commentsConnection?["totalCount"] as? Int ?? issue.commentCount, comments.count),
             lastComments: Array(comments.suffix(2)),
-            linkedPRs: prNodes.compactMap { ($0 as? [String: Any]).flatMap(Self.linkedPR) })
+            linkedPRs: prNodes.compactMap { ($0 as? [String: Any]).flatMap(Self.linkedPR) },
+            relations: Self.relations(node))
+    }
+
+    private static func relations(_ node: [String: Any]) -> IssueRelations {
+        let subIssues = relatedIssues(node["subIssues"])
+        let subSummary = node["subIssuesSummary"] as? [String: Any]
+        let dependencies = node["issueDependenciesSummary"] as? [String: Any]
+        return IssueRelations(
+            parent: relatedIssue(node["parent"]),
+            subIssues: subIssues,
+            // Without the summary, the rows' own count and closed rows stand in, so it never reads "0 of 0".
+            subIssuesTotal: subSummary.map { $0["total"] as? Int ?? 0 } ?? subIssues.totalCount,
+            subIssuesCompleted: subSummary.map { $0["completed"] as? Int ?? 0 }
+                ?? subIssues.items.filter { !$0.isOpen }.count,
+            blockedBy: relatedIssues(node["blockedBy"]),
+            openBlockedBy: dependencies?["blockedBy"] as? Int,
+            blocking: relatedIssues(node["blocking"]),
+            openBlocking: dependencies?["blocking"] as? Int)
+    }
+
+    /// A connection of related issues. `returned` counts every node, null ones included, so a null
+    /// (an issue the account can't read) doesn't read as "more".
+    static func relatedIssues(_ connection: Any?) -> RelatedIssues {
+        guard let connection = connection as? [String: Any] else { return .empty }
+        let nodes = connection["nodes"] as? [Any] ?? []
+        let items = nodes.compactMap(relatedIssue)
+        return RelatedIssues(
+            items: items, totalCount: connection["totalCount"] as? Int ?? items.count, returned: nodes.count)
+    }
+
+    static func relatedIssue(_ node: Any?) -> RelatedIssue? {
+        guard let node = node as? [String: Any],
+              let number = node["number"] as? Int,
+              let title = node["title"] as? String,
+              let url = (node["url"] as? String).flatMap(URL.init(string:)),
+              let repo = (node["repository"] as? [String: Any])?["nameWithOwner"] as? String
+        else { return nil }
+        return RelatedIssue(
+            key: PRKey(repo: repo, number: number), title: title, url: url,
+            isOpen: node["state"] as? String == "OPEN", stateReason: Decoding.stateReason(node["stateReason"] as? String))
     }
 
     // MARK: Decoding helpers

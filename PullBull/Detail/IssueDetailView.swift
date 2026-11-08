@@ -43,6 +43,10 @@ struct IssueDetailView: View {
                             if let error = fetch?.error {
                                 RefreshFailedNote(message: error) { model.reloadIssueDetail() }
                             }
+                            if let relations = detail.relations {
+                                if relations.hasDependencies { relationshipsSection(relations) }
+                                if relations.subIssues.isShown { subIssuesSection(relations) }
+                            }
                             linkedPRsSection(detail.linkedPRs)
                             DescriptionSection(source: detail.body)
                             conversationSection(detail, now: context.date)
@@ -73,7 +77,7 @@ struct IssueDetailView: View {
     private var header: some View {
         HStack(spacing: 4) {
             DetailBackButton(
-                title: backTitle, position: model.detailWalk?.position(showing: key, kind: .issue),
+                title: backTitle, position: model.detailPosition(for: key, kind: .issue),
                 action: model.closeIssueDetail)
             Spacer(minLength: 0)
             DetailIconButton(symbol: "arrow.up.right.square", help: "Open on GitHub") {
@@ -106,7 +110,8 @@ struct IssueDetailView: View {
     }
 
     private var backTitle: String {
-        model.askReturn.backTitle ?? (model.issueDetailReturnRoute == .search ? "Search" : model.selectedTabTitle)
+        model.trailBackTitle ?? model.askReturn.backTitle
+            ?? (model.issueDetailReturnRoute == .search ? "Search" : model.selectedTabTitle)
     }
 
     private var repoName: String {
@@ -117,7 +122,7 @@ struct IssueDetailView: View {
 
     private func summary(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(issue?.title ?? "\(key.repo) #\(key.number)")
+            Text(issue?.title ?? model.relatedIssue(for: key)?.title ?? "\(key.repo) #\(key.number)")
                 .font(.system(size: 15, weight: .semibold))
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -228,10 +233,67 @@ struct IssueDetailView: View {
                 DetailCard {
                     ForEach(Array(shown.enumerated()), id: \.element.key) { index, pr in
                         if index > 0 { CardDivider() }
-                        LinkedPRLine(pr: pr) { model.openDetail(pr.key) }
+                        LinkedPRLine(pr: pr) { model.followLink(.init(kind: .pullRequest, key: pr.key)) }
                     }
                 }
             }
+        }
+    }
+
+    private func relationshipsSection(_ relations: IssueRelations) -> some View {
+        DetailSection(title: "Relationships") {
+            DetailCard {
+                if let parent = relations.parent {
+                    groupHeading("Parent", summary: nil)
+                    relatedLine(parent)
+                }
+                if relations.blockedBy.isShown {
+                    if relations.parent != nil { CardDivider() }
+                    groupHeading("Blocked by", summary: relations.blockedBySummary)
+                    relatedLines(relations.blockedBy)
+                }
+                if relations.blocking.isShown {
+                    if relations.parent != nil || relations.blockedBy.isShown { CardDivider() }
+                    groupHeading("Blocking", summary: relations.blockingSummary)
+                    relatedLines(relations.blocking)
+                }
+            }
+        }
+    }
+
+    private func subIssuesSection(_ relations: IssueRelations) -> some View {
+        DetailSection(title: "Sub-issues", summary: relations.subIssuesSummary) {
+            DetailCard { relatedLines(relations.subIssues) }
+        }
+    }
+
+    private func groupHeading(_ title: String, summary: String?) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            if let summary { Text(summary).monospacedDigit() }
+        }
+        .font(.system(size: 11))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.top, 8)
+        .padding(.bottom, 2)
+    }
+
+    private func relatedLine(_ issue: RelatedIssue) -> some View {
+        RelatedIssueLine(issue: issue, repo: key.repo) {
+            model.followLink(.init(kind: .issue, key: issue.key))
+        }
+    }
+
+    @ViewBuilder private func relatedLines(_ group: RelatedIssues) -> some View {
+        ForEach(Array(group.items.enumerated()), id: \.element.key) { index, issue in
+            if index > 0 { CardDivider() }
+            relatedLine(issue)
+        }
+        if group.moreCount > 0 {
+            if !group.items.isEmpty { CardDivider() }
+            MoreOnGitHubLine(count: group.moreCount, url: webURL)
         }
     }
 
