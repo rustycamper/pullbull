@@ -102,7 +102,7 @@ struct PRDetailView: View {
     }
 
     private var backTitle: String {
-        if let title = model.askReturn.backTitle ?? model.trailBackTitle { return title }
+        if let title = model.trailBackTitle ?? model.askReturn.backTitle { return title }
         switch model.detailReturnRoute {
         case .issueDetail(let issue): return "#\(issue.number)"
         case .search: return "Search"

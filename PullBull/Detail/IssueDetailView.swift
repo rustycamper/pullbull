@@ -110,7 +110,7 @@ struct IssueDetailView: View {
     }
 
     private var backTitle: String {
-        model.askReturn.backTitle ?? model.trailBackTitle
+        model.trailBackTitle ?? model.askReturn.backTitle
             ?? (model.issueDetailReturnRoute == .search ? "Search" : model.selectedTabTitle)
     }
 
