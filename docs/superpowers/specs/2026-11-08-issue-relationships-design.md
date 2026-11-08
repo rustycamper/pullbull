@@ -62,7 +62,7 @@ closingIssuesReferences(first: 20) { totalCount nodes { ...relatedIssue } }
 **The related-issue fields** are `number title url state stateReason repository { nameWithOwner }`. That is enough for the row and for the glyph that `IssueGlyph` (open, completed, not planned) already supplies.
 
 - `issueDependenciesSummary.blockedBy` is the open blocker count. `totalBlockedBy` counts every blocker, closed ones included. `blocking` and `totalBlocking` work the same way. These counts were checked against #1026 and #1028.
-- A null node, such as an issue the account can't read, is skipped. The "+N more" count is `totalCount` minus the rows shown, so items GitHub left out still get counted somewhere.
+- A null node, such as an issue the account can't read, is skipped.
 
 ## Issue detail
 
@@ -93,8 +93,7 @@ LINKED PULL REQUESTS
 - **Relationships** is one `DetailSection` holding one `DetailCard`. The groups inside it come in a fixed order: Parent, Blocked by, Blocking. Each group has a small sub-heading and is separated from the next by a `CardDivider`.
   - A group with nothing in it is left out.
   - With all three groups empty, the section is left out.
-  - Blocked by's summary is "N open" when any blocker is open, else "all closed".
-  - Blocking's summary is its total.
+  - Blocked by's and Blocking's summaries are both "N open" when any issue in the group is open, else "all closed". They come from `issueDependenciesSummary`.
 - **Sub-issues** is its own `DetailSection`, with the summary "N of M done" from `subIssuesSummary`. It's left out when `total` is 0.
 - **The row** has the shape of `LinkedPRLine`:
   - The issue's state glyph and colour, as list rows use them.
@@ -102,8 +101,8 @@ LINKED PULL REQUESTS
   - A grey line reading `#N · state`. The state text is the word issue rows already use for that state. When the related issue is in a different repository from the issue on screen, the line reads `owner/repo#N · state`.
   - A chevron.
   - Closed and not-planned issues are listed too, with their own glyph. They aren't hidden or dimmed.
-- **More than 20** in a group: a last line "+N more on GitHub" opens the issue on screen in the browser.
-- The state shown for each row is GitHub's answer from the last detail read. Edit overrides apply wherever one already exists for that issue's state.
+- **More than 20** in a group: a last line "+N more on GitHub" opens the issue on screen in the browser. N is `totalCount` minus the nodes GitHub returned, null ones included. The line shows only when N > 0. An unreadable item, a null node, is just left out and isn't counted as "more", since the link wouldn't show it either.
+- The state shown for each row is GitHub's answer from the last read of the detail on screen. PullBull can't change an issue's state, and no edit override touches a related row.
 
 ## PR detail
 
@@ -121,14 +120,16 @@ Today a PR opened from an issue's Linked pull requests returns to that issue. Op
 - **Following a link** appends a hop and opens it. This holds in every direction: issue to issue, issue to PR, and PR to issue.
   - A hop doesn't go through the from-outside steps of `openDetail` and `openIssueDetail`. It doesn't touch `askReturn`, the return routes, the back scopes or the list or search selection.
   - The trail owns the whole back chain from the base onwards.
-  - Today's special case, a PR opened from an issue returning via `detailReturnRoute = .issueDetail`, becomes a trail with two entries. The special case goes.
+  - Today's Linked pull requests row, a PR opened from an issue returning via `detailReturnRoute = .issueDetail`, becomes a trail with two entries.
+  - A PR opened from outside while an issue detail is on screen, such as a notification, keeps today's return to that issue. It's a new base whose origin is that issue detail, and Back to it makes the issue the base of a fresh trail. Any trail the issue had before is gone, as is everything else a notification replaces.
 - **Back** from a hop returns to the entry before it. That detail shows its cached copy at once and is fetched again, as the issue detail is now when coming back from a linked PR. Back from the base goes to its origin, exactly as today, and clears the trail.
 - **The back button's title** is `#N` of the entry before while on a hop, and the origin's title on the base, as today.
-- **No loops:** opening an item already on the trail, the base included, goes back to that entry and drops everything after it. For example, base #1028 → Blocked by #1026 → Blocking #1028 lands back on the base #1028, and Back from there goes to its origin. The trail never holds the same item twice.
-- **The walk** (⌥↓ / ⌥↑ through the list) belongs to the base. On a hop, stepping does nothing and its "2 of 6" isn't shown, as today on a linked PR. Hops leave the list and search selection alone, so Back to the base finds the walk, its position and the selection as they were.
+- **No loops:** opening an item already on the trail, the base included, goes back to that entry and drops everything after it, exactly as that many Backs would: cached copy at once, then fetched again. For example, base #1028 → Blocked by #1026 → Blocking #1028 lands back on the base #1028, and Back from there goes to its origin. The trail never holds the same item twice.
+- **The walk** (⌥↓ / ⌥↑ through the list) belongs to the base. On a hop, the "2 of 6" isn't shown and stepping does nothing. This holds even when the hop's item is in the walk, such as a blocker that is also on the list. It's decided by being on a hop, not by the walk's kind. Hops leave the list and search selection alone, so Back to the base finds the walk, its position and the selection as they were.
+- **Everything that today asks "which detail is this, and where does it return to"** reads the trail's base: the popover-close handling of the back scopes (`showsPRDetail`, `showsIssueDetail`), `detailReturnsToSearch`, and the back button's position. A hop of either kind over a base of the other kind counts as being in the base's detail. Closing and reopening the popover on a hop, then Backing to the base and then to its origin, lands on the base's origin chip, or its search with the query kept.
 - **Starting fresh:** opening a detail from outside a detail (a row, a notification, Ask, search) starts a new trail with that detail as the base.
 - **Kept and cleared:** the trail lives exactly as long as being in a detail does. Closing and reopening the popover keeps it, as the open detail and its walk are kept today. Anything that today takes the route out of a detail clears it: an account switch, a reset to the list, Back from the base.
-- **Header before load:** a hop whose item is in no list and has no cached detail shows the row's `#N`, title and state glyph until it loads. The rest of the header stays empty until then. `linkedPR(for:)` does this today for a linked PR's title. It generalises to looking the key up among the related items of the details on the trail.
+- **Header before load:** a hop whose item is in no list and has no cached detail shows the row's title until it loads, in place of today's `owner/repo #N`. No stub `BoardIssue` or `PullRequest` is built from the row. It would show an empty Details card, "no assignees" and no labels, which isn't known yet. So the state pill, byline and Details card wait for the load, as they do today for a linked PR in no list. `linkedPR(for:)` gives that title today for a linked PR. It generalises to looking the key up among the related items of the details on the trail.
 - **Unreadable items:** a hop to an item the account can't read, in another org or with no access, still goes on the trail. Its detail shows the existing load error with Retry, and Back works as for any hop. Rows aren't checked before opening.
 
 ## Caching
@@ -137,7 +138,8 @@ Today a PR opened from an issue's Linked pull requests returns to that issue. Op
 - Details cached before this change still decode.
   - **Issue detail:** a cached copy shows no relationships until the next read. The detail is always read again on open, so this lasts only for the moment the cached copy is on screen.
   - **PR detail:** the missing field is `nil`. That's "not known", not "none": the Linked issues section stays hidden until a read succeeds, even when that read fails or happens offline. Showing "No linked issues" would be wrong for a PR that has some. A detail read by this version always stores the field, with an empty list when there are none.
-- `isCurrent(for:)` is unchanged. A blocker closing elsewhere doesn't change this issue's `updatedAt`, so a prefetched detail can show a stale blocker state until the issue is opened. Opening the issue always reads it again.
+- `isCurrent(for:)` is unchanged. A blocker closing elsewhere doesn't change this issue's `updatedAt`, so a prefetched detail can show a stale blocker state until the issue is opened. Prefetch also won't refresh a legacy cached detail whose `updatedAt` still matches. Opening the issue always reads it again.
+- Back to an earlier entry shows its cached copy first, so for that moment a related row can show the state from before. For example, B closed on GitHub while you were on its detail. The read that follows corrects it, and that's accepted. Rows aren't patched from other details' copies.
 
 ## Testing
 
@@ -148,6 +150,11 @@ Today a PR opened from an issue's Linked pull requests returns to that issue. Op
   - A legacy cache decoding.
   - The query text containing the new fields, as `DecodingTests` does for the list query.
 - **Trail logic:** tests over the trail's push, Back, dedupe and clearing rules. This means the trail is a small type that can be tested on its own, not state spread across `AppModel`.
+- **In the app** (there's no app test target), checked by hand:
+  - Close and reopen the popover on a hop, then Back to the base and then to its origin. It lands on the origin chip, or the search with its query.
+  - A hop to an issue that's also in the walk shows no "2 of 6", and ⌥↓ does nothing there.
+  - An account switch mid-trail lands on the list with the trail gone.
+  - A notification PR over an issue detail returns to that issue.
 - **Real GitHub:**
   - seai-tech/seai-server #1026 (Blocking #1028) and #1028 (Blocked by #1026), read with the peter-seai account. Only reads happen there.
   - A parent with sub-issues, and a PR with a closing issue, set up in the test repo rustycamper/pullbar.
