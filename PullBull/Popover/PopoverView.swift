@@ -1857,10 +1857,25 @@ private enum ListPane: Equatable {
 private enum DetailLayer: Equatable {
     case ask, stats, issue(PRKey), pr(PRKey)
 
-    /// The layers the model's route shows, bottom to top: a linked PR's detail sits on the issue it was
-    /// opened from, details opened from Ask sit on the Ask screen, and a PR's detail opened from Stats
-    /// sits on Stats.
+    /// The layers the model's route shows, bottom to top: a PR's detail opened over an issue sits on it,
+    /// details opened from Ask sit on the Ask screen, and a PR's detail opened from Stats sits on Stats.
+    /// On a hop, the base's origin layer sits under the hop, with a PR hop from an issue on that issue;
+    /// any other hop replaces the detail before it.
     @MainActor static func stack(for model: AppModel) -> [DetailLayer] {
+        if let trail = model.detailTrail, let previous = trail.previous {
+            let prefix: [DetailLayer] = if !model.askReturn.isEmpty {
+                [.ask]
+            } else if trail.base.kind == .pullRequest, model.detailReturnRoute == .stats {
+                [.stats]
+            } else {
+                []
+            }
+            let current = trail.current
+            if current.kind == .pullRequest, previous.kind == .issue {
+                return prefix + [.issue(previous.key), .pr(current.key)]
+            }
+            return prefix + [layer(for: current)]
+        }
         let ask: [DetailLayer] = model.askReturn.isEmpty ? [] : [.ask]
         switch model.route {
         case .list, .search:
@@ -1875,6 +1890,14 @@ private enum DetailLayer: Equatable {
             if case .issueDetail(let issue) = model.detailReturnRoute { return ask + [.issue(issue), .pr(key)] }
             if model.detailReturnRoute == .stats { return [.stats, .pr(key)] }
             return ask + [.pr(key)]
+        }
+    }
+
+    /// The layer showing a trail's `entry`.
+    private static func layer(for entry: DetailTrail.Entry) -> DetailLayer {
+        switch entry.kind {
+        case .pullRequest: .pr(entry.key)
+        case .issue: .issue(entry.key)
         }
     }
 }
