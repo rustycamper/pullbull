@@ -91,14 +91,14 @@ LINKED PULL REQUESTS
 
 - **Order:** board card, Relationships, Sub-issues, then Linked pull requests, Description and Conversation as today.
 - **Relationships** is one `DetailSection` holding one `DetailCard`. The groups inside it come in a fixed order: Parent, Blocked by, Blocking. Each group has a small sub-heading and is separated from the next by a `CardDivider`.
-  - A group with nothing in it is left out.
+  - A group with nothing in it is left out: no rows to show and no "+N more". A group whose only nodes are unreadable counts as empty.
   - With all three groups empty, the section is left out.
-  - Blocked by's and Blocking's summaries are both "N open" when any issue in the group is open, else "all closed". They come from `issueDependenciesSummary`.
+  - Blocked by's and Blocking's summaries are both "N open" when any issue in the group is open, else "all closed". They come from `issueDependenciesSummary`. When it's missing, N is the number of open rows shown.
 - **Sub-issues** is its own `DetailSection`, with the summary "N of M done" from `subIssuesSummary`. It's left out when `total` is 0.
 - **The row** has the shape of `LinkedPRLine`:
   - The issue's state glyph and colour, as list rows use them.
   - The title on one line.
-  - A grey line reading `#N · state`. The state text is the word issue rows already use for that state. When the related issue is in a different repository from the issue on screen, the line reads `owner/repo#N · state`.
+  - A grey line reading `#N · state`. The state is one lower-case word or phrase: `open`, `closed` or `not planned`. This mirrors the linked-PR row's `open` / `merged`, and the glyph's accessibility label carries the full "Closed as completed" or "Closed as not planned". When the related issue is in a different repository from the issue on screen, the line reads `owner/repo#N · state`.
   - A chevron.
   - Closed and not-planned issues are listed too, with their own glyph. They aren't hidden or dimmed.
 - **More than 20** in a group: a last line "+N more on GitHub" opens the issue on screen in the browser. N is `totalCount` minus the nodes GitHub returned, null ones included. The line shows only when N > 0. An unreadable item, a null node, is just left out and isn't counted as "more", since the link wouldn't show it either.
@@ -129,6 +129,8 @@ Today a PR opened from an issue's Linked pull requests returns to that issue. Op
 - **Everything that today asks "which detail is this, and where does it return to"** reads the trail's base: the popover-close handling of the back scopes (`showsPRDetail`, `showsIssueDetail`), `detailReturnsToSearch`, and the back button's position. A hop of either kind over a base of the other kind counts as being in the base's detail. Closing and reopening the popover on a hop, then Backing to the base and then to its origin, lands on the base's origin chip, or its search with the query kept.
 - **Starting fresh:** opening a detail from outside a detail (a row, a notification, Ask, search) starts a new trail with that detail as the base.
 - **Kept and cleared:** the trail lives exactly as long as being in a detail does. Closing and reopening the popover keeps it, as the open detail and its walk are kept today. Anything that today takes the route out of a detail clears it: an account switch, a reset to the list, Back from the base.
+- **How it moves on screen:** a PR opened from an issue slides over it with the issue kept mounted underneath, as a linked PR does today. Back slides it off, and the issue keeps its scroll position and unsent comment. Every other hop (issue to issue, PR to issue) replaces the detail on screen in place, as one detail replacing another does today. The popover mounts one issue layer and one PR layer at most, and an issue sliding over an issue would need a deeper stack than that. Under any detail of the trail sits the base's origin layer, when it has one: Ask, or Stats for a PR base opened from Stats.
+- **A notification over a hop:** a PR opened from outside while a hop is on screen is a new base whose origin is the list. The hop's leftover return route isn't inherited.
 - **Header before load:** a hop whose item is in no list and has no cached detail shows the row's title until it loads, in place of today's `owner/repo #N`. No stub `BoardIssue` or `PullRequest` is built from the row. It would show an empty Details card, "no assignees" and no labels, which isn't known yet. So the state pill, byline and Details card wait for the load, as they do today for a linked PR in no list. `linkedPR(for:)` gives that title today for a linked PR. It generalises to looking the key up among the related items of the details on the trail.
 - **Unreadable items:** a hop to an item the account can't read, in another org or with no access, still goes on the trail. Its detail shows the existing load error with Retry, and Back works as for any hop. Rows aren't checked before opening.
 
