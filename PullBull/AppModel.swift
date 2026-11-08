@@ -255,7 +255,11 @@ final class AppModel {
             // The trail lives exactly as long as being in a detail does.
             switch route {
             case .detail, .issueDetail: break
-            case .list, .search, .ask, .stats: detailTrail = nil
+            case .list, .search, .ask, .stats:
+                if detailTrail != nil {
+                    detailTrail = nil
+                    trailPRs = [:]
+                }
             }
         }
     }
@@ -523,6 +527,9 @@ final class AppModel {
     /// The details opened one from another through their links, from the one opened from outside a detail
     /// (the base) to the one on screen; nil outside a detail. Back walks it back before leaving the base.
     private(set) var detailTrail: DetailTrail?
+    /// The list data each PR on the trail was last shown with, for one that leaves the lists and results
+    /// before Back returns to it; emptied whenever the trail is replaced or ends.
+    @ObservationIgnored private var trailPRs: [PRKey: PullRequest] = [:]
     /// Done as the popover shows it, so a walk's order is the one on screen.
     @ObservationIgnored var listExpansion = ListExpansion()
     /// A notification opened a detail while the popover was closed; the next open shows it as it is.
@@ -2464,12 +2471,14 @@ extension AppModel {
             askReturn.reset()
             detailReturnRoute = .list
             detailBackScope = nil
+            detailWalk = nil
         }
         openedPR = fetchedPullRequest(for: key)
         closeCompletion()
         route = .detail(key)
         loadDetail(key)
         detailTrail = DetailTrail(base: .init(kind: .pullRequest, key: key))
+        trailPRs = openedPR.map { [key: $0] } ?? [:]
     }
 
     /// A relationship, Linked pull requests or Linked issues row in the detail on screen: opens `entry` as
@@ -2506,7 +2515,8 @@ extension AppModel {
         }
         switch entry.kind {
         case .pullRequest:
-            openedPR = fetchedPullRequest(for: entry.key)
+            openedPR = fetchedPullRequest(for: entry.key) ?? trailPRs[entry.key]
+            if let openedPR { trailPRs[entry.key] = openedPR }
             closeCompletion()
             route = .detail(entry.key)
             loadDetail(entry.key)
@@ -2539,6 +2549,7 @@ extension AppModel {
             // The issue's walk, if any, goes on from there, as the base of a fresh trail.
             route = detailReturnRoute
             detailTrail = DetailTrail(base: .init(kind: .issue, key: issue))
+            trailPRs = [:]
             loadIssueDetail(issue)
             return
         } else if detailReturnRoute == .stats {
@@ -3344,12 +3355,14 @@ extension AppModel {
             askReturn.reset()
             issueDetailReturnRoute = .list
             issueDetailBackScope = nil
+            detailWalk = nil
         }
         openedIssue = fetchedIssue(for: key) ?? issueDetails[key]?.issue
         closeCompletion()
         route = .issueDetail(key)
         loadIssueDetail(key)
         detailTrail = DetailTrail(base: .init(kind: .issue, key: key))
+        trailPRs = [:]
     }
 
     /// Back: on a hop, the detail before it on the trail (its cached copy, then fetched again). From the
