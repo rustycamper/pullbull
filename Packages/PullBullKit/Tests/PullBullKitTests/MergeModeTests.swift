@@ -146,10 +146,10 @@ import Testing
     @Test func secondStepWaitsAMoment() {
         var mode = shown(info(failing: 1))
         #expect(!press(&mode, at(1)))
-        #expect(!press(&mode, at(1.25)))
+        #expect(!press(&mode, at(1.45)))
         #expect(mode.isSecondStep)
         #expect(mode.phase == .ready)
-        #expect(press(&mode, at(1.35)))
+        #expect(press(&mode, at(1.55)))
     }
 
     @Test func noWarningsSendOnTheFirstConfirm() {
