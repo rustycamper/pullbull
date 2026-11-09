@@ -73,6 +73,8 @@ public enum ShortcutCatalog {
                 Shortcut("Search", [["/"], ["⌘", "F"]], note: "Or just start typing"),
                 Shortcut("Saved search 1–9", [["⌃", "1…9"]], note: "In Settings order"),
                 Shortcut("Narrow to the chip beside", [["←"], ["→"]], note: "At the field's start or end"),
+                Shortcut("Open the picked result", [["↩"]],
+                         note: "Pick it with ↑ ↓ first. #123 or a link with one result needs no pick"),
                 Shortcut("Ask AI", [["⌥", "⌘", "↩"]], note: "From the field, once Ask AI is on"),
                 Shortcut("Take the grey suggestion", [["⇥"]], note: "Writes it and opens its list"),
             ]),
