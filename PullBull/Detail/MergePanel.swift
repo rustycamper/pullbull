@@ -83,16 +83,14 @@ struct MergePanel: View {
         model.changeMergeMethod(by: to - from)
     }
 
-    /// Merge is the accent-filled button; Merge anyway stays outlined, so the riskier step doesn't look like
-    /// the recommended one.
-    @ViewBuilder private var confirmButton: some View {
-        Group {
-            if mode.isSecondStep {
-                OutlinedTextButton(title: confirmTitle) { model.confirmMerge(on: mode.key) }
-            } else {
-                AccentTextButton(title: confirmTitle) { model.confirmMerge(on: mode.key) }
-            }
-        }
+    /// Merge is the accent-filled button; Merge anyway is filled amber, the warnings' colour, so the riskier
+    /// step stands out from the recommended one without looking disabled.
+    private var confirmButton: some View {
+        AccentTextButton(
+            title: confirmTitle,
+            fill: mode.isSecondStep ? Palette.amberGlyph : .accentColor,
+            text: mode.isSecondStep ? Palette.onAmber : Palette.onAccent
+        ) { model.confirmMerge(on: mode.key) }
         .disabled(mode.phase != .ready)
         .accessibilityLabel(mode.phase == .ready ? mode.confirmTitle : confirmTitle)
     }

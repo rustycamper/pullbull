@@ -111,7 +111,7 @@ For a direct merge, any of these needs a second step:
 - no checks at all, which also covers a commit whose checks haven't started;
 - a review requesting changes that's still standing.
 
-The first confirm changes the label to "Merge anyway" and disarms for 1 s. A second, separate ⌃⌘↩ merges. A fast double tap can't pass, as the first only arms the second.
+The first confirm changes the label to "Merge anyway", fills the button amber, and disarms for 0.3 s. A second, separate ⌃⌘↩ merges. A fast double tap can't pass, as the first only arms the second. The button is filled amber, the warnings' colour, rather than outlined: an outlined button read as disabled and was easy to miss. Amber still keeps it apart from the accent-filled Merge. The disarm is 0.3 s rather than 1 s because a second click inside a full second was dropped without any sign, which made the button look broken.
 
 ### Confirming
 
