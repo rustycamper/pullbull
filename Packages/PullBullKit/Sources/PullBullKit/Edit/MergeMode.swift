@@ -49,7 +49,7 @@ public enum MergeWarning: Equatable, Sendable {
 
 public struct MergeMode: Equatable, Sendable {
     public static let armDelay: TimeInterval = 0.5
-    public static let secondStepDelay: TimeInterval = 1
+    public static let secondStepDelay: TimeInterval = 0.5
 
     public let key: PRKey
     public let pinnedHead: String

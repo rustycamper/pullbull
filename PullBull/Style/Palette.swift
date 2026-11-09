@@ -71,6 +71,8 @@ enum Palette {
     static let approved = dynamic(light: 0x1F7A3A, dark: 0x56C26F)
     static let amberFill = dynamic(light: 0xB07000, dark: 0xF5B041, alpha: (0.13, 0.15))
     static let amberGlyph = dynamic(light: 0x8A5700, dark: 0xF5B041)
+    /// Text on an `amberGlyph` fill: white on the dark light-mode amber, black on the bright dark-mode one.
+    static let onAmber = dynamic(light: 0xFFFFFF, dark: 0x000000)
     static let mergedText = dynamic(light: 0x7339AE, dark: 0xC69EF0)
     static let mergedFill = dynamic(light: 0x7339AE, dark: 0xC69EF0, alpha: (0.09, 0.11))
     /// Red for something wrong in the popover and Settings: a closed PR, a rejected key, an invalid field.
