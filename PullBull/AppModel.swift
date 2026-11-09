@@ -357,8 +357,14 @@ final class AppModel {
     /// Each tab's matches for `searchQuery` (`SearchNarrowing.counts`), kept until the query, the focus
     /// or the lists change; empty without a query.
     private(set) var searchMatchCounts: [SearchScope: IssueTabCount] = [:]
-    /// The highlighted result (Return opens it).
-    var searchSelection: PRKey?
+    /// The highlighted result and whether it was picked or implied by a number or link query.
+    private var searchPick: SearchPick = .none
+    /// The highlighted result (Return opens it); nil until one is picked, as Return after typing means
+    /// search. Setting it picks.
+    var searchSelection: PRKey? {
+        get { searchPick.key }
+        set { searchPick = .picked(newValue) }
+    }
     /// Whether the results' Closed section and Done group are expanded; both start so, and stay as set
     /// through query edits, scope and mode changes and a detail, until the field empties.
     private(set) var searchExpansion = ListExpansion(closed: true, done: true)
@@ -475,6 +481,8 @@ final class AppModel {
     /// The result highlighted when Back searched again, kept highlighted if a later answer of that search
     /// still has it; nil once the search is done or the user moves on.
     @ObservationIgnored private var keptSearchSelection: PRKey?
+    /// Until when the running search waits before asking GitHub, for typing; nil when it isn't waiting.
+    @ObservationIgnored private var searchDebounceEnds: ContinuousClock.Instant?
     /// GitHub's recent search answers for the running account and scope.
     @ObservationIgnored private let searchCache = SearchCache()
     @ObservationIgnored private var boardPickTask: Task<Void, Never>?
@@ -1086,6 +1094,7 @@ final class AppModel {
         // Editing or emptying the field cancels a running Ask and drops its line: back to normal search.
         if text != searchText {
             clearAsk()
+            dropSearchPick()
             // ⌘Z undoes this typing now, not an edit made before it.
             edits.typed()
         }
@@ -1178,6 +1187,7 @@ final class AppModel {
     /// the end, and it searches as if typed. The view puts the caret there.
     func applySavedSearch(_ saved: SavedSearch) {
         searchStartedOnTab = nil
+        dropSearchPick()
         if let query = searchField.apply(saved, people: people, labels: labels, statuses: statuses, repos: repos) { runSearch(query, debounced: false) }
     }
 
@@ -1189,6 +1199,13 @@ final class AppModel {
         if saved.fieldText != searchText { clearAsk() }
         applySavedSearch(saved)
         return true
+    }
+
+    /// New text in the field: a result picked for the old text, or kept through Back, isn't the one Return
+    /// should open now.
+    private func dropSearchPick() {
+        searchPick = .none
+        keptSearchSelection = nil
     }
 
     /// The field's query, trimmed, is one of the saved searches: the bookmark shows filled.
@@ -1228,6 +1245,7 @@ final class AppModel {
         searchGeneration += 1
         let key = searchKey(for: query)
         keptSearchSelection = keeping ?? (key == searchedFor ? keptSearchSelection : nil)
+        searchDebounceEnds = nil
         searchedFor = key
         refreshSearchMatchCounts(for: query)
         guard query != .empty else {
@@ -1259,9 +1277,11 @@ final class AppModel {
             return
         }
         let engine = SearchEngine(api: api(for: account))
+        let debounce: Duration = debounced ? .milliseconds(250) : .zero
+        if debounced { searchDebounceEnds = .now + debounce }
         let search = engine.results(
             query, snap: snapshot, account: account, cache: searchCache, focus: repoFocus,
-            debounce: debounced ? .milliseconds(250) : .zero)
+            debounce: debounce)
         setSearchResults(search.first)
         let generation = searchGeneration
         searchTask = Task { [weak self] in
@@ -1486,10 +1506,15 @@ final class AppModel {
         }
     }
 
-    /// Return: the selected result's detail view; with no result, the fallback line's mode.
+    /// Return: the picked result's detail view. With none, the fallback line's mode, or GitHub asked now
+    /// instead of after the typing delay.
     func openSearchSelection() {
         guard let key = searchSelection, let results = searchResults else {
-            followSearchFallback()
+            if searchFallback != nil {
+                followSearchFallback()
+            } else if let ends = searchDebounceEnds, ContinuousClock.now < ends {
+                runSearch(searchQuery, debounced: false)
+            }
             return
         }
         if let pr = (results.openPRs + results.closedPRs).first(where: { $0.key == key }) {
@@ -1536,12 +1561,7 @@ final class AppModel {
 
     private func setSearchResults(_ results: SearchResults) {
         rawSearchResults = results
-        let keys = searchItemKeys
-        if let kept = keptSearchSelection, keys.contains(kept) {
-            searchSelection = kept
-        } else if searchSelection.map({ !keys.contains($0) }) ?? true {
-            searchSelection = keys.first
-        }
+        searchPick = searchPick.updated(kept: keptSearchSelection, query: searchQuery, keys: searchItemKeys)
         if results.phase == .done { keptSearchSelection = nil }
     }
 

@@ -20,6 +20,13 @@ private let modifierOrder = ["⌃", "⌥", "⇧", "⌘"]
             Shortcut("Narrow to the chip beside", [["←"], ["→"]], note: "At the field's start or end")))
     }
 
+    @Test func returnInSearchSaysItNeedsAPick() throws {
+        let search = try #require(ShortcutCatalog.sections(toggle: nil).first { $0.title == "Search" })
+        #expect(search.shortcuts.contains(Shortcut(
+            "Open the picked result", [["↩"]],
+            note: "Pick it with ↑ ↓ first. #123 or a link with one result needs no pick")))
+    }
+
     @Test func commentingShortcuts() throws {
         let commenting = try #require(ShortcutCatalog.sections(toggle: nil).first { $0.title == "Commenting" })
         #expect(commenting.shortcuts == [
