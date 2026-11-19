@@ -104,7 +104,7 @@ viewerCanReact
 
 ## Approaches considered
 
-- **A · Show at once, then reconcile (chosen).** The chip flips on click, and `EditOverrides` keeps it through stale refreshes until GitHub agrees. A reaction should feel cheaper than a reply, and only an instant click does.
+- **A · Show at once, then reconcile (chosen).** The chip flips on click, and `ReactionOverrides` keeps it through stale refreshes, applied by `fetchedAt`, until GitHub agrees. A reaction should feel cheaper than a reply, and only an instant click does.
 - **B · Wait for GitHub.** The chip dims until GitHub answers, then shows its counts. It's simpler, but every click lags 0.3 to 1 s, and a refresh started before the click can still briefly undo it.
 - **C · React, then reload the detail.** This is the simplest, but it's the slowest and the whole detail flickers.
 

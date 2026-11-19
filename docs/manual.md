@@ -215,7 +215,7 @@ React to the description, a comment or a review with text from the detail of an 
 - **React:** click a chip to add your reaction of that kind, or to take it back. It shows at once, and a refresh that was already running doesn't undo it. A thing with no reactions shows no chips. Clicking again before GitHub has answered ends in the state of your last click
 - **Picker:** the ☺︎ at the top right of the description, comment or review, shown while the pointer is over it, opens a row of GitHub's eight reactions, the ones you gave tinted. Clicking one adds or removes it and closes the row. <kbd>Esc</kbd>, a click elsewhere in the detail or leaving the detail closes it without sending anything. VoiceOver has a **React…** action on each, and the chips offer Add reaction or Remove reaction
 - **Refused:** the chip goes back and a line above the footer says "Couldn't add 👍 on #88: …" (or "Couldn't remove") with GitHub's reason and **Open on GitHub**
-- **Not sure:** after a timeout or a dropped connection PullBull reads the detail once. If it shows your reaction, nothing more happens. If not, the chip goes back and the line says "Couldn't confirm your 👍 on #88. Check it on GitHub."
+- **Not sure:** after a timeout or a dropped connection PullBull reads the detail once. If it shows what you asked for, nothing more happens. If not, the chip goes back and the line says "Couldn't confirm your 👍 on #88. Check it on GitHub."
 - **Permissions:** the same as commenting, so nothing new to accept. Where you can't react (a locked conversation, an archived repo, or an account without that permission), the ☺︎ is gone and the chips only show counts and names
 
 ## Reviewing
