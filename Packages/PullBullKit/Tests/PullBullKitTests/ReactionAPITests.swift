@@ -44,6 +44,6 @@ private func answer(_ payload: String) -> String {
 
     @Test func aPayloadWithoutSubjectStaysUnknown() async {
         let t = GraphQLQueue([#"{"data":{"addReaction":{"subject":null}}}"#])
-        await #expect(throws: APIError.self) { try await api(t).addReaction(.eyes, to: "IC_1") }
+        await #expect(throws: APIError.graphQL("GitHub didn't apply the change")) { try await api(t).addReaction(.eyes, to: "IC_1") }
     }
 }
