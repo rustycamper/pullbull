@@ -93,3 +93,53 @@ public struct Reactions: Codable, Sendable, Hashable {
         groups.first { $0.content == content }?.viewerHasReacted ?? false
     }
 }
+
+extension Reactions {
+    /// One viewer's reaction laid over these groups: a missing group is added (count 0, no reactors) at its
+    /// `ReactionContent.allCases` place. A group already in the asked state is left as it is.
+    func laying(_ content: ReactionContent, add: Bool) -> Reactions {
+        var result = self
+        let order = ReactionContent.allCases
+        var index = result.groups.firstIndex { $0.content == content }
+        if index == nil {
+            let rank = order.firstIndex(of: content) ?? order.count
+            let at = result.groups.firstIndex { (order.firstIndex(of: $0.content) ?? order.count) > rank }
+                ?? result.groups.count
+            result.groups.insert(ReactionGroup(content: content, count: 0, viewerHasReacted: false, reactors: []), at: at)
+            index = at
+        }
+        guard let index, result.groups[index].viewerHasReacted != add else { return result }
+        result.groups[index].count = max(result.groups[index].count + (add ? 1 : -1), 0)
+        result.groups[index].viewerHasReacted = add
+        return result
+    }
+}
+
+extension PRDetail {
+    /// GitHub's answer for one subject written into the stored detail: the description, a comment or a
+    /// review whose `reactions.subjectId` matches. `fetchedAt` is kept. Unchanged when nothing matches.
+    public func replacingReactions(_ reactions: Reactions) -> PRDetail {
+        var copy = self
+        if self.reactions?.subjectId == reactions.subjectId { copy.reactions = reactions }
+        for index in copy.comments.indices where copy.comments[index].reactions?.subjectId == reactions.subjectId {
+            copy.comments[index].reactions = reactions
+        }
+        for index in copy.reviews.indices where copy.reviews[index].reactions?.subjectId == reactions.subjectId {
+            copy.reviews[index].reactions = reactions
+        }
+        return copy
+    }
+}
+
+extension IssueDetail {
+    /// GitHub's answer for one subject written into the stored detail: the description or a comment whose
+    /// `reactions.subjectId` matches. `fetchedAt` is kept. Unchanged when nothing matches.
+    public func replacingReactions(_ reactions: Reactions) -> IssueDetail {
+        var copy = self
+        if self.reactions?.subjectId == reactions.subjectId { copy.reactions = reactions }
+        for index in copy.lastComments.indices where copy.lastComments[index].reactions?.subjectId == reactions.subjectId {
+            copy.lastComments[index].reactions = reactions
+        }
+        return copy
+    }
+}
