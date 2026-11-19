@@ -43,12 +43,13 @@ extension AppModel {
     /// Adds `content` to the subject of `reactions` on `key`, or takes it back when the viewer has it as
     /// shown. Shows at once; GitHub's answer settles it. Leaves the failure line and ⌘Z alone.
     func toggleReaction(_ content: ReactionContent, on reactions: Reactions, key: PRKey, isPullRequest: Bool) {
+        // Any pick closes the picker, even one that sends nothing because the viewer can no longer react.
+        reactionPicker = nil
         guard canReact(reactions, on: key, isPullRequest: isPullRequest), let account = runningAccount,
               let shown = shownReactions(reactions, on: key, now: Date()) else { return }
         let target = ReactionTarget(subjectId: reactions.subjectId, content: content)
         let wanted = !shown.viewerHasReacted(content)
         reactionOverrides.record(target, add: wanted, on: key, at: Date())
-        reactionPicker = nil
         if reactionSends[target]?.account == account {
             reactionSends[target]?.wanted = wanted
             return
