@@ -58,10 +58,22 @@ struct PRDetailView: View {
                 // The failure line sits on top of it, following the comment field as it grows.
                 .detailBottomInset(for: key)
         }
+        .overlayPreferenceValue(ReactionPickerAnchorKey.self) { anchor in
+            if model.reactionPicker?.key == key {
+                ReactionPickerLayer(anchor: anchor) { model.openReactionPicker(nil) }
+            }
+        }
+        // Leaving the detail, or walking to another, closes its reaction picker.
+        .onDisappear { closeReactionPicker(on: key) }
+        .onChange(of: key) { old, _ in closeReactionPicker(on: old) }
         // Links in PR text are untrusted: only web links open, anything else is dropped.
         .environment(\.openURL, OpenURLAction { url in
             LinkPolicy.canOpen(url) ? .systemAction(url) : .discarded
         })
+    }
+
+    private func closeReactionPicker(on key: PRKey) {
+        if model.reactionPicker?.key == key { model.openReactionPicker(nil) }
     }
 
     // MARK: Header
@@ -219,9 +231,9 @@ struct PRDetailView: View {
     @ViewBuilder private func sections(_ detail: PRDetail, now: Date) -> some View {
         if pr?.state == .open {
             statusSections(detail)
-            DescriptionSection(source: detail.body)
+            descriptionSection(detail, now: now)
         } else {
-            DescriptionSection(source: detail.body)
+            descriptionSection(detail, now: now)
             statusSections(detail)
         }
         conversationSection(detail, now: now)
@@ -397,7 +409,17 @@ struct PRDetailView: View {
             comments: shown.comments, sendingIndex: shown.sendingIndex,
             reviews: model.edits.overrides.apply(toReviews: detail.reviews, on: key))
         return ConversationSection(
-            entries: entries, total: shown.total, earlier: shown.earlier, webURL: webURL, now: now)
+            entries: entries, total: shown.total, earlier: shown.earlier, webURL: webURL, now: now,
+            reactions: { reactions(of: $0, now: now) })
+    }
+
+    private func descriptionSection(_ detail: PRDetail, now: Date) -> some View {
+        let shown = reactions(of: detail.reactions, now: now)
+        return DescriptionSection(source: detail.body, reactions: shown.reactions, react: shown.react)
+    }
+
+    private func reactions(of stored: Reactions?, now: Date) -> ShownReactions {
+        ShownReactions(stored, model: model, key: key, isPullRequest: true, now: now)
     }
 
     private func filesSection(_ detail: PRDetail) -> some View {
