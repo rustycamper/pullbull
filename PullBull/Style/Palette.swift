@@ -63,7 +63,7 @@ enum Palette {
     /// A row chosen to open, for a moment: the system's emphasized selection, with its text colour.
     static let rowFlash = Color(nsColor: .selectedContentBackgroundColor)
     static let rowFlashText = Color(nsColor: .alternateSelectedControlTextColor)
-    static let field = dynamic(light: 0xFFFFFF, dark: 0xFFFFFF, alpha: (1, 0.07))
+    static let field = dynamic(light: 0xFFFFFF, dark: 0xFFFFFF, alpha: (0.5, 0.07))
 
     static let changesRequested = dynamic(light: 0xA13007, dark: 0xFF9468)
     /// Go and done: the Ready to merge glyph on rows and in the detail, the Approved check, the diffstat's
