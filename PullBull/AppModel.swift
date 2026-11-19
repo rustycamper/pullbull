@@ -3319,6 +3319,26 @@ extension AppModel {
     /// Fetches the detail of `key` once with `account`, outside `loadDetail`'s cancelling, keeps it as
     /// `loadDetail` does while `account` still runs, and returns the comments it holds.
     func fetchDetailComments(_ key: PRKey, isPullRequest: Bool, account: AccountRef) async throws -> [Comment] {
+        switch try await fetchAndKeepDetail(key, isPullRequest: isPullRequest, account: account) {
+        case .pullRequest(let fresh): fresh.comments
+        case .issue(let fresh): fresh.lastComments
+        }
+    }
+
+    /// Fetches and keeps the detail of `key` as `fetchDetailComments` does, and returns the reactions of
+    /// `subjectId` in the detail it read; nil when that detail doesn't hold the subject.
+    func fetchDetailReactions(
+        of subjectId: String, on key: PRKey, isPullRequest: Bool, account: AccountRef
+    ) async throws -> Reactions? {
+        switch try await fetchAndKeepDetail(key, isPullRequest: isPullRequest, account: account) {
+        case .pullRequest(let fresh): fresh.reactions(of: subjectId)
+        case .issue(let fresh): fresh.reactions(of: subjectId)
+        }
+    }
+
+    private func fetchAndKeepDetail(
+        _ key: PRKey, isPullRequest: Bool, account: AccountRef
+    ) async throws -> FetchedDetail {
         let api = api(for: account)
         let store = snapshotStore
         let login = account.login
@@ -3330,7 +3350,7 @@ extension AppModel {
                 if detailFetch?.key == key { detailFetch = nil }
                 try? await store.saveDetail(fresh, account: login)
             }
-            return fresh.comments
+            return .pullRequest(fresh)
         }
         let fresh = try await api.issueDetail(key)
         if running?.account == login {
@@ -3338,8 +3358,14 @@ extension AppModel {
             if issueDetailFetch?.key == key { issueDetailFetch = nil }
             try? await store.saveIssueDetail(fresh, account: login)
         }
-        return fresh.lastComments
+        return .issue(fresh)
     }
+}
+
+/// A detail as one fetch read it.
+private enum FetchedDetail {
+    case pullRequest(PRDetail)
+    case issue(IssueDetail)
 }
 
 // MARK: - Issue detail

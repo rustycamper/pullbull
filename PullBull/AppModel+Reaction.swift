@@ -95,15 +95,20 @@ extension AppModel {
         _ target: ReactionTarget, sent add: Bool, id: UUID, account: AccountRef, answer: ReactionAnswer
     ) {
         guard let pending = liveReactionSend(target, id: id, account: account) else { return }
+        // GitHub's answer is written through even when the latest click sends again: should the follow-up
+        // be refused, the stored detail already shows what GitHub holds. The latest click's override stays.
+        if case .applied(let reactions) = answer {
+            storeReactions(reactions, on: pending.key, account: pending.account)
+        }
         follow(ReactionFlow.next(sent: add, answer: answer, wanted: pending.wanted), target: target, sent: add, pending)
     }
 
     /// Acts on what `ReactionFlow` decided for `target`, whose last write sent `add`.
     private func follow(_ step: ReactionStep, target: ReactionTarget, sent add: Bool, _ pending: ReactionSend) {
         switch step {
-        case .done(let reactions):
+        case .done:
+            // `reactionAnswered` has written GitHub's answer through.
             reactionOverrides.answered(target, at: Date())
-            storeReactions(reactions, on: pending.key, account: pending.account)
             reactionSends[target] = nil
             let emoji = target.content.emoji
             AccessibilityNotification.Announcement(add ? "Reacted with \(emoji)" : "Removed \(emoji)").post()
@@ -131,10 +136,10 @@ extension AppModel {
             guard let self else { return }
             let fetched: Reactions?
             do {
-                _ = try await self.fetchDetailComments(
-                    pending.key, isPullRequest: pending.isPullRequest, account: pending.account)
-                fetched = self.details[pending.key]?.reactions(of: target.subjectId)
-                    ?? self.issueDetails[pending.key]?.reactions(of: target.subjectId)
+                // Judged from the detail this fetch read: an older fetch can land in `details` meanwhile.
+                fetched = try await self.fetchDetailReactions(
+                    of: target.subjectId, on: pending.key, isPullRequest: pending.isPullRequest,
+                    account: pending.account)
             } catch {
                 fetched = nil
             }

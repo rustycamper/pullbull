@@ -331,13 +331,17 @@ public struct EditOverrides: Equatable, Sendable {
     }
 
     /// `reviews` with the viewer's earlier reviews replaced by the one just submitted, logins compared
-    /// case-insensitively.
+    /// case-insensitively. A fetched review by the viewer with the same state and commit is that review:
+    /// its id and reactions carry over, so it can be reacted to before the override settles.
     private static func changeReviews(
         _ reviews: [Review], _ state: ReviewState, _ commit: String, _ viewer: String, _ body: String, at date: Date
     ) -> [Review] {
         var reviews = reviews
+        let fetched = reviews.last { same($0.author, viewer) && $0.state == state && $0.commitOid == commit }
         reviews.removeAll { same($0.author, viewer) }
-        reviews.append(Review(author: viewer, state: state, submittedAt: date, commitOid: commit, body: body))
+        reviews.append(Review(
+            author: viewer, state: state, submittedAt: date, commitOid: commit, body: body,
+            id: fetched?.id, reactions: fetched?.reactions))
         return reviews
     }
 
