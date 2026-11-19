@@ -72,7 +72,8 @@
   --pill-text: rgba(0, 0, 0, 0.7);
   --fill: rgba(0, 0, 0, 0.06);
   --strong-fill: rgba(0, 0, 0, 0.1);
-  --field: #ffffff;
+  /* Palette.field is white at 0.5. */
+  --field: rgba(255, 255, 255, 0.5);
   --changes-requested: #a13007;
   --amber-glyph: #8a5700;
   --merged-text: #7339ae;
