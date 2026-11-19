@@ -100,6 +100,14 @@ final class AppModel {
     /// Posts whose outcome isn't final, per account and item. `clearAccountData` keeps them, so a post
     /// can't be sent twice across an account or org switch.
     var postsInFlight = InFlightPosts()
+    /// Reactions clicked here that the stored detail may not show yet (see AppModel+Reaction.swift).
+    /// `clearAccountData` drops them.
+    var reactionOverrides = ReactionOverrides()
+    /// Reaction writes whose outcome isn't final, per target. `clearAccountData` drops them, so an answer
+    /// that lands after a switch changes nothing.
+    @ObservationIgnored var reactionSends: [ReactionTarget: ReactionSend] = [:]
+    /// The subject whose reaction picker is open, or nil. `clearAccountData` closes it.
+    var reactionPicker: ReactionPickerSubject?
     /// Bumped when a post on `key` succeeded: the comment field on `key` clears its text and undo.
     private(set) var commentFieldReset: CommentFieldSignal?
     /// Bumped when a post on `key` was refused: the comment field on `key` takes focus.
@@ -2200,6 +2208,9 @@ final class AppModel {
         endMergeMode(on: nil)
         sendingMerges.removeAll()
         mergedHere.removeAll()
+        reactionOverrides = ReactionOverrides()
+        reactionSends.removeAll()
+        reactionPicker = nil
         draftFlips.removeAll()
         readiedHere.removeAll()
         rerunPlans.removeAll()
@@ -3287,6 +3298,22 @@ extension AppModel {
         let store = snapshotStore
         let login = account.login
         Task { try? await store.saveDetail(fresh, account: login) }
+    }
+
+    /// GitHub's answer for one reaction written into the stored detail of `key`, PR or issue, and saved;
+    /// `fetchedAt` is kept. The caller has checked `account` still runs.
+    func storeReactions(_ reactions: Reactions, on key: PRKey, account: AccountRef) {
+        let store = snapshotStore
+        let login = account.login
+        if let held = details[key] {
+            let fresh = held.replacingReactions(reactions)
+            details[key] = fresh
+            Task { try? await store.saveDetail(fresh, account: login) }
+        } else if let held = issueDetails[key] {
+            let fresh = held.replacingReactions(reactions)
+            issueDetails[key] = fresh
+            Task { try? await store.saveIssueDetail(fresh, account: login) }
+        }
     }
 
     /// Fetches the detail of `key` once with `account`, outside `loadDetail`'s cancelling, keeps it as
