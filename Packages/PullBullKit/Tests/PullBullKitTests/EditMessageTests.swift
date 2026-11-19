@@ -67,3 +67,16 @@ import Testing
         #expect(EditMessage.rerunRefused(on: key, reason: "nope") == "Couldn't re-run failed jobs on #88: nope")
     }
 }
+
+@Suite struct ReactionMessageTests {
+    private let key = PRKey(repo: "acme/app", number: 12)
+
+    @Test func reactionLines() {
+        #expect(EditMessage.reactionRefused(on: key, content: .thumbsUp, add: true, reason: "nope")
+            == "Couldn't add 👍 on #12: nope")
+        #expect(EditMessage.reactionRefused(on: key, content: .thumbsUp, add: false, reason: "nope")
+            == "Couldn't remove 👍 on #12: nope")
+        #expect(EditMessage.reactionUnconfirmed(on: key, content: .thumbsUp)
+            == "Couldn't confirm your 👍 on #12. Check it on GitHub.")
+    }
+}

@@ -127,6 +127,10 @@ struct CommentLine: View {
     var tag: ReviewTag?
     /// A comment posted from here that GitHub hasn't answered for yet: dimmed and marked "Sending…".
     var isSending = false
+    /// As shown, the overlay applied; nil while sending or when GitHub sent none.
+    var reactions: Reactions?
+    var react: ReactionHandle?
+    @State private var hovering = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -152,11 +156,22 @@ struct CommentLine: View {
                 MarkdownText(comment.body.trimmingCharacters(in: .whitespacesAndNewlines))
                     .lineSpacing(2)
                     .textSelection(.enabled)
+                if let reactions, !reactions.shown.isEmpty {
+                    ReactionChips(reactions: reactions, react: react)
+                        .padding(.top, 4)
+                }
             }
             .font(.system(size: 12))
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .opacity(isSending ? 0.5 : 1)
+        .overlay(alignment: .topTrailing) {
+            if let react, let reactions, react.canReact, hovering || react.isPickerOpen {
+                ReactButton(react: react, reactions: reactions)
+            }
+        }
+        .onHover { hovering = $0 }
+        .reactAction(react)
     }
 }
 
@@ -527,6 +542,9 @@ struct ConversationSection: View {
     let earlier: Int
     let webURL: URL
     let now: Date
+    /// An entry's reactions as shown, and its handle, from the reactions it carries. Not asked for an entry
+    /// still sending.
+    let reactions: (Reactions?) -> ShownReactions
 
     var body: some View {
         DetailSection(title: "Conversation", summary: total == 1 ? "1 comment" : "\(total) comments") {
@@ -547,7 +565,10 @@ struct ConversationSection: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
-                        CommentLine(comment: entry.comment, now: now, tag: entry.tag, isSending: entry.isSending)
+                        let shown = entry.isSending ? ShownReactions.none : reactions(entry.comment.reactions)
+                        CommentLine(
+                            comment: entry.comment, now: now, tag: entry.tag, isSending: entry.isSending,
+                            reactions: shown.reactions, react: shown.react)
                     }
                 }
             }
@@ -580,6 +601,10 @@ struct Byline: View {
 /// card (cards are for structured data), folded when long. One view for both pages.
 struct DescriptionSection: View {
     let source: String
+    /// The description's, as shown, the overlay applied; nil when GitHub sent none.
+    let reactions: Reactions?
+    let react: ReactionHandle?
+    @State private var hovering = false
 
     var body: some View {
         DetailSection(title: "Description") {
@@ -596,7 +621,20 @@ struct DescriptionSection: View {
             .lineSpacing(3)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
+            if let reactions, !reactions.shown.isEmpty {
+                ReactionChips(reactions: reactions, react: react)
+            }
         }
+        // Level with the title, inside the section's gutter.
+        .overlay(alignment: .topTrailing) {
+            if let react, let reactions, react.canReact, hovering || react.isPickerOpen {
+                ReactButton(react: react, reactions: reactions)
+                    .padding(.top, 13)
+                    .padding(.trailing, 16)
+            }
+        }
+        .onHover { hovering = $0 }
+        .reactAction(react)
     }
 }
 

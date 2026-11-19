@@ -48,7 +48,9 @@ struct IssueDetailView: View {
                                 if relations.subIssues.isShown { subIssuesSection(relations) }
                             }
                             linkedPRsSection(detail.linkedPRs)
-                            DescriptionSection(source: detail.body)
+                            let description = reactions(of: detail.reactions, now: context.date)
+                            DescriptionSection(
+                                source: detail.body, reactions: description.reactions, react: description.react)
                             conversationSection(detail, now: context.date)
                         } else {
                             placeholder
@@ -66,10 +68,22 @@ struct IssueDetailView: View {
                 // The failure line sits on top of it, following the comment field as it grows.
                 .detailBottomInset(for: key)
         }
+        .overlayPreferenceValue(ReactionPickerAnchorKey.self) { anchor in
+            if model.reactionPicker?.key == key {
+                ReactionPickerLayer(anchor: anchor) { model.openReactionPicker(nil) }
+            }
+        }
+        // Leaving the detail, or walking to another, closes its reaction picker.
+        .onDisappear { closeReactionPicker(on: key) }
+        .onChange(of: key) { old, _ in closeReactionPicker(on: old) }
         // Links in issue text are untrusted: only web links open, anything else is dropped.
         .environment(\.openURL, OpenURLAction { url in
             LinkPolicy.canOpen(url) ? .systemAction(url) : .discarded
         })
+    }
+
+    private func closeReactionPicker(on key: PRKey) {
+        if model.reactionPicker?.key == key { model.openReactionPicker(nil) }
     }
 
     // MARK: Header
@@ -304,7 +318,12 @@ struct IssueDetailView: View {
         let entries = ConversationEntry.merged(
             comments: shown.comments, sendingIndex: shown.sendingIndex, reviews: [])
         return ConversationSection(
-            entries: entries, total: shown.total, earlier: shown.earlier, webURL: webURL, now: now)
+            entries: entries, total: shown.total, earlier: shown.earlier, webURL: webURL, now: now,
+            reactions: { reactions(of: $0, now: now) })
+    }
+
+    private func reactions(of stored: Reactions?, now: Date) -> ShownReactions {
+        ShownReactions(stored, model: model, key: key, isPullRequest: false, now: now)
     }
 
     // MARK: Loading and errors

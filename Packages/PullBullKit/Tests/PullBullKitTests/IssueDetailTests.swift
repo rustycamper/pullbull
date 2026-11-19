@@ -43,6 +43,23 @@ private func tempDir() -> URL {
 @Suite struct IssueDetailTests {
     private let key = PRKey(repo: "initech/gadgets", number: 231)
 
+    @Test func readsReactionsOnTheIssueAndItsComments() async throws {
+        func react(_ id: String) -> String {
+            #""id":"\#(id)","viewerCanReact":true,"reactionGroups":[{"content":"ROCKET","viewerHasReacted":true,"reactors":{"totalCount":1,"nodes":[{"login":"me"}]}}]"#
+        }
+        var json = String(decoding: try fixture("issue_detail"), as: UTF8.self)
+        json = json.replacingOccurrences(of: #""body": "Example description."#, with: #"\#(react("I_1")),"body": "Example description."#)
+        json = json.replacingOccurrences(of: #"{ "id": "IC_reply","#, with: #"{ \#(react("IC_reply")),"#)
+        let stub = StubTransport([(Data(json.utf8), response(200))])
+        let before = Date()
+        let d = try await api(stub).issueDetail(key)
+        let group = ReactionGroup(content: .rocket, count: 1, viewerHasReacted: true, reactors: ["me"])
+        #expect(d.reactions == Reactions(subjectId: "I_1", groups: [group], viewerCanReact: true))
+        #expect(d.lastComments.first { $0.id == "IC_reply" }?.reactions?.groups == [group])
+        #expect(d.lastComments.first { $0.id == "IC_comment" }?.reactions == nil)
+        #expect(try #require(d.fetchedAt) >= before)
+    }
+
     @Test func issueDetailParses() async throws {
         let stub = StubTransport([(try fixture("issue_detail"), response(200))])
         let d = try await api(stub).issueDetail(key)
@@ -79,7 +96,7 @@ private func tempDir() -> URL {
         #expect(body.contains("fragment issueRowFields on Issue"))
         // The fragment selects comments{totalCount}; an unaliased comments(last:2) is a field conflict.
         #expect(body.contains("lastComments: comments(last:2)"))
-        #expect(body.contains("lastComments: comments(last:2){totalCount nodes{id author{__typename login} body createdAt}}"))
+        #expect(body.contains("lastComments: comments(last:2){totalCount nodes{...reactable id author{__typename login} body createdAt}}"))
         #expect(body.contains("\"owner\":\"initech\""))
         #expect(body.contains("\"name\":\"gadgets\""))
         #expect(body.contains("\"n\":231"))
@@ -147,7 +164,12 @@ private func tempDir() -> URL {
         let d = try await api(StubTransport([(try fixture("issue_detail"), response(200))])).issueDetail(key)
         #expect(await store.loadIssueDetail(key, account: "a") == nil)
         try await store.saveIssueDetail(d, account: "a")
-        #expect(await store.loadIssueDetail(key, account: "a") == d)
+        // The stamp keeps what the store's date encoding does; the rest must come back equal.
+        let loaded = try #require(await store.loadIssueDetail(key, account: "a"))
+        #expect(abs(try #require(loaded.fetchedAt).timeIntervalSince(try #require(d.fetchedAt))) < 0.001)
+        #expect(loaded == IssueDetail(
+            key: d.key, issue: d.issue, body: d.body, commentTotal: d.commentTotal, lastComments: d.lastComments,
+            linkedPRs: d.linkedPRs, relations: d.relations, reactions: d.reactions, fetchedAt: loaded.fetchedAt))
         #expect(await store.loadIssueDetail(key, account: "b") == nil)
         #expect(FileManager.default.fileExists(
             atPath: dir.appendingPathComponent("details/a/issues/initech_gadgets_231.json").path))
@@ -155,7 +177,7 @@ private func tempDir() -> URL {
         #expect(await store.loadDetail(key, account: "a") == nil)
         let pr = PRDetail(key: key, body: "pr", checks: [], reviews: [], comments: [], files: [])
         try await store.saveDetail(pr, account: "a")
-        #expect(await store.loadIssueDetail(key, account: "a") == d)
+        #expect(await store.loadIssueDetail(key, account: "a")?.body == d.body)
         #expect(await store.loadDetail(key, account: "a")?.body == "pr")
     }
 

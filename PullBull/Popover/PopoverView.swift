@@ -580,6 +580,13 @@ struct PopoverView: View {
             MenuBarPopover.hide()
             return true
         }
+        // Esc closes the detail's reaction picker before it goes Back; every other key passes on.
+        if event.keyCode == SearchKeyMonitor.escape, flags.isDisjoint(with: [.command, .control, .option]),
+           Self.isDetail(model.route), let picker = model.reactionPicker,
+           model.route == .detail(picker.key) || model.route == .issueDetail(picker.key) {
+            model.openReactionPicker(nil)
+            return true
+        }
         if model.statusPicker != nil { return handleStatusPickerKey(event, flags: flags) }
         if model.setPicker != nil { return handleSetPickerKey(event, flags: flags) }
         if Self.isDetail(model.route) { return handleDetailKey(event, flags: flags, in: window) }

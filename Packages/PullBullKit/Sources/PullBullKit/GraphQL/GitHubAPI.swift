@@ -184,13 +184,19 @@ public struct Comment: Codable, Sendable, Hashable {
     public let authorIsBot: Bool?
     public let body: String
     public let createdAt: Date
+    /// The comment's reactions; nil for a comment read before they were kept.
+    public internal(set) var reactions: Reactions?
 
-    public init(id: String? = nil, author: String, authorIsBot: Bool? = nil, body: String, createdAt: Date) {
+    public init(
+        id: String? = nil, author: String, authorIsBot: Bool? = nil, body: String, createdAt: Date,
+        reactions: Reactions? = nil
+    ) {
         self.id = id
         self.author = author
         self.authorIsBot = authorIsBot
         self.body = body
         self.createdAt = createdAt
+        self.reactions = reactions
     }
 }
 
@@ -232,8 +238,8 @@ public struct PRDetail: Codable, Sendable {
     public let key: PRKey
     public let body: String
     public let checks: [Check]
-    public let reviews: [Review]
-    public let comments: [Comment]
+    public internal(set) var reviews: [Review]
+    public internal(set) var comments: [Comment]
     public let files: [ChangedFile]
     /// The PR's `updatedAt` and head-commit rollup state when this detail was fetched; nil in details
     /// cached before they were stored.
@@ -258,6 +264,10 @@ public struct PRDetail: Codable, Sendable {
     public let merge: MergeInfo?
     /// The issues the PR closes; nil in details cached before they were read.
     public let linkedIssues: RelatedIssues?
+    /// The description's reactions; nil in details cached before they were read.
+    public internal(set) var reactions: Reactions?
+    /// When this detail was fetched; nil in details cached before it was stored.
+    public let fetchedAt: Date?
 
     public init(
         key: PRKey, body: String, checks: [Check], reviews: [Review],
@@ -265,7 +275,8 @@ public struct PRDetail: Codable, Sendable {
         changedFiles: Int? = nil, additions: Int? = nil, deletions: Int? = nil, checkCount: Int? = nil,
         requests: [Reviewer]? = nil, commentCount: Int? = nil,
         headOid: String? = nil, author: String? = nil, state: PRState? = nil,
-        merge: MergeInfo? = nil, linkedIssues: RelatedIssues? = nil
+        merge: MergeInfo? = nil, linkedIssues: RelatedIssues? = nil,
+        reactions: Reactions? = nil, fetchedAt: Date? = nil
     ) {
         self.key = key
         self.body = body
@@ -286,6 +297,8 @@ public struct PRDetail: Codable, Sendable {
         self.state = state
         self.merge = merge
         self.linkedIssues = linkedIssues
+        self.reactions = reactions
+        self.fetchedAt = fetchedAt
     }
 
     public var commentTotal: Int { max(commentCount ?? 0, comments.count) }
@@ -355,14 +368,18 @@ public struct IssueDetail: Codable, Sendable, Equatable {
     public let body: String
     public let commentTotal: Int
     /// Oldest first, at most 2.
-    public let lastComments: [Comment]
+    public internal(set) var lastComments: [Comment]
     public let linkedPRs: [LinkedPR]
     /// The issue's parent, sub-issues and dependencies; nil in details cached before they were read.
     public let relations: IssueRelations?
+    /// The description's reactions; nil in details cached before they were read.
+    public internal(set) var reactions: Reactions?
+    /// When this detail was fetched; nil in details cached before it was stored.
+    public let fetchedAt: Date?
 
     public init(
         key: PRKey, issue: BoardIssue, body: String, commentTotal: Int, lastComments: [Comment], linkedPRs: [LinkedPR],
-        relations: IssueRelations? = nil
+        relations: IssueRelations? = nil, reactions: Reactions? = nil, fetchedAt: Date? = nil
     ) {
         self.key = key
         self.issue = issue
@@ -371,6 +388,8 @@ public struct IssueDetail: Codable, Sendable, Equatable {
         self.lastComments = lastComments
         self.linkedPRs = linkedPRs
         self.relations = relations
+        self.reactions = reactions
+        self.fetchedAt = fetchedAt
     }
 
     /// Comments before the ones shown.
@@ -741,6 +760,7 @@ public struct GitHubAPI: Sendable {
     public func detail(_ key: PRKey) async throws -> PRDetail {
         let parts = key.repo.split(separator: "/", maxSplits: 1).map(String.init)
         guard parts.count == 2 else { throw APIError.graphQL("bad repo \(key.repo)") }
+        let fetchedAt = Date()
         let (data, errors) = try await executeReportingErrors(
             Queries.detail, ["owner": parts[0], "name": parts[1], "n": key.number])
         guard let pr = (data["repository"] as? [String: Any])?["pullRequest"] as? [String: Any] else {
@@ -789,7 +809,8 @@ public struct GitHubAPI: Sendable {
             state: (pr["state"] as? String).flatMap { PRState(rawValue: $0.lowercased()) },
             merge: MergeInfo.read(pullRequest: pr, repository: data["repository"] as? [String: Any]),
             // Null (a field-level error) isn't known, so the section stays hidden; an absent field reads as none.
-            linkedIssues: closing is NSNull ? nil : Self.relatedIssues(closing))
+            linkedIssues: closing is NSNull ? nil : Self.relatedIssues(closing),
+            reactions: Decoding.reactions(pr), fetchedAt: fetchedAt)
     }
 
     /// The pull request's head commit and state right now, for a review that must name the commit it saw.
@@ -883,6 +904,27 @@ public struct GitHubAPI: Sendable {
         try await draftMutation(Mutations.convertToDraft, nodeID: nodeID, payload: "convertPullRequestToDraft")
     }
 
+    /// Adds the viewer's reaction to the subject and returns its reactions as GitHub now holds them. A payload
+    /// without a readable subject is `graphQL`, or a refusal when the errors say so, as the outcome is then unknown.
+    public func addReaction(_ content: ReactionContent, to subjectId: String) async throws -> Reactions {
+        try await reactionMutation(Mutations.addReaction, content, subjectId, payload: "addReaction")
+    }
+
+    /// Removes the viewer's reaction from the subject and returns its reactions as GitHub now holds them.
+    /// Failures follow `addReaction`.
+    public func removeReaction(_ content: ReactionContent, from subjectId: String) async throws -> Reactions {
+        try await reactionMutation(Mutations.removeReaction, content, subjectId, payload: "removeReaction")
+    }
+
+    private func reactionMutation(
+        _ mutation: String, _ content: ReactionContent, _ subjectId: String, payload: String
+    ) async throws -> Reactions {
+        let (data, errors) = try await executeReportingErrors(mutation, ["s": subjectId, "c": content.rawValue])
+        let subject = (data[payload] as? [String: Any])?["subject"] as? [String: Any]
+        if let subject, let reactions = Decoding.reactions(subject) { return reactions }
+        throw Self.mutationFailure(errors)
+    }
+
     /// Sends a draft-state mutation and reads `isDraft` from its payload. A payload without a Boolean
     /// `isDraft` is `graphQL`, or a refusal when the errors say so, as the outcome is then unknown.
     private func draftMutation(_ mutation: String, nodeID: String, payload: String) async throws -> Bool {
@@ -947,6 +989,7 @@ public struct GitHubAPI: Sendable {
     public func issueDetail(_ key: PRKey) async throws -> IssueDetail {
         let parts = key.repo.split(separator: "/", maxSplits: 1).map(String.init)
         guard parts.count == 2 else { throw APIError.graphQL("bad repo \(key.repo)") }
+        let fetchedAt = Date()
         let (data, errors) = try await executeReportingErrors(
             Queries.issueDetail, ["owner": parts[0], "name": parts[1], "n": key.number])
         let message = "issue \(key.repo)#\(key.number) not found"
@@ -966,7 +1009,7 @@ public struct GitHubAPI: Sendable {
             commentTotal: max(commentsConnection?["totalCount"] as? Int ?? issue.commentCount, comments.count),
             lastComments: Array(comments.suffix(2)),
             linkedPRs: prNodes.compactMap { ($0 as? [String: Any]).flatMap(Self.linkedPR) },
-            relations: Self.relations(node))
+            relations: Self.relations(node), reactions: Decoding.reactions(node), fetchedAt: fetchedAt)
     }
 
     private static func relations(_ node: [String: Any]) -> IssueRelations {
@@ -1018,7 +1061,9 @@ public struct GitHubAPI: Sendable {
         let authorNode = node["author"] as? [String: Any]
         let author = authorNode?["login"] as? String ?? "ghost"
         let isBot = (authorNode?["__typename"] as? String).map { $0 == "Bot" }
-        return Comment(id: node["id"] as? String, author: author, authorIsBot: isBot, body: body, createdAt: created)
+        return Comment(
+            id: node["id"] as? String, author: author, authorIsBot: isBot, body: body, createdAt: created,
+            reactions: Decoding.reactions(node))
     }
 
     private static func linkedPR(_ node: [String: Any]) -> LinkedPR? {
@@ -1150,7 +1195,9 @@ public struct GitHubAPI: Sendable {
               let created = try? Decoding.date(raw),
               let author = (node["user"] as? [String: Any])?["login"] as? String
         else { throw APIError.server(201) }
-        return Comment(id: id, author: author, body: text, createdAt: created)
+        return Comment(
+            id: id, author: author, body: text, createdAt: created,
+            reactions: Reactions(subjectId: id, groups: [], viewerCanReact: true))
     }
 
     /// Adds and removes assignees (user node IDs) on the issue or PR `subject`, in one request.

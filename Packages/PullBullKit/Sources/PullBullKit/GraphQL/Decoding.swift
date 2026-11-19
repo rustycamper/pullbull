@@ -287,8 +287,28 @@ public enum Decoding {
             submittedAt: try optionalDate(node["submittedAt"]),
             commitOid: (node["commit"] as? [String: Any])?["oid"] as? String,
             byBot: author.map { $0["__typename"] as? String == "Bot" },
-            body: node["body"] as? String
+            body: node["body"] as? String,
+            id: node["id"] as? String,
+            reactions: reactions(node)
         )
+    }
+
+    /// The reactions of a node selected with the `reactable` fragment; nil without its `id` or its
+    /// `reactionGroups`. Every group GitHub returns with a known content is kept, in `ReactionContent` order.
+    static func reactions(_ node: [String: Any]) -> Reactions? {
+        guard let id = node["id"] as? String, let raw = node["reactionGroups"] as? [[String: Any]] else { return nil }
+        var byContent: [ReactionContent: ReactionGroup] = [:]
+        for entry in raw {
+            guard let content = (entry["content"] as? String).flatMap(ReactionContent.init(rawValue:)) else { continue }
+            let reactors = entry["reactors"] as? [String: Any]
+            let logins = (reactors?["nodes"] as? [[String: Any]] ?? []).compactMap { $0["login"] as? String }
+            byContent[content] = ReactionGroup(
+                content: content, count: reactors?["totalCount"] as? Int ?? 0,
+                viewerHasReacted: entry["viewerHasReacted"] as? Bool ?? false, reactors: logins)
+        }
+        return Reactions(
+            subjectId: id, groups: ReactionContent.allCases.compactMap { byContent[$0] },
+            viewerCanReact: node["viewerCanReact"] as? Bool ?? false)
     }
 
     static func reviewer(_ node: [String: Any]) -> Reviewer? {

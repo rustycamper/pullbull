@@ -25,7 +25,14 @@ private func failure(of t: RESTQueue) async -> CommentFailure {
         #expect(t.sent[0].path == "/repos/o/r/issues/7/comments")
         #expect(t.sent[0].body["body"] as? String == "hi")
         #expect(comment == Comment(
-            id: "IC_1", author: "pb", body: "hi", createdAt: try Decoding.date("2026-11-02T10:00:00Z")))
+            id: "IC_1", author: "pb", body: "hi", createdAt: try Decoding.date("2026-11-02T10:00:00Z"),
+            reactions: Reactions(subjectId: "IC_1", groups: [], viewerCanReact: true)))
+    }
+
+    @Test func aPostedCommentCanBeReactedTo() async throws {
+        let t = RESTQueue([(201, #"{"node_id":"IC_1","body":"hi","created_at":"2026-11-02T10:00:00Z","user":{"login":"pb"}}"#)])
+        let comment = try await api(t).postComment(on: key, body: "hi")
+        #expect(comment.reactions == Reactions(subjectId: "IC_1", groups: [], viewerCanReact: true))
     }
 
     @Test func validationFailedUsesErrorsMessage() async {

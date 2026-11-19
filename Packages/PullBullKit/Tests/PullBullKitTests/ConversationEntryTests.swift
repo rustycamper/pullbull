@@ -13,6 +13,18 @@ import Testing
         Review(author: "bob", state: state, submittedAt: seconds.map(at), byBot: byBot, body: body)
     }
 
+    @Test func aReviewRowCarriesTheReviewsIdAndReactions() {
+        let reactions = Reactions(
+            subjectId: "PRR_1",
+            groups: [ReactionGroup(content: .rocket, count: 1, viewerHasReacted: false, reactors: ["x"])],
+            viewerCanReact: true)
+        let withReactions = Review(
+            author: "bob", state: .approved, submittedAt: at(10), body: "text", id: "PRR_1", reactions: reactions)
+        let entries = ConversationEntry.merged(comments: [], sendingIndex: nil, reviews: [withReactions])
+        #expect(entries.first?.comment.id == "PRR_1")
+        #expect(entries.first?.comment.reactions == reactions)
+    }
+
     @Test func mergesByTime() {
         let entries = ConversationEntry.merged(
             comments: [comment("a", 5), comment("c", 15)], sendingIndex: nil,

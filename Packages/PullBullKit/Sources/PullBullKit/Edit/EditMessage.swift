@@ -75,6 +75,16 @@ public enum EditMessage {
         "Couldn't confirm your comment on #\(key.number). Check the Conversation before sending again."
     }
 
+    /// A reaction GitHub refused; `reason` is GitHub's words, or PullBull's when it never got there.
+    public static func reactionRefused(on key: PRKey, content: ReactionContent, add: Bool, reason: String) -> String {
+        "Couldn't \(add ? "add" : "remove") \(content.emoji) on #\(key.number): \(reason)"
+    }
+
+    /// A reaction whose write had no clear answer, and that a fresh detail doesn't show.
+    public static func reactionUnconfirmed(on key: PRKey, content: ReactionContent) -> String {
+        "Couldn't confirm your \(content.emoji) on #\(key.number). Check it on GitHub."
+    }
+
     /// A review GitHub refused; `reason` is GitHub's words, or PullBull's when it never got there.
     public static func reviewRefused(on key: PRKey, reason: String) -> String {
         "Couldn't review #\(key.number): \(reason)"

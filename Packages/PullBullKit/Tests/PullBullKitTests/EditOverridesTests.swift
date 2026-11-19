@@ -314,6 +314,31 @@ private func mergeDetail(state: PRState? = .open, merge: MergeInfo? = nil) -> PR
         #expect(reviews[0].body == "Looks good")
     }
 
+    @Test func reviewKeepsTheFetchedCopysIdAndReactions() {
+        var o = EditOverrides()
+        o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)
+        let reactions = Reactions(subjectId: "PRR_1", groups: [], viewerCanReact: true)
+        let fetched = Review(
+            author: "PB", state: .approved, submittedAt: t0 + 5, commitOid: "abc", id: "PRR_1", reactions: reactions)
+        let reviews = o.apply(toReviews: [fetched], on: editKey(77))
+        #expect(reviews.count == 1)
+        #expect(reviews[0].id == "PRR_1")
+        #expect(reviews[0].reactions == reactions)
+    }
+
+    @Test func reviewOnAnOlderCommitDoesNotLendItsIdOrReactions() {
+        var o = EditOverrides()
+        o.record(.review(state: .approved, commit: "def", viewer: "pb"), on: editKey(77), at: t0)
+        let older = Review(
+            author: "pb", state: .approved, submittedAt: t0 - 60, commitOid: "abc", id: "PRR_0",
+            reactions: Reactions(subjectId: "PRR_0", groups: [], viewerCanReact: true))
+        let reviews = o.apply(toReviews: [older], on: editKey(77))
+        #expect(reviews.count == 1)
+        #expect(reviews[0].commitOid == "def")
+        #expect(reviews[0].id == nil)
+        #expect(reviews[0].reactions == nil)
+    }
+
     @Test func reviewWithoutTextShowsNoText() {
         var o = EditOverrides()
         o.record(.review(state: .approved, commit: "abc", viewer: "pb"), on: editKey(77), at: t0)

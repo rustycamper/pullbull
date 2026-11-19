@@ -391,7 +391,7 @@ private func node(_ name: String) throws -> [String: Any] {
 
     /// A PR page shows its newest comments, with the earlier ones counted above, as an issue page does.
     @Test func prDetailAsksForTheNewestComments() {
-        #expect(Queries.detail.contains("comments(last:50){totalCount nodes{id author{__typename login} body createdAt}}"))
+        #expect(Queries.detail.contains("comments(last:50){totalCount nodes{...reactable id author{__typename login} body createdAt}}"))
     }
 
     @Test func cachedCommentWithoutIdDecodes() throws {
