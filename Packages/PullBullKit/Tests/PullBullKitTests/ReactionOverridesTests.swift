@@ -157,4 +157,28 @@ private func overrides(add: Bool = true, answeredAt: Date? = nil) -> ReactionOve
         }
         #expect(base.replacingReactions(fresh("X")) == base)
     }
+
+    @Test func reactionsOfFindsTheDescriptionACommentAndAReview() {
+        let on = { (id: String, count: Int) in reactions([group(.heart, count)], id: id) }
+        let pr = PRDetail(
+            key: key, body: "", checks: [],
+            reviews: [Review(author: "bob", state: .approved, submittedAt: nil, id: "R", reactions: on("R", 3))],
+            comments: [
+                PullBullKit.Comment(id: "N", author: "a", body: "x", createdAt: t0, reactions: nil),
+                PullBullKit.Comment(id: "C", author: "a", body: "x", createdAt: t0, reactions: on("C", 2)),
+            ],
+            files: [], reactions: on("P", 1), fetchedAt: t0)
+        #expect(pr.reactions(of: "P") == on("P", 1))
+        #expect(pr.reactions(of: "C") == on("C", 2))
+        #expect(pr.reactions(of: "R") == on("R", 3))
+        #expect(pr.reactions(of: "X") == nil)
+
+        let issue = IssueDetail(
+            key: key, issue: BoardIssue(key: key, title: "i", url: URL(string: "https://x/12")!, isOpen: true), body: "", commentTotal: 1,
+            lastComments: [PullBullKit.Comment(id: "C", author: "a", body: "x", createdAt: t0, reactions: on("C", 2))],
+            linkedPRs: [], reactions: on("P", 1), fetchedAt: t0)
+        #expect(issue.reactions(of: "P") == on("P", 1))
+        #expect(issue.reactions(of: "C") == on("C", 2))
+        #expect(issue.reactions(of: "X") == nil)
+    }
 }

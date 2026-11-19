@@ -11,6 +11,9 @@ struct ReactionPickerSubject: Hashable {
 /// A reaction write on one target whose outcome isn't final. `wanted` is what the latest click asks for;
 /// a click made while a call or a confirm is in flight only changes it, and `ReactionFlow` sends the rest.
 struct ReactionSend {
+    /// This record's, kept by its re-sends: an answer to an earlier record on the same target and account
+    /// (from before an org switch, or A→B→A) doesn't match it.
+    let id = UUID()
     let key: PRKey
     /// From the route the click was made on: whether `key` is a pull request.
     let isPullRequest: Bool
@@ -56,7 +59,9 @@ extension AppModel {
 
     /// Writes `add` for `target` with the send's account.
     private func send(_ target: ReactionTarget, add: Bool) {
-        guard let account = reactionSends[target]?.account else { return }
+        guard let pending = reactionSends[target] else { return }
+        let id = pending.id
+        let account = pending.account
         let client = api(for: account)
         Task { [weak self] in
             let answer: ReactionAnswer
@@ -70,14 +75,14 @@ extension AppModel {
                 case .unknown: answer = .unknown
                 }
             }
-            self?.reactionAnswered(target, sent: add, account: account, answer: answer)
+            self?.reactionAnswered(target, sent: add, id: id, account: account, answer: answer)
         }
     }
 
-    /// The send on `target` while `account` owns it and runs. Nil when an account switch cleared it or
-    /// another account's send owns the target; when another account runs, the send is removed as well.
-    private func liveReactionSend(_ target: ReactionTarget, account: AccountRef) -> ReactionSend? {
-        guard let send = reactionSends[target], send.account == account else { return nil }
+    /// The send on `target` while it is the record `id` names, `account` owns it and runs. Nil when a
+    /// switch cleared it or a newer record owns the target; when another account runs, the send is removed.
+    private func liveReactionSend(_ target: ReactionTarget, id: UUID, account: AccountRef) -> ReactionSend? {
+        guard let send = reactionSends[target], send.id == id, send.account == account else { return nil }
         guard runningAccount == account else {
             reactionSends[target] = nil
             return nil
@@ -85,8 +90,10 @@ extension AppModel {
         return send
     }
 
-    private func reactionAnswered(_ target: ReactionTarget, sent add: Bool, account: AccountRef, answer: ReactionAnswer) {
-        guard let pending = liveReactionSend(target, account: account) else { return }
+    private func reactionAnswered(
+        _ target: ReactionTarget, sent add: Bool, id: UUID, account: AccountRef, answer: ReactionAnswer
+    ) {
+        guard let pending = liveReactionSend(target, id: id, account: account) else { return }
         follow(ReactionFlow.next(sent: add, answer: answer, wanted: pending.wanted), target: target, sent: add, pending)
     }
 
@@ -125,27 +132,15 @@ extension AppModel {
             do {
                 _ = try await self.fetchDetailComments(
                     pending.key, isPullRequest: pending.isPullRequest, account: pending.account)
-                fetched = self.storedReactions(of: target.subjectId, on: pending.key)
+                fetched = self.details[pending.key]?.reactions(of: target.subjectId)
+                    ?? self.issueDetails[pending.key]?.reactions(of: target.subjectId)
             } catch {
                 fetched = nil
             }
-            guard let current = self.liveReactionSend(target, account: pending.account) else { return }
+            guard let current = self.liveReactionSend(target, id: pending.id, account: pending.account) else { return }
             let step = ReactionFlow.afterConfirm(fetched, content: target.content, sent: add, wanted: current.wanted)
             self.follow(step, target: target, sent: add, current)
         }
-    }
-
-    /// The reactions of `subjectId` in the stored detail of `key`: the description, a comment or a review.
-    private func storedReactions(of subjectId: String, on key: PRKey) -> Reactions? {
-        let all: [Reactions?]
-        if let detail = details[key] {
-            all = [detail.reactions] + detail.comments.map(\.reactions) + detail.reviews.map(\.reactions)
-        } else if let detail = issueDetails[key] {
-            all = [detail.reactions] + detail.lastComments.map(\.reactions)
-        } else {
-            return nil
-        }
-        return all.lazy.compactMap { $0 }.first { $0.subjectId == subjectId }
     }
 
     /// The click is over: its override and its send go.

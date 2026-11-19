@@ -116,6 +116,13 @@ extension Reactions {
 }
 
 extension PRDetail {
+    /// The reactions of one subject in this detail: the description, a comment or a review whose
+    /// `reactions.subjectId` matches; nil when nothing does.
+    public func reactions(of subjectId: String) -> Reactions? {
+        ([reactions] + comments.map(\.reactions) + reviews.map(\.reactions))
+            .lazy.compactMap { $0 }.first { $0.subjectId == subjectId }
+    }
+
     /// GitHub's answer for one subject written into the stored detail: the description, a comment or a
     /// review whose `reactions.subjectId` matches. `fetchedAt` is kept. Unchanged when nothing matches.
     public func replacingReactions(_ reactions: Reactions) -> PRDetail {
@@ -132,6 +139,12 @@ extension PRDetail {
 }
 
 extension IssueDetail {
+    /// The reactions of one subject in this detail: the description or a comment whose
+    /// `reactions.subjectId` matches; nil when nothing does.
+    public func reactions(of subjectId: String) -> Reactions? {
+        ([reactions] + lastComments.map(\.reactions)).lazy.compactMap { $0 }.first { $0.subjectId == subjectId }
+    }
+
     /// GitHub's answer for one subject written into the stored detail: the description or a comment whose
     /// `reactions.subjectId` matches. `fetchedAt` is kept. Unchanged when nothing matches.
     public func replacingReactions(_ reactions: Reactions) -> IssueDetail {
