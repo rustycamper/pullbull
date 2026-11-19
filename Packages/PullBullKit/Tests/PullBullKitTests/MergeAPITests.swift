@@ -13,7 +13,7 @@ private let pollMerged = #"{"status":"merged","details":{"message":"Pull request
 private let wrongSha = #"{"status":"failed","details":{"message":"Pull request head branch was modified."}}"#
 
 /// Answers each GraphQL request in turn and keeps what it was sent.
-private final class GraphQLQueue: GraphQLTransport, @unchecked Sendable {
+final class GraphQLQueue: GraphQLTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var queue: [String]
     private var log: [[String: Any]] = []

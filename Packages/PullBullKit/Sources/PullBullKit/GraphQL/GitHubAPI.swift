@@ -904,6 +904,27 @@ public struct GitHubAPI: Sendable {
         try await draftMutation(Mutations.convertToDraft, nodeID: nodeID, payload: "convertPullRequestToDraft")
     }
 
+    /// Adds the viewer's reaction to the subject and returns its reactions as GitHub now holds them. A payload
+    /// without a readable subject is `graphQL`, or a refusal when the errors say so, as the outcome is then unknown.
+    public func addReaction(_ content: ReactionContent, to subjectId: String) async throws -> Reactions {
+        try await reactionMutation(Mutations.addReaction, content, subjectId, payload: "addReaction")
+    }
+
+    /// Removes the viewer's reaction from the subject and returns its reactions as GitHub now holds them.
+    /// Failures follow `addReaction`.
+    public func removeReaction(_ content: ReactionContent, from subjectId: String) async throws -> Reactions {
+        try await reactionMutation(Mutations.removeReaction, content, subjectId, payload: "removeReaction")
+    }
+
+    private func reactionMutation(
+        _ mutation: String, _ content: ReactionContent, _ subjectId: String, payload: String
+    ) async throws -> Reactions {
+        let (data, errors) = try await executeReportingErrors(mutation, ["s": subjectId, "c": content.rawValue])
+        let subject = (data[payload] as? [String: Any])?["subject"] as? [String: Any]
+        if let subject, let reactions = Decoding.reactions(subject) { return reactions }
+        throw Self.mutationFailure(errors)
+    }
+
     /// Sends a draft-state mutation and reads `isDraft` from its payload. A payload without a Boolean
     /// `isDraft` is `graphQL`, or a refusal when the errors say so, as the outcome is then unknown.
     private func draftMutation(_ mutation: String, nodeID: String, payload: String) async throws -> Bool {

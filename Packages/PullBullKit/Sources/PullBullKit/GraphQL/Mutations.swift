@@ -46,6 +46,18 @@ enum Mutations {
     }
     """
 
+    /// Adds the viewer's reaction and answers with the subject's reactions.
+    static let addReaction = """
+    mutation($s:ID!,$c:ReactionContent!){ addReaction(input:{subjectId:$s,content:$c}){subject{...reactable}} }
+    \(Queries.reactableFields)
+    """
+
+    /// Removes the viewer's reaction and answers with the subject's reactions.
+    static let removeReaction = """
+    mutation($s:ID!,$c:ReactionContent!){ removeReaction(input:{subjectId:$s,content:$c}){subject{...reactable}} }
+    \(Queries.reactableFields)
+    """
+
     static let deleteProjectItem = """
     mutation($project:ID!,$item:ID!){
       deleteProjectV2Item(input:{projectId:$project, itemId:$item}){deletedItemId}
