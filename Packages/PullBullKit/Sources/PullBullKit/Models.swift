@@ -46,6 +46,8 @@ public enum ReviewState: String, Codable, Sendable, Hashable {
 }
 
 public struct Review: Hashable, Codable, Sendable {
+    /// The review's node ID; nil on list copies and in caches from before it was kept.
+    public let id: String?
     public let author: String
     public let state: ReviewState
     public let submittedAt: Date?
@@ -55,17 +57,37 @@ public struct Review: Hashable, Codable, Sendable {
     public let byBot: Bool?
     /// The review's text; only the detail fetch reads it, so nil on list copies and older caches.
     public let body: String?
+    /// The review's reactions; nil on list copies and in caches from before they were kept.
+    public internal(set) var reactions: Reactions?
 
     public init(
         author: String, state: ReviewState, submittedAt: Date?, commitOid: String? = nil, byBot: Bool? = nil,
-        body: String? = nil
+        body: String? = nil, id: String? = nil, reactions: Reactions? = nil
     ) {
+        self.id = id
+        self.reactions = reactions
         self.author = author
         self.state = state
         self.submittedAt = submittedAt
         self.commitOid = commitOid
         self.byBot = byBot
         self.body = body
+    }
+
+    /// Equal when the review itself is: the node ID and the reactions change without the review changing,
+    /// and `ChangeDetector` compares reviews to spot new ones.
+    public static func == (lhs: Review, rhs: Review) -> Bool {
+        lhs.author == rhs.author && lhs.state == rhs.state && lhs.submittedAt == rhs.submittedAt
+            && lhs.commitOid == rhs.commitOid && lhs.byBot == rhs.byBot && lhs.body == rhs.body
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(author)
+        hasher.combine(state)
+        hasher.combine(submittedAt)
+        hasher.combine(commitOid)
+        hasher.combine(byBot)
+        hasher.combine(body)
     }
 }
 

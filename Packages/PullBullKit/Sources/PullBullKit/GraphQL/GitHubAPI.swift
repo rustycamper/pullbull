@@ -184,13 +184,19 @@ public struct Comment: Codable, Sendable, Hashable {
     public let authorIsBot: Bool?
     public let body: String
     public let createdAt: Date
+    /// The comment's reactions; nil for a comment read before they were kept.
+    public internal(set) var reactions: Reactions?
 
-    public init(id: String? = nil, author: String, authorIsBot: Bool? = nil, body: String, createdAt: Date) {
+    public init(
+        id: String? = nil, author: String, authorIsBot: Bool? = nil, body: String, createdAt: Date,
+        reactions: Reactions? = nil
+    ) {
         self.id = id
         self.author = author
         self.authorIsBot = authorIsBot
         self.body = body
         self.createdAt = createdAt
+        self.reactions = reactions
     }
 }
 
@@ -232,8 +238,8 @@ public struct PRDetail: Codable, Sendable {
     public let key: PRKey
     public let body: String
     public let checks: [Check]
-    public let reviews: [Review]
-    public let comments: [Comment]
+    public internal(set) var reviews: [Review]
+    public internal(set) var comments: [Comment]
     public let files: [ChangedFile]
     /// The PR's `updatedAt` and head-commit rollup state when this detail was fetched; nil in details
     /// cached before they were stored.
@@ -258,6 +264,10 @@ public struct PRDetail: Codable, Sendable {
     public let merge: MergeInfo?
     /// The issues the PR closes; nil in details cached before they were read.
     public let linkedIssues: RelatedIssues?
+    /// The description's reactions; nil in details cached before they were read.
+    public internal(set) var reactions: Reactions?
+    /// When this detail was fetched; nil in details cached before it was stored.
+    public let fetchedAt: Date?
 
     public init(
         key: PRKey, body: String, checks: [Check], reviews: [Review],
@@ -265,7 +275,8 @@ public struct PRDetail: Codable, Sendable {
         changedFiles: Int? = nil, additions: Int? = nil, deletions: Int? = nil, checkCount: Int? = nil,
         requests: [Reviewer]? = nil, commentCount: Int? = nil,
         headOid: String? = nil, author: String? = nil, state: PRState? = nil,
-        merge: MergeInfo? = nil, linkedIssues: RelatedIssues? = nil
+        merge: MergeInfo? = nil, linkedIssues: RelatedIssues? = nil,
+        reactions: Reactions? = nil, fetchedAt: Date? = nil
     ) {
         self.key = key
         self.body = body
@@ -286,6 +297,8 @@ public struct PRDetail: Codable, Sendable {
         self.state = state
         self.merge = merge
         self.linkedIssues = linkedIssues
+        self.reactions = reactions
+        self.fetchedAt = fetchedAt
     }
 
     public var commentTotal: Int { max(commentCount ?? 0, comments.count) }
@@ -355,14 +368,18 @@ public struct IssueDetail: Codable, Sendable, Equatable {
     public let body: String
     public let commentTotal: Int
     /// Oldest first, at most 2.
-    public let lastComments: [Comment]
+    public internal(set) var lastComments: [Comment]
     public let linkedPRs: [LinkedPR]
     /// The issue's parent, sub-issues and dependencies; nil in details cached before they were read.
     public let relations: IssueRelations?
+    /// The description's reactions; nil in details cached before they were read.
+    public internal(set) var reactions: Reactions?
+    /// When this detail was fetched; nil in details cached before it was stored.
+    public let fetchedAt: Date?
 
     public init(
         key: PRKey, issue: BoardIssue, body: String, commentTotal: Int, lastComments: [Comment], linkedPRs: [LinkedPR],
-        relations: IssueRelations? = nil
+        relations: IssueRelations? = nil, reactions: Reactions? = nil, fetchedAt: Date? = nil
     ) {
         self.key = key
         self.issue = issue
@@ -371,6 +388,8 @@ public struct IssueDetail: Codable, Sendable, Equatable {
         self.lastComments = lastComments
         self.linkedPRs = linkedPRs
         self.relations = relations
+        self.reactions = reactions
+        self.fetchedAt = fetchedAt
     }
 
     /// Comments before the ones shown.
