@@ -760,6 +760,7 @@ public struct GitHubAPI: Sendable {
     public func detail(_ key: PRKey) async throws -> PRDetail {
         let parts = key.repo.split(separator: "/", maxSplits: 1).map(String.init)
         guard parts.count == 2 else { throw APIError.graphQL("bad repo \(key.repo)") }
+        let fetchedAt = Date()
         let (data, errors) = try await executeReportingErrors(
             Queries.detail, ["owner": parts[0], "name": parts[1], "n": key.number])
         guard let pr = (data["repository"] as? [String: Any])?["pullRequest"] as? [String: Any] else {
@@ -808,7 +809,8 @@ public struct GitHubAPI: Sendable {
             state: (pr["state"] as? String).flatMap { PRState(rawValue: $0.lowercased()) },
             merge: MergeInfo.read(pullRequest: pr, repository: data["repository"] as? [String: Any]),
             // Null (a field-level error) isn't known, so the section stays hidden; an absent field reads as none.
-            linkedIssues: closing is NSNull ? nil : Self.relatedIssues(closing))
+            linkedIssues: closing is NSNull ? nil : Self.relatedIssues(closing),
+            reactions: Decoding.reactions(pr), fetchedAt: fetchedAt)
     }
 
     /// The pull request's head commit and state right now, for a review that must name the commit it saw.
@@ -966,6 +968,7 @@ public struct GitHubAPI: Sendable {
     public func issueDetail(_ key: PRKey) async throws -> IssueDetail {
         let parts = key.repo.split(separator: "/", maxSplits: 1).map(String.init)
         guard parts.count == 2 else { throw APIError.graphQL("bad repo \(key.repo)") }
+        let fetchedAt = Date()
         let (data, errors) = try await executeReportingErrors(
             Queries.issueDetail, ["owner": parts[0], "name": parts[1], "n": key.number])
         let message = "issue \(key.repo)#\(key.number) not found"
@@ -985,7 +988,7 @@ public struct GitHubAPI: Sendable {
             commentTotal: max(commentsConnection?["totalCount"] as? Int ?? issue.commentCount, comments.count),
             lastComments: Array(comments.suffix(2)),
             linkedPRs: prNodes.compactMap { ($0 as? [String: Any]).flatMap(Self.linkedPR) },
-            relations: Self.relations(node))
+            relations: Self.relations(node), reactions: Decoding.reactions(node), fetchedAt: fetchedAt)
     }
 
     private static func relations(_ node: [String: Any]) -> IssueRelations {
@@ -1037,7 +1040,9 @@ public struct GitHubAPI: Sendable {
         let authorNode = node["author"] as? [String: Any]
         let author = authorNode?["login"] as? String ?? "ghost"
         let isBot = (authorNode?["__typename"] as? String).map { $0 == "Bot" }
-        return Comment(id: node["id"] as? String, author: author, authorIsBot: isBot, body: body, createdAt: created)
+        return Comment(
+            id: node["id"] as? String, author: author, authorIsBot: isBot, body: body, createdAt: created,
+            reactions: Decoding.reactions(node))
     }
 
     private static func linkedPR(_ node: [String: Any]) -> LinkedPR? {
@@ -1169,7 +1174,9 @@ public struct GitHubAPI: Sendable {
               let created = try? Decoding.date(raw),
               let author = (node["user"] as? [String: Any])?["login"] as? String
         else { throw APIError.server(201) }
-        return Comment(id: id, author: author, body: text, createdAt: created)
+        return Comment(
+            id: id, author: author, body: text, createdAt: created,
+            reactions: Reactions(subjectId: id, groups: [], viewerCanReact: true))
     }
 
     /// Adds and removes assignees (user node IDs) on the issue or PR `subject`, in one request.

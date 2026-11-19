@@ -30,7 +30,9 @@ public struct ConversationEntry: Equatable, Sendable {
             guard let submittedAt = review.submittedAt, let tag = tag(for: review.state),
                   let text = review.body?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty
             else { continue }
-            let comment = Comment(author: review.author, authorIsBot: review.byBot, body: text, createdAt: submittedAt)
+            let comment = Comment(
+                id: review.id, author: review.author, authorIsBot: review.byBot, body: text, createdAt: submittedAt,
+                reactions: review.reactions)
             timed.append(ConversationEntry(comment: comment, tag: tag, isSending: false))
         }
         // Stable, so a comment and a review at the same moment keep the comments first.

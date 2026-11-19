@@ -225,8 +225,9 @@ enum Queries {
       repository(owner:$owner, name:$name){
         issue(number:$n){
           ...issueRowFields
+          ...reactable
           body
-          lastComments: comments(last:2){totalCount nodes{id author{__typename login} body createdAt}}
+          lastComments: comments(last:2){totalCount nodes{...reactable id author{__typename login} body createdAt}}
           closedByPullRequestsReferences(first:5, includeClosedPrs:true){nodes{
             number title url state isDraft author{login} repository{nameWithOwner}
             commits(last:1){nodes{commit{statusCheckRollup{state contexts{\(rollupCounts)}}}}}
@@ -242,6 +243,16 @@ enum Queries {
     }
     \(issueRowFields)
     \(relatedIssueFields)
+    \(reactableFields)
+    """
+
+    /// The reactions on an issue, PR, comment or review: its node ID, whether the viewer may react, and each
+    /// reaction's count, whether the viewer gave it and the first three reactors.
+    static let reactableFields = """
+    fragment reactable on Reactable {
+      id viewerCanReact
+      reactionGroups{content viewerHasReacted reactors(first:3){totalCount nodes{... on Actor{login}}}}
+    }
     """
 
     /// The fields of an issue named by another issue or PR; enough for a row and its state glyph.
@@ -275,6 +286,7 @@ enum Queries {
       repository(owner:$owner, name:$name){
         viewerPermission mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed viewerDefaultMergeMethod
         pullRequest(number:$n){
+          ...reactable
           body updatedAt changedFiles additions deletions headRefOid state author{login}
           id isDraft mergeable mergeStateStatus isMergeQueueEnabled baseRefName canBeRebased
           viewerCanEnableAutoMerge viewerCanDisableAutoMerge stack{size} autoMergeRequest{enabledBy{login}}
@@ -286,13 +298,14 @@ enum Queries {
             ... on StatusContext{context state targetUrl}
           }}}}}}
           reviewRequests(first:20){nodes{requestedReviewer{__typename ... on User{login} ... on Team{slug name}}}}
-          latestReviews(first:20){nodes{author{login} state submittedAt body commit{oid}}}
-          comments(last:50){totalCount nodes{id author{__typename login} body createdAt}}
+          latestReviews(first:20){nodes{...reactable author{login} state submittedAt body commit{oid}}}
+          comments(last:50){totalCount nodes{...reactable id author{__typename login} body createdAt}}
           files(first:100){totalCount nodes{path additions deletions}}
           closingIssuesReferences(first:20){totalCount nodes{...relatedIssue}}
         }
       }
     }
     \(relatedIssueFields)
+    \(reactableFields)
     """
 }
