@@ -21,7 +21,7 @@ This builds on `2026-10-31-edit-status-assignees-labels-design.md` (the edit spe
 
 - Review comments on lines of a diff, replying in a review thread, submitting a review. PullBull has no diff view, and these need one.
 - Editing or deleting comments, yours or anyone's. GitHub does that.
-- Reactions, quote reply, saved replies, a Markdown preview, attaching images or files.
+- Quote reply, saved replies, a Markdown preview, attaching images or files. (Reactions: see `2026-11-19-reactions-design.md`.)
 - Commenting from a row without opening the item: a reply needs the thread in view.
 - Mentioning bots and apps from the completion list. Typing `@name` by hand still works, since the text is sent as written.
 - Closing or reopening with the comment ("Close with comment").
