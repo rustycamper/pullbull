@@ -83,6 +83,19 @@ private func overrides(add: Bool = true, answeredAt: Date? = nil) -> ReactionOve
         #expect(o.apply(to: github, fetchedAt: t0 + 9, now: t0 + 12)?.groups == [group(.thumbsUp, 1, mine: true)])
     }
 
+    @Test func aNewClickAfterAnAnswerIsInForceAgain() {
+        var o = overrides(answeredAt: t0 + 1)
+        o.record(up, add: false, on: key, at: t0 + 2)
+        let shown = o.apply(to: reactions([group(.thumbsUp, 1, mine: true)]), fetchedAt: t0 + 2, now: t0 + 3)
+        #expect(shown?.groups == [group(.thumbsUp, 0)])
+    }
+
+    @Test func aFetchStampedExactlyAtTheAnswerKeepsTheOverride() {
+        let shown = overrides(answeredAt: t0 + 10)
+            .apply(to: reactions([group(.thumbsUp, 0)]), fetchedAt: t0 + 10, now: t0 + 12)
+        #expect(shown?.groups == [group(.thumbsUp, 1, mine: true)])
+    }
+
     @Test func aDetailWithoutFetchedAtRetiresNothing() {
         let shown = overrides(answeredAt: t0 + 10).apply(to: reactions([group(.thumbsUp, 0)]), fetchedAt: nil, now: t0 + 12)
         #expect(shown?.groups == [group(.thumbsUp, 1, mine: true)])
