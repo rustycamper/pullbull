@@ -204,33 +204,16 @@ struct SearchHints: View {
 }
 
 extension SearchHints {
-    /// Drawn over the top of the list, which doesn't move: the popover's own material and a 1pt rule, with
-    /// a soft shadow below unless a completion list covers the panel (only the top layer casts one).
-    func overList(solid: Bool, shadow: Bool) -> some View {
+    /// Drawn over the top of the list, which doesn't move: a raised panel attached under the header, its
+    /// 1pt rule the one line on its free side, with the shadow below unless a completion list covers the
+    /// panel (only the top layer casts one).
+    func overList(shadow: Bool) -> some View {
         VStack(spacing: 0) {
             self
             Hairline()
         }
-        .background { GlassBackground(solid: solid) }
+        .raisedSurface(radius: 0, attachedEdge: .top, castsShadow: shadow)
         .contentShape(Rectangle())
-        .background(alignment: .bottom) {
-            if shadow { HintPanelShadow() }
-        }
-    }
-}
-
-/// A soft shadow just below the panel's rule, deeper in dark mode so the edge stays clear on dark rows.
-private struct HintPanelShadow: View {
-    @Environment(\.colorScheme) private var colorScheme
-    private static let depth: CGFloat = 8
-
-    var body: some View {
-        LinearGradient(
-            colors: [.black.opacity(colorScheme == .dark ? 0.35 : 0.1), .clear], startPoint: .top, endPoint: .bottom)
-            .frame(height: Self.depth)
-            .offset(y: Self.depth)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
     }
 }
 

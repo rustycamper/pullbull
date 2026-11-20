@@ -212,9 +212,7 @@ struct ReactionPicker: View {
             }
         }
         .padding(Self.padding)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 7))
-        .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Palette.separator, lineWidth: 0.5))
-        .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+        .raisedSurface(radius: 7)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Reactions")
     }

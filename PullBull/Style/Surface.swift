@@ -115,6 +115,7 @@ private struct RaisedSurface: ViewModifier {
             .background(alignment: Self.shadowAlignment(attachedEdge)) {
                 if castsShadow {
                     shadow(shape: shape, color: increased ? Palette.raisedShadowIncreased : Palette.raisedShadow)
+                        .accessibilityHidden(true)
                 }
             }
     }

@@ -27,8 +27,7 @@ struct MentionList: View {
             }
         }
         .padding(4)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 7))
-        .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Palette.separator, lineWidth: 0.5))
+        .raisedSurface(radius: 7)
     }
 }
 

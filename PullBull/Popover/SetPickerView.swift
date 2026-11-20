@@ -61,9 +61,7 @@ struct SetPickerView: View {
                 }
             }
             .padding(4)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 7))
-            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Palette.separator, lineWidth: 0.5))
-            .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+            .raisedSurface(radius: 7)
             // Once the filter is in the window: asked for sooner, the focus lands on the search field.
             .onAppear { DispatchQueue.main.async { filterFocused = true } }
             .accessibilityElement(children: .contain)
