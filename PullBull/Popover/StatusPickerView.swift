@@ -91,7 +91,7 @@ struct StatusPickerView: View {
                         .font(.system(size: 13))
                         .padding(.horizontal, 8)
                         .frame(height: 26)
-                        .background(RoundedRectangle(cornerRadius: 5).fill(Palette.rowHover))
+                        .fieldSurface(radius: 5, focused: filterFocused)
                         .focused($filterFocused)
                         .onChange(of: filter) { _, text in model.filterStatusPicker(text) }
                         .accessibilityLabel("Filter Status options")
@@ -165,9 +165,8 @@ private struct StatusPickerRowView: View {
             .padding(.horizontal, 8)
             .frame(height: 26)
             .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(selected ? Palette.selection : hovering ? Palette.rowHover : .clear))
+            .background(RoundedRectangle(cornerRadius: 5).fill(!selected && hovering ? Palette.rowHover : .clear))
+            .selectionFill(selected, radius: 5)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }

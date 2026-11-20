@@ -9,12 +9,13 @@ enum PinnedHeader {
 }
 
 extension View {
-    /// A header's backing, so rows scrolling beneath it while it is pinned blur rather than show through: a
-    /// translucent SwiftUI material (drawn in the list, unlike an AppKit effect view) across the full list width.
+    /// A header's backing, so rows scrolling beneath it while it is pinned are hidden rather than show
+    /// through: the popover's own glass (`GlassBackground`, no lift) across the full list width, so a header
+    /// at rest reads as part of the list and never as a band above it.
     func pinnedHeaderBackground() -> some View {
         frame(maxWidth: .infinity, alignment: .leading)
             .background {
-                Rectangle().fill(.thinMaterial)
+                PinnedHeaderGlass()
                     .padding(.horizontal, -Metrics.rowInset)
             }
     }
@@ -25,5 +26,14 @@ extension View {
         padding(.top, clearance)
             .id(id)
             .padding(.top, -clearance)
+    }
+}
+
+/// `GlassBackground` as Solid background asks, for `pinnedHeaderBackground()`.
+private struct PinnedHeaderGlass: View {
+    @Environment(\.solidBackground) private var solid
+
+    var body: some View {
+        GlassBackground(solid: solid)
     }
 }

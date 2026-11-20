@@ -150,8 +150,7 @@ private struct GhSetupStepRow: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: 7).fill(Palette.fill))
-        .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Palette.separator, lineWidth: 0.5))
+        .cardSurface(radius: 7)
     }
 }
 

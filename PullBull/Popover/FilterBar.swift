@@ -81,7 +81,7 @@ struct FilterBar: View {
                 .foregroundStyle(Palette.tertiary)
             Image(systemName: "clock")
                 .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Palette.accentText)
             Text(title)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -96,7 +96,7 @@ struct FilterBar: View {
         HStack(spacing: 6) {
             Image(systemName: "line.3.horizontal.decrease")
                 .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(row.isRepoFocused ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+                .foregroundStyle(row.isRepoFocused ? AnyShapeStyle(Palette.accentText) : AnyShapeStyle(.secondary))
                 .accessibilityHidden(true)
             Button { showRepoMenu() } label: {
                 Text("\(row.repoTitle) ▾")

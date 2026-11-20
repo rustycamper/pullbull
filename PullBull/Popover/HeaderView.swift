@@ -119,13 +119,7 @@ struct HeaderView<UnderField: View>: View {
         .padding(.leading, 8)
         .padding(.trailing, 6)
         .frame(height: 24)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Palette.field))
-        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.separator, lineWidth: 0.5))
-        .overlay(
-            RoundedRectangle(cornerRadius: 6 + 3)
-                .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 3.5)
-                .padding(-3.5)
-                .opacity(fieldFocused.wrappedValue ? 1 : 0))
+        .fieldSurface(radius: 6, focused: fieldFocused.wrappedValue)
     }
 
     /// Search follows the mode; the field's label reads the same.
@@ -180,7 +174,7 @@ private struct SaveSearchButton: View {
         } label: {
             Image(systemName: saved ? "bookmark.fill" : "bookmark")
                 .font(.system(size: 11))
-                .foregroundStyle(saved ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+                .foregroundStyle(saved ? AnyShapeStyle(Palette.accentText) : AnyShapeStyle(.secondary))
                 .frame(width: 16, height: 16)
                 .contentShape(Rectangle())
         }

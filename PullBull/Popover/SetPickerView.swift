@@ -29,7 +29,7 @@ struct SetPickerView: View {
                         .font(.system(size: 13))
                         .padding(.horizontal, 8)
                         .frame(height: 26)
-                        .background(RoundedRectangle(cornerRadius: 5).fill(Palette.rowHover))
+                        .fieldSurface(radius: 5, focused: filterFocused)
                         .focused($filterFocused)
                         .onChange(of: filter) { _, text in model.filterSetPicker(text) }
                         .accessibilityLabel(labels ? "Filter labels" : "Filter people")
@@ -157,9 +157,8 @@ private struct SetPickerRowView: View {
             .padding(.horizontal, 8)
             .frame(minHeight: 26)
             .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(selected ? Palette.selection : hovering ? Palette.rowHover : .clear))
+            .background(RoundedRectangle(cornerRadius: 5).fill(!selected && hovering ? Palette.rowHover : .clear))
+            .selectionFill(selected, radius: 5)
             .opacity(row.isEnabled ? 1 : 0.4)
         }
         .buttonStyle(.plain)

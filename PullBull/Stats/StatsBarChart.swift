@@ -85,10 +85,10 @@ struct StatsBarChart: View {
             if mark.index == hovered, mark.isToday {
                 var bright = context
                 bright.addFilter(.brightness(0.2))
-                bright.fill(path, with: .color(.accentColor))
+                bright.fill(path, with: .color(Palette.accentText))
             } else {
                 let shading: GraphicsContext.Shading = mark.index == hovered ? .style(.primary)
-                    : mark.isToday ? .color(.accentColor) : mark.isEmpty ? .color(Palette.tertiary) : .style(.secondary)
+                    : mark.isToday ? .color(Palette.accentText) : mark.isEmpty ? .color(Palette.tertiary) : .style(.secondary)
                 context.fill(path, with: shading)
             }
         }
@@ -109,7 +109,7 @@ struct StatsBarChart: View {
             return
         }
         var text = context.resolve(Text(label).font(.caption2.monospacedDigit()))
-        text.shading = index == bars.todayIndex ? .color(.accentColor) : .style(.secondary)
+        text.shading = index == bars.todayIndex ? .color(Palette.accentText) : .style(.secondary)
         let half = text.measure(in: CGSize(width: width, height: Self.countSpace * 2)).width / 2
         let center = bars.centerX(of: index, width: width)
         let x = min(max(center, half), max(width - half, half))
@@ -126,7 +126,7 @@ struct StatsBarChart: View {
             let point: CGPoint
             let anchor: UnitPoint
             if period == .week {
-                text.shading = label.index == bars.todayIndex ? .color(.accentColor) : .style(.secondary)
+                text.shading = label.index == bars.todayIndex ? .color(Palette.accentText) : .style(.secondary)
                 point = CGPoint(x: bars.centerX(of: label.index, width: width), y: y)
                 anchor = .top
             } else {

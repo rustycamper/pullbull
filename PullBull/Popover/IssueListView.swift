@@ -396,8 +396,7 @@ struct BoardUnavailableView: View {
             .padding(.leading, 10)
             .padding(.trailing, 4)
             .padding(.vertical, 4)
-            .background(RoundedRectangle(cornerRadius: 7).fill(Palette.fill))
-            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Palette.separator, lineWidth: 0.5))
+            .cardSurface(radius: 7)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

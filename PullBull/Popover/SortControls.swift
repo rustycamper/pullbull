@@ -21,7 +21,7 @@ struct SortButton: View {
                         .lineLimit(1)
                 }
             }
-            .foregroundStyle(changed ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+            .foregroundStyle(changed ? AnyShapeStyle(Palette.accentText) : AnyShapeStyle(.secondary))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

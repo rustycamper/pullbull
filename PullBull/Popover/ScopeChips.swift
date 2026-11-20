@@ -167,7 +167,7 @@ struct ScopeChip: View {
     }
 
     @ViewBuilder private func countLabel(_ count: IssueTabCount) -> some View {
-        let color: Color = hot && count != .current(0) ? .accentColor : selected ? .primary : Palette.secondaryText
+        let color: Color = hot && count != .current(0) ? Palette.accentText : selected ? .primary : Palette.secondaryText
         switch count {
         case .current(let n):
             Text(TabCountText.header(n))

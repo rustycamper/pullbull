@@ -99,7 +99,7 @@ private struct ReactionChip: View {
         return HStack(spacing: 3) {
             Text(verbatim: group.content.emoji)
             Text(verbatim: String(group.count))
-                .foregroundStyle(mine ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+                .foregroundStyle(mine ? AnyShapeStyle(Palette.accentText) : AnyShapeStyle(.secondary))
         }
         .font(.system(size: 11))
         .monospacedDigit()
@@ -107,7 +107,8 @@ private struct ReactionChip: View {
         .fixedSize()
         .padding(.horizontal, 7)
         .frame(height: 20)
-        .background(Capsule().fill(mine ? Color.accentColor.opacity(0.15) : Palette.fill))
+        .background(Capsule().fill(mine ? .clear : Palette.fill))
+        .selectionFill(mine, in: Capsule())
         .overlay(Capsule().strokeBorder(mine ? Color.accentColor : Palette.separator, lineWidth: 0.5))
         .contentShape(Capsule())
     }
@@ -230,9 +231,8 @@ private struct ReactionPickerButton: View {
             Text(verbatim: content.emoji)
                 .font(.system(size: 14))
                 .frame(width: 24, height: 24)
-                .background(
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(given ? Color.accentColor.opacity(0.15) : hovering ? Palette.fill : .clear))
+                .background(RoundedRectangle(cornerRadius: 5).fill(!given && hovering ? Palette.fill : .clear))
+                .selectionFill(given, radius: 5)
                 .overlay {
                     if given { RoundedRectangle(cornerRadius: 5).strokeBorder(Color.accentColor, lineWidth: 0.5) }
                 }

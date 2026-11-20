@@ -101,7 +101,7 @@ struct AskView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10)
         .padding(.vertical, 9)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Palette.fill))
+        .cardSurface(radius: 8)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
     }

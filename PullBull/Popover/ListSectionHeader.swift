@@ -145,7 +145,7 @@ extension PRSection {
         }
     }
 
-    var glyphColor: Color { self == .needsReview ? .accentColor : .secondary }
+    var glyphColor: Color { self == .needsReview ? Palette.accentText : .secondary }
 }
 
 extension IssueSection {

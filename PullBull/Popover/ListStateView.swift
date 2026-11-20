@@ -40,7 +40,7 @@ struct ListStateView<Footer: View>: View {
     private static func accented(_ detail: String, _ phrase: String) -> AttributedString {
         var attributed = AttributedString(detail)
         if let range = attributed.range(of: phrase) {
-            attributed[range].foregroundColor = .accentColor
+            attributed[range].foregroundColor = Palette.accentText
         }
         return attributed
     }

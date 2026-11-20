@@ -61,9 +61,8 @@ private struct MentionRow: View {
             .padding(.horizontal, 8)
             .frame(height: 26)
             .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(selected ? Palette.selection : hovering ? Palette.rowHover : .clear))
+            .background(RoundedRectangle(cornerRadius: 5).fill(!selected && hovering ? Palette.rowHover : .clear))
+            .selectionFill(selected, radius: 5)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
