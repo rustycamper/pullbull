@@ -73,7 +73,7 @@ struct IssueGroupHeader: View {
     var body: some View {
         let offered = menus != .none
         ListSectionHeader(
-            glyph: symbol, glyphColor: symbolColor, title: group.title,
+            glyph: symbol, glyphColor: AnyShapeStyle(symbolColor), title: group.title,
             count: group.counted ? group.issues.count : nil, fold: fold, compact: model.settings.compact)
             .focusContextMenu(
                 offered ? focusItem : nil, time: menus == .list ? TimeFocusMenu(model: model) : nil,

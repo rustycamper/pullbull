@@ -257,12 +257,12 @@ private struct PanelButtonStyle: ButtonStyle {
             }
     }
 
-    private func fill(pressed: Bool) -> Color {
-        if selected { return Palette.selection }
-        if pressed { return Palette.strongFill }
+    private func fill(pressed: Bool) -> AnyShapeStyle {
+        if selected { return AnyShapeStyle(Palette.selection) }
+        if pressed { return AnyShapeStyle(Palette.strongFill) }
         switch look {
-        case .filled: return hovering ? Palette.strongFill : Palette.fill
-        case .outlined: return hovering ? Palette.rowHover : .clear
+        case .filled: return AnyShapeStyle(hovering ? Palette.strongFill : Palette.fill)
+        case .outlined: return AnyShapeStyle(hovering ? Palette.rowHover : .clear)
         }
     }
 }

@@ -99,7 +99,7 @@ private struct ReactionChip: View {
         return HStack(spacing: 3) {
             Text(verbatim: group.content.emoji)
             Text(verbatim: String(group.count))
-                .foregroundStyle(mine ? AnyShapeStyle(Palette.accentText) : AnyShapeStyle(.secondary))
+                .foregroundStyle(mine ? AnyShapeStyle(Palette.accentTextOnSelection) : AnyShapeStyle(.secondary))
         }
         .font(.system(size: 11))
         .monospacedDigit()

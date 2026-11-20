@@ -43,7 +43,7 @@ private struct ModeButton: View {
         Button(action: action) {
             Image(symbol: mode.symbol)
                 .font(.system(size: 13, weight: selected ? .semibold : .regular))
-                .foregroundStyle(selected ? AnyShapeStyle(Palette.accentText) : AnyShapeStyle(.secondary))
+                .foregroundStyle(selected ? AnyShapeStyle(Palette.accentTextOnSelection) : AnyShapeStyle(.secondary))
                 .frame(width: 24, height: 20)
                 .background(Self.chip.fill(fill))
                 // Increase Contrast edges the chosen chip too.

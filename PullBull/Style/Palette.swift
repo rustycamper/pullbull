@@ -59,17 +59,14 @@ enum Palette {
     /// The keyboard highlight and your own chips (`View.selectionFill`): in light mode the accent blended
     /// 0.70 toward white at 0.75, which stays clear of grey glass; in dark mode the accent at 0.25. Follows
     /// the system accent as the user changes it.
-    static let selection = accentDerived { accent, isDark in
-        isDark
-            ? accent.withAlphaComponent(0.25)
-            : (accent.blended(withFraction: 0.7, of: .white) ?? accent).withAlphaComponent(0.75)
-    }
+    static let selection = AccentStyle(role: .selection)
     /// Accent-coloured text and small glyphs on glass or a selection fill: in light mode the accent blended
     /// 0.40 toward black, about 3.8:1 on mid-grey glass where the plain accent is under 2:1; in dark mode
     /// the accent itself. Accent fills (buttons, toggles, the caret, the focus halo) keep the plain accent.
-    static let accentText = accentDerived { accent, isDark in
-        isDark ? accent : accent.blended(withFraction: 0.4, of: .black) ?? accent
-    }
+    static let accentText = AccentStyle(role: .text)
+    /// Accent text on a `selection` fill (your reaction count, the chosen mode): `accentText` in light mode;
+    /// in dark mode the accent blended 0.25 toward white, since the plain accent on the 0.25 fill drops near 3:1.
+    static let accentTextOnSelection = AccentStyle(role: .textOnSelection)
     /// White over a raised layer's glass, so it reads above the base glass it floats over.
     static let lift = dynamic(light: 0xFFFFFF, dark: 0xFFFFFF, alpha: (0.3, 0.06))
     /// A raised layer's shadow, and the sliding detail's edge; deeper in dark mode, where 0.18 can't be seen.
@@ -108,25 +105,47 @@ enum Palette {
         })
     }
 
-    /// A colour made from the system accent as it resolves in each appearance, so it follows the user's
-    /// accent as they change it.
-    private static func accentDerived(_ make: @escaping @Sendable (NSColor, Bool) -> NSColor) -> Color {
-        Color(nsColor: NSColor(name: nil) { appearance in
-            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            var accent = NSColor.controlAccentColor
-            appearance.performAsCurrentDrawingAppearance {
-                accent = NSColor.controlAccentColor.usingColorSpace(.sRGB) ?? NSColor.controlAccentColor
-            }
-            return make(accent, isDark)
-        })
-    }
-
     private static func rgb(_ hex: UInt32, alpha: CGFloat) -> NSColor {
         NSColor(
             srgbRed: CGFloat((hex >> 16) & 0xFF) / 255,
             green: CGFloat((hex >> 8) & 0xFF) / 255,
             blue: CGFloat(hex & 0xFF) / 255,
             alpha: alpha)
+    }
+}
+
+/// A colour made from the accent as the environment resolves it, so SwiftUI tracks the dependency and the
+/// colour follows the user's system accent as they change it, as well as the colour scheme. Blends are per
+/// sRGB component, as `NSColor.blended(withFraction:of:)` does.
+struct AccentStyle: ShapeStyle {
+    enum Role { case selection, text, textOnSelection }
+    let role: Role
+
+    func resolve(in environment: EnvironmentValues) -> Color.Resolved {
+        let accent = Color.accentColor.resolve(in: environment)
+        let dark = environment.colorScheme == .dark
+        switch role {
+        case .selection:
+            return dark ? Self.alpha(accent, 0.25) : Self.alpha(Self.blend(accent, toward: 1, 0.7), 0.75)
+        case .text:
+            return dark ? accent : Self.blend(accent, toward: 0, 0.4)
+        case .textOnSelection:
+            return dark ? Self.blend(accent, toward: 1, 0.25) : Self.blend(accent, toward: 0, 0.4)
+        }
+    }
+
+    /// `color` moved `fraction` of the way to white (1) or black (0), keeping its opacity.
+    private static func blend(_ color: Color.Resolved, toward target: Float, _ fraction: Float) -> Color.Resolved {
+        let mix = { (c: Float) in c + (target - c) * fraction }
+        return Color.Resolved(
+            colorSpace: .sRGB, red: mix(color.red), green: mix(color.green), blue: mix(color.blue),
+            opacity: color.opacity)
+    }
+
+    private static func alpha(_ color: Color.Resolved, _ opacity: Float) -> Color.Resolved {
+        var color = color
+        color.opacity *= opacity
+        return color
     }
 }
 
