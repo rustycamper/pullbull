@@ -91,7 +91,7 @@ struct StatusPickerView: View {
                         .font(.system(size: 13))
                         .padding(.horizontal, 8)
                         .frame(height: 26)
-                        .background(RoundedRectangle(cornerRadius: 5).fill(Palette.rowHover))
+                        .fieldSurface(radius: 5, focused: filterFocused)
                         .focused($filterFocused)
                         .onChange(of: filter) { _, text in model.filterStatusPicker(text) }
                         .accessibilityLabel("Filter Status options")
@@ -118,9 +118,7 @@ struct StatusPickerView: View {
                 }
             }
             .padding(4)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 7))
-            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Palette.separator, lineWidth: 0.5))
-            .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+            .raisedSurface(radius: 7)
             // Once the filter is in the window: asked for sooner, the focus lands on the search field.
             .onAppear { DispatchQueue.main.async { filterFocused = true } }
             .accessibilityElement(children: .contain)
@@ -167,9 +165,8 @@ private struct StatusPickerRowView: View {
             .padding(.horizontal, 8)
             .frame(height: 26)
             .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(selected ? Palette.selection : hovering ? Palette.rowHover : .clear))
+            .background(RoundedRectangle(cornerRadius: 5).fill(!selected && hovering ? Palette.rowHover : .clear))
+            .selectionFill(selected, radius: 5)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }

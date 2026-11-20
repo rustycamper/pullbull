@@ -200,7 +200,7 @@
 
   // PRSection.glyph: Needs your review's bell in the accent colour; the rest secondary.
   const SECTION_GLYPH = {
-    needsReview: ["bell", "var(--accent)"],
+    needsReview: ["bell", "var(--accent-text)"],
     yourPRs: ["pullbull.pullrequest", null],
     waiting: ["clock", null],
     recentlyClosed: ["archivebox", null],

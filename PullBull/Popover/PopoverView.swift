@@ -182,6 +182,8 @@ struct PopoverView: View {
         .overlayPreferenceValue(EditPickerAnchorKey.self) { anchor in
             EditPickerLayer(model: model, anchor: anchor)
         }
+        // Outside the overlays, so the failure line and the pickers draw their glass to match too.
+        .environment(\.solidBackground, model.settings.solidBackground)
         // Sliding layers stay inside the rounded panel.
         .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius))
         .onAppear {
@@ -339,7 +341,7 @@ struct PopoverView: View {
                                             ) { item in
                                                 pickHintItem(item, fromKeyboard: false, in: keyMonitor.window)
                                             }
-                                            .overList(solid: model.settings.solidBackground, shadow: !completionShown)
+                                            .overList(shadow: !completionShown)
                                             .transition(.opacity)
                                         }
                                     }
@@ -1942,7 +1944,7 @@ private struct PushedLayer: ViewModifier {
     func body(content: Content) -> some View {
         content.overlay(alignment: .leading) {
             if slides {
-                LinearGradient(colors: [.clear, .black.opacity(0.12)], startPoint: .leading, endPoint: .trailing)
+                LinearGradient(colors: [.clear, Palette.raisedShadow], startPoint: .leading, endPoint: .trailing)
                     .frame(width: 10)
                     .offset(x: -10)
                     .allowsHitTesting(false)

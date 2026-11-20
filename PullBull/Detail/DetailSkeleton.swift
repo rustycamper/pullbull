@@ -101,7 +101,7 @@ private struct SkeletonCard<Content: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
-            if chrome { RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.035)) }
+            if chrome { RoundedRectangle(cornerRadius: 8).fill(Palette.card) }
         }
         .overlay {
             if chrome { RoundedRectangle(cornerRadius: 8).strokeBorder(Palette.separator, lineWidth: 0.5) }

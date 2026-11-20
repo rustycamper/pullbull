@@ -36,11 +36,16 @@ struct ListStateView<Footer: View>: View {
     var detailLink: DetailLink?
     var action: Action?
     @ViewBuilder let footer: () -> Footer
+    @Environment(\.self) private var environment
 
-    private static func accented(_ detail: String, _ phrase: String) -> AttributedString {
+    /// The phrase in `Palette.accentText` as `environment` resolves it: an attributed string takes a colour,
+    /// not a style. Reading the environment re-renders the text when the accent or scheme changes.
+    private static func accented(
+        _ detail: String, _ phrase: String, in environment: EnvironmentValues
+    ) -> AttributedString {
         var attributed = AttributedString(detail)
         if let range = attributed.range(of: phrase) {
-            attributed[range].foregroundColor = .accentColor
+            attributed[range].foregroundColor = Color(Palette.accentText.resolve(in: environment))
         }
         return attributed
     }
@@ -48,7 +53,7 @@ struct ListStateView<Footer: View>: View {
     @ViewBuilder private func detailText(_ detail: String) -> some View {
         if let link = detailLink {
             Button(action: link.perform) {
-                Text(Self.accented(detail, link.phrase))
+                Text(Self.accented(detail, link.phrase, in: environment))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)

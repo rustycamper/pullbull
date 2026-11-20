@@ -8,7 +8,7 @@ import PullBullKit
 /// fold's chevron sits on one line and every title on another.
 struct ListSectionHeader: View {
     let glyph: String?
-    var glyphColor: Color = .secondary
+    var glyphColor = AnyShapeStyle(.secondary)
     let title: String
     /// Nil for headers that show no count.
     var count: Int? = nil
@@ -145,7 +145,7 @@ extension PRSection {
         }
     }
 
-    var glyphColor: Color { self == .needsReview ? .accentColor : .secondary }
+    var glyphColor: AnyShapeStyle { self == .needsReview ? AnyShapeStyle(Palette.accentText) : AnyShapeStyle(.secondary) }
 }
 
 extension IssueSection {

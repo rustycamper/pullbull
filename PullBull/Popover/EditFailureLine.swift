@@ -57,9 +57,12 @@ struct EditFailureLine: View {
             .padding(.leading, Metrics.listGutter)
             .padding(.trailing, 10)
             .padding(.vertical, 8)
-            .background(.regularMaterial)
+            // The amber on top of the glass, as the footer's warning is, rather than washed out under a material.
             .background(Palette.amberFill)
             .overlay(alignment: .top) { Hairline() }
+            // Under an open edit picker, the picker casts the shadow. The reaction picker sits in the detail,
+            // below the line, so the line stays the top layer then.
+            .raisedSurface(radius: 0, attachedEdge: .bottom, castsShadow: model.editPickerKey == nil)
             .accessibilityElement(children: .contain)
             .onAppear { AccessibilityNotification.Announcement(failure.text).post() }
         }

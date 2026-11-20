@@ -97,8 +97,7 @@ struct DetailCard<Content: View>: View {
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.035)))
-        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Palette.separator, lineWidth: 0.5))
+        .cardSurface(radius: 8)
     }
 }
 

@@ -13,6 +13,10 @@
   /* The field's placeholder reads at about secondary strength in the reference. */
   --placeholder: rgba(255, 255, 255, 0.6);
   --accent: #007aff;
+  /* Palette.accentText: the accent itself in dark mode. */
+  --accent-text: var(--accent);
+  /* Palette.selection: the dark stills keep the earlier accent 0.15 (the app draws 0.25); only light values are mirrored. */
+  --selection: color-mix(in srgb, var(--accent) 15%, transparent);
   --match: rgba(255, 214, 10, 0.3);
   --red: #ff4245;
   /* Palette */
@@ -65,6 +69,10 @@
   --separator: rgba(0, 0, 0, 0.098);
   --placeholder: rgba(0, 0, 0, 0.45);
   --accent: #007aff;
+  /* Palette.accentText: the accent blended 0.40 toward black, for text and small glyphs. --accent stays for fills. */
+  --accent-text: #004999;
+  /* Palette.selection: the accent blended 0.70 toward white, at 0.75. */
+  --selection: rgba(179, 215, 255, 0.75);
   --match: rgba(255, 204, 0, 0.4);
   --red: #ff383c;
   /* Palette */
@@ -141,7 +149,7 @@ body {
 .c-secondary { color: var(--secondary); }
 .c-secondary-text { color: var(--secondary-text); }
 .c-tertiary { color: var(--tertiary); }
-.c-accent { color: var(--accent); }
+.c-accent { color: var(--accent-text); }
 
 /* A symbol: an exported mask tinted with the current colour, at the symbol's point size. */
 .sym {
@@ -229,7 +237,7 @@ body {
 /* ModeToggle: two 24×20 segments, 2 apart, on a 24-tall track padded 2. */
 .mode-toggle { gap: 2px; flex: none; padding: 2px; border-radius: 6px; background: var(--fill); }
 .mode-button { width: 24px; height: 20px; display: flex; align-items: center; justify-content: center; color: var(--secondary); border-radius: 5px; }
-.mode-button.selected { color: var(--accent); background: var(--strong-fill); }
+.mode-button.selected { color: var(--accent-text); background: var(--strong-fill); }
 
 /* ScopeChips: capsule chips 4 apart, 22 tall, 9 pt of padding (6 when a count reads "99+"). The selected chip is on Palette.strongFill. */
 .scope-chips { flex: 1 1 auto; display: flex; gap: 4px; }
@@ -243,7 +251,7 @@ body {
 .chip.selected .title { color: var(--label); font-weight: 600; }
 .chip .count { color: var(--secondary-text); }
 .chip.selected .count { color: var(--label); }
-.chip .count.hot { color: var(--accent); }
+.chip .count.hot { color: var(--accent-text); }
 
 /* Search row: the mode switch, 6 apart from the field; 24 tall, inset 6 (Metrics.rowInset), 8 above, 6 below. */
 .search-row { padding: 8px 6px 6px; flex: none; display: flex; gap: 6px; align-items: center; }
@@ -283,7 +291,7 @@ body {
 
 .row { display: flex; align-items: flex-start; gap: 10px; padding: 7px 8px 8px; border-radius: 7px; }
 .row.hover { background: var(--row-hover); }
-.row.selected { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.row.selected { background: var(--selection); }
 .row .leading { margin-top: 1px; flex: none; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; color: var(--secondary); }
 .row .body { flex: 1 1 auto; min-width: 0; }
 .row .title-text {
@@ -373,7 +381,7 @@ body {
 
 /* ---------- Detail (PRDetailView, IssueDetailView, DetailComponents) ---------- */
 
-.link { color: var(--accent); }
+.link { color: var(--accent-text); }
 .detail { display: flex; flex-direction: column; height: 100%; color: var(--label); }
 .detail-header { position: relative; height: 44px; padding: 0 8px; display: flex; align-items: center; gap: 4px; flex: none; }
 .detail-icon { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; flex: none; }
@@ -441,18 +449,19 @@ body {
 
 /* ---------- Search hints (SearchHints) ---------- */
 
-/* The popover's material as an opaque fill: the panel hides the list under it. */
-.scheme-dark { --hints: #2b2b2c; }
-.scheme-light { --hints: #eef0f6; }
+/* The popover's material as an opaque fill: the panel hides the list under it. A raised layer: in light mode
+   Palette.lift (white 0.30) over the glass and Palette.raisedShadow (black 0.18) below. */
+.scheme-dark { --hints: #2b2b2c; --hints-lift: transparent; --hints-shadow: rgba(0, 0, 0, 0.12); }
+.scheme-light { --hints: #eef0f6; --hints-lift: rgba(255, 255, 255, 0.3); --hints-shadow: rgba(0, 0, 0, 0.18); }
 
 .hints {
   position: absolute; left: 0; right: 0; top: 0; padding: 8px 8px 6px;
-  background: var(--hints);
-  box-shadow: 0 0.5px 0 var(--separator), 0 8px 14px rgba(0, 0, 0, 0.12);
+  background: linear-gradient(var(--hints-lift), var(--hints-lift)), var(--hints);
+  box-shadow: 0 0.5px 0 var(--separator), 0 8px 14px var(--hints-shadow);
 }
 .hint-cloud { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .hint-chip { height: 24px; padding: 0 9px; display: inline-flex; align-items: center; gap: 6px; border-radius: 6px; background: var(--fill); font-size: 12px; white-space: nowrap; color: var(--label); }
-.hint-chip.selected { background: color-mix(in srgb, var(--accent) 15%, transparent); box-shadow: inset 0 0 0 1px var(--accent); }
+.hint-chip.selected { background: var(--selection); box-shadow: inset 0 0 0 1px var(--accent); }
 .code { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 .hint-tokens { display: flex; flex-direction: column; gap: 4px; }
 .hint-token { height: 22px; padding: 0 5px; display: inline-flex; align-items: center; gap: 5px; border-radius: 5px; box-shadow: inset 0 0 0 0.5px var(--separator); font-size: 12px; white-space: nowrap; }

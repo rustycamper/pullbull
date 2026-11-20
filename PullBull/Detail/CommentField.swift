@@ -115,9 +115,7 @@ struct CommentField<Secondary: View>: View {
         }
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, minHeight: CommentTextView.rowHeight)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Palette.field))
-        .overlay(
-            RoundedRectangle(cornerRadius: 6).strokeBorder(isFocused ? Color.accentColor : Palette.separator))
+        .fieldSurface(radius: 6, focused: isFocused)
         // Focused, no tooltip covers the text being written.
         .help(isFocused ? "" : CommentTextView.help)
     }

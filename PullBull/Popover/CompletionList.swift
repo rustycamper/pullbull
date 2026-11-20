@@ -107,8 +107,7 @@ struct CompletionList: View {
                 }
             }
             .padding(4)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 7))
-            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Palette.separator, lineWidth: 0.5))
+            .raisedSurface(radius: 7)
             .padding(.horizontal, 10)
             .padding(.top, 4)
         }
@@ -168,9 +167,8 @@ private struct CompletionRow: View {
             .padding(.horizontal, 8)
             .frame(height: 26)
             .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(selected ? Palette.selection : hovering ? Palette.rowHover : .clear))
+            .background(RoundedRectangle(cornerRadius: 5).fill(!selected && hovering ? Palette.rowHover : .clear))
+            .selectionFill(selected, radius: 5)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
@@ -207,9 +205,8 @@ private struct LabelCompletionRow: View {
             .padding(.horizontal, 8)
             .frame(height: 26)
             .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(selected ? Palette.selection : hovering ? Palette.rowHover : .clear))
+            .background(RoundedRectangle(cornerRadius: 5).fill(!selected && hovering ? Palette.rowHover : .clear))
+            .selectionFill(selected, radius: 5)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
@@ -243,9 +240,8 @@ private struct StateCompletionRow: View {
             .padding(.horizontal, 8)
             .frame(height: 26)
             .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(selected ? Palette.selection : hovering ? Palette.rowHover : .clear))
+            .background(RoundedRectangle(cornerRadius: 5).fill(!selected && hovering ? Palette.rowHover : .clear))
+            .selectionFill(selected, radius: 5)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
@@ -282,9 +278,8 @@ private struct StatusCompletionRow: View {
             .padding(.horizontal, 8)
             .frame(height: 26)
             .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(selected ? Palette.selection : hovering ? Palette.rowHover : .clear))
+            .background(RoundedRectangle(cornerRadius: 5).fill(!selected && hovering ? Palette.rowHover : .clear))
+            .selectionFill(selected, radius: 5)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
@@ -318,9 +313,8 @@ private struct TimeStepCompletionRow: View {
             .padding(.horizontal, 8)
             .frame(height: 26)
             .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(selected ? Palette.selection : hovering ? Palette.rowHover : .clear))
+            .background(RoundedRectangle(cornerRadius: 5).fill(!selected && hovering ? Palette.rowHover : .clear))
+            .selectionFill(selected, radius: 5)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
@@ -357,9 +351,8 @@ private struct RepoCompletionRow: View {
             .padding(.horizontal, 8)
             .frame(height: 26)
             .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(selected ? Palette.selection : hovering ? Palette.rowHover : .clear))
+            .background(RoundedRectangle(cornerRadius: 5).fill(!selected && hovering ? Palette.rowHover : .clear))
+            .selectionFill(selected, radius: 5)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
@@ -393,9 +386,8 @@ private struct ReviewCompletionRow: View {
             .padding(.horizontal, 8)
             .frame(height: 26)
             .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(selected ? Palette.selection : hovering ? Palette.rowHover : .clear))
+            .background(RoundedRectangle(cornerRadius: 5).fill(!selected && hovering ? Palette.rowHover : .clear))
+            .selectionFill(selected, radius: 5)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
@@ -429,9 +421,8 @@ private struct SizeCompletionRow: View {
             .padding(.horizontal, 8)
             .frame(height: 26)
             .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(selected ? Palette.selection : hovering ? Palette.rowHover : .clear))
+            .background(RoundedRectangle(cornerRadius: 5).fill(!selected && hovering ? Palette.rowHover : .clear))
+            .selectionFill(selected, radius: 5)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }

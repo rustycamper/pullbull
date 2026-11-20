@@ -18,11 +18,13 @@ struct RowFill: ViewModifier {
             // The content only: the fill keeps the outer appearance.
             .environment(\.colorScheme, flashing ? .dark : colorScheme)
             .background(RoundedRectangle(cornerRadius: cornerRadius).fill(fill))
+            .selectionFill(selected && !flashing, radius: cornerRadius)
     }
 
+    /// The flash or the hover tint; the keyboard highlight is `selectionFill`.
     private var fill: Color {
         if flashing { return Palette.rowFlash }
-        if selected { return Palette.selection }
+        if selected { return .clear }
         return hovering ? Palette.rowHover : .clear
     }
 }

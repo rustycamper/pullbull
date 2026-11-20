@@ -35,7 +35,6 @@ private struct ModeButton: View {
     let news: String?
     let action: () -> Void
     @State private var hovering = false
-    @Environment(\.colorSchemeContrast) private var contrast
 
     /// 20pt tall inside the 24pt track; its radius nests inside the track's 6.
     private static let chip = RoundedRectangle(cornerRadius: 5)
@@ -44,13 +43,11 @@ private struct ModeButton: View {
         Button(action: action) {
             Image(symbol: mode.symbol)
                 .font(.system(size: 13, weight: selected ? .semibold : .regular))
-                .foregroundStyle(selected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+                .foregroundStyle(selected ? AnyShapeStyle(Palette.accentTextOnSelection) : AnyShapeStyle(.secondary))
                 .frame(width: 24, height: 20)
                 .background(Self.chip.fill(fill))
-                .overlay {
-                    // Increase Contrast edges the chosen chip too.
-                    if selected, contrast == .increased { Self.chip.strokeBorder(Color.accentColor, lineWidth: 1) }
-                }
+                // Increase Contrast edges the chosen chip too.
+                .selectionFill(selected, in: Self.chip)
                 .overlay(alignment: .topTrailing) {
                     if news != nil {
                         Circle()
@@ -70,8 +67,9 @@ private struct ModeButton: View {
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
+    /// The hover tint; the chosen chip is `selectionFill`.
     private var fill: Color {
-        if selected { return Palette.selection }
+        if selected { return .clear }
         // The track is `Palette.fill`, so a hover takes the stronger fill to show on it.
         return hovering ? Palette.strongFill : .clear
     }

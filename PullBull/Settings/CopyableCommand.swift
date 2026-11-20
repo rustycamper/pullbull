@@ -22,8 +22,7 @@ struct CopyableCommand: View {
         .padding(.leading, 8)
         .padding(.trailing, 4)
         .padding(.vertical, 4)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Palette.fill))
-        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.separator, lineWidth: 0.5))
+        .cardSurface(radius: 6)
     }
 
     private func copy() {

@@ -204,62 +204,16 @@ struct SearchHints: View {
 }
 
 extension SearchHints {
-    /// Drawn over the top of the list, which doesn't move: the popover's own material and a 1pt rule, with
-    /// a soft shadow below unless a completion list covers the panel (only the top layer casts one).
-    func overList(solid: Bool, shadow: Bool) -> some View {
+    /// Drawn over the top of the list, which doesn't move: a raised panel attached under the header, its
+    /// 1pt rule the one line on its free side, with the shadow below unless a completion list covers the
+    /// panel (only the top layer casts one).
+    func overList(shadow: Bool) -> some View {
         VStack(spacing: 0) {
             self
             Hairline()
         }
-        .background { PopoverMaterial(solid: solid) }
+        .raisedSurface(radius: 0, attachedEdge: .top, castsShadow: shadow)
         .contentShape(Rectangle())
-        .background(alignment: .bottom) {
-            if shadow { HintPanelShadow() }
-        }
-    }
-}
-
-/// The popover's background, so the panel reads as part of it: the material behind the window, or with
-/// a solid background the same opaque fill under the window-background material.
-private struct PopoverMaterial: View {
-    let solid: Bool
-
-    var body: some View {
-        ZStack {
-            if solid { Color(nsColor: .windowBackgroundColor) }
-            EffectView(solid: solid)
-        }
-        .accessibilityHidden(true)
-    }
-
-    private struct EffectView: NSViewRepresentable {
-        let solid: Bool
-
-        func makeNSView(context: Context) -> NSVisualEffectView {
-            let view = NSVisualEffectView()
-            view.state = .active
-            return view
-        }
-
-        func updateNSView(_ view: NSVisualEffectView, context: Context) {
-            view.material = solid ? .windowBackground : .popover
-            view.blendingMode = solid ? .withinWindow : .behindWindow
-        }
-    }
-}
-
-/// A soft shadow just below the panel's rule, deeper in dark mode so the edge stays clear on dark rows.
-private struct HintPanelShadow: View {
-    @Environment(\.colorScheme) private var colorScheme
-    private static let depth: CGFloat = 8
-
-    var body: some View {
-        LinearGradient(
-            colors: [.black.opacity(colorScheme == .dark ? 0.35 : 0.1), .clear], startPoint: .top, endPoint: .bottom)
-            .frame(height: Self.depth)
-            .offset(y: Self.depth)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
     }
 }
 
@@ -303,12 +257,12 @@ private struct PanelButtonStyle: ButtonStyle {
             }
     }
 
-    private func fill(pressed: Bool) -> Color {
-        if selected { return Palette.selection }
-        if pressed { return Palette.strongFill }
+    private func fill(pressed: Bool) -> AnyShapeStyle {
+        if selected { return AnyShapeStyle(Palette.selection) }
+        if pressed { return AnyShapeStyle(Palette.strongFill) }
         switch look {
-        case .filled: return hovering ? Palette.strongFill : Palette.fill
-        case .outlined: return hovering ? Palette.rowHover : .clear
+        case .filled: return AnyShapeStyle(hovering ? Palette.strongFill : Palette.fill)
+        case .outlined: return AnyShapeStyle(hovering ? Palette.rowHover : .clear)
         }
     }
 }

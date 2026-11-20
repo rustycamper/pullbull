@@ -307,7 +307,7 @@ struct PRDetailView: View {
                 let running = model.rerunning.contains(key)
                 Button(running ? "Re-running…" : "Re-run failed jobs") { model.rerunFailedJobs(on: key) }
                     .buttonStyle(.link)
-                    .foregroundStyle(running ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
+                    .foregroundStyle(running ? AnyShapeStyle(.secondary) : AnyShapeStyle(Palette.accentText))
                     .lineLimit(1)
                     .fixedSize()
                     .disabled(running)
@@ -315,7 +315,7 @@ struct PRDetailView: View {
             }
             if FailingCheck.hasFailure(checks) {
                 Link("Open Failing Check", destination: FailingCheck.url(in: checks, key: key))
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(Palette.accentText)
                     .lineLimit(1)
                     .fixedSize()
             }
@@ -381,7 +381,7 @@ struct PRDetailView: View {
                 }
                 .buttonStyle(.link)
                 .font(.system(size: 11))
-                .foregroundStyle(enabled ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                .foregroundStyle(enabled ? AnyShapeStyle(Palette.accentText) : AnyShapeStyle(.secondary))
                 .lineLimit(1)
                 .fixedSize()
                 .disabled(!enabled)
