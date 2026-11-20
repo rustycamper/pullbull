@@ -47,9 +47,27 @@ Owner-approved on 2026-11-20 from a UI audit, including the darker accent text i
 - An edge-attached raised panel draws no edge on its attached side, and exactly one rule on its free side (its existing `Hairline`), so it never doubles the chrome's hairline.
 - Reduce Transparency: system materials go opaque on their own; the lift, edge and shadow still separate raised layers.
 
+## How it is built
+
+The rules live in `PullBull/Style/Palette.swift` (tokens) and `PullBull/Style/Surface.swift` (`GlassBackground`, `\.solidBackground`, `.raisedSurface`, `.fieldSurface`, `.cardSurface`, `.selectionFill`).
+
+- **Accent-derived tokens.** `selection` and `accentText` are dynamic `NSColor`s that resolve `controlAccentColor` in sRGB under the appearance being drawn, then blend with `NSColor.blended(withFraction:of:)`. Nothing is cached, so a new system accent reaches them on the next draw.
+- **The raised shadow is drawn only outside the layer.** The glass is an AppKit view, and SwiftUI's `.shadow` on a view holding one would shadow only the SwiftUI parts (the faint lift, the text), all but vanishing in dark mode. So the free-floating shadow is a black copy of the layer's shape with `.shadow`, masked to everything outside the shape: the glass never darkens, and only the area around the layer does.
+- **Increased Contrast shadow** is its own token, `raisedShadowIncreased` (black 0.234 light, 0.52 dark): `Color.opacity` can't multiply past 1.
+- **Edge-attached panels.** The search hints panel is attached at its top (under the header), so its gradient falls below its bottom `Hairline`. The edit failure line is attached at its bottom (on the footer or the detail's bottom row), so its gradient rises above its top `Hairline`. Neither draws an edge stroke of its own.
+- **Only the topmost layer casts a shadow.** The hints panel stops casting while the completion list covers it. The failure line stops casting while an edit picker or the reaction picker is open, since either may cover it. The completion and @ mention lists, the pickers and the reaction picker always cast one.
+- **The failure line's amber** is drawn between its content and the glass, so the glass never washes it out.
+- **The sliding detail's edge** is a 10pt gradient from clear to `raisedShadow`.
+- **Fields.** The picker filter fields hold the focus while their picker is open, so their halo shows the whole time the picker does. The comment field's edge is the field rule's 0.5pt, down from 1pt.
+- **Cards.** `DetailSkeleton` keeps drawing its card only in the chrome layer, filled with `Palette.card`. CopyableCommand, IssueListView's command box and GhSetupView's command box move from `Palette.fill` (0.06) to `Palette.card` (0.04). Ask's answer gains the card's separator edge.
+- **Selection.** Rows draw their hover tint underneath and `selectionFill` on top of it while selected, so selected wins over hover as before. ModeToggle's own Increased Contrast edge is now `selectionFill`'s. The hint chips keep their own 1pt accent edge, drawn whenever a chip is selected for the keyboard, and fill with `Palette.selection` directly, so Increased Contrast never adds a second edge. Your reaction chips and given reactions in the picker keep their 0.5pt accent outline over `selectionFill`.
+- **Accent text and glyphs** use `accentText`: the scope count, the filter bar's clock and repo-focus glyphs, the sort control, today's Stats bar and labels, the empty list's action phrase, your reaction counts, the Needs your review bell, the saved-search bookmark, ModeToggle's chosen glyph, and the detail's Re-run failed jobs, Open Failing Check and Convert to draft. Accent fills keep the plain accent: the account split button, ModeToggle's news dot, Merge, `AccentTextButton`, the focus halo and selection edges. Buttons in `.buttonStyle(.link)` without a tint (Open on GitHub on the failure line, the failure banner's action, Show for the hidden approved PRs) take the system link colour, not the accent, and are unchanged.
+- **Sticky headers** use `GlassBackground` with no lift, through a small view that reads `\.solidBackground`. Rows scrolling under a pinned header are hidden by the glass, not blurred.
+- **Solid background** is set on the popover's root outside its two overlays, so the failure line and the edit pickers read it too.
+
 ## Docs
 
-`docs/media/src/popover.css` mirrors the new light values (hints lift and shadow, selection, accent text), and the light stills are re-rendered.
+`docs/media/src/popover.css` mirrors the new light values: the hints panel gets the white 0.30 lift and a 0.18 shadow, `.row.selected` and the selected hint chip use the new selection, and a light-only `--accent-text` (#004999, the mock's #007aff blended 0.40 toward black) colours `.c-accent`, the hot scope count, the chosen mode glyph, `.link`, the Needs your review bell and today's Stats bar and label. `--accent` stays for fills (the caret, the halo). The light stills are re-rendered; the dark stills are unchanged, so they still show the earlier dark selection (accent 0.15, where the app draws 0.25).
 
 ## Approaches considered
 

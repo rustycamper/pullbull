@@ -30,9 +30,9 @@
   function barChart(chart) {
     const width = 312, baseline = 48, today = chart.days.length - 1;
     const bars = marks(chart, width);
-    const fill = (m) => m.index === chart.hover ? "var(--label)" : m.index === today ? "var(--accent)" : m.count === 0 ? "var(--tertiary)" : "var(--secondary)";
+    const fill = (m) => m.index === chart.hover ? "var(--label)" : m.index === today ? "var(--accent-text)" : m.count === 0 ? "var(--tertiary)" : "var(--secondary)";
     const drawn = bars.map((m) => `<span class="stat-bar" data-day="${m.index}" style="left:${m.x}px;top:${baseline - m.height}px;width:${m.width}px;height:${m.height}px;background:${fill(m)}"></span>`);
-    const axis = bars.map((m) => `<span class="stat-axis" style="left:${m.x}px;width:${m.width}px;top:${baseline + 3}px;${m.index === today ? "color:var(--accent)" : ""}">${esc(m.initial)}</span>`);
+    const axis = bars.map((m) => `<span class="stat-axis" style="left:${m.x}px;width:${m.width}px;top:${baseline + 3}px;${m.index === today ? "color:var(--accent-text)" : ""}">${esc(m.initial)}</span>`);
     const shown = bars[chart.hover];
     const label = `<span class="stat-bar-label" style="left:${shown.x + shown.width / 2}px">${shown.count} · ${esc(shown.date)}</span>`;
     return `<div class="stat-caption">Per day</div><div class="stat-plot">${drawn.join("")}${axis.join("")}${label}</div>`;
