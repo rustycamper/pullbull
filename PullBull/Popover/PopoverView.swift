@@ -182,6 +182,8 @@ struct PopoverView: View {
         .overlayPreferenceValue(EditPickerAnchorKey.self) { anchor in
             EditPickerLayer(model: model, anchor: anchor)
         }
+        // Outside the overlays, so the failure line and the pickers draw their glass to match too.
+        .environment(\.solidBackground, model.settings.solidBackground)
         // Sliding layers stay inside the rounded panel.
         .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius))
         .onAppear {

@@ -56,7 +56,28 @@ enum Palette {
     static let shimmer = dynamic(light: 0xFFFFFF, dark: 0xFFFFFF, alpha: (0.4, 0.07))
     static let strongFill = Color.primary.opacity(0.1)
     static let rowHover = Color.primary.opacity(0.05)
-    static let selection = Color.accentColor.opacity(0.15)
+    /// The keyboard highlight and your own chips (`View.selectionFill`): in light mode the accent blended
+    /// 0.70 toward white at 0.75, which stays clear of grey glass; in dark mode the accent at 0.25. Follows
+    /// the system accent as the user changes it.
+    static let selection = accentDerived { accent, isDark in
+        isDark
+            ? accent.withAlphaComponent(0.25)
+            : (accent.blended(withFraction: 0.7, of: .white) ?? accent).withAlphaComponent(0.75)
+    }
+    /// Accent-coloured text and small glyphs on glass or a selection fill: in light mode the accent blended
+    /// 0.40 toward black, about 3.8:1 on mid-grey glass where the plain accent is under 2:1; in dark mode
+    /// the accent itself. Accent fills (buttons, toggles, the caret, the focus halo) keep the plain accent.
+    static let accentText = accentDerived { accent, isDark in
+        isDark ? accent : accent.blended(withFraction: 0.4, of: .black) ?? accent
+    }
+    /// White over a raised layer's glass, so it reads above the base glass it floats over.
+    static let lift = dynamic(light: 0xFFFFFF, dark: 0xFFFFFF, alpha: (0.3, 0.06))
+    /// A raised layer's shadow, and the sliding detail's edge; deeper in dark mode, where 0.18 can't be seen.
+    static let raisedShadow = dynamic(light: 0x000000, dark: 0x000000, alpha: (0.18, 0.4))
+    /// `raisedShadow` ×1.3, under Increase Contrast.
+    static let raisedShadowIncreased = dynamic(light: 0x000000, dark: 0x000000, alpha: (0.234, 0.52))
+    /// A card's fill (`View.cardSurface`), under its separator edge.
+    static let card = Color.primary.opacity(0.04)
     /// Behind a search match in a title: a soft highlighter yellow, the colour macOS finds text in, kept
     /// apart from the accent so it reads on the selected row.
     static let match = dynamic(light: 0xFFCC00, dark: 0xFFD60A, alpha: (0.4, 0.3))
@@ -84,6 +105,19 @@ enum Palette {
         Color(nsColor: NSColor(name: nil) { appearance in
             let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
             return rgb(isDark ? dark : light, alpha: isDark ? alpha.1 : alpha.0)
+        })
+    }
+
+    /// A colour made from the system accent as it resolves in each appearance, so it follows the user's
+    /// accent as they change it.
+    private static func accentDerived(_ make: @escaping @Sendable (NSColor, Bool) -> NSColor) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            var accent = NSColor.controlAccentColor
+            appearance.performAsCurrentDrawingAppearance {
+                accent = NSColor.controlAccentColor.usingColorSpace(.sRGB) ?? NSColor.controlAccentColor
+            }
+            return make(accent, isDark)
         })
     }
 

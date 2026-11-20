@@ -211,39 +211,10 @@ extension SearchHints {
             self
             Hairline()
         }
-        .background { PopoverMaterial(solid: solid) }
+        .background { GlassBackground(solid: solid) }
         .contentShape(Rectangle())
         .background(alignment: .bottom) {
             if shadow { HintPanelShadow() }
-        }
-    }
-}
-
-/// The popover's background, so the panel reads as part of it: the material behind the window, or with
-/// a solid background the same opaque fill under the window-background material.
-private struct PopoverMaterial: View {
-    let solid: Bool
-
-    var body: some View {
-        ZStack {
-            if solid { Color(nsColor: .windowBackgroundColor) }
-            EffectView(solid: solid)
-        }
-        .accessibilityHidden(true)
-    }
-
-    private struct EffectView: NSViewRepresentable {
-        let solid: Bool
-
-        func makeNSView(context: Context) -> NSVisualEffectView {
-            let view = NSVisualEffectView()
-            view.state = .active
-            return view
-        }
-
-        func updateNSView(_ view: NSVisualEffectView, context: Context) {
-            view.material = solid ? .windowBackground : .popover
-            view.blendingMode = solid ? .withinWindow : .behindWindow
         }
     }
 }
